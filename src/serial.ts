@@ -625,7 +625,9 @@ async function readSerialPassthroughSummary(
   }
 
   const records = await Promise.all(
-    fragmentIds.map(async (fragmentId) => await fragments.getFragment(fragmentId)),
+    fragmentIds.map(
+      async (fragmentId) => await fragments.getFragment(fragmentId),
+    ),
   );
 
   return records
