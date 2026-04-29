@@ -262,7 +262,7 @@ function parseSdpubArguments(
 
   return {
     args: {
-      inputPath,
+      inputPath: inputPath!,
       ...(serialId === undefined ? {} : { serialId }),
       subcommand: parsedSubcommand,
     },
