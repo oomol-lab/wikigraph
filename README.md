@@ -132,6 +132,7 @@ SpineDigest's CLI-first design makes it easy to call directly, with no extra int
 
 - **Prefer the CLI.** Use the programmatic API only when code-level integration is explicitly required.
 - **Use help as the discovery surface.** Start with `spinedigest --help`, then read `spinedigest help ai` and the relevant topic pages before guessing behavior.
+- **Trust `--help`.** Every command in the CLI exposes usage guidance through `--help`.
 - **Use explicit paths.** Pass `--input` and `--output` for deterministic, repeatable runs.
 - **Check exit codes.** Success returns `0`; failure returns non-zero with a plain-text error on `stderr`.
 - **stdin is narrow.** Only `txt` and `md` are accepted, and only in non-interactive flows.
