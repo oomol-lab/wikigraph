@@ -20,7 +20,7 @@ Progress and diagnostics:
 Digest workspace:
   - `--digest-dir` applies only to source digest runs.
   - The target directory is removed before each run, then rebuilt as the working digest directory.
-  - `.sdpub` input ignores `--digest-dir`.
+  - With the top-level convert command, `.sdpub` input ignores `--digest-dir`; with the `sdpub` subcommands, `--digest-dir` is rejected and cannot be used.
 
 Binary safety:
   - `sdpub cover` refuses to write binary cover data to an interactive terminal.
