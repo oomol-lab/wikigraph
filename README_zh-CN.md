@@ -24,7 +24,7 @@
 
 - Node `>=22.12.0`
 - 如果要从 EPUB、Markdown 或 TXT 生成新的 digest：需要一个受支持的 LLM provider 及其凭据
-- 如果只是重新导出 `.sdpub` 或查看 `sdpub` 信息：不需要 LLM 访问权限
+- 如果只是重新导出 `.sdpub` 或查看 `.sdpub` 信息：不需要 LLM 访问权限
 
 无需全局安装，直接试用：
 
