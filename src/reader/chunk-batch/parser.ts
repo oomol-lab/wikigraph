@@ -386,7 +386,8 @@ export class ChunkBatchParser<
       ];
     }
 
-    const candidateSentenceIds = this.#sentences.map(
+    const projectedSentences = this.#projection.sentences;
+    const candidateSentenceIds = projectedSentences.map(
       (sentence) => sentence.sentenceId,
     );
     const exactMatchSentenceIds =
@@ -396,7 +397,7 @@ export class ChunkBatchParser<
       return [exactMatchSentenceIds, undefined];
     }
 
-    const candidateTexts = this.#projection.sentences.map(
+    const candidateTexts = projectedSentences.map(
       (sentence) => sentence.projectedText,
     );
     const [resolution, failure] = this.#evidenceResolver.resolve(
