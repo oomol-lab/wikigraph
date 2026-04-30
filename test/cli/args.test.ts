@@ -65,6 +65,22 @@ describe("cli/args", () => {
     });
   });
 
+  it("parses short aliases -h and -v", () => {
+    expect(parseCLIArguments(["-h"])).toMatchObject({
+      help: true,
+      kind: "convert",
+    });
+
+    expect(parseCLIArguments(["-v"])).toStrictEqual({
+      args: {
+        help: false,
+        verbose: true,
+      },
+      help: false,
+      kind: "convert",
+    });
+  });
+
   it("parses --prompt for the main convert command", () => {
     expect(parseCLIArguments(["--prompt", "Keep dialogue only"])).toStrictEqual(
       {
