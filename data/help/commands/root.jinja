@@ -8,14 +8,18 @@ Purpose:
   Digesting source input uses an LLM pipeline. Re-opening an existing .sdpub archive does not.
 
 Usage:
-  spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--prompt <text>] [--verbose]
-  spinedigest sdpub <subcommand> --input <path> [--serial <id>]
-  spinedigest help [topic]
+  spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--prompt <text>] [--verbose|-v] [--help|-h]
+  spinedigest sdpub <subcommand> --input <path> [--serial <id>] [--help|-h]
+  spinedigest help [topic] [--help|-h]
 
 Help contract:
   - Append `--help` to any command or subcommand to see its command-specific usage.
   - Use `spinedigest help <topic>` for cross-command concepts, constraints, and runtime behavior.
   - Treat `spinedigest --help` as the root page of the same help system.
+
+Flag aliases:
+  - `-h` is the short form of `--help` on every command and subcommand.
+  - `-v` is the short form of `--verbose` on the main convert command.
 
 Common paths:
   Source input -> digest -> markdown | txt | epub | .sdpub

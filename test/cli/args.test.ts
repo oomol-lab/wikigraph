@@ -217,6 +217,9 @@ describe("cli/args", () => {
     expect(rootHelpText).toContain("spinedigest help env");
     expect(rootHelpText).toContain("spinedigest help config-file");
     expect(rootHelpText).toContain("spinedigest sdpub info --help");
+    expect(rootHelpText).toContain("[--verbose|-v] [--help|-h]");
+    expect(rootHelpText).toContain("`-h` is the short form of `--help`");
+    expect(rootHelpText).toContain("`-v` is the short form of `--verbose`");
     expect(rootHelpText).toContain(
       "Append `--help` to any command or subcommand",
     );
@@ -228,6 +231,8 @@ describe("cli/args", () => {
     expect(rootHelpText).toContain("Use `spinedigest help troubleshoot`");
     expect(renderHelpTopicText("runtime")).toContain("Runtime Behavior");
     expect(renderHelpTopicText("config")).toContain("Configuration Overview");
+    expect(renderHelpTopicText("command")).toContain("--verbose, -v");
+    expect(renderHelpTopicText("command")).toContain("--help, -h");
     expect(renderHelpTopicText("config")).toContain("spinedigest help env");
     expect(renderHelpTopicText("env")).toContain("SPINEDIGEST_LLM_MODEL");
     expect(renderHelpTopicText("env")).toContain("SPINEDIGEST_REQUEST_STREAM");
@@ -236,8 +241,10 @@ describe("cli/args", () => {
     );
     expect(renderHelpTopicText("config-file")).toContain("llm.provider");
     expect(sdpubHelpText).toContain("These subcommands do not call an LLM");
+    expect(sdpubHelpText).toContain("[--help|-h]");
     expect(renderSdpubSubcommandHelpText("cover")).toContain(
       "refuses to write binary data to an interactive terminal",
     );
+    expect(renderSdpubSubcommandHelpText("cover")).toContain("[--help|-h]");
   });
 });
