@@ -251,12 +251,21 @@ describe("cli/args", () => {
     expect(renderHelpTopicText("env")).toContain(
       "JSON number array such as `0.2` or `[0.2, 0.4]`",
     );
+    expect(renderHelpTopicText("env")).toContain(
+      "non-empty URL string such as `https://api.example/v1`",
+    );
     expect(renderHelpTopicText("config-file")).toContain(
       "~/.spinedigest/config.json",
     );
     expect(renderHelpTopicText("config-file")).toContain("llm.provider");
     expect(renderHelpTopicText("config-file")).toContain(
+      'JSON string such as `"https://api.example/v1"`',
+    );
+    expect(renderHelpTopicText("config-file")).toContain(
       "JSON number array such as `0.9` or `[0.85, 0.9]`",
+    );
+    expect(renderHelpTopicText("config-file")).toContain(
+      "JSON boolean, either `true` or `false`",
     );
     expect(sdpubHelpText).toContain("These subcommands do not call an LLM");
     expect(sdpubHelpText).toContain("[--help|-h]");

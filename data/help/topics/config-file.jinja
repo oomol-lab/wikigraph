@@ -63,7 +63,7 @@ Fields:
 
   `llm.baseURL`
     Custom base URL.
-    Type: non-empty string.
+    Type: JSON string such as `"https://api.example/v1"`.
     Notes:
       The schema accepts any non-empty string and does not enforce URL format.
       `openai` does not accept this field.
@@ -107,7 +107,7 @@ Fields:
 
   `request.stream`
     Streaming toggle.
-    Type: boolean.
+    Type: JSON boolean, either `true` or `false`.
 
 Minimum source digest config:
   {
