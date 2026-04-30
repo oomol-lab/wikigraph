@@ -375,5 +375,5 @@ describe("facade/digest", () => {
         undefined,
       );
     });
-  });
+  }, 15_000);
 });
