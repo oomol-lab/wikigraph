@@ -234,6 +234,9 @@ describe("cli/args", () => {
     expect(renderHelpTopicText("config")).toContain("Configuration Overview");
     expect(renderHelpTopicText("ai")).toContain("Suggested first pass:");
     expect(renderHelpTopicText("ai")).toContain(
+      "Begin at `spinedigest --help`, which acts as the root page",
+    );
+    expect(renderHelpTopicText("ai")).toContain(
       "Start with `spinedigest help overview`",
     );
     expect(commandHelpText).toContain("--verbose, -v");

@@ -11,6 +11,7 @@ Primary contract:
   - Assume `.sdpub` re-export and `sdpub` inspection do not call an LLM.
 
 Suggested first pass:
+  - Begin at `spinedigest --help`, which acts as the root page of the layered help system.
   - Start with `spinedigest help overview` to decide whether you are digesting source input, re-exporting `.sdpub`, or inspecting an archive.
   - Continue with `spinedigest help task` when the user request is workflow-shaped rather than command-shaped.
   - Continue with `spinedigest help command` when you already know the action and need exact command shapes or flags.
