@@ -126,6 +126,11 @@ Requirements: Node `>=22.12.0` and a supported LLM provider with credentials. `.
 
 SpineDigest also exposes a programmatic API for embedding the pipeline in your own Node or TypeScript code. See [Library Usage](./docs/en/library.md).
 
+## Related Projects
+
+- [PDF Craft](https://github.com/oomol-lab/pdf-craft): If your source material is a scanned PDF, PDF Craft can convert it into EPUB or Markdown before you feed it into SpineDigest.
+- [EPUB Translator](https://github.com/oomol-lab/epub-translator): If your goal is bilingual reading rather than summarization, EPUB Translator turns an EPUB into a bilingual edition while preserving the original layout.
+
 ## For AI Agents
 
 SpineDigest's CLI-first design makes it easy to call directly, with no extra integration code.
