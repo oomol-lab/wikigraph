@@ -153,7 +153,7 @@ export function parseHelpTopic(value: string): HelpTopic {
   }
 
   throw new Error(
-    `Invalid help topic: ${value}. Expected one of ${HELP_TOPICS.join(", ")}.`,
+    `Invalid help topic: ${value}. Expected one of ${HELP_TOPICS.join(", ")}.\nSee: spinedigest --help`,
   );
 }
 

@@ -136,7 +136,7 @@ describe("cli/args", () => {
 
   it("rejects positional arguments", () => {
     expect(() => parseCLIArguments(["book.epub"])).toThrow(
-      "Unexpected positional arguments: book.epub. Use --input and --output instead.",
+      "Unexpected positional arguments: book.epub. Use --input and --output instead.\nSee: spinedigest help command",
     );
   });
 
@@ -151,24 +151,26 @@ describe("cli/args", () => {
 
   it("rejects invalid sdpub usage", () => {
     expect(() => parseCLIArguments(["sdpub"])).toThrow(
-      "Missing sdpub subcommand. Expected one of info, toc, list, cat, cover.",
+      "Missing sdpub subcommand. Expected one of info, toc, list, cat, cover.\nSee: spinedigest sdpub --help",
     );
     expect(() => parseCLIArguments(["sdpub", "inspect"])).toThrow(
-      "Invalid sdpub subcommand: inspect. Expected one of info, toc, list, cat, cover.",
+      "Invalid sdpub subcommand: inspect. Expected one of info, toc, list, cat, cover.\nSee: spinedigest sdpub --help",
     );
     expect(() =>
       parseCLIArguments(["sdpub", "info", "--output", "out.txt"]),
     ).toThrow(
-      "The `sdpub` subcommands do not support --output. Use stdout redirection or pipes instead.",
+      "The `sdpub` subcommands do not support --output. Use stdout redirection or pipes instead.\nSee: spinedigest sdpub --help",
     );
     expect(() =>
       parseCLIArguments(["sdpub", "info", "--prompt", "Keep dialogue only"]),
     ).toThrow(
-      "The `sdpub` subcommands do not support --prompt. It only applies to digest generation from source inputs.",
+      "The `sdpub` subcommands do not support --prompt. It only applies to digest generation from source inputs.\nSee: spinedigest sdpub --help",
     );
     expect(() =>
       parseCLIArguments(["sdpub", "cat", "--input", "book.sdpub"]),
-    ).toThrow("Missing --serial. `spinedigest sdpub cat` requires it.");
+    ).toThrow(
+      "Missing --serial. `spinedigest sdpub cat` requires it.\nSee: spinedigest sdpub cat --help",
+    );
     expect(() =>
       parseCLIArguments([
         "sdpub",
@@ -178,7 +180,9 @@ describe("cli/args", () => {
         "--serial",
         "2",
       ]),
-    ).toThrow("The `sdpub list` subcommand does not support --serial.");
+    ).toThrow(
+      "The `sdpub list` subcommand does not support --serial.\nSee: spinedigest sdpub list --help",
+    );
     expect(() =>
       parseCLIArguments([
         "sdpub",
@@ -188,16 +192,20 @@ describe("cli/args", () => {
         "--serial",
         "x",
       ]),
-    ).toThrow("Invalid --serial: x. Expected a non-negative integer.");
+    ).toThrow(
+      "Invalid --serial: x. Expected a non-negative integer.\nSee: spinedigest sdpub cat --help",
+    );
   });
 
   it("rejects invalid help usage", () => {
     expect(() => parseCLIArguments(["help", "unknown"])).toThrow(
-      "Invalid help topic: unknown. Expected one of overview, task, command, format, config, env, config-file, runtime, recipe, troubleshoot, ai, sdpub.",
+      "Invalid help topic: unknown. Expected one of overview, task, command, format, config, env, config-file, runtime, recipe, troubleshoot, ai, sdpub.\nSee: spinedigest --help",
     );
     expect(() =>
       parseCLIArguments(["help", "task", "--input", "book.epub"]),
-    ).toThrow("The `help` command does not support --input.");
+    ).toThrow(
+      "The `help` command does not support --input.\nSee: spinedigest --help",
+    );
   });
 
   it("documents the layered help contract", () => {

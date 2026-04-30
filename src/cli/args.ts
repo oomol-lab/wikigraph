@@ -106,9 +106,10 @@ export function parseCLIArguments(
   }
 
   if (positionals.length > 0) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       `Unexpected positional arguments: ${positionals.join(" ")}. Use --input and --output instead.`,
-    );
+      "spinedigest help command",
+    ));
   }
 
   const args = {
@@ -169,9 +170,10 @@ function parseSdpubArguments(
   const subcommand = positionals[0];
 
   if (positionals.length > 1) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       `Unexpected positional arguments: ${positionals.slice(1).join(" ")}.`,
-    );
+      `spinedigest sdpub ${subcommand ?? "<subcommand>"} --help`,
+    ));
   }
 
   if (subcommand === undefined) {
@@ -183,60 +185,78 @@ function parseSdpubArguments(
       };
     }
 
-    throw new Error(
+    throw new Error(withHelpRoute(
       `Missing sdpub subcommand. Expected one of ${SDPUB_SUBCOMMANDS.join(", ")}.`,
-    );
+      "spinedigest sdpub --help",
+    ));
   }
 
   if (!SDPUB_SUBCOMMANDS.includes(subcommand as SDPubSubcommand)) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       `Invalid sdpub subcommand: ${subcommand}. Expected one of ${SDPUB_SUBCOMMANDS.join(", ")}.`,
-    );
+      "spinedigest sdpub --help",
+    ));
   }
 
   const parsedSubcommand = subcommand as SDPubSubcommand;
 
   if (values["digest-dir"] !== undefined) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       "The `sdpub` subcommands do not support --digest-dir. Use the main command for digest generation.",
-    );
+      "spinedigest sdpub --help",
+    ));
   }
   if (values["input-format"] !== undefined) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       "The `sdpub` subcommands do not support --input-format. They always read .sdpub archives.",
-    );
+      "spinedigest sdpub --help",
+    ));
   }
   if (values.output !== undefined) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       "The `sdpub` subcommands do not support --output. Use stdout redirection or pipes instead.",
-    );
+      "spinedigest sdpub --help",
+    ));
   }
   if (values["output-format"] !== undefined) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       "The `sdpub` subcommands do not support --output-format. Their output format is fixed by the subcommand.",
-    );
+      "spinedigest sdpub --help",
+    ));
   }
   if (values.prompt !== undefined) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       "The `sdpub` subcommands do not support --prompt. It only applies to digest generation from source inputs.",
-    );
+      "spinedigest sdpub --help",
+    ));
   }
   if (values.verbose) {
-    throw new Error("The `sdpub` subcommands do not support --verbose.");
+    throw new Error(withHelpRoute(
+      "The `sdpub` subcommands do not support --verbose.",
+      "spinedigest sdpub --help",
+    ));
   }
 
   const serialId =
     values.serial === undefined
       ? undefined
-      : parseSerialId(values.serial, "--serial");
+      : parseSerialId(
+          values.serial,
+          "--serial",
+          `spinedigest sdpub ${parsedSubcommand} --help`,
+        );
 
   if (parsedSubcommand === "cat" && serialId === undefined && !help) {
-    throw new Error("Missing --serial. `spinedigest sdpub cat` requires it.");
+    throw new Error(withHelpRoute(
+      "Missing --serial. `spinedigest sdpub cat` requires it.",
+      "spinedigest sdpub cat --help",
+    ));
   }
   if (parsedSubcommand !== "cat" && serialId !== undefined) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       `The \`sdpub ${parsedSubcommand}\` subcommand does not support --serial.`,
-    );
+      `spinedigest sdpub ${parsedSubcommand} --help`,
+    ));
   }
 
   const inputPath = values.input;
@@ -244,7 +264,10 @@ function parseSdpubArguments(
   if (!help) {
     if (inputPath === undefined || inputPath === "-") {
       throw new Error(
-        "The `sdpub` subcommands require --input <path>. stdin is not supported.",
+        withHelpRoute(
+          "The `sdpub` subcommands require --input <path>. stdin is not supported.",
+          `spinedigest sdpub ${parsedSubcommand} --help`,
+        ),
       );
     }
     if (parseCLIFormat("sdpub", "--input-format") !== "sdpub") {
@@ -294,13 +317,17 @@ function parseHelpArguments(
   rejectHelpFlag("serial", values.serial);
 
   if (values.verbose) {
-    throw new Error("The `help` command does not support --verbose.");
+    throw new Error(withHelpRoute(
+      "The `help` command does not support --verbose.",
+      "spinedigest --help",
+    ));
   }
 
   if (positionals.length > 1) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       `Unexpected positional arguments: ${positionals.slice(1).join(" ")}.`,
-    );
+      "spinedigest --help",
+    ));
   }
 
   if (positionals[0] === undefined) {
@@ -318,13 +345,14 @@ function parseHelpArguments(
   };
 }
 
-function parseSerialId(value: string, flag: string): number {
+function parseSerialId(value: string, flag: string, helpRoute: string): number {
   const normalized = value.trim();
 
   if (!/^\d+$/u.test(normalized)) {
-    throw new Error(
+    throw new Error(withHelpRoute(
       `Invalid ${flag}: ${value}. Expected a non-negative integer.`,
-    );
+      helpRoute,
+    ));
   }
 
   return Number(normalized);
@@ -332,6 +360,15 @@ function parseSerialId(value: string, flag: string): number {
 
 function rejectHelpFlag(name: string, value: string | undefined): void {
   if (value !== undefined) {
-    throw new Error(`The \`help\` command does not support --${name}.`);
+    throw new Error(
+      withHelpRoute(
+        `The \`help\` command does not support --${name}.`,
+        "spinedigest --help",
+      ),
+    );
   }
+}
+
+function withHelpRoute(message: string, route: string): string {
+  return `${message}\nSee: ${route}`;
 }
