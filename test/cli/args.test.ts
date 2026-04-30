@@ -248,10 +248,16 @@ describe("cli/args", () => {
     expect(renderHelpTopicText("config")).toContain("spinedigest help env");
     expect(renderHelpTopicText("env")).toContain("SPINEDIGEST_LLM_MODEL");
     expect(renderHelpTopicText("env")).toContain("SPINEDIGEST_REQUEST_STREAM");
+    expect(renderHelpTopicText("env")).toContain(
+      "JSON number array such as `0.2` or `[0.2, 0.4]`",
+    );
     expect(renderHelpTopicText("config-file")).toContain(
       "~/.spinedigest/config.json",
     );
     expect(renderHelpTopicText("config-file")).toContain("llm.provider");
+    expect(renderHelpTopicText("config-file")).toContain(
+      "JSON number array such as `0.9` or `[0.85, 0.9]`",
+    );
     expect(sdpubHelpText).toContain("These subcommands do not call an LLM");
     expect(sdpubHelpText).toContain("[--help|-h]");
     expect(renderSdpubSubcommandHelpText("cover")).toContain(
