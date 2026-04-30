@@ -126,7 +126,8 @@ export function projectFragmentText(text: string): string {
   let result = "";
 
   for (const char of text) {
-    result += STANDARDIZATION_MAP[char as keyof typeof STANDARDIZATION_MAP] ?? char;
+    result +=
+      STANDARDIZATION_MAP[char as keyof typeof STANDARDIZATION_MAP] ?? char;
   }
 
   return result;

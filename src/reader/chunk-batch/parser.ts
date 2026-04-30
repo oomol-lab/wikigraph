@@ -27,7 +27,7 @@ import type {
   CognitiveChunk,
   SentenceTextSource,
 } from "./types.js";
-import { FragmentProjection, type TextSpan } from "./fragment-projection.js";
+import type { FragmentProjection, TextSpan } from "./fragment-projection.js";
 
 const MAX_CHOICE_RETRIES = 3;
 
@@ -389,7 +389,8 @@ export class ChunkBatchParser<
     const candidateSentenceIds = this.#sentences.map(
       (sentence) => sentence.sentenceId,
     );
-    const exactMatchSentenceIds = this.#resolveExactProjectionEvidence(evidence);
+    const exactMatchSentenceIds =
+      this.#resolveExactProjectionEvidence(evidence);
 
     if (exactMatchSentenceIds.length > 0) {
       return [exactMatchSentenceIds, undefined];
@@ -495,7 +496,9 @@ export class ChunkBatchParser<
     return [[], resolveFailure];
   }
 
-  #resolveExactProjectionEvidence(evidence: Record<string, unknown>): SentenceId[] {
+  #resolveExactProjectionEvidence(
+    evidence: Record<string, unknown>,
+  ): SentenceId[] {
     const startValue = evidence.start_anchor ?? evidence.start;
     const [startAnchor, startFailure] = this.#evidenceResolver.parseAnchor(
       startValue,
@@ -1015,8 +1018,6 @@ function createEmptyRecord<TValue>(): Record<string, TValue> {
   return Object.create(null) as Record<string, TValue>;
 }
 
-function expectSingleSpan(
-  spans: readonly TextSpan[],
-): TextSpan | undefined {
+function expectSingleSpan(spans: readonly TextSpan[]): TextSpan | undefined {
   return spans.length === 1 ? spans[0] : undefined;
 }
