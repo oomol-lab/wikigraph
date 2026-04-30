@@ -213,6 +213,11 @@ describe("cli/args", () => {
       "Append `--help` to any command or subcommand",
     );
     expect(rootHelpText).toContain("Treat `spinedigest --help` as the root");
+    expect(rootHelpText).toContain(
+      "Read `spinedigest help overview` for the product mental model.",
+    );
+    expect(rootHelpText).toContain("If a run fails:");
+    expect(rootHelpText).toContain("Use `spinedigest help troubleshoot`");
     expect(renderHelpTopicText("runtime")).toContain("Runtime Behavior");
     expect(renderHelpTopicText("config")).toContain("Configuration Overview");
     expect(renderHelpTopicText("config")).toContain("spinedigest help env");
