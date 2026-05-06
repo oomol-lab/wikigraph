@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createDigestProgressTracker } from "../../src/progress/index.js";
 
 describe("progress/tracker", () => {
-  it("updates digest progress as fragment work advances", async () => {
+  it("updates digest progress only when a serial completes", async () => {
     const events: Array<{
       readonly completedFragments?: number;
       readonly completedWords?: number;
@@ -47,20 +47,20 @@ describe("progress/tracker", () => {
         type: "serial-progress",
       },
       {
-        completedWords: 3,
-        totalWords: 3,
-        type: "digest-progress",
-      },
-      {
         completedFragments: 1,
         completedWords: 3,
         id: 7,
         type: "serial-progress",
       },
+      {
+        completedWords: 3,
+        totalWords: 3,
+        type: "digest-progress",
+      },
     ]);
   });
 
-  it("keeps discovered digest totals while serial work is still in flight", async () => {
+  it("keeps digest progress at zero while serial work is still in flight", async () => {
     const events: Array<{
       readonly completedFragments?: number;
       readonly completedWords?: number;
@@ -118,11 +118,6 @@ describe("progress/tracker", () => {
         completedWords: 2,
         id: 3,
         type: "serial-progress",
-      },
-      {
-        completedWords: 2,
-        totalWords: 12,
-        type: "digest-progress",
       },
     ]);
   });
