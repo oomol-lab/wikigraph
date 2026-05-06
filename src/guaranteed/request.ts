@@ -215,7 +215,10 @@ async function classifyResponseIntent<TData, TResult>(
 
   try {
     const classifierResponse = await options.request(
-      buildResponseIntentClassificationMessages(response),
+      buildResponseIntentClassificationMessages(
+        options.responseIntentClassifierPrompt,
+        response,
+      ),
       index,
       options.maxRetries ?? DEFAULT_MAX_RETRIES,
     );

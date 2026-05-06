@@ -1,5 +1,8 @@
 import type { LLMessage } from "../llm/index.js";
 
+export const RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE =
+  "guaranteed/response_intent_classifier";
+
 export type GuaranteedResponseIntent =
   | "ambiguous"
   | "malformed_json"
@@ -18,21 +21,13 @@ const NATURAL_LANGUAGE_PATTERNS = [
 ];
 
 export function buildResponseIntentClassificationMessages(
+  systemPrompt: string,
   response: string,
 ): readonly LLMessage[] {
   return [
     {
       role: "system",
-      content: [
-        "Classify the raw assistant reply into exactly one label.",
-        "",
-        "Labels:",
-        "- malformed_json: the reply is trying to provide JSON, but it is broken or truncated",
-        "- natural_language: the reply is plain conversational language, apology, refusal, or explanation instead of JSON",
-        "- ambiguous: unclear or mixed",
-        "",
-        "Reply with the label only.",
-      ].join("\n"),
+      content: systemPrompt,
     },
     {
       role: "user",

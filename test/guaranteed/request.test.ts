@@ -35,6 +35,7 @@ describe("guaranteed/request", () => {
         },
       ],
       parse: (data) => data.value,
+      responseIntentClassifierPrompt: "classifier prompt",
       request,
       schema,
     });
@@ -56,6 +57,7 @@ describe("guaranteed/request", () => {
       requestGuaranteedJson({
         messages: [],
         parse: (data) => data.value,
+        responseIntentClassifierPrompt: "classifier prompt",
         request: () => Promise.resolve("I cannot answer that."),
         schema,
       }),
@@ -79,6 +81,7 @@ describe("guaranteed/request", () => {
         maxRetries: 1,
         messages: [],
         parse: (data) => data.value,
+        responseIntentClassifierPrompt: "classifier prompt",
         request,
         schema,
       }),
@@ -94,6 +97,7 @@ describe("guaranteed/request", () => {
         parse: () => {
           throw new ParsedJsonError(["value is not acceptable"]);
         },
+        responseIntentClassifierPrompt: "classifier prompt",
         request: () => Promise.resolve('{"value": 1}'),
         schema,
       }),
@@ -115,6 +119,7 @@ describe("guaranteed/request", () => {
     const result = await requestGuaranteedJson({
       messages: [],
       parse: (data) => data.value,
+      responseIntentClassifierPrompt: "classifier prompt",
       request,
       schema,
     });
@@ -147,6 +152,7 @@ describe("guaranteed/request", () => {
     const result = await requestGuaranteedJson({
       messages: [],
       parse: (data) => data.value,
+      responseIntentClassifierPrompt: "classifier prompt",
       request,
       schema,
     });
@@ -157,9 +163,7 @@ describe("guaranteed/request", () => {
     const classifierMessages = request.mock.calls[1]?.[0];
     const retryMessages = request.mock.calls[2]?.[0];
 
-    expect(classifierMessages?.[0]?.content).toContain(
-      "Classify the raw assistant reply",
-    );
+    expect(classifierMessages?.[0]?.content).toBe("classifier prompt");
     expect(retryMessages?.[0]).toMatchObject({
       role: "assistant",
       content: "value: 1",
