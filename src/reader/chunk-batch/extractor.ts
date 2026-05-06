@@ -2,6 +2,7 @@ import { z, type ZodType } from "zod";
 
 import {
   GuaranteedParseValidationError,
+  GuaranteedRequestFailureError,
   ParsedJsonError,
   RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
   requestGuaranteedJson,
@@ -238,7 +239,7 @@ export class ChunkExtractor<S extends string> {
             result,
           };
         } catch (error) {
-          if (isParsedJsonValidationFailure(error)) {
+          if (isRecoverableChunkExtractionFailure(error)) {
             return {
               parser,
               result: {
@@ -368,6 +369,13 @@ function isParsedJsonValidationFailure(error: unknown): boolean {
   return (
     error instanceof GuaranteedParseValidationError &&
     error.cause instanceof ParsedJsonError
+  );
+}
+
+function isRecoverableChunkExtractionFailure(error: unknown): boolean {
+  return (
+    isParsedJsonValidationFailure(error) ||
+    error instanceof GuaranteedRequestFailureError
   );
 }
 

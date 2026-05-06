@@ -86,7 +86,7 @@ export function parseResponseIntentClassification(
 
 function hasStrongMalformedJsonSignal(text: string): boolean {
   return (
-    /^(?:```json\b|```|\{|\[)/i.test(text) ||
+    /^(?:```json\b|```|{|\[)/i.test(text) ||
     /"[^"\r\n]+"\s*:/.test(text) ||
     (hasWeakMalformedJsonSignal(text) && endsWithLikelyTruncationToken(text))
   );
@@ -94,8 +94,7 @@ function hasStrongMalformedJsonSignal(text: string): boolean {
 
 function hasWeakMalformedJsonSignal(text: string): boolean {
   const punctuationCount =
-    (text.match(/[\{\}\[\]:,]/g) ?? []).length +
-    (text.match(/"/g) ?? []).length;
+    (text.match(/[{}[\]:,]/g) ?? []).length + (text.match(/"/g) ?? []).length;
 
   return (
     /:\s/.test(text) ||
@@ -113,7 +112,7 @@ function hasUnbalancedBrackets(text: string): boolean {
 }
 
 function endsWithLikelyTruncationToken(text: string): boolean {
-  return /[:,"{\[]\s*$/.test(text);
+  return /[:, "{[]\s*$/.test(text);
 }
 
 function looksLikeNaturalLanguage(text: string): boolean {
@@ -127,7 +126,7 @@ function looksLikeNaturalLanguage(text: string): boolean {
 function looksLikePlainSentence(text: string): boolean {
   return (
     /[\p{Script=Han}A-Za-z]/u.test(text) &&
-    !/^[\[{]/.test(text) &&
+    !/^[{[]/.test(text) &&
     !/"[^"\r\n]+"\s*:/.test(text)
   );
 }

@@ -1,5 +1,6 @@
 export {
   GuaranteedEmptyResponseError,
+  GuaranteedRequestFailureError,
   GuaranteedParseValidationError,
   GuaranteedSchemaValidationError,
   ParsedJsonError,

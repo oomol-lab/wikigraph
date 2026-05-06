@@ -49,7 +49,9 @@ describe("guaranteed/request", () => {
     expect(secondCallMessages?.[1]).toMatchObject({
       role: "user",
     });
-    expect(secondCallMessages?.[1]?.content).toContain("plain natural language");
+    expect(secondCallMessages?.[1]?.content).toContain(
+      "plain natural language",
+    );
   });
 
   it("treats consecutive non-JSON responses as a refusal", async () => {

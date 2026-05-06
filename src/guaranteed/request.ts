@@ -91,7 +91,9 @@ export async function requestGuaranteedJson<TData, TResult>(
     const validation = await options.schema.safeParseAsync(parsedData);
 
     if (!validation.success) {
-      if (shouldTreatSchemaFailureAsNaturalLanguage(validation.error, parsedData)) {
+      if (
+        shouldTreatSchemaFailureAsNaturalLanguage(validation.error, parsedData)
+      ) {
         const intent = await classifyResponseIntent(options, response, index);
 
         if (intent === "natural_language") {
@@ -239,7 +241,13 @@ async function classifyResponseIntent<TData, TResult>(
 }
 
 function shouldTreatSchemaFailureAsNaturalLanguage(
-  error: { issues: readonly { code?: string; path: readonly PropertyKey[]; expected?: unknown }[] },
+  error: {
+    issues: readonly {
+      code?: string;
+      path: readonly PropertyKey[];
+      expected?: unknown;
+    }[];
+  },
   parsedData: unknown,
 ): boolean {
   if (!isPrimitiveJsonValue(parsedData)) {
@@ -255,5 +263,7 @@ function shouldTreatSchemaFailureAsNaturalLanguage(
 }
 
 function isPrimitiveJsonValue(value: unknown): boolean {
-  return value === null || (typeof value !== "object" && typeof value !== "function");
+  return (
+    value === null || (typeof value !== "object" && typeof value !== "function")
+  );
 }
