@@ -373,7 +373,7 @@ function normalizeGenerationInput(input: {
   while (firstNonSystemIndex < input.messages.length) {
     const message = input.messages[firstNonSystemIndex];
 
-    if (message.role !== "system") {
+    if (message === undefined || message.role !== "system") {
       break;
     }
 
@@ -385,11 +385,24 @@ function normalizeGenerationInput(input: {
     return input;
   }
 
+  if (systemMessages.length === 1) {
+    const [systemMessage] = systemMessages;
+
+    if (systemMessage === undefined) {
+      return input;
+    }
+
+    return {
+      ...input,
+      messages: input.messages.slice(firstNonSystemIndex),
+      system: systemMessage,
+    };
+  }
+
   return {
     ...input,
     messages: input.messages.slice(firstNonSystemIndex),
-    system:
-      systemMessages.length === 1 ? systemMessages[0] : systemMessages,
+    system: systemMessages,
   };
 }
 
