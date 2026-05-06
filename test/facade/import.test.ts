@@ -464,10 +464,7 @@ describe("facade/import", () => {
           },
         );
 
-        await Promise.all([
-          startedPromises.get(1),
-          startedPromises.get(2),
-        ]);
+        await Promise.all([startedPromises.get(1), startedPromises.get(2)]);
         expect(serialMockState.startedSerialIds).toStrictEqual([1, 2]);
 
         serialMockState.releaseSerials.get(1)?.();
