@@ -27,6 +27,7 @@ describe("progress/reporter", () => {
         {
           fragments: 4,
           id: 7,
+          title: "Chapter 7",
           words: 1600,
         },
       ],
@@ -40,6 +41,7 @@ describe("progress/reporter", () => {
         {
           fragments: 4,
           id: 7,
+          title: "Chapter 7",
           words: 1600,
         },
       ],

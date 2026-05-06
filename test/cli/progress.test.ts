@@ -37,11 +37,13 @@ describe("cli/progress", () => {
           {
             fragments: 3,
             id: 2,
+            title: "Chapter 2",
             words: 1820,
           },
           {
             fragments: 2,
             id: 1,
+            title: "Chapter 1",
             words: 882,
           },
         ],
@@ -87,7 +89,8 @@ describe("cli/progress", () => {
       "Serial  [###########.] 2,458 / 2,702 words",
       "Digest  [####........] 882 / 2,702 words",
       "------------------------",
-      "#2        [##########..] 1,576 / 1,820 words (2/3 fragments)",
+      "#2 Chapter 2",
+      "       [##########..] 1,576 / 1,820 words (2/3 fragments)",
     ]);
   });
 
@@ -113,11 +116,13 @@ describe("cli/progress", () => {
         {
           fragments: 2,
           id: 1,
+          title: "Chapter 1",
           words: 10,
         },
         {
           fragments: 2,
           id: 2,
+          title: "Chapter 2",
           words: 10,
         },
       ],
@@ -154,7 +159,122 @@ describe("cli/progress", () => {
       "Serial  [#########...] 15 / 20 words",
       "Digest  [............] 0 / 20 words",
       "------------------------",
-      "#2        [######......] 5 / 10 words (1/2 fragments)",
+      "#2 Chapter 2",
+      "       [######......] 5 / 10 words (1/2 fragments)",
+    ]);
+  });
+
+  it("does not show unstarted or completed serial rows", async () => {
+    const stream = new FakeTTYStream();
+    const renderer = createCLIProgressRenderer({
+      enabled: true,
+      stream: stream as unknown as NodeJS.WriteStream,
+    });
+
+    if (renderer.onProgress === undefined) {
+      throw new Error(
+        "Progress callback should exist when renderer is enabled",
+      );
+    }
+
+    await renderer.onProgress({
+      available: true,
+      serials: [
+        {
+          fragments: 1,
+          id: 1,
+          title: "Not started",
+          words: 10,
+        },
+        {
+          fragments: 2,
+          id: 2,
+          title: "In progress",
+          words: 20,
+        },
+        {
+          fragments: 3,
+          id: 3,
+          title: "Done",
+          words: 30,
+        },
+      ],
+      type: "serials-discovered",
+    });
+    await renderer.onProgress({
+      completedWords: 10,
+      totalWords: 60,
+      type: "digest-progress",
+    });
+    await renderer.onProgress({
+      completedFragments: 1,
+      completedWords: 10,
+      id: 2,
+      type: "serial-progress",
+    });
+    await renderer.onProgress({
+      completedFragments: 3,
+      completedWords: 30,
+      id: 3,
+      type: "serial-progress",
+    });
+
+    await renderer.stop();
+
+    expect(stream.visibleLines()).toStrictEqual([
+      "Serial  [########....] 40 / 60 words",
+      "Digest  [##..........] 10 / 60 words",
+      "------------------------",
+      "#2 In progress",
+      "       [######......] 10 / 20 words (1/2 fragments)",
+    ]);
+  });
+
+  it("sanitizes serial titles before rendering", async () => {
+    const stream = new FakeTTYStream();
+    const renderer = createCLIProgressRenderer({
+      enabled: true,
+      stream: stream as unknown as NodeJS.WriteStream,
+    });
+
+    if (renderer.onProgress === undefined) {
+      throw new Error(
+        "Progress callback should exist when renderer is enabled",
+      );
+    }
+
+    await renderer.onProgress({
+      available: true,
+      serials: [
+        {
+          fragments: 2,
+          id: 7,
+          title: "Line 1\n\u001B[31mLine 2\u001B[0m",
+          words: 10,
+        },
+      ],
+      type: "serials-discovered",
+    });
+    await renderer.onProgress({
+      completedFragments: 1,
+      completedWords: 5,
+      id: 7,
+      type: "serial-progress",
+    });
+    await renderer.onProgress({
+      completedWords: 5,
+      totalWords: 10,
+      type: "digest-progress",
+    });
+
+    await renderer.stop();
+
+    expect(stream.visibleLines()).toStrictEqual([
+      "Serial  [######......] 5 / 10 words",
+      "Digest  [######......] 5 / 10 words",
+      "------------------------",
+      "#7 Line 1Line 2",
+      "       [######......] 5 / 10 words (1/2 fragments)",
     ]);
   });
 });
