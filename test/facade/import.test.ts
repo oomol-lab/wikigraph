@@ -299,11 +299,13 @@ describe("facade/import", () => {
             {
               fragments: 1,
               id: 1,
+              title: "Chapter 1",
               words: 2,
             },
             {
               fragments: 1,
               id: 2,
+              title: "Chapter 2",
               words: 3,
             },
           ],
@@ -371,10 +373,12 @@ describe("facade/import", () => {
           serials: [
             {
               id: 1,
+              title: "Chapter 1",
               words: 2,
             },
             {
               id: 2,
+              title: "Chapter 2",
               words: 3,
             },
           ],

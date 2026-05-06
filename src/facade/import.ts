@@ -247,6 +247,7 @@ async function discoverPlannedSections(
   ) {
     return plannedSections.map((plannedSection) => ({
       id: plannedSection.serialId,
+      title: plannedSection.section.title?.trim() || undefined,
       words: plannedSection.section.wordsCount ?? 0,
     }));
   }
@@ -256,6 +257,7 @@ async function discoverPlannedSections(
   for (const plannedSection of plannedSections) {
     discoveries.push({
       id: plannedSection.serialId,
+      title: plannedSection.section.title?.trim() || undefined,
       ...(await discoverSerial({
         ...(options.segmenter === undefined
           ? {}

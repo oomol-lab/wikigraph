@@ -9,6 +9,7 @@ interface SerialState {
   completedFragments: number;
   completedWords: number;
   fragments?: number;
+  title?: string;
   words?: number;
 }
 
@@ -95,6 +96,7 @@ class TerminalProgressRenderer implements CLIProgressRenderer {
           this.#serials.set(serial.id, {
             completedFragments: 0,
             completedWords: 0,
+            ...(serial.title === undefined ? {} : { title: serial.title }),
             words: serial.words,
             ...(serial.fragments === undefined
               ? {}
@@ -171,7 +173,8 @@ class TerminalProgressRenderer implements CLIProgressRenderer {
       0,
     );
     const activeSerials = discoveredSerials.filter(
-      ([, serial]) => serial.completedWords < serial.words,
+      ([, serial]) =>
+        serial.completedWords > 0 && serial.completedWords < serial.words,
     );
 
     if (discoveredSerials.length > 0) {
@@ -214,8 +217,9 @@ class TerminalProgressRenderer implements CLIProgressRenderer {
         serial.fragments,
       );
 
+      lines.push(buildSerialHeading(serialId, serial.title));
       lines.push(
-        `${formatSerialLabel(`#${serialId}`)}${renderBar(
+        `${formatSerialDetailIndent()}${renderBar(
           serial.completedWords,
           serial.words,
         )} ${wordsLabel.padEnd(wordsLabelWidth)}${fragmentsLabel === undefined ? "" : ` (${fragmentsLabel})`}`,
@@ -240,8 +244,15 @@ function formatStageLabel(label: string): string {
   return label.padEnd(8);
 }
 
-function formatSerialLabel(label: string): string {
-  return label.padEnd(10);
+function buildSerialHeading(
+  serialId: number,
+  title: string | undefined,
+): string {
+  return title === undefined ? `#${serialId}` : `#${serialId} ${title}`;
+}
+
+function formatSerialDetailIndent(): string {
+  return " ".repeat(7);
 }
 
 function buildWordsLabel(completed: number, total: number): string {
