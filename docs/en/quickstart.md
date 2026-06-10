@@ -52,37 +52,24 @@ SpineDigest reads configuration from:
 
 - default path: `~/.spinedigest/config.json`
 - override path: `SPINEDIGEST_CONFIG`
-- one-shot inline LLM JSON: `--llm <json>`
 
-A minimal config file looks like this:
+Create the required LLM config, then verify it before running a source digest:
 
-```json
+```bash
+mkdir -p ~/.spinedigest
+
+cat > ~/.spinedigest/config.json <<'JSON'
 {
   "llm": {
-    "provider": "openai",
-    "model": "<your-model>"
+    "provider": "openai-compatible",
+    "model": "your-model",
+    "baseURL": "https://your-provider.example/v1",
+    "apiKey": "your-api-key"
   }
 }
-```
+JSON
 
-Set credentials with environment variables when possible:
-
-```bash
-export SPINEDIGEST_LLM_API_KEY="<your-api-key>"
-```
-
-For `openai-compatible`, you must also set a base URL:
-
-```bash
-export SPINEDIGEST_LLM_BASE_URL="https://your-provider.example/v1"
-```
-
-You can also place these fields in `config.json` if your environment requires it.
-
-For one-off automation, pass inline LLM client JSON instead of writing config:
-
-```bash
-spinedigest --llm "$LLM_JSON" --input ./book.md --output ./out/digest.md
+spinedigest status
 ```
 
 ## 5. Run Your First Digest
