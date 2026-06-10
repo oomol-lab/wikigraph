@@ -48,10 +48,29 @@ spinedigest help ai
 ## Quick Start
 
 The first two examples below create a new digest from source input, so they require LLM configuration first.
-If you need config setup details, run:
+For full config details, run:
 
 ```bash
 spinedigest help config
+```
+
+Create the required LLM config before running a source digest:
+
+```bash
+mkdir -p ~/.spinedigest
+
+cat > ~/.spinedigest/config.json <<'JSON'
+{
+  "llm": {
+    "provider": "openai-compatible",
+    "model": "your-model",
+    "baseURL": "https://your-provider.example/v1",
+    "apiKey": "your-api-key"
+  }
+}
+JSON
+
+spinedigest status
 ```
 
 Digest an EPUB into Markdown:

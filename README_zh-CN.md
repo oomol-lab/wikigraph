@@ -48,10 +48,29 @@ spinedigest help ai
 ## 快速开始
 
 下面前两个例子都会从源输入创建新的 digest，因此需要先完成 LLM 配置。
-如果需要配置说明，先运行：
+完整配置说明：
 
 ```bash
 spinedigest help config
+```
+
+运行源文件 digest 之前，先创建必需的 LLM 配置：
+
+```bash
+mkdir -p ~/.spinedigest
+
+cat > ~/.spinedigest/config.json <<'JSON'
+{
+  "llm": {
+    "provider": "openai-compatible",
+    "model": "your-model",
+    "baseURL": "https://your-provider.example/v1",
+    "apiKey": "your-api-key"
+  }
+}
+JSON
+
+spinedigest status
 ```
 
 把一本 EPUB 摘要成 Markdown：

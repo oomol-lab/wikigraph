@@ -52,37 +52,24 @@ SpineDigest 会从以下位置读取配置：
 
 - 默认路径：`~/.spinedigest/config.json`
 - 覆盖路径：`SPINEDIGEST_CONFIG`
-- 临时 inline LLM JSON：`--llm <json>`
 
-最小配置文件示例：
+先创建必需的 LLM 配置，再检查配置，然后才能运行源文件 digest：
 
-```json
+```bash
+mkdir -p ~/.spinedigest
+
+cat > ~/.spinedigest/config.json <<'JSON'
 {
   "llm": {
-    "provider": "openai",
-    "model": "<your-model>"
+    "provider": "openai-compatible",
+    "model": "your-model",
+    "baseURL": "https://your-provider.example/v1",
+    "apiKey": "your-api-key"
   }
 }
-```
+JSON
 
-凭据建议优先通过环境变量提供：
-
-```bash
-export SPINEDIGEST_LLM_API_KEY="<your-api-key>"
-```
-
-如果使用 `openai-compatible`，还必须提供 base URL：
-
-```bash
-export SPINEDIGEST_LLM_BASE_URL="https://your-provider.example/v1"
-```
-
-如果你的环境更适合写进 `config.json`，也可以把这些字段写入配置文件。
-
-如果只是自动化里临时运行一次，也可以直接传 inline LLM client JSON：
-
-```bash
-spinedigest --llm "$LLM_JSON" --input ./book.md --output ./out/digest.md
+spinedigest status
 ```
 
 ## 5. 跑第一条命令
