@@ -27,6 +27,7 @@ export const SDPUB_SUBCOMMANDS = [
   "list",
   "cat",
   "cover",
+  "chapter",
 ] as const;
 
 export type SDPubSubcommand = (typeof SDPUB_SUBCOMMANDS)[number];
@@ -81,7 +82,7 @@ const HELP_TOPIC_METADATA: readonly {
   },
   {
     name: "sdpub",
-    summary: "The .sdpub inspection command family and its subcommands.",
+    summary: "The .sdpub inspection and chapter editing command family.",
   },
 ] as const;
 
@@ -108,6 +109,10 @@ const SDPUB_SUBCOMMAND_METADATA: readonly {
   {
     name: "cover",
     summary: "Write raw cover bytes to stdout for redirection or piping.",
+  },
+  {
+    name: "chapter",
+    summary: "Edit the chapter tree and per-chapter digest stages.",
   },
 ] as const;
 

@@ -147,6 +147,75 @@ describe("cli/args", () => {
     });
   });
 
+  it("parses sdpub chapter edit actions", () => {
+    expect(
+      parseCLIArguments([
+        "sdpub",
+        "chapter",
+        "set-source",
+        "book.sdpub",
+        "--chapter",
+        "12",
+        "--input",
+        "chapter.md",
+        "--input-format",
+        "markdown",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "set-source",
+        chapterId: 12,
+        inputFormat: "markdown",
+        inputPath: "chapter.md",
+        path: "book.sdpub",
+      },
+      help: false,
+      kind: "sdpub-chapter",
+    });
+    expect(
+      parseCLIArguments([
+        "sdpub",
+        "chapter",
+        "add",
+        "book.sdpub",
+        "--title",
+        "Chapter 1",
+        "--parent",
+        "3",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "add",
+        parentChapterId: 3,
+        path: "book.sdpub",
+        title: "Chapter 1",
+      },
+      help: false,
+      kind: "sdpub-chapter",
+    });
+    expect(
+      parseCLIArguments([
+        "sdpub",
+        "chapter",
+        "reset",
+        "book.sdpub",
+        "--chapter",
+        "12",
+        "--to",
+        "sourced",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "reset",
+        chapterId: 12,
+        path: "book.sdpub",
+        resetStage: "sourced",
+      },
+      help: false,
+      kind: "sdpub-chapter",
+    });
+  });
+
   it("prints sdpub help text", () => {
     expect(parseCLIArguments(["sdpub", "--help"])).toStrictEqual({
       help: true,
@@ -213,10 +282,10 @@ describe("cli/args", () => {
 
   it("rejects invalid sdpub usage", () => {
     expect(() => parseCLIArguments(["sdpub"])).toThrow(
-      "Missing sdpub subcommand. Expected one of info, toc, list, cat, cover.\nSee: spinedigest sdpub --help",
+      "Missing sdpub subcommand. Expected one of info, toc, list, cat, cover, chapter.\nSee: spinedigest sdpub --help",
     );
     expect(() => parseCLIArguments(["sdpub", "inspect"])).toThrow(
-      "Invalid sdpub subcommand: inspect. Expected one of info, toc, list, cat, cover.\nSee: spinedigest sdpub --help",
+      "Invalid sdpub subcommand: inspect. Expected one of info, toc, list, cat, cover, chapter.\nSee: spinedigest sdpub --help",
     );
     expect(() => parseCLIArguments(["sdpub", "inspect", "extra"])).toThrow(
       "Unexpected positional arguments: extra.\nSee: spinedigest sdpub --help",
@@ -259,6 +328,43 @@ describe("cli/args", () => {
       ]),
     ).toThrow(
       "Invalid --serial: x. Expected a non-negative integer.\nSee: spinedigest sdpub cat --help",
+    );
+  });
+
+  it("rejects invalid sdpub chapter usage", () => {
+    expect(() => parseCLIArguments(["sdpub", "chapter"])).toThrow(
+      "Missing sdpub chapter action.\nSee: spinedigest sdpub chapter --help",
+    );
+    expect(() =>
+      parseCLIArguments(["sdpub", "chapter", "set-source", "book.sdpub"]),
+    ).toThrow(
+      "Missing --chapter. `sdpub chapter set-source` requires a chapter id.\nSee: spinedigest sdpub chapter --help",
+    );
+    expect(() =>
+      parseCLIArguments([
+        "sdpub",
+        "chapter",
+        "set-source",
+        "book.sdpub",
+        "--chapter",
+        "1",
+      ]),
+    ).toThrow(
+      "Missing --input-format. `sdpub chapter set-source` requires txt or markdown.\nSee: spinedigest sdpub chapter --help",
+    );
+    expect(() =>
+      parseCLIArguments([
+        "sdpub",
+        "chapter",
+        "reset",
+        "book.sdpub",
+        "--chapter",
+        "1",
+        "--to",
+        "summarized",
+      ]),
+    ).toThrow(
+      "`sdpub chapter reset` does not support --to summarized.\nSee: spinedigest sdpub chapter --help",
     );
   });
 

@@ -174,15 +174,15 @@ export class SerialStore implements ReadonlySerialStore {
     return maxId ?? 0;
   }
 
-  public async setTopologyReady(serialId: number): Promise<void> {
+  public async setTopologyReady(serialId: number, ready = true): Promise<void> {
     await this.ensure(serialId);
     await this.#database.run(
       `
         UPDATE serial_states
-        SET topology_ready = 1
+        SET topology_ready = ?
         WHERE serial_id = ?
       `,
-      [serialId],
+      [ready ? 1 : 0, serialId],
     );
   }
 

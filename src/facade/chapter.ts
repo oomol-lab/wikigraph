@@ -1,0 +1,493 @@
+import type { Document } from "../document/index.js";
+import type { Language } from "../common/language.js";
+import type { SpineDigestScope } from "../common/llm-scope.js";
+import type { LLM } from "../llm/index.js";
+import type { ReaderTextStream } from "../reader/index.js";
+import {
+  SerialGeneration,
+  writeSerialSource,
+  type BuildSerialTopologyOptions,
+} from "../serial.js";
+import { TOC_FILE_VERSION, type TocItem } from "../source/index.js";
+
+export const CHAPTER_STAGES = [
+  "planned",
+  "sourced",
+  "graphed",
+  "summarized",
+] as const;
+
+export type ChapterStage = (typeof CHAPTER_STAGES)[number];
+
+export interface ChapterEntry {
+  readonly chapterId: number;
+  readonly childCount: number;
+  readonly depth: number;
+  readonly fragmentCount: number;
+  readonly stage: ChapterStage;
+  readonly title: string;
+  readonly tocPath: readonly string[];
+}
+
+export interface ChapterDetails extends ChapterEntry {
+  readonly graphReady: boolean;
+  readonly hasSummary: boolean;
+}
+
+export interface AddChapterOptions {
+  readonly parentChapterId?: number;
+  readonly title: string;
+}
+
+export interface GenerateChapterGraphOptions {
+  readonly extractionPrompt: string;
+  readonly llm: LLM<SpineDigestScope>;
+  readonly logDirPath?: string;
+  readonly userLanguage?: Language;
+}
+
+export interface GenerateChapterSummaryOptions {
+  readonly llm: LLM<SpineDigestScope>;
+  readonly logDirPath?: string;
+  readonly userLanguage?: Language;
+}
+
+export async function addChapter(
+  document: Document,
+  options: AddChapterOptions,
+): Promise<ChapterDetails> {
+  return await document.openSession(async (openedDocument) => {
+    const toc = await normalizeChapterToc(openedDocument);
+    const normalizedTitle = normalizeTitle(options.title);
+
+    if (normalizedTitle === undefined) {
+      throw new Error("Chapter title is required.");
+    }
+
+    const chapterId = await openedDocument.createSerial();
+    const chapterItem = {
+      children: [],
+      serialId: chapterId,
+      title: normalizedTitle,
+    } satisfies TocItem;
+
+    if (options.parentChapterId === undefined) {
+      toc.items = [...toc.items, chapterItem];
+    } else if (
+      !appendChildToChapter(toc.items, options.parentChapterId, chapterItem)
+    ) {
+      throw new Error(`Chapter ${options.parentChapterId} does not exist.`);
+    }
+
+    await openedDocument.replaceToc(toc);
+    return await getChapterDetails(openedDocument, chapterId);
+  });
+}
+
+export async function generateChapterGraph(
+  document: Document,
+  chapterId: number,
+  options: GenerateChapterGraphOptions,
+): Promise<ChapterDetails> {
+  return await document.openSession(async (openedDocument) => {
+    const details = await requireChapterDetails(openedDocument, chapterId);
+
+    if (details.stage !== "sourced") {
+      throw new Error(
+        `Chapter ${chapterId} is ${details.stage}. Generate a graph only for sourced chapters.`,
+      );
+    }
+
+    const generation = new SerialGeneration({
+      document: openedDocument,
+      llm: options.llm,
+      ...(options.logDirPath === undefined
+        ? {}
+        : { logDirPath: options.logDirPath }),
+    });
+
+    await generation.buildTopologyInto(
+      chapterId,
+      readChapterSource(openedDocument, chapterId),
+      createTopologyOptions(options),
+    );
+    return await getChapterDetails(openedDocument, chapterId);
+  });
+}
+
+export async function generateChapterSummary(
+  document: Document,
+  chapterId: number,
+  options: GenerateChapterSummaryOptions,
+): Promise<ChapterDetails> {
+  return await document.openSession(async (openedDocument) => {
+    const details = await requireChapterDetails(openedDocument, chapterId);
+
+    if (details.stage !== "graphed") {
+      throw new Error(
+        `Chapter ${chapterId} is ${details.stage}. Generate a summary only for graphed chapters.`,
+      );
+    }
+
+    const generation = new SerialGeneration({
+      document: openedDocument,
+      llm: options.llm,
+      ...(options.logDirPath === undefined
+        ? {}
+        : { logDirPath: options.logDirPath }),
+    });
+
+    await generation.buildSummary(chapterId, {
+      ...(options.userLanguage === undefined
+        ? {}
+        : { userLanguage: options.userLanguage }),
+    });
+    return await getChapterDetails(openedDocument, chapterId);
+  });
+}
+
+export async function getChapterDetails(
+  document: Document,
+  chapterId: number,
+): Promise<ChapterDetails> {
+  const entries = await listChapters(document);
+  const entry = entries.find((item) => item.chapterId === chapterId);
+
+  if (entry === undefined) {
+    throw new Error(`Chapter ${chapterId} does not exist.`);
+  }
+
+  const serial = await document.serials.getById(chapterId);
+  const summary = await document.readSummary(chapterId);
+
+  return {
+    ...entry,
+    graphReady: serial?.topologyReady === true,
+    hasSummary: summary !== undefined,
+  };
+}
+
+export async function listChapters(
+  document: Document,
+): Promise<readonly ChapterEntry[]> {
+  const toc = await normalizeChapterToc(document);
+
+  return await collectChapterEntries(document, toc.items);
+}
+
+export async function removeChapter(
+  document: Document,
+  chapterId: number,
+  options: { readonly recursive?: boolean } = {},
+): Promise<void> {
+  await document.openSession(async (openedDocument) => {
+    const toc = await normalizeChapterToc(openedDocument);
+    const removedChapterIds: number[] = [];
+    const result = removeChapterFromItems(toc.items, chapterId, {
+      recursive: options.recursive ?? false,
+      removedChapterIds,
+    });
+
+    if (!result.removed) {
+      throw new Error(`Chapter ${chapterId} does not exist.`);
+    }
+
+    toc.items = result.items;
+    await openedDocument.replaceToc(toc);
+
+    for (const removedChapterId of removedChapterIds) {
+      await openedDocument.deleteSerial(removedChapterId);
+    }
+  });
+}
+
+export async function resetChapter(
+  document: Document,
+  chapterId: number,
+  stage: Exclude<ChapterStage, "summarized">,
+): Promise<ChapterDetails> {
+  return await document.openSession(async (openedDocument) => {
+    await requireChapterDetails(openedDocument, chapterId);
+
+    switch (stage) {
+      case "planned":
+        await openedDocument.clearSerialSource(chapterId);
+        break;
+      case "sourced":
+        await openedDocument.clearSerialGraph(chapterId);
+        break;
+      case "graphed":
+        await openedDocument.deleteSummary(chapterId);
+        break;
+    }
+
+    return await getChapterDetails(openedDocument, chapterId);
+  });
+}
+
+export async function setChapterSource(
+  document: Document,
+  chapterId: number,
+  stream: ReaderTextStream,
+): Promise<ChapterDetails> {
+  return await document.openSession(async (openedDocument) => {
+    const details = await requireChapterDetails(openedDocument, chapterId);
+
+    if (details.stage !== "planned") {
+      throw new Error(
+        `Chapter ${chapterId} is ${details.stage}. Reset it to planned before setting source.`,
+      );
+    }
+
+    await writeSerialSource(openedDocument, chapterId, stream);
+    return await getChapterDetails(openedDocument, chapterId);
+  });
+}
+
+export async function setChapterSummary(
+  document: Document,
+  chapterId: number,
+  summary: string,
+): Promise<ChapterDetails> {
+  return await document.openSession(async (openedDocument) => {
+    const details = await requireChapterDetails(openedDocument, chapterId);
+
+    if (details.stage !== "graphed") {
+      throw new Error(
+        `Chapter ${chapterId} is ${details.stage}. Set a summary only for graphed chapters.`,
+      );
+    }
+
+    await openedDocument.writeSummary(chapterId, summary);
+    return await getChapterDetails(openedDocument, chapterId);
+  });
+}
+
+async function normalizeChapterToc(
+  document: Document,
+): Promise<MutableTocFile> {
+  const existingToc = await document.readToc();
+  const toc: MutableTocFile =
+    existingToc === undefined
+      ? { items: [], version: TOC_FILE_VERSION }
+      : {
+          items: existingToc.items.map(cloneTocItem),
+          version: existingToc.version,
+        };
+  let changed = false;
+
+  const normalizeItems = async (items: MutableTocItem[]): Promise<void> => {
+    for (const item of items) {
+      if (item.serialId === undefined) {
+        item.serialId = await document.createSerial();
+        changed = true;
+      } else {
+        await document.serials.ensure(item.serialId);
+      }
+
+      await normalizeItems(item.children);
+    }
+  };
+
+  await normalizeItems(toc.items);
+
+  if (existingToc === undefined || changed) {
+    await document.replaceToc(toc);
+  }
+
+  return toc;
+}
+
+async function collectChapterEntries(
+  document: Document,
+  items: readonly TocItem[],
+  ancestorTitles: readonly string[] = [],
+  depth = 0,
+): Promise<ChapterEntry[]> {
+  const entries: ChapterEntry[] = [];
+
+  for (const item of items) {
+    if (item.serialId === undefined) {
+      continue;
+    }
+
+    const tocPath = [...ancestorTitles, item.title];
+    const fragmentCount = (
+      await document.getSerialFragments(item.serialId).listFragmentIds()
+    ).length;
+
+    entries.push({
+      chapterId: item.serialId,
+      childCount: item.children.length,
+      depth,
+      fragmentCount,
+      stage: await resolveChapterStage(document, item.serialId, fragmentCount),
+      title: item.title,
+      tocPath,
+    });
+    entries.push(
+      ...(await collectChapterEntries(
+        document,
+        item.children,
+        tocPath,
+        depth + 1,
+      )),
+    );
+  }
+
+  return entries;
+}
+
+async function resolveChapterStage(
+  document: Document,
+  chapterId: number,
+  fragmentCount: number,
+): Promise<ChapterStage> {
+  const summary = await document.readSummary(chapterId);
+
+  if (summary !== undefined) {
+    return "summarized";
+  }
+
+  const serial = await document.serials.getById(chapterId);
+
+  if (serial?.topologyReady === true) {
+    return "graphed";
+  }
+
+  if (fragmentCount > 0) {
+    return "sourced";
+  }
+
+  return "planned";
+}
+
+async function requireChapterDetails(
+  document: Document,
+  chapterId: number,
+): Promise<ChapterDetails> {
+  return await getChapterDetails(document, chapterId);
+}
+
+function appendChildToChapter(
+  items: MutableTocItem[],
+  parentChapterId: number,
+  child: MutableTocItem,
+): boolean {
+  for (const item of items) {
+    if (item.serialId === parentChapterId) {
+      item.children = [...item.children, child];
+      return true;
+    }
+
+    if (appendChildToChapter(item.children, parentChapterId, child)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function cloneTocItem(item: TocItem): MutableTocItem {
+  return {
+    children: item.children.map(cloneTocItem),
+    ...(item.serialId === undefined ? {} : { serialId: item.serialId }),
+    title: item.title,
+  };
+}
+
+function createTopologyOptions(
+  options: GenerateChapterGraphOptions,
+): BuildSerialTopologyOptions {
+  return {
+    extractionPrompt: options.extractionPrompt,
+    ...(options.userLanguage === undefined
+      ? {}
+      : { userLanguage: options.userLanguage }),
+  };
+}
+
+async function* readChapterSource(
+  document: Document,
+  chapterId: number,
+): ReaderTextStream {
+  const fragments = document.getSerialFragments(chapterId);
+
+  for (const fragmentId of await fragments.listFragmentIds()) {
+    const fragment = await fragments.getFragment(fragmentId);
+
+    for (const sentence of fragment.sentences) {
+      yield sentence.text;
+    }
+  }
+}
+
+function normalizeTitle(title: string): string | undefined {
+  const normalized = title.trim();
+
+  return normalized === "" ? undefined : normalized;
+}
+
+function removeChapterFromItems(
+  items: readonly MutableTocItem[],
+  chapterId: number,
+  options: {
+    readonly recursive: boolean;
+    readonly removedChapterIds: number[];
+  },
+): { readonly items: MutableTocItem[]; readonly removed: boolean } {
+  const nextItems: MutableTocItem[] = [];
+  let removed = false;
+
+  for (const item of items) {
+    if (item.serialId === chapterId) {
+      if (!options.recursive && item.children.length > 0) {
+        throw new Error(
+          `Chapter ${chapterId} has child chapters. Use --recursive to remove it and its descendants.`,
+        );
+      }
+
+      collectChapterIds(item, options.removedChapterIds);
+      removed = true;
+      continue;
+    }
+
+    const childResult = removeChapterFromItems(
+      item.children,
+      chapterId,
+      options,
+    );
+
+    nextItems.push({
+      ...item,
+      children: childResult.items,
+    });
+    removed ||= childResult.removed;
+  }
+
+  return {
+    items: nextItems,
+    removed,
+  };
+}
+
+function collectChapterIds(item: TocItem, chapterIds: number[]): void {
+  if (item.serialId !== undefined) {
+    chapterIds.push(item.serialId);
+  }
+
+  for (const child of item.children) {
+    collectChapterIds(child, chapterIds);
+  }
+}
+
+interface MutableTocFile {
+  items: MutableTocItem[];
+  version: typeof TOC_FILE_VERSION;
+}
+
+interface MutableTocItem {
+  children: MutableTocItem[];
+  serialId?: number | undefined;
+  title: string;
+}

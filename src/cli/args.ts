@@ -6,6 +6,7 @@ import {
   sdpubSubcommandHelpRoute,
   withHelpRoute,
 } from "./errors.js";
+import { CHAPTER_STAGES, type ChapterStage } from "../facade/index.js";
 import {
   parseHelpTopic,
   renderHelpTopicText,
@@ -33,7 +34,32 @@ export interface CLISdpubArguments {
   readonly inputPath: string;
   readonly llmJSON?: string;
   readonly serialId?: number;
-  readonly subcommand: SDPubSubcommand;
+  readonly subcommand: Exclude<SDPubSubcommand, "chapter">;
+}
+
+export type CLISdpubChapterAction =
+  | "add"
+  | "generate-graph"
+  | "generate-summary"
+  | "list"
+  | "remove"
+  | "reset"
+  | "set-source"
+  | "set-summary"
+  | "status";
+
+export interface CLISdpubChapterArguments {
+  readonly action: CLISdpubChapterAction;
+  readonly chapterId?: number;
+  readonly inputFormat?: Extract<CLIFormat, "markdown" | "txt">;
+  readonly inputPath?: string;
+  readonly llmJSON?: string;
+  readonly parentChapterId?: number;
+  readonly path: string;
+  readonly prompt?: string;
+  readonly recursive?: boolean;
+  readonly resetStage?: Exclude<ChapterStage, "summarized">;
+  readonly title?: string;
 }
 
 export interface CLIStatusArguments {
@@ -62,6 +88,16 @@ export type ParsedCLIArguments =
       readonly help: true;
       readonly helpText: string;
       readonly kind: "sdpub";
+    }
+  | {
+      readonly args: CLISdpubChapterArguments;
+      readonly help: false;
+      readonly kind: "sdpub-chapter";
+    }
+  | {
+      readonly help: true;
+      readonly helpText: string;
+      readonly kind: "sdpub-chapter";
     }
   | {
       readonly help: true;
@@ -113,6 +149,21 @@ export function parseCLIArguments(
         type: "string",
       },
       serial: {
+        type: "string",
+      },
+      chapter: {
+        type: "string",
+      },
+      parent: {
+        type: "string",
+      },
+      recursive: {
+        type: "boolean",
+      },
+      title: {
+        type: "string",
+      },
+      to: {
         type: "string",
       },
       verbose: {
@@ -188,6 +239,7 @@ export function parseCLIArguments(
 function parseSdpubArguments(
   positionals: readonly string[],
   values: {
+    readonly chapter?: string;
     readonly "digest-dir"?: string;
     readonly help?: boolean;
     readonly input?: string;
@@ -195,8 +247,12 @@ function parseSdpubArguments(
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
+    readonly parent?: string;
     readonly prompt?: string;
+    readonly recursive?: boolean;
     readonly serial?: string;
+    readonly title?: string;
+    readonly to?: string;
     readonly verbose?: boolean;
   },
 ): ParsedCLIArguments {
@@ -205,6 +261,10 @@ function parseSdpubArguments(
   const isKnownSubcommand =
     subcommand !== undefined &&
     SDPUB_SUBCOMMANDS.includes(subcommand as SDPubSubcommand);
+
+  if (subcommand === "chapter") {
+    return parseSdpubChapterArguments(positionals.slice(1), values);
+  }
 
   if (positionals.length > 1) {
     throw new Error(
@@ -243,7 +303,7 @@ function parseSdpubArguments(
     );
   }
 
-  const parsedSubcommand = subcommand as SDPubSubcommand;
+  const parsedSubcommand = subcommand as Exclude<SDPubSubcommand, "chapter">;
 
   if (values["digest-dir"] !== undefined) {
     throw new Error(
@@ -354,6 +414,353 @@ function parseSdpubArguments(
     help: false,
     kind: "sdpub",
   };
+}
+
+function parseSdpubChapterArguments(
+  positionals: readonly string[],
+  values: {
+    readonly chapter?: string;
+    readonly "digest-dir"?: string;
+    readonly help?: boolean;
+    readonly input?: string;
+    readonly "input-format"?: string;
+    readonly llm?: string;
+    readonly output?: string;
+    readonly "output-format"?: string;
+    readonly parent?: string;
+    readonly prompt?: string;
+    readonly recursive?: boolean;
+    readonly serial?: string;
+    readonly title?: string;
+    readonly to?: string;
+    readonly verbose?: boolean;
+  },
+): ParsedCLIArguments {
+  const help = values.help ?? false;
+  const action = positionals[0];
+  const path = positionals[1];
+  const helpRoute = "spinedigest sdpub chapter --help";
+
+  rejectSdpubChapterFlag("digest-dir", values["digest-dir"]);
+  rejectSdpubChapterFlag("output", values.output);
+  rejectSdpubChapterFlag("output-format", values["output-format"]);
+  rejectSdpubChapterFlag("serial", values.serial);
+  if (values.verbose) {
+    throw new Error(
+      withHelpRoute(
+        "The `sdpub chapter` command does not support --verbose.",
+        helpRoute,
+      ),
+    );
+  }
+
+  if (help) {
+    return {
+      help: true,
+      helpText: renderSdpubSubcommandHelpText("chapter"),
+      kind: "sdpub-chapter",
+    };
+  }
+
+  if (!isSdpubChapterAction(action)) {
+    throw new Error(
+      withHelpRoute(
+        action === undefined
+          ? "Missing sdpub chapter action."
+          : `Invalid sdpub chapter action: ${action}.`,
+        helpRoute,
+      ),
+    );
+  }
+  if (path === undefined || path === "-") {
+    throw new Error(
+      withHelpRoute(
+        "`spinedigest sdpub chapter` requires a .sdpub path positional argument.",
+        helpRoute,
+      ),
+    );
+  }
+  if (positionals.length > 2) {
+    throw new Error(
+      withHelpRoute(
+        `Unexpected positional arguments: ${positionals.slice(2).join(" ")}.`,
+        helpRoute,
+      ),
+    );
+  }
+
+  return {
+    args: normalizeSdpubChapterArguments(action, path, values, helpRoute),
+    help: false,
+    kind: "sdpub-chapter",
+  };
+}
+
+function normalizeSdpubChapterArguments(
+  action: CLISdpubChapterAction,
+  path: string,
+  values: {
+    readonly chapter?: string;
+    readonly input?: string;
+    readonly "input-format"?: string;
+    readonly llm?: string;
+    readonly parent?: string;
+    readonly prompt?: string;
+    readonly recursive?: boolean;
+    readonly title?: string;
+    readonly to?: string;
+  },
+  helpRoute: string,
+): CLISdpubChapterArguments {
+  const chapterId =
+    values.chapter === undefined
+      ? undefined
+      : parseSerialId(values.chapter, "--chapter", helpRoute);
+  const parentChapterId =
+    values.parent === undefined
+      ? undefined
+      : parseSerialId(values.parent, "--parent", helpRoute);
+  const inputFormat =
+    values["input-format"] === undefined
+      ? undefined
+      : parseChapterInputFormat(values["input-format"], helpRoute);
+  const resetStage =
+    values.to === undefined ? undefined : parseResetStage(values.to, helpRoute);
+
+  switch (action) {
+    case "add":
+      requireFlag(values.title, "--title", action, helpRoute);
+      rejectActionFlag(values.chapter, "--chapter", action, helpRoute);
+      rejectActionFlag(values.input, "--input", action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        path,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+        ...(parentChapterId === undefined ? {} : { parentChapterId }),
+        title: values.title,
+      };
+    case "generate-graph":
+      requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.input, "--input", action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.title, "--title", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        chapterId,
+        path,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+        ...(values.prompt === undefined ? {} : { prompt: values.prompt }),
+      };
+    case "generate-summary":
+      requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.input, "--input", action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.title, "--title", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        chapterId,
+        path,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+      };
+    case "list":
+      rejectActionFlag(values.chapter, "--chapter", action, helpRoute);
+      rejectActionFlag(values.input, "--input", action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.title, "--title", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        path,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+      };
+    case "remove":
+      requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.input, "--input", action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.title, "--title", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      return {
+        action,
+        chapterId,
+        path,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+        ...(values.recursive === undefined
+          ? {}
+          : { recursive: values.recursive }),
+      };
+    case "reset":
+      requireChapterId(chapterId, action, helpRoute);
+      if (resetStage === undefined) {
+        throw new Error(
+          withHelpRoute(
+            "Missing --to. `sdpub chapter reset` requires planned, sourced, or graphed.",
+            helpRoute,
+          ),
+        );
+      }
+      rejectActionFlag(values.input, "--input", action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.title, "--title", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        chapterId,
+        path,
+        resetStage,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+      };
+    case "set-source":
+      requireChapterId(chapterId, action, helpRoute);
+      if (inputFormat === undefined) {
+        throw new Error(
+          withHelpRoute(
+            "Missing --input-format. `sdpub chapter set-source` requires txt or markdown.",
+            helpRoute,
+          ),
+        );
+      }
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.title, "--title", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        chapterId,
+        inputFormat,
+        path,
+        ...(values.input === undefined ? {} : { inputPath: values.input }),
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+      };
+    case "set-summary":
+      requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.title, "--title", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        chapterId,
+        path,
+        ...(values.input === undefined ? {} : { inputPath: values.input }),
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+      };
+    case "status":
+      requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.input, "--input", action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.title, "--title", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        chapterId,
+        path,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+      };
+  }
 }
 
 function parseHelpArguments(
@@ -487,6 +894,144 @@ function parseSerialId(value: string, flag: string, helpRoute: string): number {
   }
 
   return Number(normalized);
+}
+
+function isSdpubChapterAction(
+  value: string | undefined,
+): value is CLISdpubChapterAction {
+  return (
+    value === "add" ||
+    value === "generate-graph" ||
+    value === "generate-summary" ||
+    value === "list" ||
+    value === "remove" ||
+    value === "reset" ||
+    value === "set-source" ||
+    value === "set-summary" ||
+    value === "status"
+  );
+}
+
+function parseChapterInputFormat(
+  value: string,
+  helpRoute: string,
+): Extract<CLIFormat, "markdown" | "txt"> {
+  const format = parseCLIFormat(value, "--input-format");
+
+  if (format === "markdown" || format === "txt") {
+    return format;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --input-format for sdpub chapter source: ${value}. Expected txt or markdown.`,
+      helpRoute,
+    ),
+  );
+}
+
+function parseResetStage(
+  value: string,
+  helpRoute: string,
+): Exclude<ChapterStage, "summarized"> {
+  const normalized = value.trim().toLowerCase();
+
+  if (
+    normalized === "planned" ||
+    normalized === "sourced" ||
+    normalized === "graphed"
+  ) {
+    return normalized;
+  }
+  if (CHAPTER_STAGES.includes(normalized as ChapterStage)) {
+    throw new Error(
+      withHelpRoute(
+        "`sdpub chapter reset` does not support --to summarized.",
+        helpRoute,
+      ),
+    );
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --to: ${value}. Expected planned, sourced, or graphed.`,
+      helpRoute,
+    ),
+  );
+}
+
+function rejectActionFlag(
+  value: string | undefined,
+  flag: string,
+  action: CLISdpubChapterAction,
+  helpRoute: string,
+): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub chapter ${action}\` action does not support ${flag}.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectActionBooleanFlag(
+  value: boolean | undefined,
+  flag: string,
+  action: CLISdpubChapterAction,
+  helpRoute: string,
+): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub chapter ${action}\` action does not support ${flag}.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectSdpubChapterFlag(name: string, value: string | undefined): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub chapter\` command does not support --${name}.`,
+        "spinedigest sdpub chapter --help",
+      ),
+    );
+  }
+}
+
+function requireChapterId(
+  chapterId: number | undefined,
+  action: CLISdpubChapterAction,
+  helpRoute: string,
+): asserts chapterId is number {
+  if (chapterId === undefined) {
+    throw new Error(
+      withHelpRoute(
+        `Missing --chapter. \`sdpub chapter ${action}\` requires a chapter id.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function requireFlag(
+  value: string | undefined,
+  flag: string,
+  action: CLISdpubChapterAction,
+  helpRoute: string,
+): asserts value is string {
+  if (value === undefined) {
+    throw new Error(
+      withHelpRoute(
+        `Missing ${flag}. \`sdpub chapter ${action}\` requires it.`,
+        helpRoute,
+      ),
+    );
+  }
 }
 
 function rejectHelpFlag(name: string, value: string | undefined): void {

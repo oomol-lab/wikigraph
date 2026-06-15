@@ -58,6 +58,10 @@ export interface BuildSerialSummaryOptions {
   readonly userLanguage?: Language;
 }
 
+export interface WriteSerialSourceOptions {
+  readonly segmenter?: ReaderSegmenter;
+}
+
 export interface SerialDiscovery {
   readonly fragments: number;
   readonly words: number;
@@ -100,6 +104,32 @@ export async function discoverSerial(input: {
     fragments,
     words,
   };
+}
+
+export async function writeSerialSource(
+  document: Document,
+  serialId: number,
+  stream: ReaderTextStream,
+  options: WriteSerialSourceOptions = {},
+): Promise<void> {
+  const serialFragments = document.getSerialFragments(serialId);
+
+  for await (const fragment of streamFragments({
+    maxWordsCount: DEFAULT_FRAGMENT_WORDS_COUNT,
+    stream: segmentTextStream(stream, {
+      ...(options.segmenter === undefined
+        ? {}
+        : { adapter: options.segmenter }),
+    }),
+  })) {
+    const fragmentDraft = await serialFragments.createDraft();
+
+    for (const sentence of fragment.sentences) {
+      fragmentDraft.addSentence(sentence.text, sentence.wordsCount);
+    }
+
+    await fragmentDraft.commit();
+  }
 }
 
 export class SerialGeneration {

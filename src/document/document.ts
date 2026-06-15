@@ -77,9 +77,14 @@ export interface Document extends ReadonlyDocument {
   createContext(): DocumentContext;
   getSerialFragments(serialId: number): SerialFragments;
   createSerial(): Promise<number>;
+  clearSerialGraph(serialId: number): Promise<void>;
+  clearSerialSource(serialId: number): Promise<void>;
+  deleteSerial(serialId: number): Promise<void>;
+  deleteSummary(serialId: number): Promise<void>;
   flush(): Promise<void>;
   openSession<T>(operation: (document: Document) => Promise<T> | T): Promise<T>;
   peekNextSerialId(): Promise<number>;
+  replaceToc(toc: TocFile): Promise<void>;
   writeBookMeta(meta: BookMeta): Promise<void>;
   writeCover(cover: SourceAsset): Promise<void>;
   writeSummary(serialId: number, summary: string): Promise<void>;
@@ -166,6 +171,36 @@ export class DirectoryDocument implements Document {
 
     this.#contextScope.getStore()?.ownSerial(serialId);
     return serialId;
+  }
+
+  public async clearSerialGraph(serialId: number): Promise<void> {
+    await this.deleteSummary(serialId);
+    await this.#deleteSerialGraphRecords(serialId);
+    await this.serials.setTopologyReady(serialId, false);
+  }
+
+  public async clearSerialSource(serialId: number): Promise<void> {
+    await this.clearSerialGraph(serialId);
+    await rm(this.#fragments.getSerial(serialId).path, {
+      force: true,
+      recursive: true,
+    });
+  }
+
+  public async deleteSerial(serialId: number): Promise<void> {
+    await this.#deleteSerialResources(serialId);
+  }
+
+  public async deleteSummary(serialId: number): Promise<void> {
+    try {
+      await unlink(this.#getSummaryPath(serialId));
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        return;
+      }
+
+      throw error;
+    }
   }
 
   public async getSentence(sentenceId: SentenceId): Promise<string> {
@@ -268,6 +303,10 @@ export class DirectoryDocument implements Document {
     await this.#writeJsonFile(this.#getTocPath(), toc);
   }
 
+  public async replaceToc(toc: TocFile): Promise<void> {
+    await this.#writeJsonFile(this.#getTocPath(), toc, { overwrite: true });
+  }
+
   public async flush(): Promise<void> {
     await this.#database.flush();
   }
@@ -304,107 +343,108 @@ export class DirectoryDocument implements Document {
 
   async #rollbackOwnedSerials(serialIds: readonly number[]): Promise<void> {
     for (const serialId of [...serialIds].sort(compareNumberDescending)) {
-      await this.#database.transaction(async () => {
-        await this.#database.run(
-          `
-            DELETE FROM snake_edges
-            WHERE from_snake_id IN (
-              SELECT id
-              FROM snakes
-              WHERE serial_id = ?
-            ) OR to_snake_id IN (
-              SELECT id
-              FROM snakes
-              WHERE serial_id = ?
-            )
-          `,
-          [serialId, serialId],
-        );
-        await this.#database.run(
-          `
-            DELETE FROM snake_chunks
-            WHERE snake_id IN (
-              SELECT id
-              FROM snakes
-              WHERE serial_id = ?
-            )
-          `,
-          [serialId],
-        );
-        await this.#database.run(
-          `
-            DELETE FROM snakes
-            WHERE serial_id = ?
-          `,
-          [serialId],
-        );
-        await this.#database.run(
-          `
-            DELETE FROM fragment_groups
-            WHERE serial_id = ?
-          `,
-          [serialId],
-        );
-        await this.#database.run(
-          `
-            DELETE FROM knowledge_edges
-            WHERE from_id IN (
-              SELECT id
-              FROM chunks
-              WHERE serial_id = ?
-            ) OR to_id IN (
-              SELECT id
-              FROM chunks
-              WHERE serial_id = ?
-            )
-          `,
-          [serialId, serialId],
-        );
-        await this.#database.run(
-          `
-            DELETE FROM chunk_sentences
-            WHERE serial_id = ?
-          `,
-          [serialId],
-        );
-        await this.#database.run(
-          `
-            DELETE FROM chunks
-            WHERE serial_id = ?
-          `,
-          [serialId],
-        );
-        await this.#database.run(
-          `
-            DELETE FROM serial_states
-            WHERE serial_id = ?
-          `,
-          [serialId],
-        );
-        await this.#database.run(
-          `
-            DELETE FROM serials
-            WHERE id = ?
-          `,
-          [serialId],
-        );
-      });
-
-      await rm(this.#fragments.getSerial(serialId).path, {
-        force: true,
-        recursive: true,
-      });
-
-      try {
-        await unlink(this.#getSummaryPath(serialId));
-      } catch (error) {
-        if (isNodeError(error) && error.code === "ENOENT") {
-          continue;
-        }
-
-        throw error;
-      }
+      await this.#deleteSerialResources(serialId);
     }
+  }
+
+  async #deleteSerialResources(serialId: number): Promise<void> {
+    await this.#deleteSerialGraphRecords(serialId);
+    await this.#database.transaction(async () => {
+      await this.#database.run(
+        `
+          DELETE FROM serial_states
+          WHERE serial_id = ?
+        `,
+        [serialId],
+      );
+      await this.#database.run(
+        `
+          DELETE FROM serials
+          WHERE id = ?
+        `,
+        [serialId],
+      );
+    });
+
+    await rm(this.#fragments.getSerial(serialId).path, {
+      force: true,
+      recursive: true,
+    });
+    await this.deleteSummary(serialId);
+  }
+
+  async #deleteSerialGraphRecords(serialId: number): Promise<void> {
+    await this.#database.transaction(async () => {
+      await this.#database.run(
+        `
+          DELETE FROM snake_edges
+          WHERE from_snake_id IN (
+            SELECT id
+            FROM snakes
+            WHERE serial_id = ?
+          ) OR to_snake_id IN (
+            SELECT id
+            FROM snakes
+            WHERE serial_id = ?
+          )
+        `,
+        [serialId, serialId],
+      );
+      await this.#database.run(
+        `
+          DELETE FROM snake_chunks
+          WHERE snake_id IN (
+            SELECT id
+            FROM snakes
+            WHERE serial_id = ?
+          )
+        `,
+        [serialId],
+      );
+      await this.#database.run(
+        `
+          DELETE FROM snakes
+          WHERE serial_id = ?
+        `,
+        [serialId],
+      );
+      await this.#database.run(
+        `
+          DELETE FROM fragment_groups
+          WHERE serial_id = ?
+        `,
+        [serialId],
+      );
+      await this.#database.run(
+        `
+          DELETE FROM knowledge_edges
+          WHERE from_id IN (
+            SELECT id
+            FROM chunks
+            WHERE serial_id = ?
+          ) OR to_id IN (
+            SELECT id
+            FROM chunks
+            WHERE serial_id = ?
+          )
+        `,
+        [serialId, serialId],
+      );
+      await this.#database.run(
+        `
+          DELETE FROM chunk_sentences
+          WHERE serial_id = ?
+        `,
+        [serialId],
+      );
+      await this.#database.run(
+        `
+          DELETE FROM chunks
+          WHERE serial_id = ?
+        `,
+        [serialId],
+      );
+    });
   }
 
   async #readJsonFile<T>(
@@ -444,23 +484,35 @@ export class DirectoryDocument implements Document {
     }
   }
 
-  async #writeJsonFile(path: string, value: unknown): Promise<void> {
-    await this.#writeNewFile(path, `${JSON.stringify(value, null, 2)}\n`);
+  async #writeJsonFile(
+    path: string,
+    value: unknown,
+    options: { readonly overwrite?: boolean } = {},
+  ): Promise<void> {
+    await this.#writeFile(path, `${JSON.stringify(value, null, 2)}\n`, options);
   }
 
   async #writeNewFile(
     path: string,
     content: string | Uint8Array,
   ): Promise<void> {
+    await this.#writeFile(path, content, { overwrite: false });
+  }
+
+  async #writeFile(
+    path: string,
+    content: string | Uint8Array,
+    options: { readonly overwrite?: boolean },
+  ): Promise<void> {
     try {
       if (typeof content === "string") {
         await writeFile(path, content, {
           encoding: "utf8",
-          flag: "wx",
+          flag: options.overwrite === true ? "w" : "wx",
         });
       } else {
         await writeFile(path, content, {
-          flag: "wx",
+          flag: options.overwrite === true ? "w" : "wx",
         });
       }
     } catch (error) {
@@ -471,7 +523,9 @@ export class DirectoryDocument implements Document {
       throw error;
     }
 
-    this.#contextScope.getStore()?.registerCreatedFile(path);
+    if (options.overwrite !== true) {
+      this.#contextScope.getStore()?.registerCreatedFile(path);
+    }
   }
 
   #getSummariesPath(): string {

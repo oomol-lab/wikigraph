@@ -14,5 +14,25 @@ export {
   type SpineDigestSourceSessionOptions,
   type SpineDigestTextStreamSessionOptions,
 } from "./app.js";
+export {
+  addChapter,
+  CHAPTER_STAGES,
+  generateChapterGraph,
+  generateChapterSummary,
+  getChapterDetails,
+  listChapters,
+  removeChapter,
+  resetChapter,
+  setChapterSource,
+  setChapterSummary,
+} from "./chapter.js";
+export type {
+  AddChapterOptions,
+  ChapterDetails,
+  ChapterEntry,
+  ChapterStage,
+  GenerateChapterGraphOptions,
+  GenerateChapterSummaryOptions,
+} from "./chapter.js";
 export { SpineDigest } from "./spine-digest.js";
 export type { SpineDigestSerialEntry } from "./types.js";

@@ -1,0 +1,31 @@
+Command: spinedigest sdpub chapter
+
+Edit chapters inside an existing `.sdpub` archive.
+
+Usage:
+  spinedigest sdpub chapter list <path> [--llm <json>] [--help|-h]
+  spinedigest sdpub chapter status <path> --chapter <id> [--llm <json>] [--help|-h]
+  spinedigest sdpub chapter add <path> --title <title> [--parent <id>] [--llm <json>] [--help|-h]
+  spinedigest sdpub chapter remove <path> --chapter <id> [--recursive] [--llm <json>] [--help|-h]
+  spinedigest sdpub chapter reset <path> --chapter <id> --to <stage> [--llm <json>] [--help|-h]
+  spinedigest sdpub chapter set-source <path> --chapter <id> [--input <path>] --input-format <format> [--llm <json>] [--help|-h]
+  spinedigest sdpub chapter generate-graph <path> --chapter <id> [--prompt <text>] [--llm <json>] [--help|-h]
+  spinedigest sdpub chapter generate-summary <path> --chapter <id> [--llm <json>] [--help|-h]
+  spinedigest sdpub chapter set-summary <path> --chapter <id> [--input <path>] [--llm <json>] [--help|-h]
+
+Chapter stages:
+  planned     TOC chapter exists, but no source is stored.
+  sourced     Normalized source fragments are stored.
+  graphed     Source plus generated graph are stored.
+  summarized  Source, graph, and final summary are stored.
+
+Input rules:
+  - `<path>` is the `.sdpub` archive edited in place.
+  - `--chapter` is the numeric chapter id printed by `list` or `add`.
+  - `set-source` and `set-summary` read `--input <path>` when provided, otherwise stdin.
+  - `set-source` accepts only `txt` or `markdown` for `--input-format`.
+  - `reset --to` accepts `planned`, `sourced`, or `graphed`.
+
+See also:
+  - spinedigest sdpub chapter list <path>
+  - spinedigest help sdpub
