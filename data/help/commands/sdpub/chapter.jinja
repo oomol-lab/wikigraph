@@ -1,3 +1,4 @@
+Help Type: command
 Command: spinedigest sdpub chapter
 
 Edit chapters inside an existing `.sdpub` archive.
@@ -26,8 +27,12 @@ Input rules:
   - `reset --to` accepts `planned`, `sourced`, or `graphed`.
   - Structure edits, `set-source`, `set-summary`, and `reset` do not call an LLM provider.
   - To generate graph or summary for a chapter, use `spinedigest sdpub stage advance <path> --chapter <id> --to <stage>`.
+  - Legacy `generate-graph` and `generate-summary` action names are accepted for compatibility, but `sdpub stage advance` is the documented path.
+  - Append `--help` after an action for action-specific details, for example `spinedigest sdpub chapter reset --help`.
 
 See also:
   - spinedigest sdpub chapter list <path>
+  - spinedigest sdpub chapter set-source --help
+  - spinedigest sdpub chapter set-summary --help
   - spinedigest sdpub stage --help
   - spinedigest help sdpub

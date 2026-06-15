@@ -4,9 +4,15 @@ Topic: task
 Task Guide
 
 Digest source material into markdown:
-  Use when the input is EPUB, Markdown, txt, or stdin and you want a new compressed text result.
+  Use when the input is EPUB, Markdown, txt, or non-interactive stdin and you want a new compressed text result.
   Command shape:
     spinedigest --input <source> --output <digest.md>
+
+Convenience stream path:
+  Pipe txt/markdown into `spinedigest` and write compressed text to stdout.
+  Use explicit `--input-format` and `--output-format` because stream formats cannot be inferred.
+  Command shape:
+    cat <chapter.txt> | spinedigest --input-format txt --output-format markdown
 
 Digest source material into .sdpub:
   Use when you want a reusable archive for future export or inspection.
@@ -16,12 +22,14 @@ Digest source material into .sdpub:
     spinedigest --input <source> --output <digest.sdpub> --stage <planned|sourced|graphed|summarized>
 
 Re-export an existing .sdpub:
-  Use when the digest already exists and you only need markdown, txt, or EPUB output.
+  Use when the archive is summarized and you only need markdown, txt, or EPUB output.
   Command shape:
     spinedigest --input <digest.sdpub> --output <target>
+  If re-export fails with a missing summary, inspect unfinished chapters:
+    spinedigest sdpub stage pending <digest.sdpub>
 
 Inspect archive structure:
-  Use when you need format version, metadata, TOC, serial ids, one serial summary, or raw cover bytes.
+  Use when you need format version, metadata, TOC, completed summaries, or raw cover bytes.
   Command shape:
     spinedigest sdpub <info|toc|list|cat|cover|meta> --input <digest.sdpub>
 
@@ -35,10 +43,11 @@ Advance staged .sdpub chapters:
   Command shape:
     spinedigest sdpub stage advance <digest.sdpub> --to summarized
 
-Pipe text through stdin/stdout:
-  Use only for txt or markdown streams in non-interactive contexts.
-  Command shape:
-    cat <chapter.txt> | spinedigest --input-format txt --output-format markdown
+Manual staged workflow:
+  1. Create or add planned chapters.
+  2. Fill source with `sdpub chapter set-source`.
+  3. Generate graph with `sdpub stage advance --to graphed`.
+  4. Set a manual summary or advance to `summarized`.
 
 Where to go next:
   - Need copyable examples for these workflows:

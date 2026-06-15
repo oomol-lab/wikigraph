@@ -204,7 +204,8 @@ describe("cli/sdpub", () => {
         "Cover Path: images/cover.png",
         "",
         "Top-level Sections: 1",
-        "Referenced Serials: 2",
+        "Referenced Chapters: 2",
+        "Summarized Chapters: 2",
         "Fragments: 3",
         "",
       ].join("\n"),
@@ -222,8 +223,8 @@ describe("cli/sdpub", () => {
         "Fixture Book",
         "",
         "Part I",
-        "  Chapter 1 [serial 1]",
-        "  Chapter 2 [serial 2]",
+        "  Chapter 1 [chapter 1]",
+        "  Chapter 2 [chapter 2]",
         "",
       ].join("\n"),
     ]);
@@ -241,6 +242,19 @@ describe("cli/sdpub", () => {
         "[2] Part I / Chapter 2 (fragments: 1)",
         "",
       ].join("\n"),
+    ]);
+  });
+
+  it("prints a chapter-oriented empty list message", async () => {
+    sdpubMockState.serialEntries = [];
+
+    await runSdpubCommand({
+      inputPath: "/tmp/book.sdpub",
+      subcommand: "list",
+    });
+
+    expect(sdpubMockState.textWrites).toStrictEqual([
+      "No summarized chapters available.\n",
     ]);
   });
 

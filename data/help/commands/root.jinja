@@ -7,8 +7,15 @@ Purpose:
   Distill long-form EPUB, Markdown, or plain text into compressed output.
   Digesting source input uses an LLM pipeline. Re-opening an existing .sdpub archive does not.
 
+Default command:
+  `spinedigest` without a subcommand is the convenience digest/export command.
+  It reads from `--input <path>`, or from stdin when `--input` is omitted.
+  It writes to `--output <path>`, or to stdout when `--output` is omitted.
+  If no arguments are passed in an interactive terminal, it prints this help page.
+  Stream input/output formats cannot be inferred, so pass `--input-format` and `--output-format` for pipes.
+
 Usage:
-  spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose|-v] [--help|-h]
+  spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose|-v] [--help|-h] [--version]
   spinedigest status [--llm <json>] [--help|-h]
   spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [options] [--help|-h]
   spinedigest sdpub chapter <action> <path> [options] [--help|-h]
@@ -23,9 +30,11 @@ Help contract:
 Flag aliases:
   - `-h` is the short form of `--help` on every command and subcommand.
   - `-v` is the short form of `--verbose` on the main convert command.
+  - `--version` prints the CLI package version and exits.
 
 Common paths:
   Source input -> digest -> markdown | txt | epub | .sdpub
+  Piped txt/markdown -> digest -> stdout text
   Config status -> validate merged config -> print masked JSON
   .sdpub input -> re-export or inspect without re-running the digest pipeline
 

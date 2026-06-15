@@ -3,6 +3,7 @@ import { createEnv } from "../common/template.js";
 
 import { CLI_FORMATS } from "./formats.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "./errors.js";
+import type { CLISdpubChapterAction, CLISdpubStageAction } from "./args.js";
 
 export const HELP_TOPICS = [
   "overview",
@@ -98,15 +99,15 @@ const SDPUB_SUBCOMMAND_METADATA: readonly {
   },
   {
     name: "toc",
-    summary: "Print the TOC tree, including any referenced serial ids.",
+    summary: "Print the TOC tree, including chapter id markers.",
   },
   {
     name: "list",
-    summary: "List serial ids with their TOC paths and fragment counts.",
+    summary: "List summarized chapters that are ready for cat.",
   },
   {
     name: "cat",
-    summary: "Print the summary text for one serial id.",
+    summary: "Print one completed summary through the legacy --serial reader.",
   },
   {
     name: "cover",
@@ -163,6 +164,18 @@ export function renderSdpubSubcommandHelpText(
   subcommand: SDPubSubcommand,
 ): string {
   return renderHelpTemplate(`help/commands/sdpub/${subcommand}`);
+}
+
+export function renderSdpubChapterActionHelpText(
+  action: CLISdpubChapterAction,
+): string {
+  return renderHelpTemplate(`help/commands/sdpub/chapter/${action}`);
+}
+
+export function renderSdpubStageActionHelpText(
+  action: CLISdpubStageAction,
+): string {
+  return renderHelpTemplate(`help/commands/sdpub/stage/${action}`);
 }
 
 export function parseHelpTopic(value: string): HelpTopic {

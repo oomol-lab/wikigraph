@@ -1,14 +1,21 @@
 import { parseCLIArguments } from "./args.js";
 import { runConvertCommand } from "./convert.js";
+import { renderMainHelpText } from "./help.js";
 import { runStatusCommand } from "./status.js";
 import { runSdpubCommand } from "./sdpub.js";
 import { runSdpubChapterCommand } from "./sdpub-chapter.js";
 import { runSdpubStageCommand } from "./sdpub-stage.js";
 import { LLMPaymentRequiredError } from "../llm/index.js";
 import { formatError } from "../utils/node-error.js";
+import { readCLIVersion } from "./version.js";
 
 export async function main(): Promise<void> {
   try {
+    if (shouldPrintDefaultHelp()) {
+      process.stdout.write(`${renderMainHelpText()}\n`);
+      return;
+    }
+
     const parsed = parseCLIArguments();
 
     if (parsed.help) {
@@ -17,6 +24,9 @@ export async function main(): Promise<void> {
     }
 
     switch (parsed.kind) {
+      case "version":
+        process.stdout.write(`${readCLIVersion()}\n`);
+        return;
       case "convert":
         await runConvertCommand(parsed.args);
         return;
@@ -41,6 +51,10 @@ export async function main(): Promise<void> {
     process.stderr.write(`${formatCLIError(error)}\n`);
     process.exitCode = 1;
   }
+}
+
+function shouldPrintDefaultHelp(): boolean {
+  return process.argv.slice(2).length === 0 && process.stdin.isTTY === true;
 }
 
 function formatCLIError(error: unknown): string {

@@ -4,16 +4,21 @@ Command: spinedigest sdpub cat
 sdpub cat
 
 Purpose:
-  Print the summary text for one serial id.
+  Print the final summary text for one completed chapter through the legacy serial reader.
 
 Usage:
   spinedigest sdpub cat --input <path> --serial <id> [--llm <json>] [--help|-h]
 
 Required flags:
   --serial <id> must be a non-negative integer.
+  For chapter-backed content, this id matches the chapter id printed by `sdpub list`.
 
 Output shape:
   - Plain summary text only
 
 Notes:
-  - Use `spinedigest sdpub list --input <path>` to discover valid serial ids.
+  - `serial` is a legacy read-interface term; current editing and staging commands use chapter ids.
+  - The selected id must have a summary.
+  - Planned, sourced, or graphed chapters are not ready for `cat`.
+  - Use `spinedigest sdpub list --input <path>` to discover completed summaries.
+  - Use `spinedigest sdpub stage pending <path>` to find unfinished chapters.

@@ -34,8 +34,10 @@ Navigation:
 Stable terms:
   - digest: a new processing run from source input
   - .sdpub: a reusable processed archive
-  - serial: one digestible summary unit referenced by the TOC
-  - TOC path: the section path that points to a serial
+  - chapter: the current editable unit inside a .sdpub TOC
+  - chapter id: the numeric id used by `sdpub chapter ...` and `sdpub stage --chapter`
+  - serial: legacy/read-interface term still used by `sdpub cat --serial`
+  - TOC path: the section path for a chapter or completed summary
 
 Safety reminders:
   - Do not use stdin for `.sdpub` inspection; only `sdpub chapter set-source` and `set-summary` accept content from stdin.

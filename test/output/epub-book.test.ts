@@ -249,7 +249,7 @@ describe("output/epub/book", () => {
         });
 
         await expect(buildEpubBook(document)).rejects.toThrow(
-          "Serial 7 summary is missing",
+          "Chapter 7 summary is missing",
         );
       } finally {
         await document.release();

@@ -54,6 +54,8 @@ async function writeSdpubInfo(digest: SpineDigest): Promise<void> {
       throw error;
     }),
   ]);
+  const referencedChapterCount =
+    toc === undefined ? 0 : countReferencedChapters(toc.items);
   const lines: string[] = [];
 
   lines.push(`Archive Format Version: ${formatVersion}`);
@@ -77,7 +79,8 @@ async function writeSdpubInfo(digest: SpineDigest): Promise<void> {
     }
 
     lines.push(`Top-level Sections: ${toc.items.length}`);
-    lines.push(`Referenced Serials: ${serials.length}`);
+    lines.push(`Referenced Chapters: ${referencedChapterCount}`);
+    lines.push(`Summarized Chapters: ${serials.length}`);
     lines.push(
       `Fragments: ${serials.reduce(
         (total, serial) => total + serial.fragmentCount,
@@ -120,7 +123,7 @@ async function writeSdpubSerialList(digest: SpineDigest): Promise<void> {
   const serials = await digest.listSerials();
 
   if (serials.length === 0) {
-    await writeTextToStdout("No serials referenced by TOC.\n");
+    await writeTextToStdout("No summarized chapters available.\n");
     return;
   }
 
@@ -251,6 +254,16 @@ async function requireToc(digest: SpineDigest): Promise<TocFile> {
   return toc;
 }
 
+function countReferencedChapters(items: readonly TocItem[]): number {
+  return items.reduce(
+    (total, item) =>
+      total +
+      (item.serialId === undefined ? 0 : 1) +
+      countReferencedChapters(item.children),
+    0,
+  );
+}
+
 function renderTocLines(
   items: readonly TocItem[],
   depth = 0,
@@ -260,7 +273,7 @@ function renderTocLines(
   for (const item of items) {
     lines.push(
       `${"  ".repeat(depth)}${item.title?.trim() || "[untitled]"}${
-        item.serialId === undefined ? "" : ` [serial ${item.serialId}]`
+        item.serialId === undefined ? "" : ` [chapter ${item.serialId}]`
       }`,
     );
     lines.push(...renderTocLines(item.children, depth + 1));

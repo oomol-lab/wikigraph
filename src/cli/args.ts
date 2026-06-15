@@ -11,7 +11,9 @@ import {
   parseHelpTopic,
   renderHelpTopicText,
   renderMainHelpText,
+  renderSdpubChapterActionHelpText,
   renderStatusHelpText,
+  renderSdpubStageActionHelpText,
   renderSdpubHelpText,
   renderSdpubSubcommandHelpText,
   SDPUB_SUBCOMMANDS,
@@ -114,6 +116,10 @@ interface SdpubMetaFlagValues {
 }
 
 export type ParsedCLIArguments =
+  | {
+      readonly help: false;
+      readonly kind: "version";
+    }
   | {
       readonly args: CLIArguments;
       readonly help: false;
@@ -270,9 +276,19 @@ export function parseCLIArguments(
         short: "v",
         type: "boolean",
       },
+      version: {
+        type: "boolean",
+      },
     },
     strict: true,
   });
+
+  if (values.version === true) {
+    return {
+      help: false,
+      kind: "version",
+    };
+  }
 
   if (positionals[0] === "help") {
     return parseHelpArguments(positionals.slice(1), values);
@@ -289,7 +305,7 @@ export function parseCLIArguments(
   if (positionals.length > 0) {
     throw new Error(
       withHelpRoute(
-        `Unexpected positional arguments: ${positionals.join(" ")}. Use --input and --output instead.`,
+        `Unexpected positional argument or unknown command: ${positionals.join(" ")}. The default command reads from stdin or --input; it does not accept positional input paths. Use --input <path>, or see available subcommands with \`spinedigest --help\`.`,
         CLI_HELP_ROUTES.command,
       ),
     );
@@ -395,9 +411,13 @@ function parseSdpubArguments(
   }
 
   if (positionals.length > 1) {
+    const message = isKnownSubcommand
+      ? `Unexpected positional arguments: ${positionals.slice(1).join(" ")}. The \`sdpub ${subcommand}\` subcommand uses --input <path>; it does not accept a positional archive path.`
+      : `Unexpected positional arguments: ${positionals.slice(1).join(" ")}.`;
+
     throw new Error(
       withHelpRoute(
-        `Unexpected positional arguments: ${positionals.slice(1).join(" ")}.`,
+        message,
         isKnownSubcommand
           ? sdpubSubcommandHelpRoute(subcommand)
           : CLI_HELP_ROUTES.sdpub,
@@ -608,7 +628,23 @@ function parseSdpubChapterArguments(
     );
   }
 
-  if (help) {
+  if (help && isSdpubChapterAction(action)) {
+    if (action === "generate-graph" || action === "generate-summary") {
+      return {
+        help: true,
+        helpText: renderSdpubSubcommandHelpText("chapter"),
+        kind: "sdpub-chapter",
+      };
+    }
+
+    return {
+      help: true,
+      helpText: renderSdpubChapterActionHelpText(action),
+      kind: "sdpub-chapter",
+    };
+  }
+
+  if (help && action === undefined) {
     return {
       help: true,
       helpText: renderSdpubSubcommandHelpText("chapter"),
@@ -621,7 +657,7 @@ function parseSdpubChapterArguments(
       withHelpRoute(
         action === undefined
           ? "Missing sdpub chapter action."
-          : `Invalid sdpub chapter action: ${action}.`,
+          : `Invalid sdpub chapter action: ${action}. Expected one of list, status, add, remove, reset, set-source, set-summary.`,
         helpRoute,
       ),
     );
@@ -709,7 +745,15 @@ function parseSdpubStageArguments(
     );
   }
 
-  if (help) {
+  if (help && isSdpubStageAction(action)) {
+    return {
+      help: true,
+      helpText: renderSdpubStageActionHelpText(action),
+      kind: "sdpub-stage",
+    };
+  }
+
+  if (help && action === undefined) {
     return {
       help: true,
       helpText: renderSdpubSubcommandHelpText("stage"),
@@ -722,7 +766,7 @@ function parseSdpubStageArguments(
       withHelpRoute(
         action === undefined
           ? "Missing sdpub stage action."
-          : `Invalid sdpub stage action: ${action}.`,
+          : `Invalid sdpub stage action: ${action}. Expected one of advance, pending.`,
         helpRoute,
       ),
     );
