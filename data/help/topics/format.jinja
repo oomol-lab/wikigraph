@@ -15,8 +15,9 @@ Input rules:
 Output rules:
   - File output supports `markdown`, `txt`, `epub`, and `.sdpub`.
   - `stdout` supports only `markdown` or `txt`.
-  - `sdpub info`, `toc`, `list`, and `cat` print text to stdout.
+  - `sdpub info`, `toc`, `list`, `cat`, and `meta` print text to stdout.
   - `sdpub cover` writes raw binary bytes to stdout.
+  - `sdpub meta` edits book metadata in place when metadata edit flags are present.
 
 Inference:
   - If `--input-format` is omitted, input format is inferred from the file extension.

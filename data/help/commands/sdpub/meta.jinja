@@ -1,0 +1,49 @@
+Help Type: command
+Command: spinedigest sdpub meta
+
+sdpub meta
+
+Purpose:
+  Read or edit book metadata stored in an existing `.sdpub` archive.
+
+Usage:
+  spinedigest sdpub meta --input <path> [--llm <json>] [--help|-h]
+  spinedigest sdpub meta --input <path> [metadata options] [--llm <json>] [--help|-h]
+
+Metadata options:
+  --title <text>             Set the book title.
+  --author <text>            Replace the author list. May be repeated.
+  --language <text>          Set the language metadata.
+  --identifier <text>        Set the identifier metadata.
+  --publisher <text>         Set the publisher metadata.
+  --published-at <text>      Set the publication date metadata.
+  --description <text>       Set the description metadata.
+  --clear-title              Clear the book title.
+  --clear-authors            Clear all authors.
+  --clear-language           Clear the language metadata.
+  --clear-identifier         Clear the identifier metadata.
+  --clear-publisher          Clear the publisher metadata.
+  --clear-published-at       Clear the publication date metadata.
+  --clear-description        Clear the description metadata.
+
+Behavior:
+  - Without metadata options, this command prints the current metadata.
+  - With metadata options, this command edits the archive in place and then prints the updated metadata.
+  - `--author` replaces the entire author list; pass it once per author.
+  - `version` and `sourceFormat` are preserved and cannot be edited by this command.
+  - Empty string metadata values are rejected. Use the matching `--clear-*` flag instead.
+  - This command does not call an LLM provider.
+
+Examples:
+  spinedigest sdpub meta --input ./book.sdpub
+  spinedigest sdpub meta --input ./book.sdpub --title "New Title"
+  spinedigest sdpub meta --input ./book.sdpub --author "Author One" --author "Author Two"
+  spinedigest sdpub meta --input ./book.sdpub --clear-title --clear-description
+
+Where to go next:
+  - Need the whole `.sdpub` command family:
+    spinedigest sdpub --help
+  - Need chapter tree editing:
+    spinedigest sdpub chapter --help
+  - Need archive-vs-source mental model:
+    spinedigest help sdpub

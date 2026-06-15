@@ -25,7 +25,7 @@ export interface ChapterEntry {
   readonly depth: number;
   readonly fragmentCount: number;
   readonly stage: ChapterStage;
-  readonly title: string;
+  readonly title: string | null;
   readonly tocPath: readonly string[];
 }
 
@@ -36,7 +36,7 @@ export interface ChapterDetails extends ChapterEntry {
 
 export interface AddChapterOptions {
   readonly parentChapterId?: number;
-  readonly title: string;
+  readonly title?: string | null | undefined;
 }
 
 export interface GenerateChapterGraphOptions {
@@ -60,15 +60,11 @@ export async function addChapter(
     const toc = await normalizeChapterToc(openedDocument);
     const normalizedTitle = normalizeTitle(options.title);
 
-    if (normalizedTitle === undefined) {
-      throw new Error("Chapter title is required.");
-    }
-
     const chapterId = await openedDocument.createSerial();
     const chapterItem = {
       children: [],
       serialId: chapterId,
-      title: normalizedTitle,
+      ...(normalizedTitle === undefined ? {} : { title: normalizedTitle }),
     } satisfies TocItem;
 
     if (options.parentChapterId === undefined) {
@@ -311,7 +307,8 @@ async function collectChapterEntries(
       continue;
     }
 
-    const tocPath = [...ancestorTitles, item.title];
+    const title = normalizeTitle(item.title) ?? null;
+    const tocPath = [...ancestorTitles, title ?? `Chapter ${item.serialId}`];
     const fragmentCount = (
       await document.getSerialFragments(item.serialId).listFragmentIds()
     ).length;
@@ -322,7 +319,7 @@ async function collectChapterEntries(
       depth,
       fragmentCount,
       stage: await resolveChapterStage(document, item.serialId, fragmentCount),
-      title: item.title,
+      title,
       tocPath,
     });
     entries.push(
@@ -422,10 +419,10 @@ async function* readChapterSource(
   }
 }
 
-function normalizeTitle(title: string): string | undefined {
-  const normalized = title.trim();
+function normalizeTitle(title: string | null | undefined): string | undefined {
+  const normalized = title?.trim();
 
-  return normalized === "" ? undefined : normalized;
+  return normalized === undefined || normalized === "" ? undefined : normalized;
 }
 
 function removeChapterFromItems(
@@ -489,5 +486,5 @@ interface MutableTocFile {
 interface MutableTocItem {
   children: MutableTocItem[];
   serialId?: number | undefined;
-  title: string;
+  title?: string | null | undefined;
 }

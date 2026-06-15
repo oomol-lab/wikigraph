@@ -11,7 +11,7 @@ Installed CLI:
 ```bash
 spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--verbose]
 spinedigest status [--llm <json>]
-spinedigest sdpub <info|toc|list|cat|cover> --input <path> [--serial <id>] [--llm <json>]
+spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
 ```
 
 From a source checkout:
@@ -19,7 +19,7 @@ From a source checkout:
 ```bash
 pnpm dev -- [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--verbose]
 pnpm dev -- status [--llm <json>]
-pnpm dev -- sdpub <info|toc|list|cat|cover> --input <path> [--serial <id>] [--llm <json>]
+pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
 ```
 
 ## Flags
@@ -38,7 +38,7 @@ The main conversion command does not support positional arguments.
 
 The `sdpub` inspection interface uses positional subcommands: `spinedigest sdpub <subcommand>`.
 
-The `sdpub` inspection subcommands only accept `--input`, and `cat` also requires `--serial`.
+The `sdpub` inspection subcommands only accept `--input`, except `cat` also requires `--serial` and `meta` accepts metadata edit flags.
 
 `--prompt` only affects digest generation from source inputs. It does not apply when reopening `.sdpub` archives or using `spinedigest sdpub ...`.
 
@@ -119,6 +119,7 @@ spinedigest sdpub toc --input ./book.sdpub
 spinedigest sdpub list --input ./book.sdpub
 spinedigest sdpub cat --input ./book.sdpub --serial 12
 spinedigest sdpub cover --input ./book.sdpub > ./cover.png
+spinedigest sdpub meta --input ./book.sdpub
 ```
 
 Use pipes:

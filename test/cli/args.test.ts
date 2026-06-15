@@ -145,6 +145,33 @@ describe("cli/args", () => {
       help: false,
       kind: "sdpub",
     });
+    expect(
+      parseCLIArguments([
+        "sdpub",
+        "meta",
+        "--input",
+        "book.sdpub",
+        "--title",
+        "  Updated Book  ",
+        "--author",
+        "Ari Lantern",
+        "--author",
+        "Bea North",
+        "--clear-description",
+      ]),
+    ).toStrictEqual({
+      args: {
+        inputPath: "book.sdpub",
+        metaPatch: {
+          authors: ["Ari Lantern", "Bea North"],
+          clearDescription: true,
+          title: "Updated Book",
+        },
+        subcommand: "meta",
+      },
+      help: false,
+      kind: "sdpub",
+    });
   });
 
   it("parses sdpub chapter edit actions", () => {
@@ -282,10 +309,10 @@ describe("cli/args", () => {
 
   it("rejects invalid sdpub usage", () => {
     expect(() => parseCLIArguments(["sdpub"])).toThrow(
-      "Missing sdpub subcommand. Expected one of info, toc, list, cat, cover, chapter.\nSee: spinedigest sdpub --help",
+      "Missing sdpub subcommand. Expected one of info, toc, list, cat, cover, meta, chapter.\nSee: spinedigest sdpub --help",
     );
     expect(() => parseCLIArguments(["sdpub", "inspect"])).toThrow(
-      "Invalid sdpub subcommand: inspect. Expected one of info, toc, list, cat, cover, chapter.\nSee: spinedigest sdpub --help",
+      "Invalid sdpub subcommand: inspect. Expected one of info, toc, list, cat, cover, meta, chapter.\nSee: spinedigest sdpub --help",
     );
     expect(() => parseCLIArguments(["sdpub", "inspect", "extra"])).toThrow(
       "Unexpected positional arguments: extra.\nSee: spinedigest sdpub --help",
@@ -328,6 +355,31 @@ describe("cli/args", () => {
       ]),
     ).toThrow(
       "Invalid --serial: x. Expected a non-negative integer.\nSee: spinedigest sdpub cat --help",
+    );
+    expect(() =>
+      parseCLIArguments([
+        "sdpub",
+        "info",
+        "--input",
+        "book.sdpub",
+        "--title",
+        "Updated",
+      ]),
+    ).toThrow(
+      "The `sdpub info` subcommand does not support metadata edit flags.\nSee: spinedigest sdpub info --help",
+    );
+    expect(() =>
+      parseCLIArguments([
+        "sdpub",
+        "meta",
+        "--input",
+        "book.sdpub",
+        "--title",
+        "Updated",
+        "--clear-title",
+      ]),
+    ).toThrow(
+      "Cannot combine --title with --clear-title.\nSee: spinedigest sdpub meta --help",
     );
   });
 
@@ -473,6 +525,7 @@ describe("cli/args", () => {
       "refuses to write binary data to an interactive terminal",
     );
     expect(renderSdpubSubcommandHelpText("cover")).toContain("[--help|-h]");
+    expect(renderSdpubSubcommandHelpText("meta")).toContain("--clear-authors");
   });
 
   it("supports a first-contact recovery chain from root help to parse failures", () => {

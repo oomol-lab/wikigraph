@@ -106,7 +106,8 @@ async function collectSerialEntries(
   const entries: SpineDigestSerialEntry[] = [];
 
   for (const item of items) {
-    const tocPath = [...ancestorTitles, item.title];
+    const title = item.title?.trim() || `Chapter ${item.serialId ?? "group"}`;
+    const tocPath = [...ancestorTitles, title];
 
     if (item.serialId !== undefined) {
       entries.push({
@@ -114,7 +115,7 @@ async function collectSerialEntries(
           await document.getSerialFragments(item.serialId).listFragmentIds()
         ).length,
         serialId: item.serialId,
-        title: item.title,
+        title,
         tocPath,
       });
     }

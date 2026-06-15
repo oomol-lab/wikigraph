@@ -11,7 +11,7 @@ SpineDigest 的设计重心是命令行使用。
 ```bash
 spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--verbose]
 spinedigest status [--llm <json>]
-spinedigest sdpub <info|toc|list|cat|cover> --input <path> [--serial <id>] [--llm <json>]
+spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
 ```
 
 在源码仓库中运行时：
@@ -19,7 +19,7 @@ spinedigest sdpub <info|toc|list|cat|cover> --input <path> [--serial <id>] [--ll
 ```bash
 pnpm dev -- [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--verbose]
 pnpm dev -- status [--llm <json>]
-pnpm dev -- sdpub <info|toc|list|cat|cover> --input <path> [--serial <id>] [--llm <json>]
+pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
 ```
 
 ## 参数
@@ -38,7 +38,7 @@ pnpm dev -- sdpub <info|toc|list|cat|cover> --input <path> [--serial <id>] [--ll
 
 `sdpub` 检查接口本身使用 positional subcommands：`spinedigest sdpub <subcommand>`。
 
-`sdpub` 检查子命令只接受 `--input`，其中 `cat` 还要求提供 `--serial`。
+`sdpub` 检查子命令只接受 `--input`，其中 `cat` 还要求提供 `--serial`，`meta` 额外接受 metadata 编辑参数。
 
 `--prompt` 只影响从源输入生成 digest 的过程，不适用于重新打开 `.sdpub` 或使用 `spinedigest sdpub ...`。
 
@@ -119,6 +119,7 @@ spinedigest sdpub toc --input ./book.sdpub
 spinedigest sdpub list --input ./book.sdpub
 spinedigest sdpub cat --input ./book.sdpub --serial 12
 spinedigest sdpub cover --input ./book.sdpub > ./cover.png
+spinedigest sdpub meta --input ./book.sdpub
 ```
 
 通过管道处理：

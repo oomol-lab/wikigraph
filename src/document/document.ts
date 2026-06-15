@@ -84,6 +84,7 @@ export interface Document extends ReadonlyDocument {
   flush(): Promise<void>;
   openSession<T>(operation: (document: Document) => Promise<T> | T): Promise<T>;
   peekNextSerialId(): Promise<number>;
+  replaceBookMeta(meta: BookMeta): Promise<void>;
   replaceToc(toc: TocFile): Promise<void>;
   writeBookMeta(meta: BookMeta): Promise<void>;
   writeCover(cover: SourceAsset): Promise<void>;
@@ -283,6 +284,12 @@ export class DirectoryDocument implements Document {
 
   public async writeBookMeta(meta: BookMeta): Promise<void> {
     await this.#writeJsonFile(this.#getBookMetaPath(), meta);
+  }
+
+  public async replaceBookMeta(meta: BookMeta): Promise<void> {
+    await this.#writeJsonFile(this.#getBookMetaPath(), meta, {
+      overwrite: true,
+    });
   }
 
   public async writeCover(cover: SourceAsset): Promise<void> {

@@ -33,8 +33,26 @@ export interface CLIArguments {
 export interface CLISdpubArguments {
   readonly inputPath: string;
   readonly llmJSON?: string;
+  readonly metaPatch?: SdpubMetaPatch;
   readonly serialId?: number;
   readonly subcommand: Exclude<SDPubSubcommand, "chapter">;
+}
+
+export interface SdpubMetaPatch {
+  readonly authors?: readonly string[];
+  readonly clearAuthors?: boolean;
+  readonly clearDescription?: boolean;
+  readonly clearIdentifier?: boolean;
+  readonly clearLanguage?: boolean;
+  readonly clearPublishedAt?: boolean;
+  readonly clearPublisher?: boolean;
+  readonly clearTitle?: boolean;
+  readonly description?: string;
+  readonly identifier?: string;
+  readonly language?: string;
+  readonly publishedAt?: string;
+  readonly publisher?: string;
+  readonly title?: string;
 }
 
 export type CLISdpubChapterAction =
@@ -64,6 +82,23 @@ export interface CLISdpubChapterArguments {
 
 export interface CLIStatusArguments {
   readonly llmJSON?: string;
+}
+
+interface SdpubMetaFlagValues {
+  readonly author?: readonly string[];
+  readonly "clear-authors"?: boolean;
+  readonly "clear-description"?: boolean;
+  readonly "clear-identifier"?: boolean;
+  readonly "clear-language"?: boolean;
+  readonly "clear-published-at"?: boolean;
+  readonly "clear-publisher"?: boolean;
+  readonly "clear-title"?: boolean;
+  readonly description?: string;
+  readonly identifier?: string;
+  readonly language?: string;
+  readonly "published-at"?: string;
+  readonly publisher?: string;
+  readonly title?: string;
 }
 
 export type ParsedCLIArguments =
@@ -123,6 +158,34 @@ export function parseCLIArguments(
     allowPositionals: true,
     args: argv,
     options: {
+      author: {
+        multiple: true,
+        type: "string",
+      },
+      "clear-authors": {
+        type: "boolean",
+      },
+      "clear-description": {
+        type: "boolean",
+      },
+      "clear-identifier": {
+        type: "boolean",
+      },
+      "clear-language": {
+        type: "boolean",
+      },
+      "clear-published-at": {
+        type: "boolean",
+      },
+      "clear-publisher": {
+        type: "boolean",
+      },
+      "clear-title": {
+        type: "boolean",
+      },
+      description: {
+        type: "string",
+      },
       help: {
         short: "h",
         type: "boolean",
@@ -130,10 +193,16 @@ export function parseCLIArguments(
       "digest-dir": {
         type: "string",
       },
+      identifier: {
+        type: "string",
+      },
       input: {
         type: "string",
       },
       "input-format": {
+        type: "string",
+      },
+      language: {
         type: "string",
       },
       llm: {
@@ -155,6 +224,12 @@ export function parseCLIArguments(
         type: "string",
       },
       parent: {
+        type: "string",
+      },
+      "published-at": {
+        type: "string",
+      },
+      publisher: {
         type: "string",
       },
       recursive: {
@@ -194,6 +269,8 @@ export function parseCLIArguments(
       ),
     );
   }
+
+  rejectConvertMetaFlags(values);
 
   const args = {
     ...(values["digest-dir"] === undefined
@@ -239,15 +316,28 @@ export function parseCLIArguments(
 function parseSdpubArguments(
   positionals: readonly string[],
   values: {
+    readonly author?: readonly string[];
     readonly chapter?: string;
+    readonly "clear-authors"?: boolean;
+    readonly "clear-description"?: boolean;
+    readonly "clear-identifier"?: boolean;
+    readonly "clear-language"?: boolean;
+    readonly "clear-published-at"?: boolean;
+    readonly "clear-publisher"?: boolean;
+    readonly "clear-title"?: boolean;
+    readonly description?: string;
     readonly "digest-dir"?: string;
     readonly help?: boolean;
+    readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly language?: string;
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
     readonly parent?: string;
+    readonly "published-at"?: string;
+    readonly publisher?: string;
     readonly prompt?: string;
     readonly recursive?: boolean;
     readonly serial?: string;
@@ -345,6 +435,7 @@ function parseSdpubArguments(
       ),
     );
   }
+  const metaPatch = parseSdpubMetaPatch(values, parsedSubcommand);
   if (values.verbose) {
     throw new Error(
       withHelpRoute(
@@ -408,6 +499,7 @@ function parseSdpubArguments(
     args: {
       inputPath: inputPath!,
       ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+      ...(metaPatch === undefined ? {} : { metaPatch }),
       ...(serialId === undefined ? {} : { serialId }),
       subcommand: parsedSubcommand,
     },
@@ -419,15 +511,28 @@ function parseSdpubArguments(
 function parseSdpubChapterArguments(
   positionals: readonly string[],
   values: {
+    readonly author?: readonly string[];
     readonly chapter?: string;
+    readonly "clear-authors"?: boolean;
+    readonly "clear-description"?: boolean;
+    readonly "clear-identifier"?: boolean;
+    readonly "clear-language"?: boolean;
+    readonly "clear-published-at"?: boolean;
+    readonly "clear-publisher"?: boolean;
+    readonly "clear-title"?: boolean;
+    readonly description?: string;
     readonly "digest-dir"?: string;
     readonly help?: boolean;
+    readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly language?: string;
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
     readonly parent?: string;
+    readonly "published-at"?: string;
+    readonly publisher?: string;
     readonly prompt?: string;
     readonly recursive?: boolean;
     readonly serial?: string;
@@ -445,6 +550,7 @@ function parseSdpubChapterArguments(
   rejectSdpubChapterFlag("output", values.output);
   rejectSdpubChapterFlag("output-format", values["output-format"]);
   rejectSdpubChapterFlag("serial", values.serial);
+  rejectSdpubChapterMetaFlags(values);
   if (values.verbose) {
     throw new Error(
       withHelpRoute(
@@ -529,7 +635,6 @@ function normalizeSdpubChapterArguments(
 
   switch (action) {
     case "add":
-      requireFlag(values.title, "--title", action, helpRoute);
       rejectActionFlag(values.chapter, "--chapter", action, helpRoute);
       rejectActionFlag(values.input, "--input", action, helpRoute);
       rejectActionFlag(
@@ -551,7 +656,7 @@ function normalizeSdpubChapterArguments(
         path,
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
         ...(parentChapterId === undefined ? {} : { parentChapterId }),
-        title: values.title,
+        ...(values.title === undefined ? {} : { title: values.title }),
       };
     case "generate-graph":
       requireChapterId(chapterId, action, helpRoute);
@@ -766,13 +871,26 @@ function normalizeSdpubChapterArguments(
 function parseHelpArguments(
   positionals: readonly string[],
   values: {
+    readonly author?: readonly string[];
+    readonly "clear-authors"?: boolean;
+    readonly "clear-description"?: boolean;
+    readonly "clear-identifier"?: boolean;
+    readonly "clear-language"?: boolean;
+    readonly "clear-published-at"?: boolean;
+    readonly "clear-publisher"?: boolean;
+    readonly "clear-title"?: boolean;
+    readonly description?: string;
     readonly "digest-dir"?: string;
     readonly help?: boolean;
+    readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly language?: string;
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
+    readonly "published-at"?: string;
+    readonly publisher?: string;
     readonly prompt?: string;
     readonly serial?: string;
     readonly verbose?: boolean;
@@ -786,6 +904,7 @@ function parseHelpArguments(
   rejectHelpFlag("output-format", values["output-format"]);
   rejectHelpFlag("prompt", values.prompt);
   rejectHelpFlag("serial", values.serial);
+  rejectHelpMetaFlags(values);
 
   if (values.verbose) {
     throw new Error(
@@ -823,13 +942,26 @@ function parseHelpArguments(
 function parseStatusArguments(
   positionals: readonly string[],
   values: {
+    readonly author?: readonly string[];
+    readonly "clear-authors"?: boolean;
+    readonly "clear-description"?: boolean;
+    readonly "clear-identifier"?: boolean;
+    readonly "clear-language"?: boolean;
+    readonly "clear-published-at"?: boolean;
+    readonly "clear-publisher"?: boolean;
+    readonly "clear-title"?: boolean;
+    readonly description?: string;
     readonly "digest-dir"?: string;
     readonly help?: boolean;
+    readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly language?: string;
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
+    readonly "published-at"?: string;
+    readonly publisher?: string;
     readonly prompt?: string;
     readonly serial?: string;
     readonly verbose?: boolean;
@@ -842,6 +974,7 @@ function parseStatusArguments(
   rejectStatusFlag("output-format", values["output-format"]);
   rejectStatusFlag("prompt", values.prompt);
   rejectStatusFlag("serial", values.serial);
+  rejectStatusMetaFlags(values);
 
   if (values.verbose) {
     throw new Error(
@@ -960,6 +1093,137 @@ function parseResetStage(
   );
 }
 
+function parseSdpubMetaPatch(
+  values: SdpubMetaFlagValues,
+  subcommand: Exclude<SDPubSubcommand, "chapter">,
+): SdpubMetaPatch | undefined {
+  const helpRoute = sdpubSubcommandHelpRoute(subcommand);
+  const patch = {
+    ...parseSdpubStringMetaPatch(values, "title", "title", helpRoute),
+    ...parseSdpubStringMetaPatch(values, "language", "language", helpRoute),
+    ...parseSdpubStringMetaPatch(values, "identifier", "identifier", helpRoute),
+    ...parseSdpubStringMetaPatch(values, "publisher", "publisher", helpRoute),
+    ...parseSdpubStringMetaPatch(
+      values,
+      "publishedAt",
+      "published-at",
+      helpRoute,
+    ),
+    ...parseSdpubStringMetaPatch(
+      values,
+      "description",
+      "description",
+      helpRoute,
+    ),
+    ...parseSdpubAuthorsMetaPatch(values, helpRoute),
+  } satisfies SdpubMetaPatch;
+
+  if (Object.keys(patch).length === 0) {
+    return undefined;
+  }
+  if (subcommand !== "meta") {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub ${subcommand}\` subcommand does not support metadata edit flags.`,
+        sdpubSubcommandHelpRoute(subcommand),
+      ),
+    );
+  }
+
+  return patch;
+}
+
+function parseSdpubStringMetaPatch(
+  values: SdpubMetaFlagValues,
+  key:
+    | "description"
+    | "identifier"
+    | "language"
+    | "publishedAt"
+    | "publisher"
+    | "title",
+  flag:
+    | "description"
+    | "identifier"
+    | "language"
+    | "published-at"
+    | "publisher"
+    | "title",
+  helpRoute: string,
+): Partial<SdpubMetaPatch> {
+  const value = values[flag];
+  const clearFlag = `clear-${flag}` as keyof SdpubMetaFlagValues;
+  const clearValue = values[clearFlag];
+
+  if (value !== undefined && clearValue === true) {
+    throw new Error(
+      withHelpRoute(
+        `Cannot combine --${flag} with --clear-${flag}.`,
+        helpRoute,
+      ),
+    );
+  }
+  if (value !== undefined) {
+    const normalized = normalizeNonEmptyFlagValue(
+      value,
+      `--${flag}`,
+      helpRoute,
+    );
+
+    return {
+      [key]: normalized,
+    };
+  }
+  if (clearValue === true) {
+    const clearKey = `clear${key[0]!.toUpperCase()}${key.slice(1)}`;
+
+    return {
+      [clearKey]: true,
+    } as Partial<SdpubMetaPatch>;
+  }
+
+  return {};
+}
+
+function parseSdpubAuthorsMetaPatch(
+  values: SdpubMetaFlagValues,
+  helpRoute: string,
+): Partial<SdpubMetaPatch> {
+  if (values.author !== undefined && values["clear-authors"] === true) {
+    throw new Error(
+      withHelpRoute("Cannot combine --author with --clear-authors.", helpRoute),
+    );
+  }
+  if (values.author !== undefined) {
+    return {
+      authors: values.author.map((value) =>
+        normalizeNonEmptyFlagValue(value, "--author", helpRoute),
+      ),
+    };
+  }
+  if (values["clear-authors"] === true) {
+    return {
+      clearAuthors: true,
+    };
+  }
+
+  return {};
+}
+
+function normalizeNonEmptyFlagValue(
+  value: string,
+  flag: string,
+  helpRoute: string,
+): string {
+  const normalized = value.trim();
+
+  if (normalized === "") {
+    throw new Error(withHelpRoute(`${flag} cannot be empty.`, helpRoute));
+  }
+
+  return normalized;
+}
+
 function rejectActionFlag(
   value: string | undefined,
   flag: string,
@@ -1003,6 +1267,83 @@ function rejectSdpubChapterFlag(name: string, value: string | undefined): void {
   }
 }
 
+function rejectConvertMetaFlags(values: SdpubMetaFlagValues): void {
+  for (const flag of listPresentMetaFlags(values)) {
+    throw new Error(
+      withHelpRoute(
+        `The main convert command does not support ${flag}.`,
+        CLI_HELP_ROUTES.command,
+      ),
+    );
+  }
+}
+
+function rejectSdpubChapterMetaFlags(values: SdpubMetaFlagValues): void {
+  for (const flag of listPresentMetaFlags(values, { includeTitle: false })) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub chapter\` command does not support ${flag}.`,
+        "spinedigest sdpub chapter --help",
+      ),
+    );
+  }
+}
+
+function rejectHelpMetaFlags(values: SdpubMetaFlagValues): void {
+  for (const flag of listPresentMetaFlags(values)) {
+    throw new Error(
+      withHelpRoute(
+        `The \`help\` command does not support ${flag}.`,
+        CLI_HELP_ROUTES.root,
+      ),
+    );
+  }
+}
+
+function rejectStatusMetaFlags(values: SdpubMetaFlagValues): void {
+  for (const flag of listPresentMetaFlags(values)) {
+    throw new Error(
+      withHelpRoute(
+        `The \`status\` command does not support ${flag}.`,
+        "spinedigest status --help",
+      ),
+    );
+  }
+}
+
+function listPresentMetaFlags(
+  values: SdpubMetaFlagValues,
+  options: { readonly includeTitle?: boolean } = {},
+): readonly string[] {
+  const includeTitle = options.includeTitle ?? true;
+  const flags: string[] = [];
+
+  if (values.author !== undefined) flags.push("--author");
+  if (values["clear-authors"] !== undefined) flags.push("--clear-authors");
+  if (values["clear-description"] !== undefined) {
+    flags.push("--clear-description");
+  }
+  if (values["clear-identifier"] !== undefined) {
+    flags.push("--clear-identifier");
+  }
+  if (values["clear-language"] !== undefined) flags.push("--clear-language");
+  if (values["clear-published-at"] !== undefined) {
+    flags.push("--clear-published-at");
+  }
+  if (values["clear-publisher"] !== undefined) flags.push("--clear-publisher");
+  if (includeTitle && values["clear-title"] !== undefined) {
+    flags.push("--clear-title");
+  }
+  if (values.description !== undefined) flags.push("--description");
+  if (values.identifier !== undefined) flags.push("--identifier");
+  if (values.language !== undefined) flags.push("--language");
+  if (values["published-at"] !== undefined) flags.push("--published-at");
+  if (values.publisher !== undefined) flags.push("--publisher");
+  if (includeTitle && values.title !== undefined) flags.push("--title");
+
+  return flags;
+}
+
 function requireChapterId(
   chapterId: number | undefined,
   action: CLISdpubChapterAction,
@@ -1012,22 +1353,6 @@ function requireChapterId(
     throw new Error(
       withHelpRoute(
         `Missing --chapter. \`sdpub chapter ${action}\` requires a chapter id.`,
-        helpRoute,
-      ),
-    );
-  }
-}
-
-function requireFlag(
-  value: string | undefined,
-  flag: string,
-  action: CLISdpubChapterAction,
-  helpRoute: string,
-): asserts value is string {
-  if (value === undefined) {
-    throw new Error(
-      withHelpRoute(
-        `Missing ${flag}. \`sdpub chapter ${action}\` requires it.`,
         helpRoute,
       ),
     );

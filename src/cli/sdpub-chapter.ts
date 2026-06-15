@@ -40,7 +40,7 @@ export async function runSdpubChapterCommand(
           ...(args.parentChapterId === undefined
             ? {}
             : { parentChapterId: args.parentChapterId }),
-          title: args.title!,
+          ...(args.title === undefined ? {} : { title: args.title }),
         });
 
         await writeChapterDetails(details);
@@ -215,7 +215,7 @@ async function readContentText(
 async function writeChapterDetails(details: ChapterDetails): Promise<void> {
   const lines = [
     `Chapter: ${details.chapterId}`,
-    `Title: ${details.title}`,
+    `Title: ${details.title ?? "[untitled]"}`,
     `Stage: ${details.stage}`,
     `Fragments: ${details.fragmentCount}`,
     `Children: ${details.childCount}`,
@@ -238,7 +238,7 @@ async function writeChapterList(
     `${entries
       .map(
         (entry) =>
-          `${"  ".repeat(entry.depth)}[${entry.chapterId}] ${entry.stage.padEnd(10)} ${entry.title}`,
+          `${"  ".repeat(entry.depth)}[${entry.chapterId}] ${entry.stage.padEnd(10)} ${entry.title ?? "[untitled]"}`,
       )
       .join("\n")}\n`,
   );

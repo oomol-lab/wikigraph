@@ -27,6 +27,7 @@ export const SDPUB_SUBCOMMANDS = [
   "list",
   "cat",
   "cover",
+  "meta",
   "chapter",
 ] as const;
 
@@ -109,6 +110,10 @@ const SDPUB_SUBCOMMAND_METADATA: readonly {
   {
     name: "cover",
     summary: "Write raw cover bytes to stdout for redirection or piping.",
+  },
+  {
+    name: "meta",
+    summary: "Read or edit book metadata stored in the archive.",
   },
   {
     name: "chapter",

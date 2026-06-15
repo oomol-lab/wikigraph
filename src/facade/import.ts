@@ -180,7 +180,7 @@ async function generatePlannedSerials(
 }
 
 function planTocItems(input: {
-  readonly fallbackTitle: string | null;
+  readonly fallbackTitle: string | null | undefined;
   readonly plannedSections: PlannedSection[];
   readonly sections: readonly SourceSection[];
   readonly serialIdAllocator: SerialIdAllocator;
@@ -188,9 +188,7 @@ function planTocItems(input: {
   return input.sections.map((section, index) =>
     planTocItem({
       fallbackTitle:
-        input.sections.length === 1
-          ? input.fallbackTitle
-          : createSectionFallbackTitle([index]),
+        input.sections.length === 1 ? input.fallbackTitle : undefined,
       indexPath: [index],
       plannedSections: input.plannedSections,
       section,
@@ -200,7 +198,7 @@ function planTocItems(input: {
 }
 
 function planTocItem(input: {
-  readonly fallbackTitle: string | null;
+  readonly fallbackTitle: string | null | undefined;
   readonly indexPath: readonly number[];
   readonly plannedSections: PlannedSection[];
   readonly section: SourceSection;
@@ -211,7 +209,7 @@ function planTocItem(input: {
     : undefined;
   const children = input.section.children.map((child, index) =>
     planTocItem({
-      fallbackTitle: createSectionFallbackTitle([...input.indexPath, index]),
+      fallbackTitle: undefined,
       indexPath: [...input.indexPath, index],
       plannedSections: input.plannedSections,
       section: child,
@@ -226,18 +224,14 @@ function planTocItem(input: {
     });
   }
 
+  const title =
+    normalizeTitle(input.section.title) ?? normalizeTitle(input.fallbackTitle);
+
   return {
-    title:
-      normalizeTitle(input.section.title) ??
-      normalizeTitle(input.fallbackTitle) ??
-      createSectionFallbackTitle(input.indexPath),
+    ...(title === undefined ? {} : { title }),
     ...(serialId === undefined ? {} : { serialId }),
     children,
   };
-}
-
-function createSectionFallbackTitle(indexPath: readonly number[]): string {
-  return `Section ${indexPath.map((value) => value + 1).join(".")}`;
 }
 
 function normalizeTitle(title: string | null | undefined): string | undefined {

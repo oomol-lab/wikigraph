@@ -14,7 +14,7 @@ export function buildNavItems(
       item.serialId === undefined
         ? undefined
         : sectionMap.get(item.serialId)?.href,
-    title: item.title,
+    title: item.title?.trim() || `Section ${item.serialId ?? 1}`,
   }));
 }
 

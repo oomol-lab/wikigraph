@@ -83,9 +83,10 @@ For archives written by SpineDigest today:
 Source-specific notes:
 
 - TXT input currently produces one top-level serial and never produces a
-  cover.
+  cover. The TOC item may omit `title` when no title is supplied.
 - Markdown input currently produces one top-level serial and never
-  produces a cover.
+  produces a cover. The TOC item may omit `title` when no title is
+  supplied.
 - EPUB input may or may not produce a cover.
 - EPUB input may produce grouping TOC nodes that omit `serialId`.
 
@@ -162,6 +163,10 @@ Field contract:
 metadata. It is not a promise that the current public CLI necessarily
 accepts that source type as direct input.
 
+The public CLI can inspect and edit these fields with
+`spinedigest sdpub meta --input <path>`. The command preserves `version`
+and `sourceFormat`.
+
 ### `toc.json`
 
 `toc.json` defines the exported reading order and section tree.
@@ -188,7 +193,7 @@ Current schema:
 
 Each item contains:
 
-- `title`: non-empty string
+- `title`: optional non-empty string or `null`
 - `serialId`: optional non-negative integer
 - `children`: array of child items
 
@@ -198,6 +203,11 @@ A node may omit `serialId` and act as a pure grouping node. When
 `serialId` is present, it points to
 `summaries/serial-<serialId>.txt` and may also have a matching
 fragment directory.
+
+A node may omit `title` or set it to `null`. Text renderers may omit the
+heading for such nodes. EPUB renderers should use a display fallback such
+as `Section <serialId>` because EPUB navigation and section documents
+need visible labels.
 
 ### `cover/info.json` and `cover/data.bin`
 

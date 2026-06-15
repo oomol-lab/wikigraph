@@ -132,6 +132,51 @@ describe("document/directory-document", () => {
     });
   });
 
+  it("replaces existing book metadata", async () => {
+    await withTempDir("spinedigest-document-", async (path) => {
+      const document = await DirectoryDocument.open(path);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.writeBookMeta({
+            authors: ["Ari Lantern"],
+            description: null,
+            identifier: null,
+            language: null,
+            publishedAt: null,
+            publisher: null,
+            sourceFormat: "txt",
+            title: "Original",
+            version: 1,
+          });
+        });
+
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.replaceBookMeta({
+            authors: ["Bea North"],
+            description: "Updated",
+            identifier: null,
+            language: "en",
+            publishedAt: null,
+            publisher: null,
+            sourceFormat: "txt",
+            title: "Replacement",
+            version: 1,
+          });
+        });
+
+        await expect(document.readBookMeta()).resolves.toMatchObject({
+          authors: ["Bea North"],
+          description: "Updated",
+          language: "en",
+          title: "Replacement",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("rolls back owned serial resources when a document context is disposed without completion", async () => {
     await withTempDir("spinedigest-document-", async (path) => {
       const document = await DirectoryDocument.open(path);

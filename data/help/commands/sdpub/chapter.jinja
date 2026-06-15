@@ -5,7 +5,7 @@ Edit chapters inside an existing `.sdpub` archive.
 Usage:
   spinedigest sdpub chapter list <path> [--llm <json>] [--help|-h]
   spinedigest sdpub chapter status <path> --chapter <id> [--llm <json>] [--help|-h]
-  spinedigest sdpub chapter add <path> --title <title> [--parent <id>] [--llm <json>] [--help|-h]
+  spinedigest sdpub chapter add <path> [--title <title>] [--parent <id>] [--llm <json>] [--help|-h]
   spinedigest sdpub chapter remove <path> --chapter <id> [--recursive] [--llm <json>] [--help|-h]
   spinedigest sdpub chapter reset <path> --chapter <id> --to <stage> [--llm <json>] [--help|-h]
   spinedigest sdpub chapter set-source <path> --chapter <id> [--input <path>] --input-format <format> [--llm <json>] [--help|-h]
@@ -22,6 +22,7 @@ Chapter stages:
 Input rules:
   - `<path>` is the `.sdpub` archive edited in place.
   - `--chapter` is the numeric chapter id printed by `list` or `add`.
+  - `add` creates an untitled planned chapter when `--title` is omitted.
   - `set-source` and `set-summary` read `--input <path>` when provided, otherwise stdin.
   - `set-source` accepts only `txt` or `markdown` for `--input-format`.
   - `reset --to` accepts `planned`, `sourced`, or `graphed`.

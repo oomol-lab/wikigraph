@@ -48,6 +48,37 @@ describe("output/plain-text", () => {
     });
   });
 
+  it("omits headings for untitled toc items", async () => {
+    await withTempDir("spinedigest-output-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.writeSummary(1, "Untitled summary");
+          await openedDocument.writeToc({
+            items: [
+              {
+                children: [],
+                serialId: 1,
+              },
+            ],
+            version: 1,
+          });
+        });
+
+        const outputPath = `${path}/result/book.txt`;
+        await writePlainText({
+          document,
+          path: outputPath,
+        });
+
+        expect(await readFile(outputPath, "utf8")).toBe("Untitled summary\n");
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("throws when toc or required summaries are missing", async () => {
     await withTempDir("spinedigest-output-", async (path) => {
       const missingTocDocument = await DirectoryDocument.open(`${path}/no-toc`);

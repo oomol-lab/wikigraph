@@ -57,7 +57,9 @@ async function renderTocItem(
   document: ReadonlyDocument,
   item: TocItem,
 ): Promise<string | undefined> {
-  const parts = [item.title.trim()].filter((value) => value !== "");
+  const parts = [item.title?.trim()].filter(
+    (value): value is string => value !== undefined && value !== "",
+  );
 
   if (item.serialId !== undefined) {
     const summary = await document.readSummary(item.serialId);

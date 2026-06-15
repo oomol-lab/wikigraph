@@ -24,10 +24,10 @@ export function createFallbackSection(
 export function createSectionDocument(
   serialId: number,
   language: string,
-  title: string,
+  title: string | null | undefined,
   summary: string,
 ): EpubSection {
-  const normalizedTitle = title.trim() || `Section ${serialId}`;
+  const normalizedTitle = title?.trim() || `Section ${serialId}`;
 
   return {
     href: `text/serial-${serialId}.xhtml`,

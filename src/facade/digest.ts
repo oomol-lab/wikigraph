@@ -87,7 +87,7 @@ export async function digestTextStreamSession<T>(
   return await withTemporaryDocumentSession(async (document, directoryPath) => {
     await document.openSession(async (openedDocument) => {
       const serialId = await openedDocument.peekNextSerialId();
-      const normalizedTitle = normalizeTitle(options.title) ?? "Section 1";
+      const normalizedTitle = normalizeTitle(options.title);
       const serialProgressTracker = progressTracker.createSerialTracker({
         id: serialId,
       });
@@ -130,9 +130,11 @@ export async function digestTextStreamSession<T>(
         version: TOC_FILE_VERSION,
         items: [
           {
-            title: normalizedTitle,
             serialId: serial.id,
             children: [],
+            ...(normalizedTitle === undefined
+              ? {}
+              : { title: normalizedTitle }),
           },
         ],
       });

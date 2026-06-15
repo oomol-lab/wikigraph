@@ -1,13 +1,18 @@
 import { SpineDigestApp } from "../index.js";
+import { SpineDigestFile } from "../facade/spine-digest-file.js";
 import type { SpineDigest } from "../facade/index.js";
-import type { TocFile, TocItem } from "../source/index.js";
+import type { BookMeta, TocFile, TocItem } from "../source/index.js";
 
-import type { CLISdpubArguments } from "./args.js";
+import type { CLISdpubArguments, SdpubMetaPatch } from "./args.js";
 import { writeBinaryToStdout, writeTextToStdout } from "./io.js";
 
 export async function runSdpubCommand(args: CLISdpubArguments): Promise<void> {
-  const app = new SpineDigestApp({});
+  if (args.subcommand === "meta" && args.metaPatch !== undefined) {
+    await updateSdpubMeta(args.inputPath, args.metaPatch);
+    return;
+  }
 
+  const app = new SpineDigestApp({});
   await app.openSession(args.inputPath, async (digest) => {
     switch (args.subcommand) {
       case "info":
@@ -24,6 +29,9 @@ export async function runSdpubCommand(args: CLISdpubArguments): Promise<void> {
         return;
       case "cover":
         await writeSdpubCover(digest);
+        return;
+      case "meta":
+        await writeSdpubMeta(await digest.readMeta());
         return;
     }
   });
@@ -140,6 +148,77 @@ async function writeSdpubCover(digest: SpineDigest): Promise<void> {
   await writeBinaryToStdout(cover.data);
 }
 
+async function updateSdpubMeta(
+  path: string,
+  patch: SdpubMetaPatch,
+): Promise<void> {
+  await new SpineDigestFile(path).openEditableSession(async (document) => {
+    const meta = await document.readBookMeta();
+
+    if (meta === undefined) {
+      throw new Error("Document book meta is missing.");
+    }
+
+    const updatedMeta = applySdpubMetaPatch(meta, patch);
+
+    await document.replaceBookMeta(updatedMeta);
+    await writeSdpubMeta(updatedMeta);
+  });
+}
+
+async function writeSdpubMeta(meta: BookMeta | undefined): Promise<void> {
+  if (meta === undefined) {
+    await writeTextToStdout("No document metadata is available.\n");
+    return;
+  }
+
+  const lines = [
+    `Source Format: ${meta.sourceFormat}`,
+    `Title: ${meta.title ?? "[none]"}`,
+    `Authors: ${
+      meta.authors.length === 0 ? "[none]" : meta.authors.join(", ")
+    }`,
+    `Language: ${meta.language ?? "[none]"}`,
+    `Identifier: ${meta.identifier ?? "[none]"}`,
+    `Publisher: ${meta.publisher ?? "[none]"}`,
+    `Published At: ${meta.publishedAt ?? "[none]"}`,
+    `Description: ${meta.description ?? "[none]"}`,
+  ];
+
+  await writeTextToStdout(`${lines.join("\n")}\n`);
+}
+
+function applySdpubMetaPatch(meta: BookMeta, patch: SdpubMetaPatch): BookMeta {
+  return {
+    ...meta,
+    title: patch.clearTitle === true ? null : (patch.title ?? meta.title),
+    authors:
+      patch.clearAuthors === true
+        ? []
+        : patch.authors === undefined
+          ? meta.authors
+          : [...patch.authors],
+    language:
+      patch.clearLanguage === true ? null : (patch.language ?? meta.language),
+    identifier:
+      patch.clearIdentifier === true
+        ? null
+        : (patch.identifier ?? meta.identifier),
+    publisher:
+      patch.clearPublisher === true
+        ? null
+        : (patch.publisher ?? meta.publisher),
+    publishedAt:
+      patch.clearPublishedAt === true
+        ? null
+        : (patch.publishedAt ?? meta.publishedAt),
+    description:
+      patch.clearDescription === true
+        ? null
+        : (patch.description ?? meta.description),
+  };
+}
+
 function appendOptionalLine(
   lines: string[],
   label: string,
@@ -178,7 +257,7 @@ function renderTocLines(
 
   for (const item of items) {
     lines.push(
-      `${"  ".repeat(depth)}${item.title}${
+      `${"  ".repeat(depth)}${item.title?.trim() || "[untitled]"}${
         item.serialId === undefined ? "" : ` [serial ${item.serialId}]`
       }`,
     );

@@ -98,7 +98,7 @@ describe("facade/import", () => {
     serialMockState.startedSerialIds.length = 0;
   });
 
-  it("imports source sections into an empty document with planned toc titles", async () => {
+  it("imports source sections into an empty document with optional toc titles", async () => {
     await withTempDir("spinedigest-import-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
       const meta = createBookMeta({
@@ -147,15 +147,12 @@ describe("facade/import", () => {
               {
                 children: [],
                 serialId: 1,
-                title: "Section 1.1",
               },
             ],
-            title: "Section 1",
           },
           {
             children: [],
             serialId: 2,
-            title: "Section 2",
           },
         ]);
 
