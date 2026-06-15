@@ -51,8 +51,9 @@ Edit one completed chapter summary with normal file tools:
   # edit /tmp/chapter-12.md with your editor or automation
   spinedigest sdpub chapter set-summary ./book.sdpub --chapter 12 --input /tmp/chapter-12.md
 
-Write the cover to a file:
-  spinedigest sdpub cover --input ./book.sdpub > ./cover.bin
+Write the cover to an image file:
+  spinedigest sdpub info --input ./book.sdpub
+  spinedigest sdpub cover --input ./book.sdpub > ./cover.jpg
 
 Where to go next:
   - Need to choose the right workflow before copying a command:

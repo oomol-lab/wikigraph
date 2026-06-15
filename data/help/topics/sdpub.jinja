@@ -15,7 +15,7 @@ Archive model:
   - Document metadata is edited with `sdpub meta`.
   - The TOC is a chapter tree. Each editable chapter has a numeric chapter id.
   - A chapter may store normalized source data, graph data, and a final summary.
-  - A cover, when present, can be read with `sdpub cover`.
+  - A cover, when present, can be projected to a normal image file with `sdpub cover`.
   - `manifest.json` stores the archive format version. Missing manifest means format version 1.
   - `database.db` is internal state for SpineDigest. Do not edit it directly from automation.
   - Chapter graph data can be explored with `sdpub graph ...`; routine users should not read SQLite directly.
