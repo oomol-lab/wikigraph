@@ -6,7 +6,6 @@ import {
   listGraphNeighbors,
   listGraphNodes,
   searchGraphNodes,
-  type GraphEdge,
   type GraphEvidenceLine,
   type GraphNeighbor,
   type GraphNode,
@@ -107,7 +106,7 @@ function formatStatus(status: {
 
 function formatLog(nodes: readonly GraphNode[], limit: number): string {
   if (nodes.length === 0) {
-    return "No graph nodes.\n";
+    return "No nodes.\n";
   }
 
   return `${nodes.slice(0, limit).map(formatNodeOneLine).join("\n")}\n`;
@@ -118,14 +117,8 @@ function formatShow(
   neighbors: readonly GraphNeighbor[],
   evidence: readonly GraphEvidenceLine[],
 ): string {
-  const lines = [
-    formatNodeHeading(node),
-    `Weight: ${formatWeight(node.weight)}`,
-    `Words: ${node.wordsCount}`,
-  ];
+  const lines = [formatNodeHeading(node)];
 
-  appendOptional(lines, "Importance", node.importance);
-  appendOptional(lines, "Retention", node.retention);
   lines.push("", "Content:", node.content, "");
 
   if (neighbors.length === 0) {
@@ -203,7 +196,7 @@ function formatPath(
 
   for (const [index, step] of steps.entries()) {
     if (index > 0) {
-      lines.push(`  ${formatPathEdge(step.edge)}`);
+      lines.push(`  ${formatPathEdge()}`);
     }
     lines.push(formatNodeOneLine(step.node));
   }
@@ -212,7 +205,7 @@ function formatPath(
 }
 
 function formatNodeOneLine(node: GraphNode): string {
-  return `[${node.id}] ${formatWeight(node.weight)} ${node.label} - ${node.content}`;
+  return `[${node.id}] ${node.label} - ${node.content}`;
 }
 
 function formatNodeHeading(node: GraphNode): string {
@@ -226,31 +219,13 @@ function formatNeighborLine(neighbor: GraphNeighbor): string {
       ? neighbor.edge.fromId
       : neighbor.edge.toId;
 
-  return `  ${arrow} [${edgeNodeId}] ${formatWeight(neighbor.edge.weight)} ${neighbor.node.label}`;
+  return `  ${arrow} [${edgeNodeId}] ${neighbor.node.label}`;
 }
 
-function formatPathEdge(edge: GraphEdge | undefined): string {
-  if (edge === undefined) {
-    return "->";
-  }
-
-  return `-> ${formatWeight(edge.weight)}`;
+function formatPathEdge(): string {
+  return "->";
 }
 
 function formatSentenceId(sentenceId: readonly number[]): string {
   return sentenceId.join(".");
-}
-
-function formatWeight(value: number): string {
-  return value.toFixed(3);
-}
-
-function appendOptional(
-  lines: string[],
-  label: string,
-  value: string | undefined,
-): void {
-  if (value !== undefined) {
-    lines.push(`${label}: ${value}`);
-  }
 }

@@ -4,15 +4,15 @@ Command: spinedigest sdpub graph path
 sdpub graph path
 
 Purpose:
-  Find a directed path between two graph nodes.
+  Find a directed path between two nodes.
 
 Usage:
   spinedigest sdpub graph path <path> --chapter <id> <from> <to> [--help|-h]
 
 Output shape:
-  [<node>] <weight> <label> - <content>
-    -> <edge-weight>
-  [<node>] <weight> <label> - <content>
+  [<node>] <label> - <content>
+    ->
+  [<node>] <label> - <content>
 
 Notes:
   - The first implementation returns a shortest directed path by edge count.

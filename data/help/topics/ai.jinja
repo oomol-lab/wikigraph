@@ -36,7 +36,7 @@ Stable terms:
   - .sdpub: a reusable processed archive
   - chapter: the current editable unit inside a .sdpub TOC
   - chapter id: the numeric id used by `sdpub chapter ...` and `sdpub stage --chapter`
-  - graph node: a read-only chapter graph node discovered with `sdpub graph log`
+  - node: a read-only chapter graph item discovered with `sdpub graph log`
   - TOC path: the section path for a chapter or completed summary
 
 Safety reminders:
@@ -53,7 +53,7 @@ File workflow:
 Graph workflow:
   - Use `spinedigest sdpub graph status <archive.sdpub> --chapter <id>` to check graph availability.
   - Use `spinedigest sdpub graph log <archive.sdpub> --chapter <id>` to discover node ids.
-  - Use `show`, `grep`, `neighbors`, `blame`, and `path` as Git-like read-only graph exploration commands.
+  - Use `show`, `grep`, `neighbors`, `blame`, and `path` as Git-like read-only chapter graph commands.
 
 Cover workflow:
   - Use `spinedigest sdpub info --input <archive.sdpub>` to see whether a cover exists and which media type is stored.

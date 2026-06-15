@@ -47,7 +47,7 @@ const graphMockState = vi.hoisted(() => ({
     },
   ],
   node: {
-    content: "Central graph node content",
+    content: "Central node content",
     id: 9,
     importance: "important",
     label: "Central",
@@ -61,7 +61,7 @@ const graphMockState = vi.hoisted(() => ({
   },
   nodes: [
     {
-      content: "Central graph node content",
+      content: "Central node content",
       id: 9,
       importance: "important",
       label: "Central",
@@ -184,11 +184,11 @@ describe("cli/sdpub-graph", () => {
     });
 
     expect(graphMockState.textWrites).toStrictEqual([
-      "[9] 0.900 Central - Central graph node content\n",
+      "[9] Central - Central node content\n",
     ]);
   });
 
-  it("shows one graph node", async () => {
+  it("shows one node", async () => {
     await runSdpubGraphCommand({
       action: "show",
       chapterId: 2,
@@ -198,12 +198,15 @@ describe("cli/sdpub-graph", () => {
 
     expect(graphMockState.textWrites[0]).toContain("[9] Central\n");
     expect(graphMockState.textWrites[0]).toContain(
-      "Content:\nCentral graph node content\n",
+      "Content:\nCentral node content\n",
     );
-    expect(graphMockState.textWrites[0]).toContain("<- [7] 0.400 Earlier");
+    expect(graphMockState.textWrites[0]).toContain("<- [7] Earlier");
     expect(graphMockState.textWrites[0]).toContain(
       "2.0.1 Source sentence one.",
     );
+    expect(graphMockState.textWrites[0]).not.toContain("Weight:");
+    expect(graphMockState.textWrites[0]).not.toContain("Importance:");
+    expect(graphMockState.textWrites[0]).not.toContain("Retention:");
   });
 
   it("prints grep hits", async () => {
@@ -215,7 +218,7 @@ describe("cli/sdpub-graph", () => {
     });
 
     expect(graphMockState.textWrites).toStrictEqual([
-      "[9] 0.900 Central - Central graph node content matches:label,content\n",
+      "[9] Central - Central node content matches:label,content\n",
     ]);
   });
 
@@ -228,7 +231,7 @@ describe("cli/sdpub-graph", () => {
     });
 
     expect(graphMockState.textWrites).toStrictEqual([
-      "  <- [7] 0.400 Earlier\n  -> [11] 0.600 Later\n",
+      "  <- [7] Earlier\n  -> [11] Later\n",
     ]);
   });
 
@@ -255,7 +258,7 @@ describe("cli/sdpub-graph", () => {
     });
 
     expect(graphMockState.textWrites).toStrictEqual([
-      "[9] 0.900 Central - Central graph node content\n  -> 0.600\n[11] 0.500 Later - Later context\n",
+      "[9] Central - Central node content\n  ->\n[11] Later - Later context\n",
     ]);
   });
 });
