@@ -230,7 +230,7 @@ describe("cli/sdpub", () => {
     ]);
   });
 
-  it("renders serials in toc order", async () => {
+  it("renders chapters in toc order", async () => {
     await runSdpubCommand({
       inputPath: "/tmp/book.sdpub",
       subcommand: "list",
@@ -258,10 +258,10 @@ describe("cli/sdpub", () => {
     ]);
   });
 
-  it("writes only serial summary text for cat", async () => {
+  it("writes only chapter summary text for cat", async () => {
     await runSdpubCommand({
+      chapterId: 2,
       inputPath: "/tmp/book.sdpub",
-      serialId: 2,
       subcommand: "cat",
     });
 

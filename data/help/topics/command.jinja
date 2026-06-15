@@ -33,7 +33,7 @@ sdpub inspection and metadata commands:
   spinedigest sdpub info --input <path> [--llm <json>]
   spinedigest sdpub toc --input <path> [--llm <json>]
   spinedigest sdpub list --input <path> [--llm <json>]
-  spinedigest sdpub cat --input <path> --serial <id> [--llm <json>]
+  spinedigest sdpub cat --input <path> --chapter <id> [--llm <json>]
   spinedigest sdpub cover --input <path> [--llm <json>]
   spinedigest sdpub meta --input <path> [metadata options] [--llm <json>]
 
@@ -51,8 +51,7 @@ sdpub chapter commands:
   spinedigest sdpub chapter set-summary <path> --chapter <id> [--input <path>] [--llm <json>]
 
 sdpub-specific flags:
-  --serial <id>          Legacy read flag required by `spinedigest sdpub cat`; for chapter-backed content it matches the chapter id.
-  --chapter <id>         Numeric chapter id printed by `sdpub chapter list` or `add`.
+  --chapter <id>         Numeric chapter id printed by `sdpub list`, `sdpub chapter list`, or `sdpub chapter add`.
   --parent <id>          Parent chapter id for `sdpub chapter add`.
   --to <stage>           Target stage for `sdpub stage advance` or `sdpub chapter reset`.
 

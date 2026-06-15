@@ -162,7 +162,7 @@ describe("cli/args", () => {
         "cat",
         "--input",
         "book.sdpub",
-        "--serial",
+        "--chapter",
         "12",
         "--llm",
         '{"model":"cli-model"}',
@@ -171,7 +171,7 @@ describe("cli/args", () => {
       args: {
         inputPath: "book.sdpub",
         llmJSON: '{"model":"cli-model"}',
-        serialId: 12,
+        chapterId: 12,
         subcommand: "cat",
       },
       help: false,
@@ -416,7 +416,7 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments(["sdpub", "cat", "--input", "book.sdpub"]),
     ).toThrow(
-      "Missing --serial. `spinedigest sdpub cat` requires it.\nSee: spinedigest sdpub cat --help",
+      "Missing --chapter. `spinedigest sdpub cat` requires a chapter id.\nSee: spinedigest sdpub cat --help",
     );
     expect(() =>
       parseCLIArguments([
@@ -424,11 +424,11 @@ describe("cli/args", () => {
         "list",
         "--input",
         "book.sdpub",
-        "--serial",
+        "--chapter",
         "2",
       ]),
     ).toThrow(
-      "The `sdpub list` subcommand does not support --serial.\nSee: spinedigest sdpub list --help",
+      "The `sdpub list` subcommand does not support --chapter.\nSee: spinedigest sdpub list --help",
     );
     expect(() =>
       parseCLIArguments([
@@ -436,11 +436,11 @@ describe("cli/args", () => {
         "cat",
         "--input",
         "book.sdpub",
-        "--serial",
+        "--chapter",
         "x",
       ]),
     ).toThrow(
-      "Invalid --serial: x. Expected a non-negative integer.\nSee: spinedigest sdpub cat --help",
+      "Invalid --chapter: x. Expected a non-negative integer.\nSee: spinedigest sdpub cat --help",
     );
     expect(() =>
       parseCLIArguments([
@@ -609,7 +609,7 @@ describe("cli/args", () => {
       "--digest-dir <path>",
       "--llm <json>",
       "--prompt <text>",
-      "--serial <id>",
+      "--chapter <id>",
     ]) {
       expect(commandHelpText).toContain(flag);
     }

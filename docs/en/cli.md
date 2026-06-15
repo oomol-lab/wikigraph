@@ -12,7 +12,7 @@ Installed CLI:
 spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 spinedigest --version
 spinedigest status [--llm <json>]
-spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
+spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--llm <json>]
 spinedigest sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 spinedigest sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
 ```
@@ -23,7 +23,7 @@ From a source checkout:
 pnpm dev -- [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 pnpm dev -- --version
 pnpm dev -- status [--llm <json>]
-pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
+pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--llm <json>]
 pnpm dev -- sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
 ```
@@ -48,7 +48,7 @@ The main conversion command does not support positional arguments.
 
 The `sdpub` interface uses positional subcommands: `spinedigest sdpub <subcommand>`.
 
-Read-oriented `sdpub` subcommands use `--input`, except `cat` also requires `--serial` and `meta` accepts metadata edit flags. `sdpub stage` and `sdpub chapter` edit existing archives in place and take the archive path as a positional argument.
+Read-oriented `sdpub` subcommands use `--input`, except `cat` also requires `--chapter` and `meta` accepts metadata edit flags. `sdpub stage` and `sdpub chapter` edit existing archives in place and take the archive path as a positional argument.
 
 `--prompt` affects digest generation from source inputs and graph generation through `spinedigest sdpub stage advance`.
 
@@ -133,7 +133,7 @@ Inspect an `.sdpub` archive:
 spinedigest sdpub info --input ./book.sdpub
 spinedigest sdpub toc --input ./book.sdpub
 spinedigest sdpub list --input ./book.sdpub
-spinedigest sdpub cat --input ./book.sdpub --serial 12
+spinedigest sdpub cat --input ./book.sdpub --chapter 12
 spinedigest sdpub cover --input ./book.sdpub > ./cover.png
 spinedigest sdpub meta --input ./book.sdpub
 spinedigest sdpub stage pending ./book.sdpub
@@ -279,7 +279,7 @@ Expect a plain-text error message on `stderr` and a non-zero exit code when:
 - `stdin` or `stdout` is used with a non-text format
 - `--verbose` is used while writing output to `stdout`
 - no LLM configuration is available for a digest operation
-- `spinedigest sdpub cat` is used without `--serial`
+- `spinedigest sdpub cat` is used without `--chapter`
 - `sdpub` subcommands are used with unsupported flags such as `--output`, `--output-format`, `--prompt`, or `--verbose`
 - `spinedigest sdpub cover` tries to write binary data to an interactive terminal
 - `spinedigest sdpub cover` is used on an archive without a cover

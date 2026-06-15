@@ -37,7 +37,7 @@ export interface CLISdpubArguments {
   readonly inputPath: string;
   readonly llmJSON?: string;
   readonly metaPatch?: SdpubMetaPatch;
-  readonly serialId?: number;
+  readonly chapterId?: number;
   readonly subcommand: Exclude<SDPubSubcommand, "chapter">;
 }
 
@@ -245,9 +245,6 @@ export function parseCLIArguments(
       prompt: {
         type: "string",
       },
-      serial: {
-        type: "string",
-      },
       stage: {
         type: "string",
       },
@@ -390,7 +387,6 @@ function parseSdpubArguments(
     readonly publisher?: string;
     readonly prompt?: string;
     readonly recursive?: boolean;
-    readonly serial?: string;
     readonly stage?: string;
     readonly title?: string;
     readonly to?: string;
@@ -511,27 +507,27 @@ function parseSdpubArguments(
     );
   }
 
-  const serialId =
-    values.serial === undefined
+  const chapterId =
+    values.chapter === undefined
       ? undefined
       : parseSerialId(
-          values.serial,
-          "--serial",
+          values.chapter,
+          "--chapter",
           sdpubSubcommandHelpRoute(parsedSubcommand),
         );
 
-  if (parsedSubcommand === "cat" && serialId === undefined && !help) {
+  if (parsedSubcommand === "cat" && chapterId === undefined && !help) {
     throw new Error(
       withHelpRoute(
-        "Missing --serial. `spinedigest sdpub cat` requires it.",
+        "Missing --chapter. `spinedigest sdpub cat` requires a chapter id.",
         sdpubSubcommandHelpRoute("cat"),
       ),
     );
   }
-  if (parsedSubcommand !== "cat" && serialId !== undefined) {
+  if (parsedSubcommand !== "cat" && chapterId !== undefined) {
     throw new Error(
       withHelpRoute(
-        `The \`sdpub ${parsedSubcommand}\` subcommand does not support --serial.`,
+        `The \`sdpub ${parsedSubcommand}\` subcommand does not support --chapter.`,
         sdpubSubcommandHelpRoute(parsedSubcommand),
       ),
     );
@@ -566,7 +562,7 @@ function parseSdpubArguments(
       inputPath: inputPath!,
       ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       ...(metaPatch === undefined ? {} : { metaPatch }),
-      ...(serialId === undefined ? {} : { serialId }),
+      ...(chapterId === undefined ? {} : { chapterId }),
       subcommand: parsedSubcommand,
     },
     help: false,
@@ -601,7 +597,6 @@ function parseSdpubChapterArguments(
     readonly publisher?: string;
     readonly prompt?: string;
     readonly recursive?: boolean;
-    readonly serial?: string;
     readonly stage?: string;
     readonly title?: string;
     readonly to?: string;
@@ -616,7 +611,6 @@ function parseSdpubChapterArguments(
   rejectSdpubChapterFlag("digest-dir", values["digest-dir"]);
   rejectSdpubChapterFlag("output", values.output);
   rejectSdpubChapterFlag("output-format", values["output-format"]);
-  rejectSdpubChapterFlag("serial", values.serial);
   rejectSdpubChapterFlag("stage", values.stage);
   rejectSdpubChapterMetaFlags(values);
   if (values.verbose) {
@@ -713,7 +707,6 @@ function parseSdpubStageArguments(
     readonly publisher?: string;
     readonly prompt?: string;
     readonly recursive?: boolean;
-    readonly serial?: string;
     readonly stage?: string;
     readonly title?: string;
     readonly to?: string;
@@ -732,7 +725,6 @@ function parseSdpubStageArguments(
   rejectSdpubStageFlag("output-format", values["output-format"]);
   rejectSdpubStageFlag("parent", values.parent);
   rejectSdpubStageFlag("recursive", values.recursive);
-  rejectSdpubStageFlag("serial", values.serial);
   rejectSdpubStageFlag("stage", values.stage);
   rejectSdpubStageFlag("title", values.title);
   rejectSdpubStageMetaFlags(values);
@@ -1117,7 +1109,6 @@ function parseHelpArguments(
     readonly "published-at"?: string;
     readonly publisher?: string;
     readonly prompt?: string;
-    readonly serial?: string;
     readonly stage?: string;
     readonly verbose?: boolean;
   },
@@ -1129,7 +1120,6 @@ function parseHelpArguments(
   rejectHelpFlag("output", values.output);
   rejectHelpFlag("output-format", values["output-format"]);
   rejectHelpFlag("prompt", values.prompt);
-  rejectHelpFlag("serial", values.serial);
   rejectHelpFlag("stage", values.stage);
   rejectHelpMetaFlags(values);
 
@@ -1190,7 +1180,6 @@ function parseStatusArguments(
     readonly "published-at"?: string;
     readonly publisher?: string;
     readonly prompt?: string;
-    readonly serial?: string;
     readonly stage?: string;
     readonly verbose?: boolean;
   },
@@ -1201,7 +1190,6 @@ function parseStatusArguments(
   rejectStatusFlag("output", values.output);
   rejectStatusFlag("output-format", values["output-format"]);
   rejectStatusFlag("prompt", values.prompt);
-  rejectStatusFlag("serial", values.serial);
   rejectStatusFlag("stage", values.stage);
   rejectStatusMetaFlags(values);
 

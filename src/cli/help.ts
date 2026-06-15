@@ -107,7 +107,7 @@ const SDPUB_SUBCOMMAND_METADATA: readonly {
   },
   {
     name: "cat",
-    summary: "Print one completed summary through the legacy --serial reader.",
+    summary: "Print one completed chapter summary.",
   },
   {
     name: "cover",

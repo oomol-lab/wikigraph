@@ -10,7 +10,7 @@ Usage:
   spinedigest sdpub info --input <path> [--llm <json>] [--help|-h]
   spinedigest sdpub toc --input <path> [--llm <json>] [--help|-h]
   spinedigest sdpub list --input <path> [--llm <json>] [--help|-h]
-  spinedigest sdpub cat --input <path> --serial <id> [--llm <json>] [--help|-h]
+  spinedigest sdpub cat --input <path> --chapter <id> [--llm <json>] [--help|-h]
   spinedigest sdpub cover --input <path> [--llm <json>] [--help|-h]
   spinedigest sdpub meta --input <path> [metadata options] [--llm <json>] [--help|-h]
   spinedigest sdpub stage <action> <path> [options] [--help|-h]
@@ -31,7 +31,8 @@ Shared behavior:
 Path convention:
   - Use `--input <path>` for read-oriented commands: `info`, `toc`, `list`, `cat`, `cover`, and `meta`.
   - Use positional `<path>` for operated-document commands: `stage` and `chapter`.
-  - This split follows the top-level option style for inspection, while mutating/stage commands treat the archive as the document being operated on.
+  - This keeps `chapter set-source` and `chapter set-summary` free to use `--input` for the text being inserted.
+  - Mutating/stage commands treat the archive as the document being operated on.
   - `.sdpub` is a ZIP archive, but routine automation should not unzip and edit it directly. Use this command family instead.
 
 Mutation safety:

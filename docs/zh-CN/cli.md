@@ -12,7 +12,7 @@ SpineDigest 的设计重心是命令行使用。
 spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 spinedigest --version
 spinedigest status [--llm <json>]
-spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
+spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--llm <json>]
 spinedigest sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 spinedigest sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
 ```
@@ -23,7 +23,7 @@ spinedigest sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 pnpm dev -- [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 pnpm dev -- --version
 pnpm dev -- status [--llm <json>]
-pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
+pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--llm <json>]
 pnpm dev -- sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
 ```
@@ -48,7 +48,7 @@ pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 
 `sdpub` 接口本身使用 positional subcommands：`spinedigest sdpub <subcommand>`。
 
-偏读取的 `sdpub` 子命令使用 `--input`，其中 `cat` 还要求提供 `--serial`，`meta` 额外接受 metadata 编辑参数。`sdpub stage` 和 `sdpub chapter` 会原地编辑已有归档，并把归档路径作为 positional argument。
+偏读取的 `sdpub` 子命令使用 `--input`，其中 `cat` 还要求提供 `--chapter`，`meta` 额外接受 metadata 编辑参数。`sdpub stage` 和 `sdpub chapter` 会原地编辑已有归档，并把归档路径作为 positional argument。
 
 `--prompt` 影响从源输入生成 digest 的过程，也会影响 `spinedigest sdpub stage advance` 中的 graph 生成。
 
@@ -133,7 +133,7 @@ spinedigest --input ./book.sdpub --output ./digest.txt
 spinedigest sdpub info --input ./book.sdpub
 spinedigest sdpub toc --input ./book.sdpub
 spinedigest sdpub list --input ./book.sdpub
-spinedigest sdpub cat --input ./book.sdpub --serial 12
+spinedigest sdpub cat --input ./book.sdpub --chapter 12
 spinedigest sdpub cover --input ./book.sdpub > ./cover.png
 spinedigest sdpub meta --input ./book.sdpub
 spinedigest sdpub stage pending ./book.sdpub
@@ -279,7 +279,7 @@ SpineDigest 支持通过环境变量覆盖配置值：
 - 对非文本格式使用了 `stdin` 或 `stdout`
 - 在写入 `stdout` 时同时使用了 `--verbose`
 - digest 操作缺少 LLM 配置
-- `spinedigest sdpub cat` 缺少 `--serial`
+- `spinedigest sdpub cat` 缺少 `--chapter`
 - `sdpub` 子命令使用了不支持的参数，例如 `--output`、`--output-format`、`--prompt` 或 `--verbose`
 - `spinedigest sdpub cover` 试图向交互式终端输出二进制数据
 - `spinedigest sdpub cover` 针对一个没有封面的归档运行

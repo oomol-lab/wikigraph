@@ -22,10 +22,12 @@ export async function runSdpubCommand(args: CLISdpubArguments): Promise<void> {
         await writeSdpubToc(digest);
         return;
       case "list":
-        await writeSdpubSerialList(digest);
+        await writeSdpubChapterList(digest);
         return;
       case "cat":
-        await writeTextToStdout(await digest.readSerialSummary(args.serialId!));
+        await writeTextToStdout(
+          await digest.readSerialSummary(args.chapterId!),
+        );
         return;
       case "cover":
         await writeSdpubCover(digest);
@@ -119,7 +121,7 @@ async function writeSdpubToc(digest: SpineDigest): Promise<void> {
   await writeTextToStdout(`${lines.join("\n")}\n`);
 }
 
-async function writeSdpubSerialList(digest: SpineDigest): Promise<void> {
+async function writeSdpubChapterList(digest: SpineDigest): Promise<void> {
   const serials = await digest.listSerials();
 
   if (serials.length === 0) {

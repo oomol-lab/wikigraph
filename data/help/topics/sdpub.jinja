@@ -36,12 +36,6 @@ Primary model:
   Use chapter ids with `sdpub chapter ...` and `sdpub stage --chapter`.
   Prefer `sdpub chapter list` when selecting a chapter to inspect, edit, or advance.
 
-Legacy term: serial
-  Some read commands and older archive internals use `serial` for summary-bearing content.
-  `sdpub cat` still uses the legacy flag name `--serial`.
-  For chapter-backed content, the serial id currently matches the chapter id.
-  Use `sdpub list` and `sdpub cat --serial` only to read completed summaries through the legacy read interface.
-
 Fragments:
   A fragment is a normalized internal text unit stored for a chapter.
   Fragment counts are useful for diagnostics and rough size checks, but they are not the original source file's chapter count.
@@ -50,7 +44,7 @@ Read-only commands:
   - `sdpub info --input <path>`
   - `sdpub toc --input <path>`
   - `sdpub list --input <path>` for completed summaries
-  - `sdpub cat --input <path> --serial <id>` for legacy summary reading
+  - `sdpub cat --input <path> --chapter <id>` for one completed chapter summary
   - `sdpub cover --input <path>`
   - `sdpub stage pending <path>`
   - `sdpub chapter list <path>`
