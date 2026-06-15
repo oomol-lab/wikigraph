@@ -1,4 +1,8 @@
+import { createWriteStream } from "fs";
 import { mkdir, readFile, writeFile } from "fs/promises";
+import { dirname } from "path";
+import { finished } from "stream/promises";
+import { ZipFile } from "yazl";
 
 import { describe, expect, it } from "vitest";
 
@@ -48,6 +52,9 @@ describe("facade/archive", () => {
       await writeSdpubArchive(sourceDir, archivePath);
       await extractSdpubArchive(archivePath, extractDir);
 
+      expect(
+        JSON.parse(await readFile(`${extractDir}/manifest.json`, "utf8")),
+      ).toEqual({ formatVersion: 1 });
       expect(await readFile(`${extractDir}/database.db`, "utf8")).toBe(
         "sqlite",
       );
@@ -97,4 +104,66 @@ describe("facade/archive", () => {
       );
     });
   });
+
+  it("accepts archives that omit the manifest as format version 1", async () => {
+    await withTempDir("spinedigest-archive-", async (path) => {
+      const archivePath = `${path}/legacy.sdpub`;
+      const extractDir = `${path}/extract`;
+      const zipFile = new ZipFile();
+
+      zipFile.addBuffer(Buffer.from("sqlite", "utf8"), "database.db");
+      await writeZipFile(zipFile, archivePath);
+
+      await extractSdpubArchive(archivePath, extractDir);
+
+      expect(await readFile(`${extractDir}/database.db`, "utf8")).toBe(
+        "sqlite",
+      );
+    });
+  });
+
+  it("rejects archives with unsupported manifest versions", async () => {
+    await withTempDir("spinedigest-archive-", async (path) => {
+      const archivePath = `${path}/future.sdpub`;
+      const zipFile = new ZipFile();
+
+      zipFile.addBuffer(
+        Buffer.from('{"formatVersion":2}', "utf8"),
+        "manifest.json",
+      );
+      zipFile.addBuffer(Buffer.from("sqlite", "utf8"), "database.db");
+      await writeZipFile(zipFile, archivePath);
+
+      await expect(
+        extractSdpubArchive(archivePath, `${path}/extract`),
+      ).rejects.toThrow("Unsupported SDPUB format version in manifest.json.");
+    });
+  });
+
+  it("rejects archives with malformed manifest files", async () => {
+    await withTempDir("spinedigest-archive-", async (path) => {
+      const archivePath = `${path}/malformed.sdpub`;
+      const zipFile = new ZipFile();
+
+      zipFile.addBuffer(Buffer.from("not json", "utf8"), "manifest.json");
+      zipFile.addBuffer(Buffer.from("sqlite", "utf8"), "database.db");
+      await writeZipFile(zipFile, archivePath);
+
+      await expect(
+        extractSdpubArchive(archivePath, `${path}/extract`),
+      ).rejects.toThrow();
+    });
+  });
 });
+
+async function writeZipFile(zipFile: ZipFile, path: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+
+  const output = createWriteStream(path);
+  const outputDone = finished(output);
+  const zipDone = finished(zipFile.outputStream);
+
+  zipFile.outputStream.pipe(output);
+  zipFile.end();
+  await Promise.all([outputDone, zipDone]);
+}

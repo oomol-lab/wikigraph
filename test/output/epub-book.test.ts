@@ -126,6 +126,50 @@ describe("output/epub/book", () => {
     });
   });
 
+  it("uses fallback section titles for untitled toc items", async () => {
+    await withTempDir("spinedigest-epub-book-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          await openedDocument.writeBookMeta({
+            authors: [],
+            description: null,
+            identifier: null,
+            language: null,
+            publishedAt: null,
+            publisher: null,
+            sourceFormat: "txt",
+            title: null,
+            version: 1,
+          });
+          await openedDocument.writeSummary(1, "Untitled summary");
+          await openedDocument.writeToc({
+            items: [
+              {
+                children: [],
+                serialId: 1,
+              },
+            ],
+            version: 1,
+          });
+        });
+
+        const book = await buildEpubBook(document);
+
+        expect(book.sections[0]).toMatchObject({
+          id: "serial-1",
+          title: "Section 1",
+        });
+        expect(book.navXhtml).toContain("Section 1");
+        expect(book.packageOpf).toContain("Untitled");
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("throws when book meta is missing", async () => {
     await withTempDir("spinedigest-epub-book-", async (path) => {
       const document = await DirectoryDocument.open(path);

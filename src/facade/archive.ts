@@ -1,8 +1,9 @@
 import { createWriteStream } from "fs";
-import { mkdir, readdir } from "fs/promises";
+import { mkdir, readFile, readdir } from "fs/promises";
 import { dirname, join, posix, relative, resolve, sep } from "path";
 import { finished, pipeline } from "stream/promises";
 
+import { z } from "zod";
 import {
   open as openZip,
   type Entry,
@@ -10,7 +11,14 @@ import {
 } from "yauzl";
 import { ZipFile as YazlZipFile } from "yazl";
 
+export const SDPUB_FORMAT_VERSION = 1;
+const SDPUB_MANIFEST_PATH = "manifest.json";
+const SDPUB_MANIFEST_CONTENT = `${JSON.stringify({
+  formatVersion: SDPUB_FORMAT_VERSION,
+})}\n`;
+
 const SDPUB_ARCHIVE_PATTERNS = [
+  /^manifest\.json$/u,
   /^database\.db$/u,
   /^book-meta\.json$/u,
   /^toc\.json$/u,
@@ -18,6 +26,10 @@ const SDPUB_ARCHIVE_PATTERNS = [
   /^summaries\/serial-\d+\.txt$/u,
   /^fragments\/serial-\d+\/fragment_\d+\.json$/u,
 ] as const;
+
+const sdpubManifestSchema = z.object({
+  formatVersion: z.literal(SDPUB_FORMAT_VERSION),
+});
 
 export async function extractSdpubArchive(
   inputPath: string,
@@ -27,6 +39,8 @@ export async function extractSdpubArchive(
   const entries = await indexArchiveEntries(zipFile);
 
   try {
+    await validateArchiveManifest(zipFile, entries);
+
     for (const entry of entries) {
       const archivePath = normalizeArchivePath(entry.fileName);
 
@@ -56,9 +70,20 @@ export async function writeSdpubArchive(
 
   const zipFile = new YazlZipFile();
   const files = await listDocumentFiles(documentDirectoryPath);
+  const entries = [
+    ...files.filter((file) => file.archivePath !== SDPUB_MANIFEST_PATH),
+    {
+      archivePath: SDPUB_MANIFEST_PATH,
+      content: Buffer.from(SDPUB_MANIFEST_CONTENT, "utf8"),
+    },
+  ].sort((left, right) => left.archivePath.localeCompare(right.archivePath));
 
-  for (const file of files) {
-    zipFile.addFile(file.absolutePath, file.archivePath);
+  for (const entry of entries) {
+    if ("content" in entry) {
+      zipFile.addBuffer(entry.content, entry.archivePath);
+    } else {
+      zipFile.addFile(entry.absolutePath, entry.archivePath);
+    }
   }
 
   zipFile.end();
@@ -69,6 +94,22 @@ export async function writeSdpubArchive(
 
   zipFile.outputStream.pipe(output);
   await Promise.all([outputDone, zipDone]);
+}
+
+export async function readSdpubArchiveFormatVersion(
+  documentDirectoryPath: string,
+): Promise<number> {
+  try {
+    return parseSdpubManifest(
+      await readFile(join(documentDirectoryPath, SDPUB_MANIFEST_PATH), "utf8"),
+    ).formatVersion;
+  } catch (error) {
+    if (isFileMissingError(error)) {
+      return SDPUB_FORMAT_VERSION;
+    }
+
+    throw error;
+  }
 }
 
 async function listDocumentFiles(
@@ -137,6 +178,44 @@ function isSdpubArchivePath(archivePath: string): boolean {
   return SDPUB_ARCHIVE_PATTERNS.some((pattern) => pattern.test(archivePath));
 }
 
+async function validateArchiveManifest(
+  zipFile: YauzlZipFile,
+  entries: readonly Entry[],
+): Promise<void> {
+  const entry = entries.find(
+    (candidate) =>
+      normalizeArchivePath(candidate.fileName) === SDPUB_MANIFEST_PATH,
+  );
+
+  if (entry === undefined) {
+    return;
+  }
+
+  parseSdpubManifest(await readArchiveEntryText(zipFile, entry));
+}
+
+function parseSdpubManifest(
+  content: string,
+): z.infer<typeof sdpubManifestSchema> {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error(`Invalid SDPUB manifest: ${SDPUB_MANIFEST_PATH}.`);
+  }
+
+  const result = sdpubManifestSchema.safeParse(parsed);
+
+  if (!result.success) {
+    throw new Error(
+      `Unsupported SDPUB format version in ${SDPUB_MANIFEST_PATH}.`,
+    );
+  }
+
+  return result.data;
+}
+
 function assertWithinDirectory(
   rootDirectoryPath: string,
   targetPath: string,
@@ -198,4 +277,24 @@ async function openArchiveEntryStream(
       resolve(stream);
     });
   });
+}
+
+async function readArchiveEntryText(
+  zipFile: YauzlZipFile,
+  entry: Entry,
+): Promise<string> {
+  const chunks: Buffer[] = [];
+  const stream = await openArchiveEntryStream(zipFile, entry);
+
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+function isFileMissingError(error: unknown): boolean {
+  return (
+    error instanceof Error && (error as NodeJS.ErrnoException).code === "ENOENT"
+  );
 }

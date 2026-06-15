@@ -25,6 +25,8 @@ const sdpubMockState = vi.hoisted(() => ({
     version: 1,
   },
   openCalls: [] as string[],
+  editableCalls: [] as string[],
+  replacedMeta: [] as unknown[],
   serialEntries: [
     {
       fragmentCount: 2,
@@ -75,6 +77,30 @@ vi.mock("../../src/index.js", () => ({
   },
 }));
 
+vi.mock("../../src/facade/spine-digest-file.js", () => ({
+  SpineDigestFile: class {
+    readonly #path: string;
+
+    public constructor(path: string) {
+      this.#path = path;
+    }
+
+    public async openEditableSession(
+      operation: (document: MockEditableDocument) => Promise<unknown>,
+    ): Promise<unknown> {
+      sdpubMockState.editableCalls.push(this.#path);
+      return await operation({
+        readBookMeta: () => Promise.resolve(sdpubMockState.meta),
+        replaceBookMeta: (meta: unknown) => {
+          sdpubMockState.replacedMeta.push(meta);
+          sdpubMockState.meta = meta as typeof sdpubMockState.meta;
+          return Promise.resolve();
+        },
+      });
+    }
+  },
+}));
+
 vi.mock("../../src/cli/io.js", () => ({
   writeBinaryToStdout: vi.fn((data: Uint8Array) => {
     sdpubMockState.binaryWrites.push(data);
@@ -109,7 +135,9 @@ describe("cli/sdpub", () => {
       title: "Fixture Book",
       version: 1,
     };
+    sdpubMockState.editableCalls.length = 0;
     sdpubMockState.openCalls.length = 0;
+    sdpubMockState.replacedMeta.length = 0;
     sdpubMockState.serialEntries = [
       {
         fragmentCount: 2,
@@ -162,6 +190,7 @@ describe("cli/sdpub", () => {
     expect(sdpubMockState.openCalls).toStrictEqual(["/tmp/book.sdpub"]);
     expect(sdpubMockState.textWrites).toStrictEqual([
       [
+        "Archive Format Version: 1",
         "Title: Fixture Book",
         "Authors: Ari Lantern, Bea North",
         "Language: en",
@@ -239,6 +268,68 @@ describe("cli/sdpub", () => {
     ]);
   });
 
+  it("renders book metadata", async () => {
+    await runSdpubCommand({
+      inputPath: "/tmp/book.sdpub",
+      subcommand: "meta",
+    });
+
+    expect(sdpubMockState.openCalls).toStrictEqual(["/tmp/book.sdpub"]);
+    expect(sdpubMockState.textWrites).toStrictEqual([
+      [
+        "Source Format: epub",
+        "Title: Fixture Book",
+        "Authors: Ari Lantern, Bea North",
+        "Language: en",
+        "Identifier: urn:test:sdpub-cli",
+        "Publisher: Open Sample Press",
+        "Published At: 2026-01-01",
+        "Description: Fixture description",
+        "",
+      ].join("\n"),
+    ]);
+  });
+
+  it("updates book metadata in place and prints the result", async () => {
+    await runSdpubCommand({
+      inputPath: "/tmp/book.sdpub",
+      metaPatch: {
+        authors: ["Cy Lake"],
+        clearDescription: true,
+        title: "Updated Fixture",
+      },
+      subcommand: "meta",
+    });
+
+    expect(sdpubMockState.editableCalls).toStrictEqual(["/tmp/book.sdpub"]);
+    expect(sdpubMockState.replacedMeta).toStrictEqual([
+      {
+        authors: ["Cy Lake"],
+        description: null,
+        identifier: "urn:test:sdpub-cli",
+        language: "en",
+        publishedAt: "2026-01-01",
+        publisher: "Open Sample Press",
+        sourceFormat: "epub",
+        title: "Updated Fixture",
+        version: 1,
+      },
+    ]);
+    expect(sdpubMockState.textWrites).toStrictEqual([
+      [
+        "Source Format: epub",
+        "Title: Updated Fixture",
+        "Authors: Cy Lake",
+        "Language: en",
+        "Identifier: urn:test:sdpub-cli",
+        "Publisher: Open Sample Press",
+        "Published At: 2026-01-01",
+        "Description: [none]",
+        "",
+      ].join("\n"),
+    ]);
+  });
+
   it("rejects binary cover output to an interactive terminal", async () => {
     setStdoutTTY(true);
 
@@ -268,15 +359,22 @@ describe("cli/sdpub", () => {
 
 interface MockDigest {
   listSerials(): Promise<readonly unknown[]>;
+  readArchiveFormatVersion(): Promise<number>;
   readCover(): Promise<typeof sdpubMockState.cover>;
   readMeta(): Promise<typeof sdpubMockState.meta>;
   readSerialSummary(serialId: number): Promise<string>;
   readToc(): Promise<typeof sdpubMockState.toc>;
 }
 
+interface MockEditableDocument {
+  readBookMeta(): Promise<typeof sdpubMockState.meta>;
+  replaceBookMeta(meta: unknown): Promise<void>;
+}
+
 function createMockDigest(): MockDigest {
   return {
     listSerials: () => Promise.resolve(sdpubMockState.serialEntries),
+    readArchiveFormatVersion: () => Promise.resolve(1),
     readCover: () => Promise.resolve(sdpubMockState.cover),
     readMeta: () => Promise.resolve(sdpubMockState.meta),
     readSerialSummary: (serialId: number) => {

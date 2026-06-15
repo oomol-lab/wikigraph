@@ -52,6 +52,16 @@ export interface GenerateSerialOptions {
   readonly userLanguage?: Language;
 }
 
+export type BuildSerialTopologyOptions = GenerateSerialOptions;
+
+export interface BuildSerialSummaryOptions {
+  readonly userLanguage?: Language;
+}
+
+export interface WriteSerialSourceOptions {
+  readonly segmenter?: ReaderSegmenter;
+}
+
 export interface SerialDiscovery {
   readonly fragments: number;
   readonly words: number;
@@ -94,6 +104,32 @@ export async function discoverSerial(input: {
     fragments,
     words,
   };
+}
+
+export async function writeSerialSource(
+  document: Document,
+  serialId: number,
+  stream: ReaderTextStream,
+  options: WriteSerialSourceOptions = {},
+): Promise<void> {
+  const serialFragments = document.getSerialFragments(serialId);
+
+  for await (const fragment of streamFragments({
+    maxWordsCount: DEFAULT_FRAGMENT_WORDS_COUNT,
+    stream: segmentTextStream(stream, {
+      ...(options.segmenter === undefined
+        ? {}
+        : { adapter: options.segmenter }),
+    }),
+  })) {
+    const fragmentDraft = await serialFragments.createDraft();
+
+    for (const sentence of fragment.sentences) {
+      fragmentDraft.addSentence(sentence.text, sentence.wordsCount);
+    }
+
+    await fragmentDraft.commit();
+  }
 }
 
 export class SerialGeneration {
@@ -155,6 +191,30 @@ export class SerialGeneration {
       options,
       progressTracker,
     );
+  }
+
+  public async buildTopologyInto(
+    serialId: number,
+    stream: ReaderTextStream,
+    options: BuildSerialTopologyOptions,
+    progressTracker?: SerialProgressTracker,
+  ): Promise<void> {
+    await this.#buildTopology(
+      serialId,
+      stream,
+      options.extractionPrompt,
+      options.userLanguage,
+      progressTracker,
+    );
+  }
+
+  public async buildSummary(
+    serialId: number,
+    options: BuildSerialSummaryOptions = {},
+  ): Promise<Serial> {
+    const summary = await this.#buildSummary(serialId, options.userLanguage);
+
+    return new Serial(this.#document, serialId, summary);
   }
 
   async #generatePrepared(

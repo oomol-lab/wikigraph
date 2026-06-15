@@ -5,8 +5,8 @@ import {
   SerialGeneration,
   discoverSerial,
   type GenerateSerialOptions,
-  type Serial,
   type SerialGenerationOptions,
+  writeSerialSource,
 } from "../serial.js";
 import {
   TOC_FILE_VERSION,
@@ -18,21 +18,32 @@ import {
   type TocFile,
   type TocItem,
 } from "../source/index.js";
+import type { ChapterStage } from "./chapter.js";
 
 export interface ImportSourceOptions
-  extends GenerateSerialOptions, Omit<SerialGenerationOptions, "document"> {
+  extends
+    GenerateSerialOptions,
+    Omit<SerialGenerationOptions, "document" | "llm"> {
   readonly adapter: SourceAdapter;
   readonly digestProgressTracker?: DigestProgressTracker;
   readonly document: Document;
+  readonly llm?: SerialGenerationOptions["llm"];
   readonly path: string;
+  readonly targetStage?: ImportSourceStage;
 }
 
 export interface ImportedSource {
   readonly cover: SourceAsset | undefined;
   readonly meta: BookMeta;
-  readonly serials: readonly Serial[];
+  readonly serials: readonly ImportedSerial[];
   readonly toc: TocFile;
 }
+
+export interface ImportedSerial {
+  readonly id: number;
+}
+
+export type ImportSourceStage = ChapterStage;
 
 interface PlannedSection {
   readonly section: SourceSection;
@@ -78,18 +89,25 @@ export async function importSourceDocument(
       }),
     ],
   } satisfies TocFile;
-  const generation = new SerialGeneration({
-    document: options.document,
-    llm: options.llm,
-    ...(options.logDirPath === undefined
-      ? {}
-      : { logDirPath: options.logDirPath }),
-    ...(options.segmenter === undefined
-      ? {}
-      : { segmenter: options.segmenter }),
-  });
+  const targetStage = options.targetStage ?? "summarized";
+  const generation =
+    targetStage === "planned" || targetStage === "sourced"
+      ? undefined
+      : new SerialGeneration({
+          document: options.document,
+          llm: requireImportLLM(options.llm, targetStage),
+          ...(options.logDirPath === undefined
+            ? {}
+            : { logDirPath: options.logDirPath }),
+          ...(options.segmenter === undefined
+            ? {}
+            : { segmenter: options.segmenter }),
+        });
 
-  if (options.digestProgressTracker !== undefined) {
+  if (
+    options.digestProgressTracker !== undefined &&
+    targetStage !== "planned"
+  ) {
     const discoveries = await discoverPlannedSections(plannedSections, {
       ...(options.segmenter === undefined
         ? {}
@@ -102,8 +120,9 @@ export async function importSourceDocument(
   const serials = await generatePlannedSerials(plannedSections, {
     document: options.document,
     extractionPrompt: options.extractionPrompt,
-    generation,
+    ...(generation === undefined ? {} : { generation }),
     serialConcurrency: resolveSerialGenerationConcurrency(options.llm),
+    targetStage,
     ...(options.digestProgressTracker === undefined
       ? {}
       : { digestProgressTracker: options.digestProgressTracker }),
@@ -135,11 +154,24 @@ async function generatePlannedSerials(
     readonly digestProgressTracker?: DigestProgressTracker;
     readonly document: Document;
     readonly extractionPrompt: string;
-    readonly generation: SerialGeneration;
+    readonly generation?: SerialGeneration;
     readonly serialConcurrency: number;
+    readonly targetStage: ImportSourceStage;
     readonly userLanguage?: GenerateSerialOptions["userLanguage"];
   },
-): Promise<Serial[]> {
+): Promise<ImportedSerial[]> {
+  if (options.targetStage === "planned") {
+    await options.document.openSession(async (document) => {
+      for (const plannedSection of plannedSections) {
+        await document.serials.createWithId(plannedSection.serialId);
+      }
+    });
+
+    return plannedSections.map((plannedSection) => ({
+      id: plannedSection.serialId,
+    }));
+  }
+
   const limiter = new AsyncSemaphore(options.serialConcurrency);
   const serials = await Promise.all(
     plannedSections.map(async (plannedSection) => {
@@ -154,7 +186,49 @@ async function generatePlannedSerials(
               id: plannedSection.serialId,
             });
           const serial = await context.run(async () => {
-            return await options.generation.generateInto(
+            if (options.targetStage === "sourced") {
+              await options.document.serials.createWithId(
+                plannedSection.serialId,
+              );
+              await writeSerialSource(
+                options.document,
+                plannedSection.serialId,
+                await plannedSection.section.open(),
+              );
+
+              return {
+                id: plannedSection.serialId,
+              } satisfies ImportedSerial;
+            }
+
+            if (options.targetStage === "graphed") {
+              await options.document.serials.createWithId(
+                plannedSection.serialId,
+              );
+              await requireSerialGeneration(
+                options.generation,
+                options.targetStage,
+              ).buildTopologyInto(
+                plannedSection.serialId,
+                await plannedSection.section.open(),
+                {
+                  extractionPrompt: options.extractionPrompt,
+                  ...(options.userLanguage === undefined
+                    ? {}
+                    : { userLanguage: options.userLanguage }),
+                },
+                serialProgressTracker,
+              );
+
+              return {
+                id: plannedSection.serialId,
+              } satisfies ImportedSerial;
+            }
+
+            return await requireSerialGeneration(
+              options.generation,
+              options.targetStage,
+            ).generateInto(
               plannedSection.serialId,
               await plannedSection.section.open(),
               {
@@ -180,7 +254,7 @@ async function generatePlannedSerials(
 }
 
 function planTocItems(input: {
-  readonly fallbackTitle: string | null;
+  readonly fallbackTitle: string | null | undefined;
   readonly plannedSections: PlannedSection[];
   readonly sections: readonly SourceSection[];
   readonly serialIdAllocator: SerialIdAllocator;
@@ -188,9 +262,7 @@ function planTocItems(input: {
   return input.sections.map((section, index) =>
     planTocItem({
       fallbackTitle:
-        input.sections.length === 1
-          ? input.fallbackTitle
-          : createSectionFallbackTitle([index]),
+        input.sections.length === 1 ? input.fallbackTitle : undefined,
       indexPath: [index],
       plannedSections: input.plannedSections,
       section,
@@ -200,7 +272,7 @@ function planTocItems(input: {
 }
 
 function planTocItem(input: {
-  readonly fallbackTitle: string | null;
+  readonly fallbackTitle: string | null | undefined;
   readonly indexPath: readonly number[];
   readonly plannedSections: PlannedSection[];
   readonly section: SourceSection;
@@ -211,7 +283,7 @@ function planTocItem(input: {
     : undefined;
   const children = input.section.children.map((child, index) =>
     planTocItem({
-      fallbackTitle: createSectionFallbackTitle([...input.indexPath, index]),
+      fallbackTitle: undefined,
       indexPath: [...input.indexPath, index],
       plannedSections: input.plannedSections,
       section: child,
@@ -226,18 +298,14 @@ function planTocItem(input: {
     });
   }
 
+  const title =
+    normalizeTitle(input.section.title) ?? normalizeTitle(input.fallbackTitle);
+
   return {
-    title:
-      normalizeTitle(input.section.title) ??
-      normalizeTitle(input.fallbackTitle) ??
-      createSectionFallbackTitle(input.indexPath),
+    ...(title === undefined ? {} : { title }),
     ...(serialId === undefined ? {} : { serialId }),
     children,
   };
-}
-
-function createSectionFallbackTitle(indexPath: readonly number[]): string {
-  return `Section ${indexPath.map((value) => value + 1).join(".")}`;
 }
 
 function normalizeTitle(title: string | null | undefined): string | undefined {
@@ -329,4 +397,28 @@ function resolveSerialGenerationConcurrency(
   }
 
   return llm.config.concurrent;
+}
+
+function requireImportLLM(
+  llm: ImportSourceOptions["llm"],
+  targetStage: ImportSourceStage,
+): NonNullable<ImportSourceOptions["llm"]> {
+  if (llm === undefined) {
+    throw new Error(`LLM is required to import source to ${targetStage}.`);
+  }
+
+  return llm;
+}
+
+function requireSerialGeneration(
+  generation: SerialGeneration | undefined,
+  targetStage: ImportSourceStage,
+): SerialGeneration {
+  if (generation === undefined) {
+    throw new Error(
+      `Internal error: serial generation is required for ${targetStage}.`,
+    );
+  }
+
+  return generation;
 }

@@ -189,7 +189,7 @@ describe("facade/digest", () => {
     ).rejects.toThrow();
   });
 
-  it("keeps custom text-stream session directories and uses a fallback toc title", async () => {
+  it("keeps custom text-stream session directories and omits an empty toc title", async () => {
     await withTempDir("spinedigest-digest-", async (path) => {
       const documentDirPath = `${path}/custom-document`;
 
@@ -214,7 +214,6 @@ describe("facade/digest", () => {
               {
                 children: [],
                 serialId: 1,
-                title: "Section 1",
               },
             ],
             version: 1,

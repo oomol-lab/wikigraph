@@ -7,7 +7,7 @@ import type {
   TocItem,
 } from "../source/index.js";
 
-import { writeSdpubArchive } from "./archive.js";
+import { readSdpubArchiveFormatVersion, writeSdpubArchive } from "./archive.js";
 import type { SpineDigestSerialEntry } from "./types.js";
 
 export class SpineDigest {
@@ -46,6 +46,10 @@ export class SpineDigest {
 
   public async readToc(): Promise<TocFile | undefined> {
     return await this.#document.readToc();
+  }
+
+  public async readArchiveFormatVersion(): Promise<number> {
+    return await readSdpubArchiveFormatVersion(this.#documentDirectoryPath);
   }
 
   public async listSerials(): Promise<readonly SpineDigestSerialEntry[]> {
@@ -106,7 +110,8 @@ async function collectSerialEntries(
   const entries: SpineDigestSerialEntry[] = [];
 
   for (const item of items) {
-    const tocPath = [...ancestorTitles, item.title];
+    const title = item.title?.trim() || `Chapter ${item.serialId ?? "group"}`;
+    const tocPath = [...ancestorTitles, title];
 
     if (item.serialId !== undefined) {
       entries.push({
@@ -114,7 +119,7 @@ async function collectSerialEntries(
           await document.getSerialFragments(item.serialId).listFragmentIds()
         ).length,
         serialId: item.serialId,
-        title: item.title,
+        title,
         tocPath,
       });
     }

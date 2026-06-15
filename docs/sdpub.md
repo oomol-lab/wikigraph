@@ -22,14 +22,14 @@ At a high level, the archive contains three layers of data:
 - digest text outputs at serial and fragment granularity
 - internal relational state used by SpineDigest itself
 
-No archive-level manifest currently exists. Compatibility is expressed
-through the archive path layout and the versioned JSON payloads inside
-that layout.
+Archive-level compatibility is expressed by `manifest.json`. Archives
+that omit `manifest.json` are interpreted as format version `1` for
+compatibility with earlier SpineDigest output.
 
 In this document, a _serial_ means one persisted digest unit referenced
 from `toc.json` by `serialId`. A serial usually corresponds to one
-exportable section, carries one serial summary text file, and may also
-have fragment files.
+exportable section. Depending on the archive stage, it may carry source
+fragments, graph data, and a serial summary text file.
 
 ## Container Model
 
@@ -39,6 +39,7 @@ Conforming archives produced by SpineDigest use POSIX-style archive
 paths and contain entries from this path set:
 
 - `database.db`
+- `manifest.json`
 - `book-meta.json`
 - `toc.json`
 - `cover/info.json`
@@ -71,28 +72,37 @@ requirements are treated separately.
 
 For archives written by SpineDigest today:
 
-| Path family                                              | SpineDigest writer behavior                             | Notes                                         |
-| -------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------- |
-| `database.db`                                            | always written                                          | Created for every document directory          |
-| `book-meta.json`                                         | always written                                          | Written for TXT, Markdown, and EPUB imports   |
-| `toc.json`                                               | always written                                          | Written for TXT, Markdown, and EPUB imports   |
-| `cover/info.json` + `cover/data.bin`                     | written together only when a source cover exists        | Treat as a pair                               |
-| `summaries/serial-<serialId>.txt`                        | written for every `serialId` that appears in `toc.json` | Grouping-only TOC nodes have no summary file  |
-| `fragments/serial-<serialId>/fragment_<fragmentId>.json` | written only for non-empty fragments                    | Do not assume every serial has fragment files |
+| Path family                                              | SpineDigest writer behavior                      | Notes                                         |
+| -------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------- |
+| `database.db`                                            | always written                                   | Created for every document directory          |
+| `manifest.json`                                          | always written                                   | Declares the archive-level format version     |
+| `book-meta.json`                                         | always written                                   | Written for TXT, Markdown, and EPUB imports   |
+| `toc.json`                                               | always written                                   | Written for TXT, Markdown, and EPUB imports   |
+| `cover/info.json` + `cover/data.bin`                     | written together only when a source cover exists | Treat as a pair                               |
+| `summaries/serial-<serialId>.txt`                        | written for summarized serials                   | Staged archives may omit summary files        |
+| `fragments/serial-<serialId>/fragment_<fragmentId>.json` | written only for non-empty fragments             | Do not assume every serial has fragment files |
 
 Source-specific notes:
 
 - TXT input currently produces one top-level serial and never produces a
-  cover.
+  cover. The TOC item may omit `title` when no title is supplied.
 - Markdown input currently produces one top-level serial and never
-  produces a cover.
+  produces a cover. The TOC item may omit `title` when no title is
+  supplied.
 - EPUB input may or may not produce a cover.
 - EPUB input may produce grouping TOC nodes that omit `serialId`.
+- When the CLI is run with `--stage planned`, serials are allocated but
+  source fragments, graph data, and summaries are omitted.
+- When the CLI is run with `--stage sourced`, source fragments are
+  written but graph data and summaries are omitted.
+- When the CLI is run with `--stage graphed`, graph data is written but
+  summaries are omitted.
 
 For readers and validators:
 
 - `toc.json` plus `summaries/` is the minimum useful set for ordered text
-  rendering.
+  rendering of completed archives. Staged archives may require
+  `spinedigest sdpub stage advance` before text rendering is complete.
 - `book-meta.json` is optional for plain rendering, but required if
   metadata is part of the target feature set.
 - `cover/info.json` and `cover/data.bin` are optional as a pair.
@@ -106,6 +116,7 @@ For readers and validators:
 
 - `database.db`: SQLite database with internal indexed state for
   serials, chunks, topology, and graph relationships
+- `manifest.json`: UTF-8 JSON with the archive-level format version
 - `book-meta.json`: UTF-8 JSON with source-level metadata for the
   processed document
 - `toc.json`: UTF-8 JSON with the navigation tree used for export and
@@ -125,6 +136,25 @@ Fragment ids are integers scoped to a serial. SpineDigest currently
 allocates them from `0` upward within each serial directory.
 
 ## File Formats
+
+### `manifest.json`
+
+`manifest.json` declares the archive-level `.sdpub` format version.
+
+Current schema:
+
+```json
+{
+  "formatVersion": 1
+}
+```
+
+Field contract:
+
+- `formatVersion`: currently `1`
+
+Archives that omit `manifest.json` are interpreted as
+`formatVersion: 1`.
 
 ### `book-meta.json`
 
@@ -162,6 +192,10 @@ Field contract:
 metadata. It is not a promise that the current public CLI necessarily
 accepts that source type as direct input.
 
+The public CLI can inspect and edit these fields with
+`spinedigest sdpub meta --input <path>`. The command preserves `version`
+and `sourceFormat`.
+
 ### `toc.json`
 
 `toc.json` defines the exported reading order and section tree.
@@ -188,7 +222,7 @@ Current schema:
 
 Each item contains:
 
-- `title`: non-empty string
+- `title`: optional non-empty string or `null`
 - `serialId`: optional non-negative integer
 - `children`: array of child items
 
@@ -198,6 +232,11 @@ A node may omit `serialId` and act as a pure grouping node. When
 `serialId` is present, it points to
 `summaries/serial-<serialId>.txt` and may also have a matching
 fragment directory.
+
+A node may omit `title` or set it to `null`. Text renderers may omit the
+heading for such nodes. EPUB renderers should use a display fallback such
+as `Section <serialId>` because EPUB navigation and section documents
+need visible labels.
 
 ### `cover/info.json` and `cover/data.bin`
 
@@ -226,7 +265,7 @@ again.
 
 ### `summaries/serial-<serialId>.txt`
 
-Each serial summary is stored as a standalone UTF-8 text file.
+Each completed serial summary is stored as a standalone UTF-8 text file.
 
 The text is the serial-level digest content used by plain-text and EPUB
 export. The file may be empty. Readers should not depend on a trailing
@@ -300,7 +339,7 @@ This database is useful when an implementation needs full structural
 fidelity with SpineDigest's internal model.
 
 A minimal reader does not need to understand the entire database. For
-simple rendering, `toc.json` plus `summaries/` is enough. For
+simple rendering of completed archives, `toc.json` plus `summaries/` is enough. For
 sentence-level inspection, `fragments/` is enough for sentence payloads,
 but `toc.json` is still needed if reading order or section titles
 matter. The SQLite layer matters when the implementation needs chunk
@@ -314,7 +353,7 @@ For a lightweight reader:
 
 1. read `book-meta.json` if metadata is needed
 2. read `toc.json`
-3. follow each `serialId` into `summaries/serial-<serialId>.txt`
+3. follow each summarized `serialId` into `summaries/serial-<serialId>.txt`
 4. read `cover/info.json` and `cover/data.bin` only if a cover is needed
 
 For a sentence-aware reader:
@@ -331,8 +370,9 @@ For a full-fidelity implementation:
 
 ## Compatibility Notes
 
-- There is no top-level archive version number.
-- Compatibility is currently versioned per JSON payload, not per archive.
+- `manifest.json` carries the archive-level format version.
+- Archives without `manifest.json` are treated as archive format version
+  `1`.
 - `book-meta.json` currently uses `version: 1`.
 - `toc.json` currently uses `version: 1`.
 - Fragment files have no explicit version field.
@@ -346,7 +386,7 @@ Readers that accept untrusted `.sdpub` input should validate at least the follow
 
 - the ZIP entry path normalizes to a safe relative path
 - JSON payloads match the expected schema
-- every `serialId` referenced by `toc.json` has a matching summary file
+- every summarized `serialId` referenced by `toc.json` has a matching summary file
 - cover metadata and cover bytes either both exist or are both absent
 - fragment files, if present, use non-negative integer ids and valid
   sentence records

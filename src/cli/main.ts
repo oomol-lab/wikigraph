@@ -2,6 +2,8 @@ import { parseCLIArguments } from "./args.js";
 import { runConvertCommand } from "./convert.js";
 import { runStatusCommand } from "./status.js";
 import { runSdpubCommand } from "./sdpub.js";
+import { runSdpubChapterCommand } from "./sdpub-chapter.js";
+import { runSdpubStageCommand } from "./sdpub-stage.js";
 import { LLMPaymentRequiredError } from "../llm/index.js";
 import { formatError } from "../utils/node-error.js";
 
@@ -24,6 +26,12 @@ export async function main(): Promise<void> {
         }
 
         await runSdpubCommand(parsed.args);
+        return;
+      case "sdpub-chapter":
+        await runSdpubChapterCommand(parsed.args);
+        return;
+      case "sdpub-stage":
+        await runSdpubStageCommand(parsed.args);
         return;
       case "status":
         await runStatusCommand(parsed.args);
