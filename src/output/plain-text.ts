@@ -66,7 +66,7 @@ async function renderTocItem(
 
     if (summary === undefined) {
       throw new Error(
-        `Serial ${item.serialId} summary is missing. Run \`spinedigest sdpub stage pending <path>\` to inspect unfinished chapters.`,
+        `Chapter ${item.serialId} summary is missing. Run \`spinedigest sdpub stage pending <path>\` to inspect unfinished chapters.`,
       );
     }
     if (summary.trim() !== "") {

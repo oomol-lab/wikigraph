@@ -82,10 +82,13 @@ vi.mock("../../src/cli/sdpub-stage.js", () => ({
 }));
 
 import { main } from "../../src/cli/main.js";
+import { renderMainHelpText } from "../../src/cli/help.js";
 import { LLMPaymentRequiredError } from "../../src/llm/index.js";
 
 describe("cli/main", () => {
   const originalExitCode = process.exitCode;
+  const originalArgv = process.argv;
+  const originalStdinIsTTY = process.stdin.isTTY;
   let stdoutWrite: MockInstance;
   let stderrWrite: MockInstance;
   let stdoutChunks: string[];
@@ -111,6 +114,8 @@ describe("cli/main", () => {
     mainMockState.sdpubRunError = undefined;
     mainMockState.sdpubStageRunError = undefined;
     process.exitCode = 0;
+    process.argv = ["node", "spinedigest"];
+    setStdinTTY(false);
     stdoutChunks = [];
     stderrChunks = [];
     stdoutWrite = vi
@@ -131,6 +136,21 @@ describe("cli/main", () => {
     stdoutWrite.mockRestore();
     stderrWrite.mockRestore();
     process.exitCode = originalExitCode;
+    process.argv = originalArgv;
+    setStdinTTY(originalStdinIsTTY);
+  });
+
+  it("prints root help for a bare interactive invocation", async () => {
+    setStdinTTY(true);
+
+    await main();
+
+    expect(stdoutChunks).toStrictEqual([`${renderMainHelpText()}\n`]);
+    expect(stderrChunks).toStrictEqual([]);
+    expect(mainMockState.runCalls).toHaveLength(0);
+    expect(mainMockState.statusRunCalls).toBe(0);
+    expect(mainMockState.sdpubRunCalls).toHaveLength(0);
+    expect(process.exitCode).toBe(0);
   });
 
   it("prints help text and skips conversion when --help is used", async () => {
@@ -382,3 +402,10 @@ describe("cli/main", () => {
     expect(process.exitCode).toBe(1);
   });
 });
+
+function setStdinTTY(value: boolean | undefined): void {
+  Object.defineProperty(process.stdin, "isTTY", {
+    configurable: true,
+    value,
+  });
+}

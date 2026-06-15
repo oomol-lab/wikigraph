@@ -29,8 +29,9 @@ Shared behavior:
   - `-h` is available as the short form of `--help`.
 
 Path convention:
-  - Use `--input <path>` for `info`, `toc`, `list`, `cat`, `cover`, and `meta`.
-  - Use positional `<path>` for `stage` and `chapter`.
+  - Use `--input <path>` for read-oriented commands: `info`, `toc`, `list`, `cat`, `cover`, and `meta`.
+  - Use positional `<path>` for operated-document commands: `stage` and `chapter`.
+  - This split follows the top-level option style for inspection, while mutating/stage commands treat the archive as the document being operated on.
   - `.sdpub` is a ZIP archive, but routine automation should not unzip and edit it directly. Use this command family instead.
 
 Mutation safety:

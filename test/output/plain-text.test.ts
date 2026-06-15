@@ -112,7 +112,7 @@ describe("output/plain-text", () => {
             document: missingSummaryDocument,
             path: `${path}/missing-summary.txt`,
           }),
-        ).rejects.toThrow("Serial 7 summary is missing");
+        ).rejects.toThrow("Chapter 7 summary is missing");
       } finally {
         await missingTocDocument.release();
         await missingSummaryDocument.release();

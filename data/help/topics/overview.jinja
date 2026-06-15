@@ -19,8 +19,14 @@ Mental model:
   4. Archive command path:
      `spinedigest sdpub ...` inspects or edits existing archives.
 
+Default command:
+  `spinedigest` without a subcommand is the convenience digest/export command.
+  It reads from `--input <path>` or stdin, and writes to `--output <path>` or stdout.
+  In an interactive terminal, a bare `spinedigest` prints root help instead of trying to digest empty stdin.
+
 Think in terms of intent:
   - Use source input when you want a new digest.
+  - Use a pipe only for non-interactive txt or markdown streams with explicit format flags.
   - Use .sdpub input when you want deterministic reuse of a previous digest.
   - Use `sdpub` subcommands when you want to inspect or edit an archive, not export it.
 

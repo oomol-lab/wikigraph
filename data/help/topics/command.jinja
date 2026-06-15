@@ -6,6 +6,11 @@ Command Reference
 Main convert command:
   spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose|-v] [--help|-h] [--version]
 
+Default command behavior:
+  `spinedigest` without a subcommand is the convenience digest/export command.
+  It reads stdin when `--input` is omitted and writes stdout when `--output` is omitted.
+  Use explicit format flags for streams because there is no filename extension to inspect.
+
 Status command:
   spinedigest status [--llm <json>] [--help|-h]
     Validate and print the masked merged config.
@@ -46,7 +51,7 @@ sdpub chapter commands:
   spinedigest sdpub chapter set-summary <path> --chapter <id> [--input <path>] [--llm <json>]
 
 sdpub-specific flags:
-  --serial <id>          Required by `spinedigest sdpub cat`; must be a non-negative integer.
+  --serial <id>          Legacy read flag required by `spinedigest sdpub cat`; for chapter-backed content it matches the chapter id.
   --chapter <id>         Numeric chapter id printed by `sdpub chapter list` or `add`.
   --parent <id>          Parent chapter id for `sdpub chapter add`.
   --to <stage>           Target stage for `sdpub stage advance` or `sdpub chapter reset`.

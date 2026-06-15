@@ -377,7 +377,7 @@ describe("cli/args", () => {
 
   it("rejects positional arguments", () => {
     expect(() => parseCLIArguments(["book.epub"])).toThrow(
-      "Unexpected positional arguments: book.epub. Use --input and --output instead.\nSee: spinedigest help command",
+      "Unexpected positional argument or unknown command: book.epub. The default command reads from stdin or --input; it does not accept positional input paths. Use --input <path>, or see available subcommands with `spinedigest --help`.\nSee: spinedigest help command",
     );
   });
 
@@ -399,6 +399,9 @@ describe("cli/args", () => {
     );
     expect(() => parseCLIArguments(["sdpub", "inspect", "extra"])).toThrow(
       "Unexpected positional arguments: extra.\nSee: spinedigest sdpub --help",
+    );
+    expect(() => parseCLIArguments(["sdpub", "info", "book.sdpub"])).toThrow(
+      "Unexpected positional arguments: book.sdpub. The `sdpub info` subcommand uses --input <path>; it does not accept a positional archive path.\nSee: spinedigest sdpub info --help",
     );
     expect(() =>
       parseCLIArguments(["sdpub", "info", "--output", "out.txt"]),
@@ -674,3 +677,11 @@ describe("cli/args", () => {
     );
   });
 });
+expect(() =>
+  parseCLIArguments(["sdpub", "chapter", "bogus", "--help"]),
+).toThrow(
+  "Invalid sdpub chapter action: bogus. Expected one of list, status, add, remove, reset, set-source, set-summary.\nSee: spinedigest sdpub chapter --help",
+);
+expect(() => parseCLIArguments(["sdpub", "stage", "bogus", "--help"])).toThrow(
+  "Invalid sdpub stage action: bogus. Expected one of advance, pending.\nSee: spinedigest sdpub stage --help",
+);

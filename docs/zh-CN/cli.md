@@ -44,6 +44,8 @@ pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 
 主转换命令不支持 positional arguments。
 
+没有 subcommand 的 `spinedigest` 是便捷 digest/export 命令。它从 `--input <path>` 或 stdin 读取，并写入 `--output <path>` 或 stdout。在交互式终端中，裸 `spinedigest` 会打印 help，而不是尝试 digest stdin。
+
 `sdpub` 接口本身使用 positional subcommands：`spinedigest sdpub <subcommand>`。
 
 偏读取的 `sdpub` 子命令使用 `--input`，其中 `cat` 还要求提供 `--serial`，`meta` 额外接受 metadata 编辑参数。`sdpub stage` 和 `sdpub chapter` 会原地编辑已有归档，并把归档路径作为 positional argument。
@@ -252,7 +254,7 @@ SpineDigest 支持通过环境变量覆盖配置值：
 - SpineDigest 会直接打开已经保存的 digest 状态
 - 不需要 LLM 配置
 - 如果归档已经 summarized，可以导出为 `.txt`、`.md` 或 `.epub`
-- 也可以通过 `spinedigest sdpub ...` 检查元信息、TOC、已完成 serial、serial 文本、封面数据、未完成章节和章节阶段
+- 也可以通过 `spinedigest sdpub ...` 检查元信息、TOC、已完成摘要、封面数据、未完成章节和章节阶段
 
 当输出是 `.sdpub` 时：
 

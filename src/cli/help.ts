@@ -99,15 +99,15 @@ const SDPUB_SUBCOMMAND_METADATA: readonly {
   },
   {
     name: "toc",
-    summary: "Print the TOC tree, including any referenced serial ids.",
+    summary: "Print the TOC tree, including chapter id markers.",
   },
   {
     name: "list",
-    summary: "List serial ids with their TOC paths and fragment counts.",
+    summary: "List summarized chapters that are ready for cat.",
   },
   {
     name: "cat",
-    summary: "Print the summary text for one serial id.",
+    summary: "Print one completed summary through the legacy --serial reader.",
   },
   {
     name: "cover",

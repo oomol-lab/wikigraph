@@ -577,7 +577,7 @@ export async function readSerial(
 
   if (summary === undefined) {
     throw new Error(
-      `Serial ${serialId} summary is missing. Run \`spinedigest sdpub stage pending <path>\` to inspect unfinished chapters.`,
+      `Chapter ${serialId} summary is missing. Run \`spinedigest sdpub stage pending <path>\` to inspect unfinished chapters.`,
     );
   }
 
@@ -602,7 +602,7 @@ async function getSerialRecord(
 
   if (record === undefined) {
     throw new Error(
-      `Serial ${serialId} does not exist. Use \`spinedigest sdpub list --input <path>\` to discover summarized serial ids.`,
+      `Chapter ${serialId} does not exist. Use \`spinedigest sdpub chapter list <path>\` to discover chapter ids.`,
     );
   }
 

@@ -44,6 +44,8 @@ pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 
 The main conversion command does not support positional arguments.
 
+`spinedigest` without a subcommand is the convenience digest/export command. It reads from `--input <path>` or stdin, and writes to `--output <path>` or stdout. In an interactive terminal, a bare `spinedigest` prints help instead of trying to digest stdin.
+
 The `sdpub` interface uses positional subcommands: `spinedigest sdpub <subcommand>`.
 
 Read-oriented `sdpub` subcommands use `--input`, except `cat` also requires `--serial` and `meta` accepts metadata edit flags. `sdpub stage` and `sdpub chapter` edit existing archives in place and take the archive path as a positional argument.
@@ -252,7 +254,7 @@ When the input is `.sdpub`:
 - SpineDigest opens the saved digest state
 - no LLM configuration is required
 - if the archive is summarized, you can export to `.txt`, `.md`, or `.epub`
-- you can inspect metadata, TOC, summarized serials, serial text, cover data, pending chapters, and chapter stages through `spinedigest sdpub ...`
+- you can inspect metadata, TOC, completed summaries, cover data, pending chapters, and chapter stages through `spinedigest sdpub ...`
 
 When the output is `.sdpub`:
 

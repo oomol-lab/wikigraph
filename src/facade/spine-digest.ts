@@ -70,7 +70,7 @@ export class SpineDigest {
 
       if (record === undefined) {
         throw new Error(
-          `Serial ${serialId} does not exist. Use \`spinedigest sdpub list --input <path>\` to discover summarized serial ids.`,
+          `No completed summary exists for id ${serialId}. Use \`spinedigest sdpub list --input <path>\` to discover ids ready for \`sdpub cat --serial\`.`,
         );
       }
 
@@ -78,7 +78,7 @@ export class SpineDigest {
 
       if (summary === undefined) {
         throw new Error(
-          `Serial ${serialId} summary is missing. Run \`spinedigest sdpub stage pending <path>\` to inspect unfinished chapters.`,
+          `Chapter ${serialId} summary is missing. Run \`spinedigest sdpub stage pending <path>\` to inspect unfinished chapters.`,
         );
       }
 
