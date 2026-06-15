@@ -255,4 +255,53 @@ describe("facade/chapter", () => {
       }
     });
   });
+
+  it("reports advance progress without making progress callbacks fatal", async () => {
+    await withTempDir("spinedigest-chapter-", async (path) => {
+      const document = await DirectoryDocument.open(path);
+
+      try {
+        const chapter = await addChapter(document, {
+          title: "Draft",
+        });
+        const events: unknown[] = [];
+
+        const skipped = await advanceChapterStages(document, {
+          extractionPrompt: "Keep key beats",
+          llm: {} as never,
+          onProgress: (event) => {
+            events.push(event);
+            throw new Error("progress failed");
+          },
+          targetStage: "summarized",
+        });
+
+        expect(skipped.advanced).toStrictEqual([]);
+        expect(skipped.pending).toMatchObject([
+          {
+            chapterId: chapter.chapterId,
+            stage: "planned",
+          },
+        ]);
+        expect(events).toMatchObject([
+          {
+            targetStage: "summarized",
+            totalChapters: 1,
+            type: "selected",
+          },
+          {
+            chapter: {
+              chapterId: chapter.chapterId,
+              title: "Draft",
+            },
+            reason: "planned",
+            targetStage: "summarized",
+            type: "skipped",
+          },
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
 });

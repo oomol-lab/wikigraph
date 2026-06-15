@@ -18,6 +18,19 @@ export async function writeTextToStdout(text: string): Promise<void> {
   await pipeline(Readable.from([text]), process.stdout);
 }
 
+export async function writeTextToStderr(text: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    process.stderr.write(text, (error) => {
+      if (error === undefined || error === null) {
+        resolve();
+        return;
+      }
+
+      reject(error);
+    });
+  });
+}
+
 export async function writeBinaryToStdout(data: Uint8Array): Promise<void> {
   await pipeline(Readable.from([data]), process.stdout);
 }

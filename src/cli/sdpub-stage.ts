@@ -1,13 +1,14 @@
 import {
   advanceChapterStages,
   listChapters,
+  type AdvanceChapterStagesProgressEvent,
   type AdvanceChapterStagesResult,
   type ChapterEntry,
 } from "../facade/index.js";
 import { SpineDigestFile } from "../facade/spine-digest-file.js";
 
 import type { CLISdpubStageArguments } from "./args.js";
-import { writeTextToStdout } from "./io.js";
+import { writeTextToStderr, writeTextToStdout } from "./io.js";
 import {
   createStageLLM,
   loadRequiredStageConfig,
@@ -40,22 +41,110 @@ export async function runSdpubStageCommand(
           }
 
           const config = await loadRequiredStageConfig(args);
-          const result = await advanceChapterStages(document, {
-            ...(args.chapterId === undefined
-              ? {}
-              : { chapterId: args.chapterId }),
-            extractionPrompt: resolveExtractionPrompt(
-              args.prompt ?? config.prompt,
-            ),
-            llm: createStageLLM(config),
-            targetStage,
-          });
+          const progressWriter = createStageAdvanceProgressWriter();
+          let result: AdvanceChapterStagesResult;
+
+          try {
+            result = await advanceChapterStages(document, {
+              ...(args.chapterId === undefined
+                ? {}
+                : { chapterId: args.chapterId }),
+              extractionPrompt: resolveExtractionPrompt(
+                args.prompt ?? config.prompt,
+              ),
+              llm: createStageLLM(config),
+              onProgress: progressWriter.onProgress,
+              targetStage,
+            });
+          } finally {
+            await progressWriter.stop();
+          }
 
           await writeAdvanceResult(result);
         },
       );
       return;
   }
+}
+
+function createStageAdvanceProgressWriter(input?: {
+  readonly heartbeatIntervalMs?: number;
+}): {
+  readonly onProgress: (
+    event: AdvanceChapterStagesProgressEvent,
+  ) => Promise<void>;
+  stop(): Promise<void>;
+} {
+  const heartbeatIntervalMs = input?.heartbeatIntervalMs ?? 15_000;
+  let heartbeat: NodeJS.Timeout | undefined;
+  let activeLabel: string | undefined;
+  let writeQueue = Promise.resolve();
+
+  const writeLine = async (line: string): Promise<void> => {
+    writeQueue = writeQueue
+      .catch(() => undefined)
+      .then(async () => {
+        await writeTextToStderr(`${line}\n`);
+      });
+    await writeQueue;
+  };
+
+  const clearHeartbeat = (): void => {
+    if (heartbeat !== undefined) {
+      clearInterval(heartbeat);
+      heartbeat = undefined;
+    }
+  };
+
+  const startHeartbeat = (label: string): void => {
+    clearHeartbeat();
+    activeLabel = label;
+    heartbeat = setInterval(() => {
+      const currentLabel = activeLabel;
+
+      if (currentLabel === undefined) {
+        return;
+      }
+
+      void writeLine(`Still ${currentLabel.toLowerCase()}...`);
+    }, heartbeatIntervalMs);
+    heartbeat.unref();
+  };
+
+  return {
+    async onProgress(event) {
+      switch (event.type) {
+        case "selected":
+          await writeLine(
+            `Selected ${event.totalChapters} ${event.totalChapters === 1 ? "chapter" : "chapters"}; target: ${event.targetStage}.`,
+          );
+          return;
+        case "skipped":
+          await writeLine(
+            `Skipping ${formatProgressChapter(event.chapter)}: source is missing.`,
+          );
+          return;
+        case "started": {
+          const label = `${formatProgressVerb(event.step)} for ${formatProgressChapter(event.chapter)}`;
+          startHeartbeat(label);
+          await writeLine(`${label}...`);
+          return;
+        }
+        case "completed":
+          clearHeartbeat();
+          activeLabel = undefined;
+          await writeLine(
+            `Finished ${formatProgressStep(event.step)} for ${formatProgressChapter(event.chapter)}.`,
+          );
+          return;
+      }
+    },
+    async stop() {
+      clearHeartbeat();
+      activeLabel = undefined;
+      await writeQueue.catch(() => undefined);
+    },
+  };
 }
 
 async function writePendingChapters(
@@ -105,4 +194,26 @@ function formatTocPath(entry: ChapterEntry): string {
   }
 
   return entry.tocPath.join(" / ");
+}
+
+function formatProgressChapter(entry: ChapterEntry): string {
+  return `chapter ${entry.chapterId} (${formatTocPath(entry)})`;
+}
+
+function formatProgressVerb(step: "graph" | "summary"): string {
+  switch (step) {
+    case "graph":
+      return "Generating graph";
+    case "summary":
+      return "Generating summary";
+  }
+}
+
+function formatProgressStep(step: "graph" | "summary"): string {
+  switch (step) {
+    case "graph":
+      return "graph";
+    case "summary":
+      return "summary";
+  }
 }

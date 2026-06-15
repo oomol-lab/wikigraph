@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const stageMockState = vi.hoisted(() => ({
   advancedCalls: [] as unknown[],
   editableCalls: [] as string[],
+  errorWrites: [] as string[],
   listEntries: [
     {
       chapterId: 1,
@@ -86,6 +87,10 @@ vi.mock("../../src/llm/index.js", () => ({
 }));
 
 vi.mock("../../src/cli/io.js", () => ({
+  writeTextToStderr: vi.fn((text: string) => {
+    stageMockState.errorWrites.push(text);
+    return Promise.resolve();
+  }),
   writeTextToStdout: vi.fn((text: string) => {
     stageMockState.textWrites.push(text);
     return Promise.resolve();
@@ -98,6 +103,7 @@ describe("cli/sdpub-stage", () => {
   beforeEach(() => {
     stageMockState.advancedCalls.length = 0;
     stageMockState.editableCalls.length = 0;
+    stageMockState.errorWrites.length = 0;
     stageMockState.loadConfigCalls.length = 0;
     stageMockState.textWrites.length = 0;
   });
@@ -126,6 +132,36 @@ describe("cli/sdpub-stage", () => {
       extractionPrompt: "CLI prompt",
       targetStage: "summarized",
     });
+    const onProgress = (
+      stageMockState.advancedCalls[0] as {
+        readonly onProgress?: (event: unknown) => Promise<void>;
+      }
+    ).onProgress;
+    expect(onProgress).toBeTypeOf("function");
+
+    await onProgress?.({
+      targetStage: "summarized",
+      totalChapters: 1,
+      type: "selected",
+    });
+    await onProgress?.({
+      chapter: stageMockState.listEntries[1],
+      step: "graph",
+      targetStage: "summarized",
+      type: "started",
+    });
+    await onProgress?.({
+      chapter: stageMockState.listEntries[1],
+      step: "graph",
+      targetStage: "summarized",
+      type: "completed",
+    });
+
+    expect(stageMockState.errorWrites).toStrictEqual([
+      "Selected 1 chapter; target: summarized.\n",
+      "Generating graph for chapter 2 (Todo)...\n",
+      "Finished graph for chapter 2 (Todo).\n",
+    ]);
     expect(stageMockState.textWrites).toStrictEqual([
       "Advanced: 1\nPending: 0\nSkipped: 0\n",
     ]);
@@ -140,6 +176,7 @@ describe("cli/sdpub-stage", () => {
 
     expect(stageMockState.loadConfigCalls).toHaveLength(0);
     expect(stageMockState.advancedCalls).toHaveLength(0);
+    expect(stageMockState.errorWrites).toStrictEqual([]);
     expect(stageMockState.textWrites).toStrictEqual([
       "Advanced: 0\nPending: 0\nSkipped: 0\n",
     ]);

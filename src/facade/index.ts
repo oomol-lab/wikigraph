@@ -39,6 +39,8 @@ export {
 export type {
   AddChapterOptions,
   AdvanceChapterStagesOptions,
+  AdvanceChapterStagesProgressCallback,
+  AdvanceChapterStagesProgressEvent,
   AdvanceChapterStagesResult,
   ChapterDetails,
   ChapterEntry,
