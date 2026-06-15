@@ -12,7 +12,7 @@ Installed CLI:
 spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 spinedigest --version
 spinedigest status [--llm <json>]
-spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--llm <json>]
+spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--json] [--llm <json>]
 spinedigest sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 spinedigest sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
 ```
@@ -23,7 +23,7 @@ From a source checkout:
 pnpm dev -- [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 pnpm dev -- --version
 pnpm dev -- status [--llm <json>]
-pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--llm <json>]
+pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--json] [--llm <json>]
 pnpm dev -- sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
 ```
@@ -38,6 +38,7 @@ pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 - `--llm <json>`: inline LLM client JSON for this invocation
 - `--prompt <text>`: one-off extraction prompt override for the current digest run
 - `--stage <stage>`: create `.sdpub` output up to `planned`, `sourced`, `graphed`, or `summarized`
+- `--json`: print `sdpub list` as structured JSON
 - `--verbose`: write diagnostic logs to `stderr`
 - `--version`: print the installed package version
 - `-h`, `--help`: print help text
@@ -254,7 +255,7 @@ When the input is `.sdpub`:
 - SpineDigest opens the saved digest state
 - no LLM configuration is required
 - if the archive is summarized, you can export to `.txt`, `.md`, or `.epub`
-- you can inspect metadata, TOC, completed summaries, cover data, pending chapters, and chapter stages through `spinedigest sdpub ...`
+- you can inspect metadata, TOC, chapter tree, cover data, pending chapters, and chapter stages through `spinedigest sdpub ...`
 
 When the output is `.sdpub`:
 
@@ -264,7 +265,7 @@ When the output is `.sdpub`:
 Chapter stages:
 
 - `planned`: the chapter exists in the TOC but has no source
-- `sourced`: normalized source fragments are stored
+- `sourced`: normalized source text is stored
 - `graphed`: graph data is stored, but no final summary exists yet
 - `summarized`: final summary exists and the chapter is ready for re-export or `sdpub cat`
 

@@ -8,6 +8,7 @@ Purpose:
 
 Usage:
   spinedigest sdpub meta --input <path> [--llm <json>] [--help|-h]
+  spinedigest sdpub meta --input <path> --json [--llm <json>] [--help|-h]
   spinedigest sdpub meta --input <path> [metadata options] [--llm <json>] [--help|-h]
 
 Metadata options:
@@ -28,14 +29,17 @@ Metadata options:
 
 Behavior:
   - Without metadata options, this command prints the current metadata.
+  - `--json` prints read-only structured metadata and cannot be combined with metadata options.
   - With metadata options, this command edits the archive in place and then prints the updated metadata.
   - `--author` replaces the entire author list; pass it once per author.
   - `version` and `sourceFormat` are preserved and cannot be edited by this command.
   - Empty string metadata values are rejected. Use the matching `--clear-*` flag instead.
+  - Literal values such as `unknown` are printed as stored metadata values, not interpreted as missing.
   - This command does not call an LLM provider.
 
 Examples:
   spinedigest sdpub meta --input ./book.sdpub
+  spinedigest sdpub meta --input ./book.sdpub --json
   spinedigest sdpub meta --input ./book.sdpub --title "New Title"
   spinedigest sdpub meta --input ./book.sdpub --author "Author One" --author "Author Two"
   spinedigest sdpub meta --input ./book.sdpub --clear-title --clear-description

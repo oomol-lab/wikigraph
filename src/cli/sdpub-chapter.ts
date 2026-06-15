@@ -170,7 +170,7 @@ async function writeChapterDetails(details: ChapterDetails): Promise<void> {
     `Chapter: ${details.chapterId}`,
     `Title: ${details.title ?? "[untitled]"}`,
     `Stage: ${details.stage}`,
-    `Fragments: ${details.fragmentCount}`,
+    `Source Units: ${details.fragmentCount}`,
     `Children: ${details.childCount}`,
     `Graph: ${details.graphReady ? "yes" : "no"}`,
     `Summary: ${details.hasSummary ? "yes" : "no"}`,

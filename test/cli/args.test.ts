@@ -178,6 +178,28 @@ describe("cli/args", () => {
       kind: "sdpub",
     });
     expect(
+      parseCLIArguments(["sdpub", "list", "--input", "book.sdpub", "--json"]),
+    ).toStrictEqual({
+      args: {
+        inputPath: "book.sdpub",
+        json: true,
+        subcommand: "list",
+      },
+      help: false,
+      kind: "sdpub",
+    });
+    expect(
+      parseCLIArguments(["sdpub", "meta", "--input", "book.sdpub", "--json"]),
+    ).toStrictEqual({
+      args: {
+        inputPath: "book.sdpub",
+        json: true,
+        subcommand: "meta",
+      },
+      help: false,
+      kind: "sdpub",
+    });
+    expect(
       parseCLIArguments([
         "sdpub",
         "meta",
@@ -412,6 +434,24 @@ describe("cli/args", () => {
       parseCLIArguments(["sdpub", "info", "--prompt", "Keep dialogue only"]),
     ).toThrow(
       "The `sdpub` subcommands do not support --prompt. It only applies to digest generation from source inputs.\nSee: spinedigest sdpub --help",
+    );
+    expect(() =>
+      parseCLIArguments(["sdpub", "info", "--input", "book.sdpub", "--json"]),
+    ).toThrow(
+      "The `sdpub info` subcommand does not support --json.\nSee: spinedigest sdpub info --help",
+    );
+    expect(() =>
+      parseCLIArguments([
+        "sdpub",
+        "meta",
+        "--input",
+        "book.sdpub",
+        "--json",
+        "--title",
+        "Updated",
+      ]),
+    ).toThrow(
+      "`sdpub meta --json` is read-only and cannot be combined with metadata edit flags.\nSee: spinedigest sdpub meta --help",
     );
     expect(() =>
       parseCLIArguments(["sdpub", "cat", "--input", "book.sdpub"]),

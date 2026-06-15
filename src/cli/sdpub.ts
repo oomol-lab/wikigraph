@@ -1,6 +1,10 @@
 import { SpineDigestApp } from "../index.js";
 import { SpineDigestFile } from "../facade/spine-digest-file.js";
-import type { SpineDigest } from "../facade/index.js";
+import {
+  listChapters,
+  type ChapterEntry,
+  type SpineDigest,
+} from "../facade/index.js";
 import type { BookMeta, TocFile, TocItem } from "../source/index.js";
 
 import type { CLISdpubArguments, SdpubMetaPatch } from "./args.js";
@@ -9,6 +13,12 @@ import { writeBinaryToStdout, writeTextToStdout } from "./io.js";
 export async function runSdpubCommand(args: CLISdpubArguments): Promise<void> {
   if (args.subcommand === "meta" && args.metaPatch !== undefined) {
     await updateSdpubMeta(args.inputPath, args.metaPatch);
+    return;
+  }
+  if (args.subcommand === "list") {
+    await writeSdpubChapterList(args.inputPath, {
+      json: args.json ?? false,
+    });
     return;
   }
 
@@ -21,9 +31,6 @@ export async function runSdpubCommand(args: CLISdpubArguments): Promise<void> {
       case "toc":
         await writeSdpubToc(digest);
         return;
-      case "list":
-        await writeSdpubChapterList(digest);
-        return;
       case "cat":
         await writeTextToStdout(
           await digest.readSerialSummary(args.chapterId!),
@@ -33,7 +40,9 @@ export async function runSdpubCommand(args: CLISdpubArguments): Promise<void> {
         await writeSdpubCover(digest);
         return;
       case "meta":
-        await writeSdpubMeta(await digest.readMeta());
+        await writeSdpubMeta(await digest.readMeta(), {
+          json: args.json ?? false,
+        });
         return;
     }
   });
@@ -61,16 +70,7 @@ async function writeSdpubInfo(digest: SpineDigest): Promise<void> {
   const lines: string[] = [];
 
   lines.push(`Archive Format Version: ${formatVersion}`);
-  appendOptionalLine(lines, "Title", meta?.title);
-  if (meta?.authors.length !== undefined && meta.authors.length > 0) {
-    lines.push(`Authors: ${meta.authors.join(", ")}`);
-  }
-  appendOptionalLine(lines, "Language", meta?.language);
-  appendOptionalLine(lines, "Source Format", meta?.sourceFormat);
-  appendOptionalLine(lines, "Identifier", meta?.identifier);
-  appendOptionalLine(lines, "Publisher", meta?.publisher);
-  appendOptionalLine(lines, "Published At", meta?.publishedAt);
-  appendOptionalLine(lines, "Description", meta?.description);
+  appendMetaLines(lines, meta);
   lines.push(`Cover: ${cover === undefined ? "no" : "yes"}`);
   appendOptionalLine(lines, "Cover Media Type", cover?.mediaType);
   appendOptionalLine(lines, "Cover Path", cover?.path);
@@ -84,7 +84,7 @@ async function writeSdpubInfo(digest: SpineDigest): Promise<void> {
     lines.push(`Referenced Chapters: ${referencedChapterCount}`);
     lines.push(`Summarized Chapters: ${serials.length}`);
     lines.push(
-      `Fragments: ${serials.reduce(
+      `Source Units: ${serials.reduce(
         (total, serial) => total + serial.fragmentCount,
         0,
       )}`,
@@ -121,22 +121,29 @@ async function writeSdpubToc(digest: SpineDigest): Promise<void> {
   await writeTextToStdout(`${lines.join("\n")}\n`);
 }
 
-async function writeSdpubChapterList(digest: SpineDigest): Promise<void> {
-  const serials = await digest.listSerials();
+async function writeSdpubChapterList(
+  path: string,
+  options: { readonly json: boolean },
+): Promise<void> {
+  await new SpineDigestFile(path).openEditableSession(async (document) => {
+    const entries = await listChapters(document);
 
-  if (serials.length === 0) {
-    await writeTextToStdout("No summarized chapters available.\n");
-    return;
-  }
+    if (options.json) {
+      await writeTextToStdout(
+        `${JSON.stringify(formatChapterListJSON(entries), null, 2)}\n`,
+      );
+      return;
+    }
 
-  await writeTextToStdout(
-    `${serials
-      .map(
-        (serial) =>
-          `[${serial.serialId}] ${serial.tocPath.join(" / ")} (fragments: ${serial.fragmentCount})`,
-      )
-      .join("\n")}\n`,
-  );
+    if (entries.length === 0) {
+      await writeTextToStdout("No chapters.\n");
+      return;
+    }
+
+    await writeTextToStdout(
+      `${entries.map(formatChapterListLine).join("\n")}\n`,
+    );
+  });
 }
 
 async function writeSdpubCover(digest: SpineDigest): Promise<void> {
@@ -169,28 +176,29 @@ async function updateSdpubMeta(
     const updatedMeta = applySdpubMetaPatch(meta, patch);
 
     await document.replaceBookMeta(updatedMeta);
-    await writeSdpubMeta(updatedMeta);
+    await writeSdpubMeta(updatedMeta, { json: false });
   });
 }
 
-async function writeSdpubMeta(meta: BookMeta | undefined): Promise<void> {
+async function writeSdpubMeta(
+  meta: BookMeta | undefined,
+  options: { readonly json: boolean },
+): Promise<void> {
+  if (options.json) {
+    await writeTextToStdout(
+      `${JSON.stringify(formatMetaJSON(meta), null, 2)}\n`,
+    );
+    return;
+  }
+
   if (meta === undefined) {
     await writeTextToStdout("No document metadata is available.\n");
     return;
   }
 
-  const lines = [
-    `Source Format: ${meta.sourceFormat}`,
-    `Title: ${meta.title ?? "[none]"}`,
-    `Authors: ${
-      meta.authors.length === 0 ? "[none]" : meta.authors.join(", ")
-    }`,
-    `Language: ${meta.language ?? "[none]"}`,
-    `Identifier: ${meta.identifier ?? "[none]"}`,
-    `Publisher: ${meta.publisher ?? "[none]"}`,
-    `Published At: ${meta.publishedAt ?? "[none]"}`,
-    `Description: ${meta.description ?? "[none]"}`,
-  ];
+  const lines: string[] = [];
+
+  appendMetaLines(lines, meta);
 
   await writeTextToStdout(`${lines.join("\n")}\n`);
 }
@@ -223,6 +231,55 @@ function applySdpubMetaPatch(meta: BookMeta, patch: SdpubMetaPatch): BookMeta {
       patch.clearDescription === true
         ? null
         : (patch.description ?? meta.description),
+  };
+}
+
+function formatChapterListLine(entry: ChapterEntry): string {
+  const stageSuffix = entry.stage === "summarized" ? "" : ` (${entry.stage})`;
+  return `${"  ".repeat(entry.depth)}[${entry.chapterId}] ${entry.title ?? "[untitled]"}${stageSuffix}`;
+}
+
+function formatChapterListJSON(entries: readonly ChapterEntry[]): object {
+  return {
+    chapters: entries.map((entry) => ({
+      catReady: entry.stage === "summarized",
+      chapterId: entry.chapterId,
+      childCount: entry.childCount,
+      depth: entry.depth,
+      stage: entry.stage,
+      title: entry.title,
+      tocPath: entry.tocPath,
+    })),
+  };
+}
+
+function appendMetaLines(lines: string[], meta: BookMeta | undefined): void {
+  lines.push(`Source Format: ${meta?.sourceFormat ?? "[none]"}`);
+  lines.push(`Title: ${meta?.title ?? "[none]"}`);
+  lines.push(
+    `Authors: ${
+      meta?.authors.length === undefined || meta.authors.length === 0
+        ? "[none]"
+        : meta.authors.join(", ")
+    }`,
+  );
+  lines.push(`Language: ${meta?.language ?? "[none]"}`);
+  lines.push(`Identifier: ${meta?.identifier ?? "[none]"}`);
+  lines.push(`Publisher: ${meta?.publisher ?? "[none]"}`);
+  lines.push(`Published At: ${meta?.publishedAt ?? "[none]"}`);
+  lines.push(`Description: ${meta?.description ?? "[none]"}`);
+}
+
+function formatMetaJSON(meta: BookMeta | undefined): object {
+  return {
+    authors: meta?.authors ?? [],
+    description: meta?.description ?? null,
+    identifier: meta?.identifier ?? null,
+    language: meta?.language ?? null,
+    publishedAt: meta?.publishedAt ?? null,
+    publisher: meta?.publisher ?? null,
+    sourceFormat: meta?.sourceFormat ?? null,
+    title: meta?.title ?? null,
   };
 }
 

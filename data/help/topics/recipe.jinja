@@ -33,11 +33,19 @@ Advance a staged archive to summaries:
 Add an empty planned chapter:
   spinedigest sdpub chapter add ./book.sdpub --title "Appendix"
 
-List completed summaries:
+List chapters:
   spinedigest sdpub list --input ./book.sdpub
+
+List chapters as JSON:
+  spinedigest sdpub list --input ./book.sdpub --json
 
 Read one completed chapter summary:
   spinedigest sdpub cat --input ./book.sdpub --chapter 12
+
+Edit one completed chapter summary with normal file tools:
+  spinedigest sdpub cat --input ./book.sdpub --chapter 12 > /tmp/chapter-12.md
+  # edit /tmp/chapter-12.md with your editor or automation
+  spinedigest sdpub chapter set-summary ./book.sdpub --chapter 12 --input /tmp/chapter-12.md
 
 Write the cover to a file:
   spinedigest sdpub cover --input ./book.sdpub > ./cover.bin

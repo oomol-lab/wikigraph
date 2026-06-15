@@ -43,5 +43,11 @@ Safety reminders:
   - Do not combine `--verbose` with stdout digest output.
   - Do not send `sdpub cover` binary output to an interactive terminal.
 
+File workflow:
+  - Prefer projecting chapter summaries into ordinary temporary files, then use your normal file tools.
+  - Read a summary with `spinedigest sdpub cat --input <archive.sdpub> --chapter <id> > /tmp/summary.md`.
+  - Write a revised summary back with `spinedigest sdpub chapter set-summary <archive.sdpub> --chapter <id> --input /tmp/summary.md`.
+  - Do not inspect or edit the `.sdpub` ZIP internals for routine summary edits.
+
 Discovery rule:
   - If a user question sounds like task selection, format support, config setup, runtime behavior, failure diagnosis, or `.sdpub` commands, read the matching help topic before guessing.

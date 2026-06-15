@@ -35,6 +35,7 @@ export interface CLIArguments {
 
 export interface CLISdpubArguments {
   readonly inputPath: string;
+  readonly json?: boolean;
   readonly llmJSON?: string;
   readonly metaPatch?: SdpubMetaPatch;
   readonly chapterId?: number;
@@ -233,6 +234,9 @@ export function parseCLIArguments(
       language: {
         type: "string",
       },
+      json: {
+        type: "boolean",
+      },
       llm: {
         type: "string",
       },
@@ -309,6 +313,7 @@ export function parseCLIArguments(
   }
 
   rejectConvertMetaFlags(values);
+  rejectConvertFlag("json", values.json);
 
   const args = {
     ...(values["digest-dir"] === undefined
@@ -378,6 +383,7 @@ function parseSdpubArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
     readonly llm?: string;
     readonly output?: string;
@@ -498,6 +504,26 @@ function parseSdpubArguments(
     );
   }
   const metaPatch = parseSdpubMetaPatch(values, parsedSubcommand);
+  if (
+    values.json === true &&
+    parsedSubcommand !== "list" &&
+    parsedSubcommand !== "meta"
+  ) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub ${parsedSubcommand}\` subcommand does not support --json.`,
+        sdpubSubcommandHelpRoute(parsedSubcommand),
+      ),
+    );
+  }
+  if (values.json === true && metaPatch !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        "`sdpub meta --json` is read-only and cannot be combined with metadata edit flags.",
+        sdpubSubcommandHelpRoute("meta"),
+      ),
+    );
+  }
   if (values.verbose) {
     throw new Error(
       withHelpRoute(
@@ -560,6 +586,7 @@ function parseSdpubArguments(
   return {
     args: {
       inputPath: inputPath!,
+      ...(values.json === undefined ? {} : { json: values.json }),
       ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       ...(metaPatch === undefined ? {} : { metaPatch }),
       ...(chapterId === undefined ? {} : { chapterId }),
@@ -588,6 +615,7 @@ function parseSdpubChapterArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
     readonly llm?: string;
     readonly output?: string;
@@ -609,6 +637,7 @@ function parseSdpubChapterArguments(
   const helpRoute = "spinedigest sdpub chapter --help";
 
   rejectSdpubChapterFlag("digest-dir", values["digest-dir"]);
+  rejectSdpubChapterFlag("json", values.json);
   rejectSdpubChapterFlag("output", values.output);
   rejectSdpubChapterFlag("output-format", values["output-format"]);
   rejectSdpubChapterFlag("stage", values.stage);
@@ -698,6 +727,7 @@ function parseSdpubStageArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
     readonly llm?: string;
     readonly output?: string;
@@ -721,6 +751,7 @@ function parseSdpubStageArguments(
   rejectSdpubStageFlag("digest-dir", values["digest-dir"]);
   rejectSdpubStageFlag("input", values.input);
   rejectSdpubStageFlag("input-format", values["input-format"]);
+  rejectSdpubStageFlag("json", values.json);
   rejectSdpubStageFlag("output", values.output);
   rejectSdpubStageFlag("output-format", values["output-format"]);
   rejectSdpubStageFlag("parent", values.parent);
@@ -1102,6 +1133,7 @@ function parseHelpArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
     readonly llm?: string;
     readonly output?: string;
@@ -1116,6 +1148,7 @@ function parseHelpArguments(
   rejectHelpFlag("digest-dir", values["digest-dir"]);
   rejectHelpFlag("input", values.input);
   rejectHelpFlag("input-format", values["input-format"]);
+  rejectHelpFlag("json", values.json);
   rejectHelpFlag("llm", values.llm);
   rejectHelpFlag("output", values.output);
   rejectHelpFlag("output-format", values["output-format"]);
@@ -1173,6 +1206,7 @@ function parseStatusArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
     readonly llm?: string;
     readonly output?: string;
@@ -1187,6 +1221,7 @@ function parseStatusArguments(
   rejectStatusFlag("digest-dir", values["digest-dir"]);
   rejectStatusFlag("input", values.input);
   rejectStatusFlag("input-format", values["input-format"]);
+  rejectStatusFlag("json", values.json);
   rejectStatusFlag("output", values.output);
   rejectStatusFlag("output-format", values["output-format"]);
   rejectStatusFlag("prompt", values.prompt);
@@ -1498,6 +1533,20 @@ function rejectActionBooleanFlag(
   }
 }
 
+function rejectConvertFlag(
+  name: string,
+  value: boolean | string | undefined,
+): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The main convert command does not support --${name}.`,
+        CLI_HELP_ROUTES.command,
+      ),
+    );
+  }
+}
+
 function rejectSdpubStageActionFlag(
   value: string | undefined,
   flag: string,
@@ -1513,7 +1562,10 @@ function rejectSdpubStageActionFlag(
   }
 }
 
-function rejectSdpubChapterFlag(name: string, value: string | undefined): void {
+function rejectSdpubChapterFlag(
+  name: string,
+  value: boolean | string | undefined,
+): void {
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(
@@ -1641,7 +1693,10 @@ function requireChapterId(
   }
 }
 
-function rejectHelpFlag(name: string, value: string | undefined): void {
+function rejectHelpFlag(
+  name: string,
+  value: boolean | string | undefined,
+): void {
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(
@@ -1652,7 +1707,10 @@ function rejectHelpFlag(name: string, value: string | undefined): void {
   }
 }
 
-function rejectStatusFlag(name: string, value: string | undefined): void {
+function rejectStatusFlag(
+  name: string,
+  value: boolean | string | undefined,
+): void {
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(

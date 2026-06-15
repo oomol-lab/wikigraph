@@ -103,7 +103,7 @@ const SDPUB_SUBCOMMAND_METADATA: readonly {
   },
   {
     name: "list",
-    summary: "List summarized chapters that are ready for cat.",
+    summary: "List the chapter tree with ids and cat readiness.",
   },
   {
     name: "cat",

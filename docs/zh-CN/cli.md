@@ -12,7 +12,7 @@ SpineDigest 的设计重心是命令行使用。
 spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 spinedigest --version
 spinedigest status [--llm <json>]
-spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--llm <json>]
+spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--json] [--llm <json>]
 spinedigest sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 spinedigest sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
 ```
@@ -23,7 +23,7 @@ spinedigest sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 pnpm dev -- [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 pnpm dev -- --version
 pnpm dev -- status [--llm <json>]
-pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--llm <json>]
+pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--json] [--llm <json>]
 pnpm dev -- sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
 ```
@@ -38,6 +38,7 @@ pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 - `--llm <json>`：为当前这次调用传入 inline LLM client JSON
 - `--prompt <text>`：为当前这次 digest 临时覆盖 extraction prompt
 - `--stage <stage>`：把 `.sdpub` 输出生成到 `planned`、`sourced`、`graphed` 或 `summarized`
+- `--json`：把 `sdpub list` 输出为结构化 JSON
 - `--verbose`：把诊断日志输出到 `stderr`
 - `--version`：打印已安装包版本
 - `-h`, `--help`：打印帮助文本
@@ -254,7 +255,7 @@ SpineDigest 支持通过环境变量覆盖配置值：
 - SpineDigest 会直接打开已经保存的 digest 状态
 - 不需要 LLM 配置
 - 如果归档已经 summarized，可以导出为 `.txt`、`.md` 或 `.epub`
-- 也可以通过 `spinedigest sdpub ...` 检查元信息、TOC、已完成摘要、封面数据、未完成章节和章节阶段
+- 也可以通过 `spinedigest sdpub ...` 检查元信息、TOC、章节树、封面数据、未完成章节和章节阶段
 
 当输出是 `.sdpub` 时：
 
@@ -264,7 +265,7 @@ SpineDigest 支持通过环境变量覆盖配置值：
 章节阶段：
 
 - `planned`：章节已经存在于 TOC，但还没有原文
-- `sourced`：已经保存 normalized source fragments
+- `sourced`：已经保存规范化后的原文
 - `graphed`：已经保存 graph 数据，但还没有最终摘要
 - `summarized`：已经有最终摘要，可以重新导出或用 `sdpub cat` 读取
 

@@ -9,7 +9,7 @@ Purpose:
 Usage:
   spinedigest sdpub info --input <path> [--llm <json>] [--help|-h]
   spinedigest sdpub toc --input <path> [--llm <json>] [--help|-h]
-  spinedigest sdpub list --input <path> [--llm <json>] [--help|-h]
+  spinedigest sdpub list --input <path> [--json] [--llm <json>] [--help|-h]
   spinedigest sdpub cat --input <path> --chapter <id> [--llm <json>] [--help|-h]
   spinedigest sdpub cover --input <path> [--llm <json>] [--help|-h]
   spinedigest sdpub meta --input <path> [metadata options] [--llm <json>] [--help|-h]
@@ -24,6 +24,7 @@ Shared behavior:
   - `chapter set-source` and `chapter set-summary` can read content from stdin when `--input` is omitted.
   - `--digest-dir`, `--output`, `--output-format`, and `--verbose` are not supported.
   - `--prompt` is only supported by `sdpub stage advance`.
+  - `--json` is only supported by `sdpub list`.
   - `sdpub stage advance` calls an LLM provider when graph or summary generation is needed.
   - Inspection commands and metadata/tree edits do not call an LLM provider.
   - `-h` is available as the short form of `--help`.
