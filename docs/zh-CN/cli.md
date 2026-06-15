@@ -12,9 +12,10 @@ SpineDigest 的设计重心是命令行使用。
 spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 spinedigest --version
 spinedigest status [--llm <json>]
-spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
+spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--json] [--llm <json>]
 spinedigest sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 spinedigest sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
+spinedigest sdpub graph <status|log|show|grep|neighbors|blame|path> <path> --chapter <id> [options]
 ```
 
 在源码仓库中运行时：
@@ -23,9 +24,10 @@ spinedigest sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 pnpm dev -- [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 pnpm dev -- --version
 pnpm dev -- status [--llm <json>]
-pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
+pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--json] [--llm <json>]
 pnpm dev -- sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
+pnpm dev -- sdpub graph <status|log|show|grep|neighbors|blame|path> <path> --chapter <id> [options]
 ```
 
 ## 参数
@@ -38,6 +40,8 @@ pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 - `--llm <json>`：为当前这次调用传入 inline LLM client JSON
 - `--prompt <text>`：为当前这次 digest 临时覆盖 extraction prompt
 - `--stage <stage>`：把 `.sdpub` 输出生成到 `planned`、`sourced`、`graphed` 或 `summarized`
+- `--json`：把 `sdpub list` 输出为结构化 JSON
+- `--limit <n>`：限制 `sdpub graph log` 的输出数量
 - `--verbose`：把诊断日志输出到 `stderr`
 - `--version`：打印已安装包版本
 - `-h`, `--help`：打印帮助文本
@@ -48,7 +52,7 @@ pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 
 `sdpub` 接口本身使用 positional subcommands：`spinedigest sdpub <subcommand>`。
 
-偏读取的 `sdpub` 子命令使用 `--input`，其中 `cat` 还要求提供 `--serial`，`meta` 额外接受 metadata 编辑参数。`sdpub stage` 和 `sdpub chapter` 会原地编辑已有归档，并把归档路径作为 positional argument。
+偏读取的 `sdpub` 子命令使用 `--input`，其中 `cat` 还要求提供 `--chapter`，`meta` 额外接受 metadata 编辑参数。`sdpub stage`、`sdpub chapter` 和 `sdpub graph` 会把归档路径作为 positional argument。
 
 `--prompt` 影响从源输入生成 digest 的过程，也会影响 `spinedigest sdpub stage advance` 中的 graph 生成。
 
@@ -133,7 +137,7 @@ spinedigest --input ./book.sdpub --output ./digest.txt
 spinedigest sdpub info --input ./book.sdpub
 spinedigest sdpub toc --input ./book.sdpub
 spinedigest sdpub list --input ./book.sdpub
-spinedigest sdpub cat --input ./book.sdpub --serial 12
+spinedigest sdpub cat --input ./book.sdpub --chapter 12
 spinedigest sdpub cover --input ./book.sdpub > ./cover.png
 spinedigest sdpub meta --input ./book.sdpub
 spinedigest sdpub stage pending ./book.sdpub
@@ -254,7 +258,7 @@ SpineDigest 支持通过环境变量覆盖配置值：
 - SpineDigest 会直接打开已经保存的 digest 状态
 - 不需要 LLM 配置
 - 如果归档已经 summarized，可以导出为 `.txt`、`.md` 或 `.epub`
-- 也可以通过 `spinedigest sdpub ...` 检查元信息、TOC、已完成摘要、封面数据、未完成章节和章节阶段
+- 也可以通过 `spinedigest sdpub ...` 检查元信息、TOC、章节树、封面数据、未完成章节和章节阶段
 
 当输出是 `.sdpub` 时：
 
@@ -264,7 +268,7 @@ SpineDigest 支持通过环境变量覆盖配置值：
 章节阶段：
 
 - `planned`：章节已经存在于 TOC，但还没有原文
-- `sourced`：已经保存 normalized source fragments
+- `sourced`：已经保存规范化后的原文
 - `graphed`：已经保存 graph 数据，但还没有最终摘要
 - `summarized`：已经有最终摘要，可以重新导出或用 `sdpub cat` 读取
 
@@ -279,7 +283,7 @@ SpineDigest 支持通过环境变量覆盖配置值：
 - 对非文本格式使用了 `stdin` 或 `stdout`
 - 在写入 `stdout` 时同时使用了 `--verbose`
 - digest 操作缺少 LLM 配置
-- `spinedigest sdpub cat` 缺少 `--serial`
+- `spinedigest sdpub cat` 缺少 `--chapter`
 - `sdpub` 子命令使用了不支持的参数，例如 `--output`、`--output-format`、`--prompt` 或 `--verbose`
 - `spinedigest sdpub cover` 试图向交互式终端输出二进制数据
 - `spinedigest sdpub cover` 针对一个没有封面的归档运行

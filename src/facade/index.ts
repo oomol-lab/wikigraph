@@ -27,9 +27,20 @@ export {
   setChapterSource,
   setChapterSummary,
 } from "./chapter.js";
+export {
+  findGraphPath,
+  getGraphEvidence,
+  getGraphNode,
+  getGraphStatus,
+  listGraphNeighbors,
+  listGraphNodes,
+  searchGraphNodes,
+} from "./graph.js";
 export type {
   AddChapterOptions,
   AdvanceChapterStagesOptions,
+  AdvanceChapterStagesProgressCallback,
+  AdvanceChapterStagesProgressEvent,
   AdvanceChapterStagesResult,
   ChapterDetails,
   ChapterEntry,
@@ -37,5 +48,15 @@ export type {
   GenerateChapterGraphOptions,
   GenerateChapterSummaryOptions,
 } from "./chapter.js";
+export type {
+  GraphEdge,
+  GraphEvidenceLine,
+  GraphNeighbor,
+  GraphNode,
+  GraphPathStep,
+  GraphSearchField,
+  GraphSearchHit,
+  GraphStatus,
+} from "./graph.js";
 export { SpineDigest } from "./spine-digest.js";
 export type { SpineDigestSerialEntry } from "./types.js";

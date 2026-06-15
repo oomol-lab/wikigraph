@@ -36,13 +36,29 @@ Stable terms:
   - .sdpub: a reusable processed archive
   - chapter: the current editable unit inside a .sdpub TOC
   - chapter id: the numeric id used by `sdpub chapter ...` and `sdpub stage --chapter`
-  - serial: legacy/read-interface term still used by `sdpub cat --serial`
+  - node: a read-only chapter graph item discovered with `sdpub graph log`
   - TOC path: the section path for a chapter or completed summary
 
 Safety reminders:
   - Do not use stdin for `.sdpub` inspection; only `sdpub chapter set-source` and `set-summary` accept content from stdin.
   - Do not combine `--verbose` with stdout digest output.
   - Do not send `sdpub cover` binary output to an interactive terminal.
+
+File workflow:
+  - Prefer projecting chapter summaries into ordinary temporary files, then use your normal file tools.
+  - Read a summary with `spinedigest sdpub cat --input <archive.sdpub> --chapter <id> > /tmp/summary.md`.
+  - Write a revised summary back with `spinedigest sdpub chapter set-summary <archive.sdpub> --chapter <id> --input /tmp/summary.md`.
+  - Do not inspect or edit the `.sdpub` ZIP internals for routine summary edits.
+
+Graph workflow:
+  - Use `spinedigest sdpub graph status <archive.sdpub> --chapter <id>` to check graph availability.
+  - Use `spinedigest sdpub graph log <archive.sdpub> --chapter <id>` to discover node ids.
+  - Use `show`, `grep`, `neighbors`, `blame`, and `path` as Git-like read-only chapter graph commands.
+
+Cover workflow:
+  - Use `spinedigest sdpub info --input <archive.sdpub>` to see whether a cover exists and which media type is stored.
+  - Project the cover to a normal image file, for example `spinedigest sdpub cover --input <archive.sdpub> > /tmp/cover.jpg`.
+  - If you have multimodal tools, inspect the exported image file rather than the `.sdpub` archive internals.
 
 Discovery rule:
   - If a user question sounds like task selection, format support, config setup, runtime behavior, failure diagnosis, or `.sdpub` commands, read the matching help topic before guessing.

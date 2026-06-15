@@ -29,9 +29,16 @@ Re-export an existing .sdpub:
     spinedigest sdpub stage pending <digest.sdpub>
 
 Inspect archive structure:
-  Use when you need format version, metadata, TOC, completed summaries, or raw cover bytes.
+  Use when you need format version, metadata, TOC, chapter tree, or raw cover bytes.
   Command shape:
     spinedigest sdpub <info|toc|list|cat|cover|meta> --input <digest.sdpub>
+  For a cover image, inspect metadata first and redirect `sdpub cover` to a normal image file.
+
+Explore a chapter graph:
+  Use when a chapter is graphed or summarized and you want to inspect generated chapter graph data without reading SQLite directly.
+  Command shape:
+    spinedigest sdpub graph log <digest.sdpub> --chapter <id>
+    spinedigest sdpub graph show <digest.sdpub> --chapter <id> <node>
 
 Edit archive chapters:
   Use when you need to add, remove, reset, or fill individual chapters.

@@ -12,9 +12,10 @@ Installed CLI:
 spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 spinedigest --version
 spinedigest status [--llm <json>]
-spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
+spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--json] [--llm <json>]
 spinedigest sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 spinedigest sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
+spinedigest sdpub graph <status|log|show|grep|neighbors|blame|path> <path> --chapter <id> [options]
 ```
 
 From a source checkout:
@@ -23,9 +24,10 @@ From a source checkout:
 pnpm dev -- [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose]
 pnpm dev -- --version
 pnpm dev -- status [--llm <json>]
-pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--serial <id>] [--llm <json>]
+pnpm dev -- sdpub <info|toc|list|cat|cover|meta> --input <path> [--chapter <id>] [--json] [--llm <json>]
 pnpm dev -- sdpub stage <pending|advance> <path> [--to <stage>] [--chapter <id>] [--prompt <text>] [--llm <json>]
 pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> <path> [options]
+pnpm dev -- sdpub graph <status|log|show|grep|neighbors|blame|path> <path> --chapter <id> [options]
 ```
 
 ## Flags
@@ -38,6 +40,8 @@ pnpm dev -- sdpub chapter <list|status|add|remove|reset|set-source|set-summary> 
 - `--llm <json>`: inline LLM client JSON for this invocation
 - `--prompt <text>`: one-off extraction prompt override for the current digest run
 - `--stage <stage>`: create `.sdpub` output up to `planned`, `sourced`, `graphed`, or `summarized`
+- `--json`: print `sdpub list` as structured JSON
+- `--limit <n>`: limit `sdpub graph log` output
 - `--verbose`: write diagnostic logs to `stderr`
 - `--version`: print the installed package version
 - `-h`, `--help`: print help text
@@ -48,7 +52,7 @@ The main conversion command does not support positional arguments.
 
 The `sdpub` interface uses positional subcommands: `spinedigest sdpub <subcommand>`.
 
-Read-oriented `sdpub` subcommands use `--input`, except `cat` also requires `--serial` and `meta` accepts metadata edit flags. `sdpub stage` and `sdpub chapter` edit existing archives in place and take the archive path as a positional argument.
+Read-oriented `sdpub` subcommands use `--input`, except `cat` also requires `--chapter` and `meta` accepts metadata edit flags. `sdpub stage`, `sdpub chapter`, and `sdpub graph` take the archive path as a positional argument.
 
 `--prompt` affects digest generation from source inputs and graph generation through `spinedigest sdpub stage advance`.
 
@@ -133,7 +137,7 @@ Inspect an `.sdpub` archive:
 spinedigest sdpub info --input ./book.sdpub
 spinedigest sdpub toc --input ./book.sdpub
 spinedigest sdpub list --input ./book.sdpub
-spinedigest sdpub cat --input ./book.sdpub --serial 12
+spinedigest sdpub cat --input ./book.sdpub --chapter 12
 spinedigest sdpub cover --input ./book.sdpub > ./cover.png
 spinedigest sdpub meta --input ./book.sdpub
 spinedigest sdpub stage pending ./book.sdpub
@@ -254,7 +258,7 @@ When the input is `.sdpub`:
 - SpineDigest opens the saved digest state
 - no LLM configuration is required
 - if the archive is summarized, you can export to `.txt`, `.md`, or `.epub`
-- you can inspect metadata, TOC, completed summaries, cover data, pending chapters, and chapter stages through `spinedigest sdpub ...`
+- you can inspect metadata, TOC, chapter tree, cover data, pending chapters, and chapter stages through `spinedigest sdpub ...`
 
 When the output is `.sdpub`:
 
@@ -264,7 +268,7 @@ When the output is `.sdpub`:
 Chapter stages:
 
 - `planned`: the chapter exists in the TOC but has no source
-- `sourced`: normalized source fragments are stored
+- `sourced`: normalized source text is stored
 - `graphed`: graph data is stored, but no final summary exists yet
 - `summarized`: final summary exists and the chapter is ready for re-export or `sdpub cat`
 
@@ -279,7 +283,7 @@ Expect a plain-text error message on `stderr` and a non-zero exit code when:
 - `stdin` or `stdout` is used with a non-text format
 - `--verbose` is used while writing output to `stdout`
 - no LLM configuration is available for a digest operation
-- `spinedigest sdpub cat` is used without `--serial`
+- `spinedigest sdpub cat` is used without `--chapter`
 - `sdpub` subcommands are used with unsupported flags such as `--output`, `--output-format`, `--prompt`, or `--verbose`
 - `spinedigest sdpub cover` tries to write binary data to an interactive terminal
 - `spinedigest sdpub cover` is used on an archive without a cover

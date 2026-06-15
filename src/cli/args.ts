@@ -12,6 +12,7 @@ import {
   renderHelpTopicText,
   renderMainHelpText,
   renderSdpubChapterActionHelpText,
+  renderSdpubGraphActionHelpText,
   renderStatusHelpText,
   renderSdpubStageActionHelpText,
   renderSdpubHelpText,
@@ -35,9 +36,10 @@ export interface CLIArguments {
 
 export interface CLISdpubArguments {
   readonly inputPath: string;
+  readonly json?: boolean;
   readonly llmJSON?: string;
   readonly metaPatch?: SdpubMetaPatch;
-  readonly serialId?: number;
+  readonly chapterId?: number;
   readonly subcommand: Exclude<SDPubSubcommand, "chapter">;
 }
 
@@ -96,6 +98,27 @@ export interface CLISdpubStageArguments {
   readonly path: string;
   readonly prompt?: string;
   readonly targetStage?: ChapterStage;
+}
+
+export type CLISdpubGraphAction =
+  | "blame"
+  | "grep"
+  | "log"
+  | "neighbors"
+  | "path"
+  | "show"
+  | "status";
+
+export interface CLISdpubGraphArguments {
+  readonly action: CLISdpubGraphAction;
+  readonly chapterId: number;
+  readonly fromNodeId?: number;
+  readonly limit?: number;
+  readonly llmJSON?: string;
+  readonly nodeId?: number;
+  readonly path: string;
+  readonly pattern?: string;
+  readonly toNodeId?: number;
 }
 
 interface SdpubMetaFlagValues {
@@ -161,6 +184,16 @@ export type ParsedCLIArguments =
       readonly help: true;
       readonly helpText: string;
       readonly kind: "sdpub-stage";
+    }
+  | {
+      readonly args: CLISdpubGraphArguments;
+      readonly help: false;
+      readonly kind: "sdpub-graph";
+    }
+  | {
+      readonly help: true;
+      readonly helpText: string;
+      readonly kind: "sdpub-graph";
     }
   | {
       readonly help: true;
@@ -230,8 +263,14 @@ export function parseCLIArguments(
       "input-format": {
         type: "string",
       },
+      limit: {
+        type: "string",
+      },
       language: {
         type: "string",
+      },
+      json: {
+        type: "boolean",
       },
       llm: {
         type: "string",
@@ -243,9 +282,6 @@ export function parseCLIArguments(
         type: "string",
       },
       prompt: {
-        type: "string",
-      },
-      serial: {
         type: "string",
       },
       stage: {
@@ -312,6 +348,7 @@ export function parseCLIArguments(
   }
 
   rejectConvertMetaFlags(values);
+  rejectConvertFlag("json", values.json);
 
   const args = {
     ...(values["digest-dir"] === undefined
@@ -381,7 +418,9 @@ function parseSdpubArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
+    readonly limit?: string;
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
@@ -390,7 +429,6 @@ function parseSdpubArguments(
     readonly publisher?: string;
     readonly prompt?: string;
     readonly recursive?: boolean;
-    readonly serial?: string;
     readonly stage?: string;
     readonly title?: string;
     readonly to?: string;
@@ -408,6 +446,9 @@ function parseSdpubArguments(
   }
   if (subcommand === "stage") {
     return parseSdpubStageArguments(positionals.slice(1), values);
+  }
+  if (subcommand === "graph") {
+    return parseSdpubGraphArguments(positionals.slice(1), values);
   }
 
   if (positionals.length > 1) {
@@ -502,6 +543,26 @@ function parseSdpubArguments(
     );
   }
   const metaPatch = parseSdpubMetaPatch(values, parsedSubcommand);
+  if (
+    values.json === true &&
+    parsedSubcommand !== "list" &&
+    parsedSubcommand !== "meta"
+  ) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub ${parsedSubcommand}\` subcommand does not support --json.`,
+        sdpubSubcommandHelpRoute(parsedSubcommand),
+      ),
+    );
+  }
+  if (values.json === true && metaPatch !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        "`sdpub meta --json` is read-only and cannot be combined with metadata edit flags.",
+        sdpubSubcommandHelpRoute("meta"),
+      ),
+    );
+  }
   if (values.verbose) {
     throw new Error(
       withHelpRoute(
@@ -511,27 +572,27 @@ function parseSdpubArguments(
     );
   }
 
-  const serialId =
-    values.serial === undefined
+  const chapterId =
+    values.chapter === undefined
       ? undefined
       : parseSerialId(
-          values.serial,
-          "--serial",
+          values.chapter,
+          "--chapter",
           sdpubSubcommandHelpRoute(parsedSubcommand),
         );
 
-  if (parsedSubcommand === "cat" && serialId === undefined && !help) {
+  if (parsedSubcommand === "cat" && chapterId === undefined && !help) {
     throw new Error(
       withHelpRoute(
-        "Missing --serial. `spinedigest sdpub cat` requires it.",
+        "Missing --chapter. `spinedigest sdpub cat` requires a chapter id.",
         sdpubSubcommandHelpRoute("cat"),
       ),
     );
   }
-  if (parsedSubcommand !== "cat" && serialId !== undefined) {
+  if (parsedSubcommand !== "cat" && chapterId !== undefined) {
     throw new Error(
       withHelpRoute(
-        `The \`sdpub ${parsedSubcommand}\` subcommand does not support --serial.`,
+        `The \`sdpub ${parsedSubcommand}\` subcommand does not support --chapter.`,
         sdpubSubcommandHelpRoute(parsedSubcommand),
       ),
     );
@@ -564,9 +625,10 @@ function parseSdpubArguments(
   return {
     args: {
       inputPath: inputPath!,
+      ...(values.json === undefined ? {} : { json: values.json }),
       ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       ...(metaPatch === undefined ? {} : { metaPatch }),
-      ...(serialId === undefined ? {} : { serialId }),
+      ...(chapterId === undefined ? {} : { chapterId }),
       subcommand: parsedSubcommand,
     },
     help: false,
@@ -592,7 +654,9 @@ function parseSdpubChapterArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
+    readonly limit?: string;
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
@@ -601,7 +665,6 @@ function parseSdpubChapterArguments(
     readonly publisher?: string;
     readonly prompt?: string;
     readonly recursive?: boolean;
-    readonly serial?: string;
     readonly stage?: string;
     readonly title?: string;
     readonly to?: string;
@@ -614,9 +677,10 @@ function parseSdpubChapterArguments(
   const helpRoute = "spinedigest sdpub chapter --help";
 
   rejectSdpubChapterFlag("digest-dir", values["digest-dir"]);
+  rejectSdpubChapterFlag("json", values.json);
+  rejectSdpubChapterFlag("limit", values.limit);
   rejectSdpubChapterFlag("output", values.output);
   rejectSdpubChapterFlag("output-format", values["output-format"]);
-  rejectSdpubChapterFlag("serial", values.serial);
   rejectSdpubChapterFlag("stage", values.stage);
   rejectSdpubChapterMetaFlags(values);
   if (values.verbose) {
@@ -704,7 +768,9 @@ function parseSdpubStageArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
+    readonly limit?: string;
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
@@ -713,7 +779,6 @@ function parseSdpubStageArguments(
     readonly publisher?: string;
     readonly prompt?: string;
     readonly recursive?: boolean;
-    readonly serial?: string;
     readonly stage?: string;
     readonly title?: string;
     readonly to?: string;
@@ -728,11 +793,12 @@ function parseSdpubStageArguments(
   rejectSdpubStageFlag("digest-dir", values["digest-dir"]);
   rejectSdpubStageFlag("input", values.input);
   rejectSdpubStageFlag("input-format", values["input-format"]);
+  rejectSdpubStageFlag("json", values.json);
+  rejectSdpubStageFlag("limit", values.limit);
   rejectSdpubStageFlag("output", values.output);
   rejectSdpubStageFlag("output-format", values["output-format"]);
   rejectSdpubStageFlag("parent", values.parent);
   rejectSdpubStageFlag("recursive", values.recursive);
-  rejectSdpubStageFlag("serial", values.serial);
   rejectSdpubStageFlag("stage", values.stage);
   rejectSdpubStageFlag("title", values.title);
   rejectSdpubStageMetaFlags(values);
@@ -825,6 +891,116 @@ function parseSdpubStageArguments(
         kind: "sdpub-stage",
       };
   }
+}
+
+function parseSdpubGraphArguments(
+  positionals: readonly string[],
+  values: {
+    readonly author?: readonly string[];
+    readonly chapter?: string;
+    readonly "clear-authors"?: boolean;
+    readonly "clear-description"?: boolean;
+    readonly "clear-identifier"?: boolean;
+    readonly "clear-language"?: boolean;
+    readonly "clear-published-at"?: boolean;
+    readonly "clear-publisher"?: boolean;
+    readonly "clear-title"?: boolean;
+    readonly description?: string;
+    readonly "digest-dir"?: string;
+    readonly help?: boolean;
+    readonly identifier?: string;
+    readonly input?: string;
+    readonly "input-format"?: string;
+    readonly json?: boolean;
+    readonly language?: string;
+    readonly limit?: string;
+    readonly llm?: string;
+    readonly output?: string;
+    readonly "output-format"?: string;
+    readonly parent?: string;
+    readonly "published-at"?: string;
+    readonly publisher?: string;
+    readonly prompt?: string;
+    readonly recursive?: boolean;
+    readonly stage?: string;
+    readonly title?: string;
+    readonly to?: string;
+    readonly verbose?: boolean;
+  },
+): ParsedCLIArguments {
+  const help = values.help ?? false;
+  const action = positionals[0];
+  const path = positionals[1];
+  const helpRoute = "spinedigest sdpub graph --help";
+
+  rejectSdpubGraphFlag("digest-dir", values["digest-dir"]);
+  rejectSdpubGraphFlag("input", values.input);
+  rejectSdpubGraphFlag("input-format", values["input-format"]);
+  rejectSdpubGraphFlag("json", values.json);
+  rejectSdpubGraphFlag("output", values.output);
+  rejectSdpubGraphFlag("output-format", values["output-format"]);
+  rejectSdpubGraphFlag("parent", values.parent);
+  rejectSdpubGraphFlag("prompt", values.prompt);
+  rejectSdpubGraphFlag("recursive", values.recursive);
+  rejectSdpubGraphFlag("stage", values.stage);
+  rejectSdpubGraphFlag("title", values.title);
+  rejectSdpubGraphFlag("to", values.to);
+  rejectSdpubGraphMetaFlags(values);
+  if (values.verbose) {
+    throw new Error(
+      withHelpRoute(
+        "The `sdpub graph` command does not support --verbose.",
+        helpRoute,
+      ),
+    );
+  }
+
+  if (help && isSdpubGraphAction(action)) {
+    return {
+      help: true,
+      helpText: renderSdpubGraphActionHelpText(action),
+      kind: "sdpub-graph",
+    };
+  }
+
+  if (help && action === undefined) {
+    return {
+      help: true,
+      helpText: renderSdpubSubcommandHelpText("graph"),
+      kind: "sdpub-graph",
+    };
+  }
+
+  if (!isSdpubGraphAction(action)) {
+    throw new Error(
+      withHelpRoute(
+        action === undefined
+          ? "Missing sdpub graph action."
+          : `Invalid sdpub graph action: ${action}. Expected one of status, log, show, grep, neighbors, blame, path.`,
+        helpRoute,
+      ),
+    );
+  }
+  if (path === undefined || path === "-") {
+    throw new Error(
+      withHelpRoute(
+        "`spinedigest sdpub graph` requires a .sdpub path positional argument.",
+        helpRoute,
+      ),
+    );
+  }
+
+  return {
+    args: normalizeSdpubGraphArguments(
+      action,
+      path,
+      positionals.slice(2),
+      values,
+      helpRoute,
+    ),
+    help: false,
+    kind: "sdpub-graph",
+  };
 }
 
 function normalizeSdpubChapterArguments(
@@ -1093,6 +1269,114 @@ function normalizeSdpubChapterArguments(
   }
 }
 
+function normalizeSdpubGraphArguments(
+  action: CLISdpubGraphAction,
+  path: string,
+  actionPositionals: readonly string[],
+  values: {
+    readonly chapter?: string;
+    readonly limit?: string;
+    readonly llm?: string;
+  },
+  helpRoute: string,
+): CLISdpubGraphArguments {
+  const chapterId =
+    values.chapter === undefined
+      ? undefined
+      : parseSerialId(values.chapter, "--chapter", helpRoute);
+  const limit =
+    values.limit === undefined
+      ? undefined
+      : parsePositiveInteger(values.limit, "--limit", helpRoute);
+
+  if (chapterId === undefined) {
+    throw new Error(
+      withHelpRoute(
+        "Missing --chapter. `sdpub graph` requires a chapter id.",
+        helpRoute,
+      ),
+    );
+  }
+
+  switch (action) {
+    case "status":
+      rejectGraphActionPositionals(actionPositionals, action, helpRoute);
+      rejectGraphActionLimit(limit, action, helpRoute);
+      return {
+        action,
+        chapterId,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+        path,
+      };
+    case "log":
+      rejectGraphActionPositionals(actionPositionals, action, helpRoute);
+      return {
+        action,
+        chapterId,
+        ...(limit === undefined ? {} : { limit }),
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+        path,
+      };
+    case "show":
+    case "neighbors":
+    case "blame":
+      rejectGraphActionLimit(limit, action, helpRoute);
+      if (actionPositionals.length !== 1) {
+        throw new Error(
+          withHelpRoute(
+            `\`sdpub graph ${action}\` requires exactly one node id.`,
+            helpRoute,
+          ),
+        );
+      }
+
+      return {
+        action,
+        chapterId,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+        nodeId: parseSerialId(actionPositionals[0]!, "<node>", helpRoute),
+        path,
+      };
+    case "grep":
+      rejectGraphActionLimit(limit, action, helpRoute);
+      if (actionPositionals.length !== 1) {
+        throw new Error(
+          withHelpRoute(
+            "`sdpub graph grep` requires exactly one search pattern.",
+            helpRoute,
+          ),
+        );
+      }
+
+      return {
+        action,
+        chapterId,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+        path,
+        pattern: actionPositionals[0]!,
+      };
+    case "path":
+      rejectGraphActionLimit(limit, action, helpRoute);
+      if (actionPositionals.length !== 2) {
+        throw new Error(
+          withHelpRoute(
+            "`sdpub graph path` requires exactly two node ids.",
+            helpRoute,
+          ),
+        );
+      }
+
+      return {
+        action,
+        chapterId,
+        fromNodeId: parseSerialId(actionPositionals[0]!, "<from>", helpRoute),
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+        path,
+        toNodeId: parseSerialId(actionPositionals[1]!, "<to>", helpRoute),
+      };
+  }
+}
+
 function parseHelpArguments(
   positionals: readonly string[],
   values: {
@@ -1110,14 +1394,15 @@ function parseHelpArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
+    readonly limit?: string;
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
     readonly "published-at"?: string;
     readonly publisher?: string;
     readonly prompt?: string;
-    readonly serial?: string;
     readonly stage?: string;
     readonly verbose?: boolean;
   },
@@ -1125,11 +1410,12 @@ function parseHelpArguments(
   rejectHelpFlag("digest-dir", values["digest-dir"]);
   rejectHelpFlag("input", values.input);
   rejectHelpFlag("input-format", values["input-format"]);
+  rejectHelpFlag("json", values.json);
+  rejectHelpFlag("limit", values.limit);
   rejectHelpFlag("llm", values.llm);
   rejectHelpFlag("output", values.output);
   rejectHelpFlag("output-format", values["output-format"]);
   rejectHelpFlag("prompt", values.prompt);
-  rejectHelpFlag("serial", values.serial);
   rejectHelpFlag("stage", values.stage);
   rejectHelpMetaFlags(values);
 
@@ -1183,14 +1469,15 @@ function parseStatusArguments(
     readonly identifier?: string;
     readonly input?: string;
     readonly "input-format"?: string;
+    readonly json?: boolean;
     readonly language?: string;
+    readonly limit?: string;
     readonly llm?: string;
     readonly output?: string;
     readonly "output-format"?: string;
     readonly "published-at"?: string;
     readonly publisher?: string;
     readonly prompt?: string;
-    readonly serial?: string;
     readonly stage?: string;
     readonly verbose?: boolean;
   },
@@ -1198,10 +1485,11 @@ function parseStatusArguments(
   rejectStatusFlag("digest-dir", values["digest-dir"]);
   rejectStatusFlag("input", values.input);
   rejectStatusFlag("input-format", values["input-format"]);
+  rejectStatusFlag("json", values.json);
+  rejectStatusFlag("limit", values.limit);
   rejectStatusFlag("output", values.output);
   rejectStatusFlag("output-format", values["output-format"]);
   rejectStatusFlag("prompt", values.prompt);
-  rejectStatusFlag("serial", values.serial);
   rejectStatusFlag("stage", values.stage);
   rejectStatusMetaFlags(values);
 
@@ -1280,6 +1568,20 @@ function isSdpubStageAction(
   return value === "advance" || value === "pending";
 }
 
+function isSdpubGraphAction(
+  value: string | undefined,
+): value is CLISdpubGraphAction {
+  return (
+    value === "blame" ||
+    value === "grep" ||
+    value === "log" ||
+    value === "neighbors" ||
+    value === "path" ||
+    value === "show" ||
+    value === "status"
+  );
+}
+
 function parseChapterStage(
   value: string,
   flag: string,
@@ -1315,6 +1617,25 @@ function parseChapterInputFormat(
       helpRoute,
     ),
   );
+}
+
+function parsePositiveInteger(
+  value: string,
+  flag: string,
+  helpRoute: string,
+): number {
+  const parsed = parseSerialId(value, flag, helpRoute);
+
+  if (parsed === 0) {
+    throw new Error(
+      withHelpRoute(
+        `Invalid ${flag}: ${value}. Expected a positive integer.`,
+        helpRoute,
+      ),
+    );
+  }
+
+  return parsed;
 }
 
 function parseResetStage(
@@ -1510,6 +1831,20 @@ function rejectActionBooleanFlag(
   }
 }
 
+function rejectConvertFlag(
+  name: string,
+  value: boolean | string | undefined,
+): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The main convert command does not support --${name}.`,
+        CLI_HELP_ROUTES.command,
+      ),
+    );
+  }
+}
+
 function rejectSdpubStageActionFlag(
   value: string | undefined,
   flag: string,
@@ -1525,7 +1860,10 @@ function rejectSdpubStageActionFlag(
   }
 }
 
-function rejectSdpubChapterFlag(name: string, value: string | undefined): void {
+function rejectSdpubChapterFlag(
+  name: string,
+  value: boolean | string | undefined,
+): void {
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(
@@ -1545,6 +1883,20 @@ function rejectSdpubStageFlag(
       withHelpRoute(
         `The \`sdpub stage\` command does not support --${name}.`,
         "spinedigest sdpub stage --help",
+      ),
+    );
+  }
+}
+
+function rejectSdpubGraphFlag(
+  name: string,
+  value: boolean | string | undefined,
+): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub graph\` command does not support --${name}.`,
+        "spinedigest sdpub graph --help",
       ),
     );
   }
@@ -1578,6 +1930,17 @@ function rejectSdpubStageMetaFlags(values: SdpubMetaFlagValues): void {
       withHelpRoute(
         `The \`sdpub stage\` command does not support ${flag}.`,
         "spinedigest sdpub stage --help",
+      ),
+    );
+  }
+}
+
+function rejectSdpubGraphMetaFlags(values: SdpubMetaFlagValues): void {
+  for (const flag of listPresentMetaFlags(values)) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub graph\` command does not support ${flag}.`,
+        "spinedigest sdpub graph --help",
       ),
     );
   }
@@ -1653,7 +2016,40 @@ function requireChapterId(
   }
 }
 
-function rejectHelpFlag(name: string, value: string | undefined): void {
+function rejectGraphActionPositionals(
+  actionPositionals: readonly string[],
+  action: CLISdpubGraphAction,
+  helpRoute: string,
+): void {
+  if (actionPositionals.length > 0) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub graph ${action}\` action does not accept node or pattern arguments.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectGraphActionLimit(
+  limit: number | undefined,
+  action: CLISdpubGraphAction,
+  helpRoute: string,
+): void {
+  if (limit !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The \`sdpub graph ${action}\` action does not support --limit.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectHelpFlag(
+  name: string,
+  value: boolean | string | undefined,
+): void {
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(
@@ -1664,7 +2060,10 @@ function rejectHelpFlag(name: string, value: string | undefined): void {
   }
 }
 
-function rejectStatusFlag(name: string, value: string | undefined): void {
+function rejectStatusFlag(
+  name: string,
+  value: boolean | string | undefined,
+): void {
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(

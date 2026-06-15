@@ -32,8 +32,8 @@ Main flags:
 sdpub inspection and metadata commands:
   spinedigest sdpub info --input <path> [--llm <json>]
   spinedigest sdpub toc --input <path> [--llm <json>]
-  spinedigest sdpub list --input <path> [--llm <json>]
-  spinedigest sdpub cat --input <path> --serial <id> [--llm <json>]
+  spinedigest sdpub list --input <path> [--json] [--llm <json>]
+  spinedigest sdpub cat --input <path> --chapter <id> [--llm <json>]
   spinedigest sdpub cover --input <path> [--llm <json>]
   spinedigest sdpub meta --input <path> [metadata options] [--llm <json>]
 
@@ -50,9 +50,19 @@ sdpub chapter commands:
   spinedigest sdpub chapter set-source <path> --chapter <id> [--input <path>] --input-format <format> [--llm <json>]
   spinedigest sdpub chapter set-summary <path> --chapter <id> [--input <path>] [--llm <json>]
 
+sdpub graph commands:
+  spinedigest sdpub graph status <path> --chapter <id> [--llm <json>]
+  spinedigest sdpub graph log <path> --chapter <id> [--limit <n>] [--llm <json>]
+  spinedigest sdpub graph show <path> --chapter <id> <node> [--llm <json>]
+  spinedigest sdpub graph grep <path> --chapter <id> <pattern> [--llm <json>]
+  spinedigest sdpub graph neighbors <path> --chapter <id> <node> [--llm <json>]
+  spinedigest sdpub graph blame <path> --chapter <id> <node> [--llm <json>]
+  spinedigest sdpub graph path <path> --chapter <id> <from> <to> [--llm <json>]
+
 sdpub-specific flags:
-  --serial <id>          Legacy read flag required by `spinedigest sdpub cat`; for chapter-backed content it matches the chapter id.
-  --chapter <id>         Numeric chapter id printed by `sdpub chapter list` or `add`.
+  --chapter <id>         Numeric chapter id printed by `sdpub list`, `sdpub chapter list`, or `sdpub chapter add`.
+  --json                 Print supported read commands as structured JSON.
+  --limit <n>            Limit `sdpub graph log` output.
   --parent <id>          Parent chapter id for `sdpub chapter add`.
   --to <stage>           Target stage for `sdpub stage advance` or `sdpub chapter reset`.
 

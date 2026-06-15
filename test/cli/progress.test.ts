@@ -90,7 +90,7 @@ describe("cli/progress", () => {
       "Digest  [####........] 882 / 2,702 words",
       "------------------------",
       "#2 Chapter 2",
-      "       [##########..] 1,576 / 1,820 words (2/3 fragments)",
+      "       [##########..] 1,576 / 1,820 words (2/3 source units)",
     ]);
   });
 
@@ -160,7 +160,7 @@ describe("cli/progress", () => {
       "Digest  [............] 0 / 20 words",
       "------------------------",
       "#2 Chapter 2",
-      "       [######......] 5 / 10 words (1/2 fragments)",
+      "       [######......] 5 / 10 words (1/2 source units)",
     ]);
   });
 
@@ -226,7 +226,7 @@ describe("cli/progress", () => {
       "Digest  [##..........] 10 / 60 words",
       "------------------------",
       "#2 In progress",
-      "       [######......] 10 / 20 words (1/2 fragments)",
+      "       [######......] 10 / 20 words (1/2 source units)",
     ]);
   });
 
@@ -274,7 +274,7 @@ describe("cli/progress", () => {
       "Digest  [######......] 5 / 10 words",
       "------------------------",
       "#7 Line 1Line 2",
-      "       [######......] 5 / 10 words (1/2 fragments)",
+      "       [######......] 5 / 10 words (1/2 source units)",
     ]);
   });
 });

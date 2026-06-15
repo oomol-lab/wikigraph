@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as FacadeModule from "../../src/facade/index.js";
+import type { BookMeta } from "../../src/source/index.js";
+
 const sdpubMockState = vi.hoisted(() => ({
   binaryWrites: [] as Uint8Array[],
   cover: {
@@ -23,8 +26,37 @@ const sdpubMockState = vi.hoisted(() => ({
     sourceFormat: "epub",
     title: "Fixture Book",
     version: 1,
-  },
+  } as BookMeta,
   openCalls: [] as string[],
+  listEntries: [
+    {
+      chapterId: 10,
+      childCount: 2,
+      depth: 0,
+      fragmentCount: 0,
+      stage: "planned",
+      title: "Part I",
+      tocPath: ["Part I"],
+    },
+    {
+      chapterId: 1,
+      childCount: 0,
+      depth: 1,
+      fragmentCount: 2,
+      stage: "summarized",
+      title: "Chapter 1",
+      tocPath: ["Part I", "Chapter 1"],
+    },
+    {
+      chapterId: 2,
+      childCount: 0,
+      depth: 1,
+      fragmentCount: 1,
+      stage: "graphed",
+      title: "Chapter 2",
+      tocPath: ["Part I", "Chapter 2"],
+    },
+  ],
   editableCalls: [] as string[],
   replacedMeta: [] as unknown[],
   serialEntries: [
@@ -90,6 +122,7 @@ vi.mock("../../src/facade/spine-digest-file.js", () => ({
     ): Promise<unknown> {
       sdpubMockState.editableCalls.push(this.#path);
       return await operation({
+        listChapters: () => Promise.resolve(sdpubMockState.listEntries),
         readBookMeta: () => Promise.resolve(sdpubMockState.meta),
         replaceBookMeta: (meta: unknown) => {
           sdpubMockState.replacedMeta.push(meta);
@@ -100,6 +133,15 @@ vi.mock("../../src/facade/spine-digest-file.js", () => ({
     }
   },
 }));
+
+vi.mock("../../src/facade/index.js", async (importOriginal) => {
+  const original = await importOriginal<typeof FacadeModule>();
+
+  return {
+    ...original,
+    listChapters: (document: MockEditableDocument) => document.listChapters(),
+  };
+});
 
 vi.mock("../../src/cli/io.js", () => ({
   writeBinaryToStdout: vi.fn((data: Uint8Array) => {
@@ -136,6 +178,35 @@ describe("cli/sdpub", () => {
       version: 1,
     };
     sdpubMockState.editableCalls.length = 0;
+    sdpubMockState.listEntries = [
+      {
+        chapterId: 10,
+        childCount: 2,
+        depth: 0,
+        fragmentCount: 0,
+        stage: "planned",
+        title: "Part I",
+        tocPath: ["Part I"],
+      },
+      {
+        chapterId: 1,
+        childCount: 0,
+        depth: 1,
+        fragmentCount: 2,
+        stage: "summarized",
+        title: "Chapter 1",
+        tocPath: ["Part I", "Chapter 1"],
+      },
+      {
+        chapterId: 2,
+        childCount: 0,
+        depth: 1,
+        fragmentCount: 1,
+        stage: "graphed",
+        title: "Chapter 2",
+        tocPath: ["Part I", "Chapter 2"],
+      },
+    ];
     sdpubMockState.openCalls.length = 0;
     sdpubMockState.replacedMeta.length = 0;
     sdpubMockState.serialEntries = [
@@ -191,10 +262,10 @@ describe("cli/sdpub", () => {
     expect(sdpubMockState.textWrites).toStrictEqual([
       [
         "Archive Format Version: 1",
+        "Source Format: epub",
         "Title: Fixture Book",
         "Authors: Ari Lantern, Bea North",
         "Language: en",
-        "Source Format: epub",
         "Identifier: urn:test:sdpub-cli",
         "Publisher: Open Sample Press",
         "Published At: 2026-01-01",
@@ -206,10 +277,37 @@ describe("cli/sdpub", () => {
         "Top-level Sections: 1",
         "Referenced Chapters: 2",
         "Summarized Chapters: 2",
-        "Fragments: 3",
+        "Source Units: 3",
         "",
       ].join("\n"),
     ]);
+  });
+
+  it("renders missing sdpub info metadata fields as none", async () => {
+    sdpubMockState.meta = {
+      authors: [],
+      description: null,
+      identifier: null,
+      language: null,
+      publishedAt: null,
+      publisher: null,
+      sourceFormat: "markdown",
+      title: null,
+      version: 1,
+    };
+
+    await runSdpubCommand({
+      inputPath: "/tmp/book.sdpub",
+      subcommand: "info",
+    });
+
+    expect(sdpubMockState.textWrites[0]).toContain("Title: [none]");
+    expect(sdpubMockState.textWrites[0]).toContain("Authors: [none]");
+    expect(sdpubMockState.textWrites[0]).toContain("Language: [none]");
+    expect(sdpubMockState.textWrites[0]).toContain("Identifier: [none]");
+    expect(sdpubMockState.textWrites[0]).toContain("Publisher: [none]");
+    expect(sdpubMockState.textWrites[0]).toContain("Published At: [none]");
+    expect(sdpubMockState.textWrites[0]).toContain("Description: [none]");
   });
 
   it("renders the toc tree", async () => {
@@ -230,38 +328,78 @@ describe("cli/sdpub", () => {
     ]);
   });
 
-  it("renders serials in toc order", async () => {
+  it("renders chapters in toc order", async () => {
     await runSdpubCommand({
       inputPath: "/tmp/book.sdpub",
       subcommand: "list",
     });
 
+    expect(sdpubMockState.editableCalls).toStrictEqual(["/tmp/book.sdpub"]);
     expect(sdpubMockState.textWrites).toStrictEqual([
       [
-        "[1] Part I / Chapter 1 (fragments: 2)",
-        "[2] Part I / Chapter 2 (fragments: 1)",
+        "[10] Part I (planned)",
+        "  [1] Chapter 1",
+        "  [2] Chapter 2 (graphed)",
         "",
       ].join("\n"),
     ]);
   });
 
+  it("renders chapter list JSON", async () => {
+    await runSdpubCommand({
+      inputPath: "/tmp/book.sdpub",
+      json: true,
+      subcommand: "list",
+    });
+
+    expect(JSON.parse(sdpubMockState.textWrites[0]!)).toStrictEqual({
+      chapters: [
+        {
+          catReady: false,
+          chapterId: 10,
+          childCount: 2,
+          depth: 0,
+          stage: "planned",
+          title: "Part I",
+          tocPath: ["Part I"],
+        },
+        {
+          catReady: true,
+          chapterId: 1,
+          childCount: 0,
+          depth: 1,
+          stage: "summarized",
+          title: "Chapter 1",
+          tocPath: ["Part I", "Chapter 1"],
+        },
+        {
+          catReady: false,
+          chapterId: 2,
+          childCount: 0,
+          depth: 1,
+          stage: "graphed",
+          title: "Chapter 2",
+          tocPath: ["Part I", "Chapter 2"],
+        },
+      ],
+    });
+  });
+
   it("prints a chapter-oriented empty list message", async () => {
-    sdpubMockState.serialEntries = [];
+    sdpubMockState.listEntries = [];
 
     await runSdpubCommand({
       inputPath: "/tmp/book.sdpub",
       subcommand: "list",
     });
 
-    expect(sdpubMockState.textWrites).toStrictEqual([
-      "No summarized chapters available.\n",
-    ]);
+    expect(sdpubMockState.textWrites).toStrictEqual(["No chapters.\n"]);
   });
 
-  it("writes only serial summary text for cat", async () => {
+  it("writes only chapter summary text for cat", async () => {
     await runSdpubCommand({
+      chapterId: 2,
       inputPath: "/tmp/book.sdpub",
-      serialId: 2,
       subcommand: "cat",
     });
 
@@ -302,6 +440,25 @@ describe("cli/sdpub", () => {
         "",
       ].join("\n"),
     ]);
+  });
+
+  it("renders book metadata as JSON", async () => {
+    await runSdpubCommand({
+      inputPath: "/tmp/book.sdpub",
+      json: true,
+      subcommand: "meta",
+    });
+
+    expect(JSON.parse(sdpubMockState.textWrites[0]!)).toStrictEqual({
+      authors: ["Ari Lantern", "Bea North"],
+      description: "Fixture description",
+      identifier: "urn:test:sdpub-cli",
+      language: "en",
+      publishedAt: "2026-01-01",
+      publisher: "Open Sample Press",
+      sourceFormat: "epub",
+      title: "Fixture Book",
+    });
   });
 
   it("updates book metadata in place and prints the result", async () => {
@@ -381,6 +538,7 @@ interface MockDigest {
 }
 
 interface MockEditableDocument {
+  listChapters(): Promise<typeof sdpubMockState.listEntries>;
   readBookMeta(): Promise<typeof sdpubMockState.meta>;
   replaceBookMeta(meta: unknown): Promise<void>;
 }

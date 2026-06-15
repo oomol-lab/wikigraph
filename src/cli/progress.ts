@@ -344,7 +344,7 @@ function buildFragmentsLabel(
     return undefined;
   }
 
-  return `${formatNumber(completed)}/${formatNumber(total)} fragments`;
+  return `${formatNumber(completed)}/${formatNumber(total)} source units`;
 }
 
 function renderBar(completed: number, total: number): string {

@@ -23,9 +23,9 @@ Output shape:
   - Top-level section count
   - Referenced chapter count
   - Summarized chapter count
-  - Total fragment count
+  - Total source unit count
 
 Notes:
   - Archives without `manifest.json` are reported as archive format version 1.
-  - Missing metadata fields are omitted.
-  - If no document metadata exists, the command prints a fallback message.
+  - Missing metadata fields are printed as `[none]`, matching `sdpub meta`.
+  - If no document metadata exists, metadata fields are printed as `[none]`.

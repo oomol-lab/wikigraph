@@ -39,9 +39,39 @@ export interface AdvanceChapterStagesOptions {
   readonly extractionPrompt: string;
   readonly llm: LLM<SpineDigestScope>;
   readonly logDirPath?: string;
+  readonly onProgress?: AdvanceChapterStagesProgressCallback;
   readonly targetStage: ChapterStage;
   readonly userLanguage?: Language;
 }
+
+export type AdvanceChapterStagesProgressCallback = (
+  event: AdvanceChapterStagesProgressEvent,
+) => void | Promise<void>;
+
+export type AdvanceChapterStagesProgressEvent =
+  | {
+      readonly type: "selected";
+      readonly targetStage: ChapterStage;
+      readonly totalChapters: number;
+    }
+  | {
+      readonly type: "skipped";
+      readonly chapter: ChapterEntry;
+      readonly reason: "planned";
+      readonly targetStage: ChapterStage;
+    }
+  | {
+      readonly type: "started";
+      readonly chapter: ChapterEntry;
+      readonly step: "graph" | "summary";
+      readonly targetStage: ChapterStage;
+    }
+  | {
+      readonly type: "completed";
+      readonly chapter: ChapterEntry;
+      readonly step: "graph" | "summary";
+      readonly targetStage: ChapterStage;
+    };
 
 export interface AdvanceChapterStagesResult {
   readonly advanced: readonly ChapterEntry[];
@@ -81,6 +111,12 @@ export async function advanceChapterStages(
 
   const advancedIds = new Set<number>();
   const entries = await selectChapterEntries(document, options.chapterId);
+  await emitAdvanceProgress(options, {
+    targetStage: options.targetStage,
+    totalChapters: entries.length,
+    type: "selected",
+  });
+  await emitPlannedSkips(entries, options);
 
   if (isStageBefore("sourced", options.targetStage)) {
     await advanceEntriesToGraphed(document, entries, options, {
@@ -409,6 +445,12 @@ async function advanceEntriesToGraphed(
       continue;
     }
 
+    await emitAdvanceProgress(options, {
+      chapter: entry,
+      step: "graph",
+      targetStage: options.targetStage,
+      type: "started",
+    });
     await generateChapterGraph(document, entry.chapterId, {
       extractionPrompt: options.extractionPrompt,
       llm: options.llm,
@@ -418,6 +460,12 @@ async function advanceEntriesToGraphed(
       ...(options.userLanguage === undefined
         ? {}
         : { userLanguage: options.userLanguage }),
+    });
+    await emitAdvanceProgress(options, {
+      chapter: entry,
+      step: "graph",
+      targetStage: options.targetStage,
+      type: "completed",
     });
     state.advancedIds.add(entry.chapterId);
   }
@@ -436,6 +484,12 @@ async function advanceEntriesToSummarized(
       continue;
     }
 
+    await emitAdvanceProgress(options, {
+      chapter: entry,
+      step: "summary",
+      targetStage: options.targetStage,
+      type: "started",
+    });
     await generateChapterSummary(document, entry.chapterId, {
       llm: options.llm,
       ...(options.logDirPath === undefined
@@ -444,6 +498,12 @@ async function advanceEntriesToSummarized(
       ...(options.userLanguage === undefined
         ? {}
         : { userLanguage: options.userLanguage }),
+    });
+    await emitAdvanceProgress(options, {
+      chapter: entry,
+      step: "summary",
+      targetStage: options.targetStage,
+      type: "completed",
     });
     state.advancedIds.add(entry.chapterId);
   }
@@ -512,6 +572,35 @@ function isStageBefore(
   targetStage: ChapterStage,
 ): boolean {
   return CHAPTER_STAGES.indexOf(stage) < CHAPTER_STAGES.indexOf(targetStage);
+}
+
+async function emitPlannedSkips(
+  entries: readonly ChapterEntry[],
+  options: AdvanceChapterStagesOptions,
+): Promise<void> {
+  for (const entry of entries) {
+    if (entry.stage !== "planned") {
+      continue;
+    }
+
+    await emitAdvanceProgress(options, {
+      chapter: entry,
+      reason: "planned",
+      targetStage: options.targetStage,
+      type: "skipped",
+    });
+  }
+}
+
+async function emitAdvanceProgress(
+  options: AdvanceChapterStagesOptions,
+  event: AdvanceChapterStagesProgressEvent,
+): Promise<void> {
+  try {
+    await options.onProgress?.(event);
+  } catch {
+    return;
+  }
 }
 
 async function resolveChapterStage(
