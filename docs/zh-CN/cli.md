@@ -16,24 +16,30 @@ spinedigest build <archive.sdpub> [--stage <source|graph|summary|ready>] [--chap
 spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--json]
 spinedigest status <archive.sdpub> [--json]
 spinedigest index <archive.sdpub> [--json]
-spinedigest ls <archive.sdpub> [chapters|nodes|edges|evidence|summaries|meta] [--json]
+spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest find <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest grep <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest page <archive.sdpub> <id> [--json]
+spinedigest read <archive.sdpub> <id>
 spinedigest evidence <archive.sdpub> <id> [--json]
 spinedigest links <archive.sdpub> <node:id> [--json]
 spinedigest backlinks <archive.sdpub> <node:id> [--json]
 spinedigest path <archive.sdpub> <node:id> <node:id> --chapter <id>
-spinedigest map <archive.sdpub> [--json]
 spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 ```
 
-搜索行为：
+探索模式：
+
+- 搜索模式：`find` 用确定性关键词发现对象；`grep` 检查连续精确文本。
+- 结构模式：`list` 返回有界对象集合；`page` 打开一个带局部导航的详情页。
+- 阅读模式：`read` 将一个对象以连续纯文本输出。
+
+搜索与集合行为：
 
 - `find` 是确定性的关键词发现。它按空白拆分 query，并返回同一个对象内包含全部关键词的结果。
 - `grep` 是精确文本搜索。它把 query 当作一个连续字符串。
 - `--chapter 12` 或 `--chapter 11,12` 用于限定章节。
-- `--type summary,node,fragment,sentence` 用于限定结果对象类型。
+- `--type chapter,summary,node,fragment,sentence,meta` 用于限定 `list`；`find` 和 `grep` 搜索 `summary,node,fragment,sentence`。
 - `--order doc-asc|doc-desc` 按稳定文档位置排序，默认 `doc-asc`。
 - `--limit` 默认 `20`；下一页把返回的 `nextCursor` 传给 `--cursor`。
 - 两个命令都不做语义扩展、模糊匹配、词干匹配或向量搜索。
@@ -42,6 +48,7 @@ spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 
 - `chapter:<id>`
 - `node:<id>`
+- `fragment:<serial>:<fragment>`
 - `sentence:<serial>:<fragment>:<index>`
 - `summary:<id>`
 - `meta:book`

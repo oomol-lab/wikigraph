@@ -17,12 +17,16 @@ Prefer archive-first CLI commands:
 ```bash
 spinedigest status book.sdpub
 spinedigest index book.sdpub
+spinedigest list book.sdpub --type chapter
 spinedigest find book.sdpub "keyword"
 spinedigest page book.sdpub node:84
+spinedigest read book.sdpub chapter:12
 spinedigest evidence book.sdpub node:84
 ```
 
-Use `find` for multi-keyword discovery. It splits on whitespace and requires all keywords inside one returned object. Use `grep` when checking an exact continuous phrase. Add `--type summary,node` for concept discovery, `--type fragment,sentence` for source wording, and `--chapter`, `--limit`, and `--cursor` to keep retrieval bounded.
+Use three exploration modes. Search mode uses `find` for multi-keyword discovery and `grep` for exact phrases. Structure mode uses `list` for bounded collections and `page` for one detailed object. Reading mode uses `read` when the user needs prose flow rather than object navigation.
+
+Add `--type summary,node` for concept discovery, `--type fragment,sentence` for source wording, and `--chapter`, `--limit`, and `--cursor` to keep retrieval bounded.
 
 Use the library API only when the surrounding system explicitly needs in-process integration.
 
@@ -30,8 +34,8 @@ Use the library API only when the surrounding system explicitly needs in-process
 
 - Primary object: `.sdpub`
 - Import sources: EPUB, Markdown, TXT, and text pipelines
-- Read objects: `chapter:<id>`, `node:<id>`, `sentence:<serial>:<fragment>:<index>`, `summary:<id>`, `meta:book`
-- Cheap operations: `status`, `index`, `ls`, `find`, `page`, `evidence`, `links`, `backlinks`, `map`, `export`
+- Read objects: `chapter:<id>`, `node:<id>`, `fragment:<serial>:<fragment>`, `sentence:<serial>:<fragment>:<index>`, `summary:<id>`, `meta:book`
+- Cheap operations: `status`, `index`, `list`, `find`, `grep`, `page`, `read`, `evidence`, `links`, `backlinks`, `export`
 - Expensive operations: graph, summary, or ready `build`
 - Estimate first: `spinedigest estimate <archive.sdpub> --stage ready`
 - JSON: pass `--json` when composing with tools
@@ -39,12 +43,13 @@ Use the library API only when the surrounding system explicitly needs in-process
 ## Recommended Execution Strategy
 
 1. For an unknown archive, run `status` and `index`.
-2. Use `find` or `ls` to discover stable object ids.
+2. Use `list`, `find`, or `grep` to discover stable object ids.
 3. Use `page` to read one object.
-4. Use `evidence` before quoting or making source-backed claims.
-5. Use `links`, `backlinks`, `path`, or `map` to navigate graph context.
-6. Use `export` only when the user needs a projection.
-7. Before `build`, run `estimate`; if the estimate is too large for the session, ask the user.
+4. Use `read` when the user needs chapter, fragment, summary, node, or sentence text as prose.
+5. Use `evidence` before quoting or making source-backed claims.
+6. Use `links`, `backlinks`, or `path` to navigate graph context.
+7. Use `export` only when the user needs a projection.
+8. Before `build`, run `estimate`; if the estimate is too large for the session, ask the user.
 
 ## Build Workflow
 

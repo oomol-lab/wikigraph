@@ -315,6 +315,49 @@ describe("cli/args", () => {
       kind: "archive",
     });
 
+    expect(
+      parseCLIArguments([
+        "list",
+        "book.sdpub",
+        "--type",
+        "chapter,node",
+        "--chapter",
+        "12,13",
+        "--id",
+        "chapter:12,node:320",
+        "--limit",
+        "20",
+        "--json",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "list",
+        archivePath: "book.sdpub",
+        chapters: [12, 13],
+        ids: ["chapter:12", "node:320"],
+        json: true,
+        limit: 20,
+        searchTypes: ["chapter", "node"],
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments(["read", "book.sdpub", "chapter:12"]),
+    ).toStrictEqual({
+      args: {
+        action: "read",
+        archivePath: "book.sdpub",
+        objectId: "chapter:12",
+      },
+      help: false,
+      kind: "archive",
+    });
+    expect(() =>
+      parseCLIArguments(["read", "book.sdpub", "chapter:12", "--json"]),
+    ).toThrow("The `read` command does not support --json.");
+
     expect(parseCLIArguments(["ls", "book.sdpub", "nodes"])).toStrictEqual({
       args: {
         action: "ls",

@@ -7,22 +7,30 @@ Purpose:
   Build portable LLM Wiki archives for AI agents.
   Treat `.sdpub` as the primary knowledge archive: import sources, build derived knowledge, then search, browse, trace evidence, navigate links, and export projections without unpacking it.
 
+Three exploration modes:
+  1. Search mode:
+     Use `find` for whitespace-separated keyword discovery and `grep` for exact continuous text.
+  2. Structure mode:
+     Use `list` to get bounded object collections and `page` to open one detailed object with local navigation.
+  3. Reading mode:
+     Use `read` to print chapter, summary, fragment, node, or sentence text as continuous plain text.
+
 Archive-first usage:
   spinedigest import <archive.sdpub> [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
   spinedigest build <archive.sdpub> [--stage <source|graph|summary|ready>] [--chapter <id>] [--llm <json>] [--prompt <text>] [--confirm]
   spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--json]
   spinedigest status <archive.sdpub> [--json]
   spinedigest index <archive.sdpub> [--json]
-  spinedigest ls <archive.sdpub> [chapters|nodes|edges|evidence|summaries|meta] [--json]
+  spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--limit <n>] [--cursor <token>] [--json]
   spinedigest find <archive.sdpub> <query> [--json]
   spinedigest grep <archive.sdpub> <query> [--json]
   spinedigest page <archive.sdpub> <id> [--json]
+  spinedigest read <archive.sdpub> <id>
   spinedigest evidence <archive.sdpub> <id> [--json]
   spinedigest links <archive.sdpub> <node:id> [--json]
   spinedigest backlinks <archive.sdpub> <node:id> [--json]
   spinedigest related <archive.sdpub> <node:id> [--json]
   spinedigest path <archive.sdpub> <node:id> <node:id> --chapter <id>
-  spinedigest map <archive.sdpub> [--json]
   spinedigest pack <archive.sdpub> <id> [--budget <chars>] [--json]
   spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 
@@ -45,13 +53,14 @@ Direct and maintenance usage:
 Core object ids:
   chapter:<id>     A chapter-like archive page.
   node:<id>        A graph knowledge node.
+  fragment:a:b     A source reading fragment.
   sentence:a:b:c   A source evidence sentence.
   summary:<id>     A chapter summary projection.
   meta:book        Archive metadata.
 
 Cost contract:
   Import is cheap when it stops at source.
-  Search, page, evidence, links, map, and export are cheap after build.
+  List, search, page, read, evidence, links, and export are cheap after build.
   Build can call an LLM and may be expensive. Run `spinedigest estimate <archive.sdpub>` before full-archive graph, summary, or ready builds, then rerun `build` with `--confirm`.
 
 Help contract:

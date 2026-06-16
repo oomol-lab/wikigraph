@@ -24,6 +24,7 @@ export {
   formatSummaryId,
   getArchiveIndex,
   grepArchiveObjects,
+  listArchiveCollection,
   listAllArchiveLinks,
   listArchiveLinks,
   listArchiveObjects,
@@ -31,6 +32,7 @@ export {
   packArchiveContext,
   readArchiveEvidence,
   readArchivePage,
+  readArchiveText,
 } from "./archive-view.js";
 export {
   addChapter,
@@ -56,12 +58,17 @@ export {
 } from "./graph.js";
 export type {
   ArchiveEstimate,
+  ArchiveCollectionOptions,
+  ArchiveCollectionResult,
+  ArchiveCollectionType,
   ArchiveFindField,
   ArchiveFindFilterType,
   ArchiveFindHit,
   ArchiveIndex,
   ArchiveListItem,
   ArchiveListKind,
+  ArchiveNodeGroup,
+  ArchiveNodeLabel,
   ArchiveFindObjectType,
   ArchiveFindOptions,
   ArchiveFindOrder,

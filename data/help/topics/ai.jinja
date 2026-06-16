@@ -5,7 +5,8 @@ AI Agent Guide
 
 Primary contract:
   - Treat `.sdpub` as an LLM Wiki archive managed by SpineDigest.
-  - Use `spinedigest index/find/page/evidence/links/backlinks/map/export` before unpacking or inspecting ZIP internals.
+  - Use `spinedigest index/list/find/grep/page/read/evidence/links/backlinks/export` before unpacking or inspecting ZIP internals.
+  - Choose one of three exploration modes first: search mode (`find`/`grep`), structure mode (`list`/`page`), or reading mode (`read`).
   - Prefer `--json` when composing with tools.
   - Do not inspect `database.db` for routine retrieval.
   - Do not launch full-archive LLM-backed builds without estimating first.
@@ -15,15 +16,17 @@ Safe first moves:
     spinedigest status <archive.sdpub>
     spinedigest index <archive.sdpub>
   - Need information:
+    spinedigest list <archive.sdpub> --type chapter
+    spinedigest list <archive.sdpub> --type node --chapter <id>
     spinedigest find <archive.sdpub> <query>
     spinedigest grep <archive.sdpub> <exact phrase>
     spinedigest page <archive.sdpub> <id>
+    spinedigest read <archive.sdpub> chapter:<id>
     spinedigest evidence <archive.sdpub> <id>
   - Need graph context:
     spinedigest links <archive.sdpub> <node:id>
     spinedigest backlinks <archive.sdpub> <node:id>
     spinedigest related <archive.sdpub> <node:id>
-    spinedigest map <archive.sdpub>
   - Need a reusable context projection:
     spinedigest pack <archive.sdpub> <id> --budget 5000
     spinedigest export <archive.sdpub> --output-format markdown
@@ -39,6 +42,7 @@ Build safety:
 Object ids:
   - chapter:<id> for chapter-like archive pages
   - node:<id> for graph knowledge nodes
+  - fragment:<serial>:<fragment> for source reading fragments
   - sentence:<serial>:<fragment>:<index> for source evidence
   - summary:<id> for chapter summaries
   - meta:book for metadata
@@ -56,8 +60,9 @@ Maintenance commands:
   - Prefer archive-first commands unless the user specifically needs lower-level maintenance operations.
 
 Discovery rule:
-  If the user question is about what is inside an archive, start with `status`, `index`, `ls`, and `find`; do not unzip first.
+  If the user question is about what is inside an archive, start with `status`, `index`, `list`, and `find`; do not unzip first.
   Use `find` for multi-keyword discovery: whitespace separates keywords and all keywords must appear in one returned object.
   Use `grep` only when checking whether an exact continuous phrase exists.
   Use `--type summary,node` to discover concepts first; use `--type fragment,sentence` when tracing wording or evidence.
   Use `--chapter`, `--limit`, and returned `nextCursor` to keep retrieval bounded and reproducible.
+  Use `read` when the user wants to understand a chapter or fragment as prose rather than navigate object ids.

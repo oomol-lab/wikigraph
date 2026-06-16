@@ -2,7 +2,7 @@ Help Type: command
 Command: spinedigest page
 
 Purpose:
-  Read one archive object by id.
+  Open one detailed archive object page by id.
 
 Usage:
   spinedigest page <archive.sdpub> <id> [--json]
@@ -11,7 +11,10 @@ Contract:
   - Mutates: no.
   - LLM: no.
   - JSON: yes.
-  - For sourced chapters without summaries, prints source preview and fragment ids.
+  - Chapter pages show summary, topology-derived node groups, and source preview.
+  - Node pages show content, evidence, and local neighbor previews.
+  - Fragment pages show source text, adjacent fragments, and related node labels.
+  - Summary and meta pages show only their own content.
 
 Examples:
   spinedigest page book.sdpub chapter:1

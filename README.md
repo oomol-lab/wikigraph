@@ -12,6 +12,12 @@
 
 **SpineDigest builds portable LLM Wiki archives for AI agents.** It imports long-form sources into `.sdpub`, then lets agents search, browse, trace evidence, follow graph links, and export projections without unpacking the archive.
 
+For agents, `.sdpub` exploration has three primary modes:
+
+- **Search mode:** use `find` for whitespace-separated keyword discovery and `grep` for exact continuous text.
+- **Structure mode:** use `list` for bounded object collections and `page` for one detailed object with local navigation.
+- **Reading mode:** use `read` to print chapter, summary, fragment, node, or sentence text as continuous plain text.
+
 ![Inkora screenshot](./docs/images/app-screenshot-en.png)
 
 <div align=center>
@@ -73,8 +79,11 @@ spinedigest build ./book.sdpub --stage graph --confirm
 Search and read through the archive interface:
 
 ```bash
+spinedigest list ./book.sdpub --type chapter
 spinedigest find ./book.sdpub "RAG"
+spinedigest grep ./book.sdpub "exact source phrase"
 spinedigest page ./book.sdpub node:84
+spinedigest read ./book.sdpub chapter:12
 spinedigest evidence ./book.sdpub node:84
 spinedigest links ./book.sdpub node:84
 spinedigest related ./book.sdpub node:84
@@ -131,10 +140,11 @@ With that archive on hand, agents can search and navigate the knowledge structur
 
 ```bash
 spinedigest index ./book.sdpub
-spinedigest ls ./book.sdpub nodes
+spinedigest list ./book.sdpub --type chapter
+spinedigest list ./book.sdpub --type node --chapter 12
 spinedigest find ./book.sdpub "central argument"
-spinedigest page ./book.sdpub node:84
-spinedigest evidence ./book.sdpub node:84
+spinedigest page ./book.sdpub chapter:12
+spinedigest read ./book.sdpub chapter:12
 ```
 
 Markdown, EPUB, txt, and JSON-style outputs are projections of the archive. They are useful for portability, but they do not replace the `.sdpub` object when graph links and evidence matter.
@@ -170,12 +180,12 @@ SpineDigest also exposes a programmatic API for embedding the pipeline in your o
 SpineDigest's CLI-first design exposes `.sdpub` as a managed LLM Wiki archive.
 
 - **Treat `.sdpub` as the primary object.** Use archive commands before unpacking or inspecting internals.
-- **Search and read through the CLI.** Start with `status`, `index`, `ls`, `find`, `page`, and `evidence`.
+- **Choose an exploration mode first.** Use `find/grep` for search, `list/page` for structure, and `read` for continuous prose.
 - **Use help as the discovery surface.** Start with `spinedigest --help` as the root page, then follow `spinedigest help ai`, topic pages, or command-specific `--help` before guessing behavior.
 - **Prefer `--json`.** Use it when composing with tools.
 - **Estimate before build.** Do not run full-archive graph, summary, or ready builds without `spinedigest estimate`.
 - **Check exit codes.** Success returns `0`; failure returns non-zero with a plain-text error on `stderr`.
-- **Do not inspect `database.db` routinely.** Use `page`, `evidence`, `links`, and `map` instead.
+- **Do not inspect `database.db` routinely.** Use `list`, `page`, `read`, `evidence`, and graph navigation commands instead.
 
 Useful help entry points:
 

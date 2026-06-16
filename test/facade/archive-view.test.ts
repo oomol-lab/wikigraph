@@ -4,7 +4,9 @@ import { DirectoryDocument } from "../../src/document/index.js";
 import {
   findArchiveObjects,
   grepArchiveObjects,
+  listArchiveCollection,
   listArchiveObjects,
+  readArchiveText,
   readArchivePage,
 } from "../../src/facade/archive-view.js";
 import { withTempDir } from "../helpers/temp.js";
@@ -196,9 +198,130 @@ describe("facade/archive-view", () => {
       }
     });
   });
+
+  it("shows chapter node groups and fragment related nodes", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const chapterPage = await readArchivePage(document, "chapter:1");
+        const fragmentPage = await readArchivePage(document, "fragment:1:0");
+
+        expect(chapterPage).toMatchObject({
+          nodeCount: 2,
+          nodeGroups: [
+            expect.objectContaining({
+              nodeCount: 2,
+              nodes: [
+                expect.objectContaining({
+                  id: "node:100",
+                  title: "Wiki pages",
+                }),
+                expect.objectContaining({
+                  id: "node:101",
+                  title: "Source search",
+                }),
+              ],
+            }),
+          ],
+          type: "chapter",
+        });
+        expect(fragmentPage).toMatchObject({
+          nodes: [
+            expect.objectContaining({ id: "node:100", title: "Wiki pages" }),
+            expect.objectContaining({ id: "node:101", title: "Source search" }),
+          ],
+          type: "fragment",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("groups chapter nodes by fragment when topology groups are absent", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document, { withSnake: false });
+
+        const chapterPage = await readArchivePage(document, "chapter:1");
+
+        expect(chapterPage).toMatchObject({
+          nodeCount: 2,
+          nodeGroups: [
+            expect.objectContaining({
+              id: "node-group:1:fragment:0",
+              nodeCount: 2,
+              nodes: [
+                expect.objectContaining({
+                  id: "node:100",
+                  title: "Wiki pages",
+                }),
+                expect.objectContaining({
+                  id: "node:101",
+                  title: "Source search",
+                }),
+              ],
+            }),
+          ],
+          type: "chapter",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("lists objects as a pageable collection", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const result = await listArchiveCollection(document, {
+          chapters: [1],
+          types: ["node"],
+        });
+
+        expect(result.items).toStrictEqual([
+          expect.objectContaining({ id: "node:100", type: "node" }),
+          expect.objectContaining({ id: "node:101", type: "node" }),
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("reads archive objects as continuous text", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(readArchiveText(document, "chapter:1")).resolves.toContain(
+          "An LLM Wiki exposes pages",
+        );
+        await expect(readArchiveText(document, "node:100")).resolves.toBe(
+          "Pages and links make archive navigation explicit.",
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
 });
 
-async function seedSourcedDocument(document: DirectoryDocument): Promise<void> {
+async function seedSourcedDocument(
+  document: DirectoryDocument,
+  options: { readonly withSnake?: boolean } = {},
+): Promise<void> {
   await document.openSession(async (openedDocument) => {
     await openedDocument.createSerial();
     const draft = await openedDocument.getSerialFragments(1).createDraft();
@@ -210,6 +333,48 @@ async function seedSourcedDocument(document: DirectoryDocument): Promise<void> {
     draft.addSentence("朱元璋知道了这个消息，随后亲自来到洪都。", 18);
     draft.addSentence("Source-only archives should be searchable.", 6);
     await draft.commit();
+    await openedDocument.chunks.save({
+      content: "Pages and links make archive navigation explicit.",
+      generation: 0,
+      id: 100,
+      label: "Wiki pages",
+      sentenceId: [1, 0, 0],
+      sentenceIds: [[1, 0, 0]],
+      wordsCount: 7,
+      weight: 1,
+    });
+    await openedDocument.chunks.save({
+      content: "Source search remains available before graph summaries.",
+      generation: 0,
+      id: 101,
+      label: "Source search",
+      sentenceId: [1, 0, 2],
+      sentenceIds: [[1, 0, 2]],
+      wordsCount: 7,
+      weight: 1,
+    });
+    if (options.withSnake !== false) {
+      const snakeId = await openedDocument.snakes.create({
+        firstLabel: "Wiki pages",
+        groupId: 0,
+        lastLabel: "Source search",
+        localSnakeId: 0,
+        serialId: 1,
+        size: 2,
+        wordsCount: 14,
+        weight: 2,
+      });
+      await openedDocument.snakeChunks.save({
+        chunkId: 100,
+        position: 0,
+        snakeId,
+      });
+      await openedDocument.snakeChunks.save({
+        chunkId: 101,
+        position: 1,
+        snakeId,
+      });
+    }
     await openedDocument.writeBookMeta({
       authors: [],
       description: null,

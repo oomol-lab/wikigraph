@@ -134,11 +134,13 @@ export type CLIArchiveAction =
   | "import"
   | "index"
   | "links"
+  | "list"
   | "ls"
   | "map"
   | "page"
   | "pack"
   | "path"
+  | "read"
   | "related"
   | "status";
 
@@ -153,6 +155,7 @@ export interface CLIArchiveArguments {
   readonly fromNodeId?: number;
   readonly inputFormat?: CLIFormat;
   readonly json?: boolean;
+  readonly ids?: readonly string[];
   readonly limit?: number;
   readonly listKind?:
     | "chapters"
@@ -170,7 +173,9 @@ export interface CLIArchiveArguments {
   readonly query?: string;
   readonly searchOrder?: "doc-asc" | "doc-desc";
   readonly searchTypes?: readonly (
+    | "chapter"
     | "fragment"
+    | "meta"
     | "node"
     | "sentence"
     | "summary"
@@ -206,6 +211,7 @@ interface ArchiveArgumentValues extends SdpubMetaFlagValues {
   readonly help?: boolean;
   readonly input?: string;
   readonly "input-format"?: string;
+  readonly id?: string;
   readonly json?: boolean;
   readonly limit?: string;
   readonly llm?: string;
@@ -344,6 +350,9 @@ export function parseCLIArguments(
         type: "string",
       },
       identifier: {
+        type: "string",
+      },
+      id: {
         type: "string",
       },
       input: {
@@ -1013,6 +1022,43 @@ function parseArchiveArguments(
         kind: "archive",
       };
     }
+    case "list": {
+      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
+      rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      return {
+        args: {
+          action,
+          archivePath,
+          ...(values.chapter === undefined
+            ? {}
+            : { chapters: parseArchiveSearchChapters(values.chapter) }),
+          ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
+          ...(values.id === undefined
+            ? {}
+            : { ids: parseArchiveIds(values.id) }),
+          ...(values.json === undefined ? {} : { json: values.json }),
+          ...(values.limit === undefined
+            ? {}
+            : {
+                limit: parsePositiveIntegerFlag(
+                  values.limit,
+                  "--limit",
+                  helpRoute,
+                ),
+              }),
+          ...(values.order === undefined
+            ? {}
+            : { searchOrder: parseArchiveSearchOrder(values.order) }),
+          ...(values.type === undefined
+            ? {}
+            : { searchTypes: parseArchiveCollectionTypes(values.type) }),
+        },
+        help: false,
+        kind: "archive",
+      };
+    }
     case "find":
     case "grep": {
       const query = positionals[1];
@@ -1059,6 +1105,26 @@ function parseArchiveArguments(
         kind: "archive",
       };
     }
+    case "read":
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
+      rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
+      if (positionals[1] === undefined) {
+        throw new Error(
+          withHelpRoute("`spinedigest read` requires an object id.", helpRoute),
+        );
+      }
+      return {
+        args: {
+          action,
+          archivePath,
+          objectId: positionals[1],
+        },
+        help: false,
+        kind: "archive",
+      };
     case "page":
     case "evidence":
     case "links":
@@ -2618,11 +2684,13 @@ function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
     value === "import" ||
     value === "index" ||
     value === "links" ||
+    value === "list" ||
     value === "ls" ||
     value === "map" ||
     value === "page" ||
     value === "pack" ||
     value === "path" ||
+    value === "read" ||
     value === "related" ||
     value === "status"
   );
@@ -2708,6 +2776,21 @@ function parseArchiveSearchChapters(value: string): readonly number[] {
   return [...new Set(chapters)];
 }
 
+function parseArchiveIds(value: string): readonly string[] {
+  const ids = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "");
+
+  if (ids.length === 0) {
+    throw new Error(
+      withHelpRoute("--id cannot be empty.", CLI_HELP_ROUTES.command),
+    );
+  }
+
+  return [...new Set(ids)];
+}
+
 function parseArchiveSearchOrder(
   value: string,
 ): NonNullable<CLIArchiveArguments["searchOrder"]> {
@@ -2756,6 +2839,46 @@ function parseArchiveSearchType(
   throw new Error(
     withHelpRoute(
       `Invalid --type: ${value}. Expected summary, node, fragment, or sentence.`,
+      CLI_HELP_ROUTES.command,
+    ),
+  );
+}
+
+function parseArchiveCollectionTypes(
+  value: string,
+): NonNullable<CLIArchiveArguments["searchTypes"]> {
+  const types = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "")
+    .map(parseArchiveCollectionType);
+
+  if (types.length === 0) {
+    throw new Error(
+      withHelpRoute("--type cannot be empty.", CLI_HELP_ROUTES.command),
+    );
+  }
+
+  return [...new Set(types)];
+}
+
+function parseArchiveCollectionType(
+  value: string,
+): NonNullable<CLIArchiveArguments["searchTypes"]>[number] {
+  if (
+    value === "chapter" ||
+    value === "fragment" ||
+    value === "meta" ||
+    value === "node" ||
+    value === "sentence" ||
+    value === "summary"
+  ) {
+    return value;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --type: ${value}. Expected chapter, summary, node, fragment, sentence, or meta.`,
       CLI_HELP_ROUTES.command,
     ),
   );
@@ -2824,6 +2947,7 @@ function normalizeArchiveInlineOptions(
       case "--budget":
       case "--chapter":
       case "--cursor":
+      case "--id":
       case "--input":
       case "--input-format":
       case "--limit":

@@ -1,7 +1,9 @@
 import type {
+  ChunkRecord,
   Document,
   KnowledgeEdgeRecord,
   SentenceId,
+  SnakeRecord,
 } from "../document/index.js";
 import type { BookMeta } from "../source/index.js";
 
@@ -21,6 +23,14 @@ export type ArchiveObjectType =
   | "fragment"
   | "meta"
   | "node"
+  | "summary";
+
+export type ArchiveCollectionType =
+  | "chapter"
+  | "fragment"
+  | "meta"
+  | "node"
+  | "sentence"
   | "summary";
 
 export type ArchiveFindObjectType =
@@ -66,6 +76,7 @@ export type ArchiveFindField =
 export interface ArchiveFindOptions {
   readonly chapters?: readonly number[];
   readonly cursor?: string;
+  readonly ids?: readonly string[];
   readonly limit?: number;
   readonly order?: ArchiveFindOrder;
   readonly types?: readonly ArchiveFindFilterType[];
@@ -87,6 +98,25 @@ export interface ArchiveFindResult {
   readonly order: ArchiveFindOrder;
   readonly query: string;
   readonly types: readonly ArchiveFindFilterType[] | null;
+}
+
+export interface ArchiveCollectionOptions {
+  readonly chapters?: readonly number[];
+  readonly cursor?: string;
+  readonly ids?: readonly string[];
+  readonly limit?: number;
+  readonly order?: ArchiveFindOrder;
+  readonly types?: readonly ArchiveCollectionType[];
+}
+
+export interface ArchiveCollectionResult {
+  readonly chapters: readonly number[] | null;
+  readonly ids: readonly string[] | null;
+  readonly items: readonly ArchiveFindHit[];
+  readonly limit: number;
+  readonly nextCursor: string | null;
+  readonly order: ArchiveFindOrder;
+  readonly types: readonly ArchiveCollectionType[] | null;
 }
 
 export type ArchiveListKind =
@@ -111,6 +141,8 @@ export type ArchivePage =
       readonly content: string | undefined;
       readonly fragments: readonly ArchiveSourceFragment[];
       readonly id: string;
+      readonly nodeGroups: readonly ArchiveNodeGroup[];
+      readonly nodeCount: number;
       readonly sourcePreview: string | undefined;
       readonly title: string;
       readonly type: "chapter";
@@ -118,14 +150,20 @@ export type ArchivePage =
   | {
       readonly evidence: readonly GraphEvidenceLine[];
       readonly id: string;
+      readonly incoming: readonly GraphNeighbor[];
       readonly neighbors: readonly GraphNeighbor[];
       readonly node: GraphNode;
+      readonly outgoing: readonly GraphNeighbor[];
+      readonly position: ArchiveFindPosition | undefined;
       readonly title: string;
       readonly type: "node";
     }
   | {
       readonly fragment: ArchiveSourceFragment;
       readonly id: string;
+      readonly nextFragmentId: string | undefined;
+      readonly nodes: readonly ArchiveNodeLabel[];
+      readonly previousFragmentId: string | undefined;
       readonly title: string;
       readonly type: "fragment";
     }
@@ -174,6 +212,25 @@ export interface ArchivePack {
   readonly budget: number;
   readonly evidence: readonly GraphEvidenceLine[];
   readonly links: readonly GraphNeighbor[];
+}
+
+export interface ArchiveNodeGroup {
+  readonly groupId: number;
+  readonly id: string;
+  readonly nodeCount: number;
+  readonly nodes: readonly ArchiveNodeLabel[];
+  readonly span: {
+    readonly end?: ArchiveFindPosition;
+    readonly start?: ArchiveFindPosition;
+  };
+  readonly weight: number;
+  readonly wordsCount: number;
+}
+
+export interface ArchiveNodeLabel {
+  readonly id: string;
+  readonly position: ArchiveFindPosition | undefined;
+  readonly title: string;
 }
 
 export interface ArchiveSourceFragment {
@@ -284,6 +341,129 @@ export async function listArchiveObjects(
   }
 }
 
+export async function listArchiveCollection(
+  document: Document,
+  options: ArchiveCollectionOptions = {},
+): Promise<ArchiveCollectionResult> {
+  const items: ArchiveFindHit[] = [];
+  const types = options.types ?? [
+    "chapter",
+    "node",
+    "summary",
+    "fragment",
+    "sentence",
+    "meta",
+  ];
+
+  if (types.includes("meta")) {
+    const meta = await document.readBookMeta();
+
+    if (meta !== undefined) {
+      items.push({
+        field: "metadata",
+        id: "meta:book",
+        snippet: formatMetaSummary(meta),
+        title: meta.title ?? "Book metadata",
+        type: "meta",
+      });
+    }
+  }
+
+  if (types.includes("chapter") || types.includes("summary")) {
+    for (const chapter of await listChapters(document)) {
+      const title = chapter.title ?? `[chapter ${chapter.chapterId}]`;
+
+      if (types.includes("chapter")) {
+        items.push({
+          chapter: chapter.chapterId,
+          field: "title",
+          id: formatChapterId(chapter.chapterId),
+          position: { chapter: chapter.chapterId },
+          snippet: `${chapter.stage}; ${chapter.fragmentCount} fragments`,
+          title,
+          type: "chapter",
+        });
+      }
+
+      if (types.includes("summary")) {
+        const summary = await document.readSummary(chapter.chapterId);
+
+        if (summary !== undefined) {
+          items.push({
+            chapter: chapter.chapterId,
+            field: "summary",
+            id: formatSummaryId(chapter.chapterId),
+            position: { chapter: chapter.chapterId },
+            snippet: createSnippet(summary),
+            title,
+            type: "summary",
+          });
+        }
+      }
+    }
+  }
+
+  if (types.includes("fragment")) {
+    for (const chapter of await listChapters(document)) {
+      const title = chapter.title ?? formatChapterId(chapter.chapterId);
+
+      for (const fragment of await listChapterSourceFragments(
+        document,
+        chapter.chapterId,
+      )) {
+        items.push({
+          chapter: chapter.chapterId,
+          field: "source",
+          id: fragment.id,
+          position: {
+            chapter: chapter.chapterId,
+            fragment: fragment.fragmentId,
+          },
+          snippet: fragment.preview,
+          title,
+          type: "fragment",
+        });
+      }
+    }
+  }
+
+  if (types.includes("node") || types.includes("sentence")) {
+    for (const node of await document.chunks.listAll()) {
+      const position = createNodePosition(node.sentenceIds);
+
+      if (types.includes("node")) {
+        items.push({
+          chapter: node.sentenceId[0],
+          field: "content",
+          id: formatNodeId(node.id),
+          ...(position === undefined ? {} : { position }),
+          snippet: createSnippet(node.content),
+          title: node.label,
+          type: "node",
+        });
+      }
+
+      if (types.includes("sentence")) {
+        for (const sentenceId of node.sentenceIds) {
+          const text = await document.getSentence(sentenceId);
+
+          items.push({
+            chapter: sentenceId[0],
+            field: "evidence",
+            id: formatSentenceId(sentenceId),
+            position: createSentencePosition(sentenceId),
+            snippet: createSnippet(text),
+            title: node.label,
+            type: "sentence",
+          });
+        }
+      }
+    }
+  }
+
+  return createCollectionResult(items, options);
+}
+
 export async function findArchiveObjects(
   document: Document,
   query: string,
@@ -324,6 +504,49 @@ export async function grepArchiveObjects(
   return createFindResult(query, hits, options);
 }
 
+export async function readArchiveText(
+  document: Document,
+  id: string,
+): Promise<string> {
+  const reference = parseArchiveReference(id);
+
+  switch (reference.type) {
+    case "chapter":
+      return (await listChapterSourceFragments(document, reference.id))
+        .map((fragment) => fragment.text)
+        .join("\n\n");
+    case "fragment":
+      return (
+        await readSourceFragment(
+          document,
+          reference.serialId,
+          reference.fragmentId,
+        )
+      ).text;
+    case "summary": {
+      const summary = await document.readSummary(reference.id);
+
+      if (summary === undefined) {
+        throw new Error(`Summary ${formatSummaryId(reference.id)} is missing.`);
+      }
+
+      return summary;
+    }
+    case "node": {
+      const { node } = await requireNode(document, reference.id);
+
+      return node.content;
+    }
+    case "evidence":
+      return await document.getSentence(reference.sentenceId);
+    case "meta": {
+      const meta = await document.readBookMeta();
+
+      return meta === undefined ? "" : JSON.stringify(meta, null, 2);
+    }
+  }
+}
+
 export async function readArchivePage(
   document: Document,
   id: string,
@@ -333,16 +556,19 @@ export async function readArchivePage(
   switch (reference.type) {
     case "chapter": {
       const chapter = await requireChapter(document, reference.id);
-      const fragments = await listChapterSourceFragments(
-        document,
-        reference.id,
-      );
+      const [fragments, nodeGroups, nodes] = await Promise.all([
+        listChapterSourceFragments(document, reference.id),
+        listChapterNodeGroups(document, reference.id),
+        document.chunks.listBySerial(reference.id),
+      ]);
 
       return {
         chapter,
         content: await document.readSummary(reference.id),
         fragments,
         id: formatChapterId(reference.id),
+        nodeCount: nodes.length,
+        nodeGroups,
         sourcePreview: createSourcePreview(fragments),
         title: chapter.title ?? `[chapter ${reference.id}]`,
         type: "chapter",
@@ -360,15 +586,31 @@ export async function readArchivePage(
       };
     }
     case "fragment": {
-      const fragment = await readSourceFragment(
-        document,
-        reference.serialId,
-        reference.fragmentId,
-      );
+      const [fragment, relatedNodes, fragmentIds] = await Promise.all([
+        readSourceFragment(document, reference.serialId, reference.fragmentId),
+        listFragmentNodes(document, reference.serialId, reference.fragmentId),
+        document.getSerialFragments(reference.serialId).listFragmentIds(),
+      ]);
+      const fragmentIndex = fragmentIds.indexOf(reference.fragmentId);
+      const previousFragmentId =
+        fragmentIndex > 0 ? fragmentIds[fragmentIndex - 1] : undefined;
+      const nextFragmentId =
+        fragmentIndex >= 0 && fragmentIndex < fragmentIds.length - 1
+          ? fragmentIds[fragmentIndex + 1]
+          : undefined;
 
       return {
         fragment,
         id: fragment.id,
+        nextFragmentId:
+          nextFragmentId === undefined
+            ? undefined
+            : formatFragmentId(reference.serialId, nextFragmentId),
+        nodes: relatedNodes,
+        previousFragmentId:
+          previousFragmentId === undefined
+            ? undefined
+            : formatFragmentId(reference.serialId, previousFragmentId),
         title: fragment.id,
         type: "fragment",
       };
@@ -386,12 +628,21 @@ export async function readArchivePage(
         listGraphNeighbors(document, chapterId, reference.id),
         readNodeEvidence(document, node),
       ]);
+      const outgoing = neighbors.filter(
+        (neighbor) => neighbor.direction === "outgoing",
+      );
+      const incoming = neighbors.filter(
+        (neighbor) => neighbor.direction === "incoming",
+      );
 
       return {
         evidence,
         id: formatNodeId(node.id),
+        incoming,
         neighbors,
         node,
+        outgoing,
+        position: createNodePosition(node.sentenceIds),
         title: node.label,
         type: "node",
       };
@@ -722,6 +973,150 @@ async function readSourceFragment(
   };
 }
 
+async function listChapterNodeGroups(
+  document: Document,
+  chapterId: number,
+): Promise<readonly ArchiveNodeGroup[]> {
+  const snakes = await document.snakes.listBySerial(chapterId);
+
+  if (snakes.length === 0) {
+    return listChapterNodeGroupsByFragment(document, chapterId);
+  }
+
+  return (
+    await Promise.all(
+      snakes.map(async (snake) =>
+        createArchiveNodeGroup({
+          groupId: snake.localSnakeId,
+          id: `node-group:${chapterId}:${snake.localSnakeId}`,
+          nodes: await listSnakeNodeLabels(document, snake),
+          weight: snake.weight,
+          wordsCount: snake.wordsCount,
+        }),
+      ),
+    )
+  ).filter((group) => group.nodeCount > 0);
+}
+
+async function listChapterNodeGroupsByFragment(
+  document: Document,
+  chapterId: number,
+): Promise<readonly ArchiveNodeGroup[]> {
+  const nodes = (await document.chunks.listBySerial(chapterId))
+    .map(createNodeLabel)
+    .sort(compareNodeLabels);
+  const nodesByFragment = new Map<number, ArchiveNodeLabel[]>();
+
+  for (const node of nodes) {
+    const fragmentId = node.position?.fragment ?? -1;
+    const groupNodes = nodesByFragment.get(fragmentId) ?? [];
+
+    groupNodes.push(node);
+    nodesByFragment.set(fragmentId, groupNodes);
+  }
+
+  return [...nodesByFragment.entries()]
+    .sort(([leftFragment], [rightFragment]) =>
+      compareNumbers(leftFragment, rightFragment),
+    )
+    .map(([fragmentId, groupNodes], index) =>
+      createArchiveNodeGroup({
+        groupId: index,
+        id:
+          fragmentId < 0
+            ? `node-group:${chapterId}:unknown`
+            : `node-group:${chapterId}:fragment:${fragmentId}`,
+        nodes: groupNodes,
+        weight: groupNodes.length,
+        wordsCount: 0,
+      }),
+    );
+}
+
+function createArchiveNodeGroup(input: {
+  readonly groupId: number;
+  readonly id: string;
+  readonly nodes: readonly ArchiveNodeLabel[];
+  readonly weight: number;
+  readonly wordsCount: number;
+}): ArchiveNodeGroup {
+  const positions = input.nodes
+    .map((node) => node.position)
+    .filter(isDefined)
+    .sort(compareArchivePositions);
+
+  return {
+    groupId: input.groupId,
+    id: input.id,
+    nodeCount: input.nodes.length,
+    nodes: input.nodes,
+    span: {
+      ...(positions[positions.length - 1] === undefined
+        ? {}
+        : { end: positions[positions.length - 1] }),
+      ...(positions[0] === undefined ? {} : { start: positions[0] }),
+    },
+    weight: input.weight,
+    wordsCount: input.wordsCount,
+  };
+}
+
+async function listSnakeNodeLabels(
+  document: Document,
+  snake: SnakeRecord,
+): Promise<readonly ArchiveNodeLabel[]> {
+  return (
+    await Promise.all(
+      (await document.snakeChunks.listChunkIds(snake.id)).map(
+        async (chunkId) => {
+          const chunk = await document.chunks.getById(chunkId);
+
+          return chunk === undefined ? undefined : createNodeLabel(chunk);
+        },
+      ),
+    )
+  )
+    .filter(isDefined)
+    .sort(compareNodeLabels);
+}
+
+async function listFragmentNodes(
+  document: Document,
+  chapterId: number,
+  fragmentId: number,
+): Promise<readonly ArchiveNodeLabel[]> {
+  return (await document.chunks.listByFragments(chapterId, [fragmentId]))
+    .map(createNodeLabel)
+    .sort(compareNodeLabels);
+}
+
+function createNodeLabel(node: ChunkRecord): ArchiveNodeLabel {
+  return {
+    id: formatNodeId(node.id),
+    position: createNodePosition(node.sentenceIds),
+    title: node.label,
+  };
+}
+
+function compareNodeLabels(
+  left: ArchiveNodeLabel,
+  right: ArchiveNodeLabel,
+): number {
+  if (left.position !== undefined && right.position !== undefined) {
+    return compareArchivePositions(left.position, right.position);
+  }
+
+  if (left.position !== undefined) {
+    return -1;
+  }
+
+  if (right.position !== undefined) {
+    return 1;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
 function createSourcePreview(
   fragments: readonly ArchiveSourceFragment[],
 ): string | undefined {
@@ -1044,8 +1439,10 @@ function createFindResult(
   const limit = options.limit ?? DEFAULT_FIND_LIMIT;
   const chapters = options.chapters ?? null;
   const types = options.types ?? null;
+  const ids = options.ids ?? null;
   const start = decodeFindCursor(options.cursor);
   const filtered = hits
+    .filter((hit) => matchesFindId(hit, ids))
     .filter((hit) => matchesFindChapter(hit, chapters))
     .filter((hit) => matchesFindType(hit, types))
     .sort((left, right) => compareFindHits(left, right, order));
@@ -1062,6 +1459,43 @@ function createFindResult(
     query,
     types,
   };
+}
+
+function createCollectionResult(
+  hits: readonly ArchiveFindHit[],
+  options: ArchiveCollectionOptions,
+): ArchiveCollectionResult {
+  const order = options.order ?? "doc-asc";
+  const limit = options.limit ?? DEFAULT_FIND_LIMIT;
+  const chapters = options.chapters ?? null;
+  const ids = options.ids ?? null;
+  const types = options.types ?? null;
+  const start = decodeFindCursor(options.cursor);
+  const filtered = hits
+    .filter((hit) => matchesFindId(hit, ids))
+    .filter((hit) => matchesFindChapter(hit, chapters))
+    .filter((hit) => matchesCollectionType(hit, types))
+    .sort((left, right) => compareFindHits(left, right, order));
+  const items = filtered.slice(start, start + limit);
+  const nextOffset = start + items.length;
+
+  return {
+    chapters,
+    ids,
+    items,
+    limit,
+    nextCursor:
+      nextOffset < filtered.length ? encodeFindCursor(nextOffset) : null,
+    order,
+    types,
+  };
+}
+
+function matchesFindId(
+  hit: ArchiveFindHit,
+  ids: readonly string[] | null,
+): boolean {
+  return ids === null || ids.includes(hit.id);
 }
 
 function matchesFindChapter(
@@ -1084,6 +1518,13 @@ function matchesFindType(
   }
 
   return isFindFilterType(hit.type) && types.includes(hit.type);
+}
+
+function matchesCollectionType(
+  hit: ArchiveFindHit,
+  types: readonly ArchiveCollectionType[] | null,
+): boolean {
+  return types === null || types.includes(hit.type);
 }
 
 function compareFindHits(
@@ -1152,6 +1593,17 @@ function compareSentenceIds(left: SentenceId, right: SentenceId): number {
     compareNumbers(left[0], right[0]) ||
     compareNumbers(left[1], right[1]) ||
     compareNumbers(left[2], right[2])
+  );
+}
+
+function compareArchivePositions(
+  left: ArchiveFindPosition,
+  right: ArchiveFindPosition,
+): number {
+  return (
+    compareNumbers(left.chapter, right.chapter) ||
+    compareNumbers(left.fragment ?? 0, right.fragment ?? 0) ||
+    compareNumbers(left.sentence ?? 0, right.sentence ?? 0)
   );
 }
 

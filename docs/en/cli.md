@@ -16,24 +16,30 @@ spinedigest build <archive.sdpub> [--stage <source|graph|summary|ready>] [--chap
 spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--json]
 spinedigest status <archive.sdpub> [--json]
 spinedigest index <archive.sdpub> [--json]
-spinedigest ls <archive.sdpub> [chapters|nodes|edges|evidence|summaries|meta] [--json]
+spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest find <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest grep <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest page <archive.sdpub> <id> [--json]
+spinedigest read <archive.sdpub> <id>
 spinedigest evidence <archive.sdpub> <id> [--json]
 spinedigest links <archive.sdpub> <node:id> [--json]
 spinedigest backlinks <archive.sdpub> <node:id> [--json]
 spinedigest path <archive.sdpub> <node:id> <node:id> --chapter <id>
-spinedigest map <archive.sdpub> [--json]
 spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 ```
 
-Search behavior:
+Exploration modes:
+
+- Search mode: `find` discovers objects by deterministic keywords; `grep` checks exact continuous text.
+- Structure mode: `list` returns bounded object collections; `page` opens one detailed object with local navigation.
+- Reading mode: `read` prints one object as continuous plain text.
+
+Search and collection behavior:
 
 - `find` is deterministic keyword discovery. It splits the query on whitespace and returns objects where every keyword appears in the same object.
 - `grep` is exact text search. It treats the query as one continuous string.
 - `--chapter 12` or `--chapter 11,12` limits results to chapters.
-- `--type summary,node,fragment,sentence` limits result object types.
+- `--type chapter,summary,node,fragment,sentence,meta` limits `list`; `find` and `grep` search `summary,node,fragment,sentence`.
 - `--order doc-asc|doc-desc` sorts by stable document position. Default is `doc-asc`.
 - `--limit` defaults to `20`; pass returned `nextCursor` back through `--cursor` for the next page.
 - Neither command does semantic expansion, fuzzy matching, stemming, or vector search.
@@ -42,6 +48,7 @@ Object ids:
 
 - `chapter:<id>`
 - `node:<id>`
+- `fragment:<serial>:<fragment>`
 - `sentence:<serial>:<fragment>:<index>`
 - `summary:<id>`
 - `meta:book`

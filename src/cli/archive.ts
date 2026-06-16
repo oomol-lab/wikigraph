@@ -5,13 +5,17 @@ import { tmpdir } from "os";
 import {
   findGraphPath,
   getArchiveIndex,
+  listArchiveCollection,
   listArchiveLinks,
   listArchiveObjects,
   listRelatedArchiveObjects,
   packArchiveContext,
   readArchiveEvidence,
   readArchivePage,
+  readArchiveText,
   estimateArchiveBuild,
+  type ArchiveCollectionOptions,
+  type ArchiveCollectionResult,
   findArchiveObjects,
   formatNodeId,
   type ArchiveEstimate,
@@ -100,6 +104,14 @@ export async function runArchiveCommand(
         );
       });
       return;
+    case "list":
+      await withArchiveDocument(args.archivePath, async (document) => {
+        await writeCollection(
+          await listArchiveCollection(document, createCollectionOptions(args)),
+          args.json ?? false,
+        );
+      });
+      return;
     case "find":
       await withArchiveDocument(args.archivePath, async (document) => {
         await writeFindHits(
@@ -129,6 +141,13 @@ export async function runArchiveCommand(
         await writePage(
           await readArchivePage(document, args.objectId!),
           args.json ?? false,
+        );
+      });
+      return;
+    case "read":
+      await withArchiveDocument(args.archivePath, async (document) => {
+        await writeTextToStdout(
+          `${await readArchiveText(document, args.objectId!)}\n`,
         );
       });
       return;
@@ -293,6 +312,22 @@ function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
   return {
     ...(args.chapters === undefined ? {} : { chapters: args.chapters }),
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
+    ...(args.ids === undefined ? {} : { ids: args.ids }),
+    ...(args.limit === undefined ? {} : { limit: args.limit }),
+    ...(args.searchOrder === undefined ? {} : { order: args.searchOrder }),
+    ...(args.searchTypes === undefined
+      ? {}
+      : { types: args.searchTypes.filter(isSearchFilterType) }),
+  };
+}
+
+function createCollectionOptions(
+  args: CLIArchiveArguments,
+): ArchiveCollectionOptions {
+  return {
+    ...(args.chapters === undefined ? {} : { chapters: args.chapters }),
+    ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
+    ...(args.ids === undefined ? {} : { ids: args.ids }),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
     ...(args.searchOrder === undefined ? {} : { order: args.searchOrder }),
     ...(args.searchTypes === undefined ? {} : { types: args.searchTypes }),
@@ -338,7 +373,7 @@ async function writeIndex(
       "",
       "Graph note:",
       "  Graph nodes exist, but no edges are currently available. This can be valid when extracted nodes have no stable relationships.",
-      "  Next: inspect nodes with `spinedigest ls <archive.sdpub> nodes`.",
+      "  Next: inspect nodes with `spinedigest list <archive.sdpub> --type node`.",
     );
   }
 
@@ -354,7 +389,7 @@ async function writeIndex(
       "Next:",
       "  spinedigest find <archive.sdpub> <term>",
       "  spinedigest page <archive.sdpub> chapter:<id>",
-      "  spinedigest ls <archive.sdpub> nodes",
+      "  spinedigest list <archive.sdpub> --type node",
     );
   }
 
@@ -406,6 +441,30 @@ async function writeList(
   );
 }
 
+async function writeCollection(
+  result: ArchiveCollectionResult,
+  json: boolean,
+): Promise<void> {
+  if (json) {
+    await writeTextToStdout(`${JSON.stringify(result, null, 2)}\n`);
+    return;
+  }
+
+  if (result.items.length === 0) {
+    await writeTextToStdout("No objects.\n");
+    return;
+  }
+
+  await writeTextToStdout(
+    `${result.items
+      .map(
+        (item) =>
+          `${item.id}  ${item.type}/${item.field}  ${item.title}\n${item.snippet}\nNext: spinedigest page <archive.sdpub> ${item.id}`,
+      )
+      .join("\n\n")}${formatCollectionCursor(result)}\n`,
+  );
+}
+
 async function writeFindHits(
   result: ArchiveFindResult,
   json: boolean,
@@ -443,10 +502,15 @@ async function writePage(page: ArchivePage, json: boolean): Promise<void> {
           `${page.id}  ${page.title}`,
           `Stage: ${page.chapter.stage}`,
           `Fragments: ${page.chapter.fragmentCount}`,
+          `Nodes: ${page.nodeCount}`,
           "",
-          page.content === undefined
-            ? formatChapterSourcePreview(page)
-            : page.content,
+          "Node Groups:",
+          ...formatNodeGroups(page.nodeGroups),
+          "",
+          "Summary:",
+          formatLongPageText(page.content ?? "[summary missing]"),
+          "",
+          formatChapterSourcePreview(page),
         ].join("\n") + "\n",
       );
       return;
@@ -464,10 +528,14 @@ async function writePage(page: ArchivePage, json: boolean): Promise<void> {
       await writeTextToStdout(
         [
           `${page.id}`,
-          `Sentences: ${page.fragment.sentenceCount}`,
           `Words: ${page.fragment.wordsCount}`,
+          `Previous: ${page.previousFragmentId ?? "[none]"}`,
+          `Next: ${page.nextFragmentId ?? "[none]"}`,
           "",
           page.fragment.text,
+          "",
+          "Related Nodes:",
+          ...formatNodeLabels(page.nodes),
         ].join("\n") + "\n",
       );
       return;
@@ -475,14 +543,20 @@ async function writePage(page: ArchivePage, json: boolean): Promise<void> {
       await writeTextToStdout(
         [
           `${page.id}  ${page.node.label}`,
+          `Chapter: ${page.position === undefined ? "[unknown]" : `chapter:${page.position.chapter}`}`,
+          `Position: ${formatPosition(page.position)}`,
           "",
+          "Content:",
           page.node.content,
-          "",
-          "Links:",
-          ...formatNeighborLines(page.neighbors),
           "",
           "Evidence:",
           ...formatEvidenceLines(page.evidence),
+          "",
+          "Outgoing Nodes:",
+          ...formatNeighborLines(page.outgoing),
+          "",
+          "Incoming Nodes:",
+          ...formatNeighborLines(page.incoming),
         ].join("\n") + "\n",
       );
       return;
@@ -547,7 +621,7 @@ async function writeMap(
         "This can be valid after a graph build when the source is too short, too sparse, or the model found no stable relationships.",
         "Next:",
         "  spinedigest status <archive.sdpub>",
-        "  spinedigest ls <archive.sdpub> nodes",
+        "  spinedigest list <archive.sdpub> --type node",
         "  spinedigest page <archive.sdpub> chapter:<id>",
       ].join("\n") + "\n",
     );
@@ -597,6 +671,25 @@ function formatNextCursor(result: ArchiveFindResult): string {
   return `\n\nNext page: add --cursor ${result.nextCursor}`;
 }
 
+function formatCollectionCursor(result: ArchiveCollectionResult): string {
+  if (result.nextCursor === null) {
+    return "";
+  }
+
+  return `\n\nNext page: add --cursor ${result.nextCursor}`;
+}
+
+function isSearchFilterType(
+  type: NonNullable<CLIArchiveArguments["searchTypes"]>[number],
+): type is NonNullable<ArchiveFindOptions["types"]>[number] {
+  return (
+    type === "fragment" ||
+    type === "node" ||
+    type === "sentence" ||
+    type === "summary"
+  );
+}
+
 function formatNeighborLines(neighbors: readonly GraphNeighbor[]): string[] {
   if (neighbors.length === 0) {
     return ["  [none]"];
@@ -609,6 +702,42 @@ function formatNeighborLines(neighbors: readonly GraphNeighbor[]): string[] {
   });
 }
 
+function formatNodeGroups(
+  groups: Extract<ArchivePage, { readonly type: "chapter" }>["nodeGroups"],
+): string[] {
+  if (groups.length === 0) {
+    return ["  [none]"];
+  }
+
+  const visibleGroups = groups.slice(0, 12);
+  const lines = visibleGroups.flatMap((group, index) => {
+    const visibleNodes = group.nodes.slice(0, 10);
+    const moreNodes = group.nodeCount - visibleNodes.length;
+
+    return [
+      `  Group ${index + 1}  ${group.nodeCount} nodes  ${formatSpan(group.span)}`,
+      ...formatNodeLabels(visibleNodes).map((line) => `  ${line}`),
+      ...(moreNodes > 0 ? [`    ... ${moreNodes} more nodes`] : []),
+    ];
+  });
+
+  if (groups.length > visibleGroups.length) {
+    lines.push(`  ... ${groups.length - visibleGroups.length} more groups`);
+  }
+
+  return lines;
+}
+
+function formatNodeLabels(
+  nodes: readonly { readonly id: string; readonly title: string }[],
+): string[] {
+  if (nodes.length === 0) {
+    return ["  [none]"];
+  }
+
+  return nodes.map((node) => `  ${node.id}  ${node.title}`);
+}
+
 function formatEvidenceLines(evidence: readonly GraphEvidenceLine[]): string[] {
   if (evidence.length === 0) {
     return ["  [none]"];
@@ -617,6 +746,51 @@ function formatEvidenceLines(evidence: readonly GraphEvidenceLine[]): string[] {
   return evidence.map(
     (line) => `  sentence:${line.sentenceId.join(":")}  ${line.text}`,
   );
+}
+
+function formatPosition(
+  position:
+    | {
+        readonly chapter: number;
+        readonly fragment?: number;
+        readonly sentence?: number;
+      }
+    | undefined,
+): string {
+  if (position === undefined) {
+    return "[unknown]";
+  }
+
+  return [
+    `chapter ${position.chapter}`,
+    position.fragment === undefined
+      ? undefined
+      : `fragment ${position.fragment}`,
+    position.sentence === undefined
+      ? undefined
+      : `sentence ${position.sentence}`,
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(", ");
+}
+
+function formatSpan(span: {
+  readonly end?: {
+    readonly chapter: number;
+    readonly fragment?: number;
+    readonly sentence?: number;
+  };
+  readonly start?: {
+    readonly chapter: number;
+    readonly fragment?: number;
+    readonly sentence?: number;
+  };
+}): string {
+  if (span.start === undefined && span.end === undefined) {
+    return "span [unknown]";
+  }
+
+  return `span ${formatPosition(span.start)} -> ${formatPosition(span.end)}`;
 }
 
 function formatDuration(seconds: number): string {
@@ -653,31 +827,25 @@ function formatPackAnchor(anchor: ArchivePage): string {
 function formatChapterSourcePreview(
   page: Extract<ArchivePage, { readonly type: "chapter" }>,
 ): string {
-  const lines = ["[summary missing]"];
+  const lines: string[] = [];
 
   if (page.sourcePreview !== undefined) {
-    lines.push("", "Source Preview:", page.sourcePreview);
-  }
-
-  if (page.fragments.length > 0) {
-    lines.push(
-      "",
-      "Fragments:",
-      ...page.fragments.map(
-        (fragment) =>
-          `  ${fragment.id}  ${fragment.sentenceCount} sentences, ${fragment.wordsCount} words`,
-      ),
-    );
+    lines.push("Source Preview:", page.sourcePreview);
   }
 
   lines.push(
     "",
     "Next:",
-    "  spinedigest find <archive.sdpub> <keyword>",
-    `  spinedigest build <archive.sdpub> --chapter ${page.chapter.chapterId} --stage graph --confirm`,
+    `  spinedigest list <archive.sdpub> --type node --chapter ${page.chapter.chapterId}`,
+    `  spinedigest find <archive.sdpub> <keyword> --chapter ${page.chapter.chapterId}`,
+    `  spinedigest read <archive.sdpub> ${page.id}`,
   );
 
   return lines.join("\n");
+}
+
+function formatLongPageText(text: string): string {
+  return text.length > 1200 ? `${text.slice(0, 1197)}...` : text;
 }
 
 function truncateToBudget(text: string, budget: number): string {

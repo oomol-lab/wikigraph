@@ -13,16 +13,18 @@ Primary rule:
 Preferred top-level operations:
   - `spinedigest status <archive.sdpub>` for readiness and counts
   - `spinedigest index <archive.sdpub>` for entry points
-  - `spinedigest ls <archive.sdpub> ...` for object discovery
+  - `spinedigest list <archive.sdpub> ...` for bounded object discovery
   - `spinedigest find <archive.sdpub> <query>` for deterministic search
-  - `spinedigest page <archive.sdpub> <id>` for reading
+  - `spinedigest grep <archive.sdpub> <query>` for exact continuous text
+  - `spinedigest page <archive.sdpub> <id>` for object details and local navigation
+  - `spinedigest read <archive.sdpub> <id>` for continuous plain-text reading
   - `spinedigest evidence <archive.sdpub> <id>` for source backing
-  - `spinedigest links/backlinks/map/path ...` for graph navigation
+  - `spinedigest links/backlinks/path ...` for graph navigation
   - `spinedigest export <archive.sdpub> ...` for projections
 
 Archive model:
   - The archive stores metadata, TOC chapters, normalized source fragments, graph nodes, graph edges, source evidence, and summaries.
-  - Public object ids include chapter:<id>, node:<id>, sentence:<serial>:<fragment>:<index>, summary:<id>, and meta:book.
+  - Public object ids include chapter:<id>, node:<id>, fragment:<serial>:<fragment>, sentence:<serial>:<fragment>:<index>, summary:<id>, and meta:book.
   - Current editable archives are still maintained internally around chapters and graph nodes.
 
 sdpub maintenance command family:

@@ -2,7 +2,7 @@ Help Type: command
 Command: spinedigest ls
 
 Purpose:
-  List archive objects.
+  Compatibility alias for older object listing workflows.
 
 Usage:
   spinedigest ls <archive.sdpub> [chapters|nodes|edges|evidence|fragments|summaries|meta] [--json]
@@ -11,6 +11,7 @@ Contract:
   - Mutates: no.
   - LLM: no.
   - JSON: yes.
+  - Prefer `spinedigest list` for new agent workflows because it supports filters, stable order, and cursor paging.
 
 Examples:
   spinedigest ls book.sdpub chapters

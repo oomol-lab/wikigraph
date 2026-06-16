@@ -10,7 +10,7 @@ Archive-first rules:
   - `.sdpub` is the primary managed knowledge archive.
   - `epub`, `markdown`, `txt`, URL text, and stdin text are import sources.
   - `markdown`, `txt`, `epub`, and `.sdpub` are export projections.
-  - Search, page, evidence, links, map, and pack operate on `.sdpub` and do not require output formats.
+  - List, search, page, read, evidence, links, path, and pack operate on `.sdpub` and do not require output formats.
 
 Import rules:
   - `spinedigest import <archive.sdpub> <source>` infers source format from the source path when possible.
@@ -32,7 +32,7 @@ Readiness by archive stage:
 LLM usage:
   - Import/source does not call an LLM.
   - Graph, summary, and ready builds may call an LLM and require `--confirm`.
-  - Search, page, evidence, navigation, pack, and export do not call an LLM.
+  - List, search, page, read, evidence, navigation, pack, and export do not call an LLM.
 
 Direct digest and maintenance commands:
   The direct `spinedigest transform --input ... --output ...` command remains available for one-shot digest/export workflows.

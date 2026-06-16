@@ -9,16 +9,16 @@ Archive-first commands:
   estimate    Estimate words, token scale, calls, time, cost, and risk before build.
   status      Show archive readiness and object counts.
   index       Show the archive home/index page.
-  ls          List chapters, nodes, edges, evidence, summaries, or metadata.
+  list        List archive objects with filters, stable order, and cursor paging.
   find        Find objects by whitespace-separated keyword AND search.
   grep        Search objects for one exact continuous text phrase.
-  page        Read one object by id.
+  page        Open one detailed object page by id.
+  read        Print one object as continuous plain text.
   evidence    Show source evidence for an object.
   links       Show outgoing node links.
   backlinks   Show incoming node links.
   related     Show graph-adjacent knowledge units.
   path        Find a directed graph path between two nodes in one chapter.
-  map         Print graph edges.
   pack        Pack deterministic context around a known object id.
   export      Export a projection from the archive.
 
@@ -28,10 +28,11 @@ Command shapes:
   spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--json]
   spinedigest status <archive.sdpub> [--json]
   spinedigest index <archive.sdpub> [--json]
-  spinedigest ls <archive.sdpub> [chapters|nodes|edges|evidence|summaries|meta] [--json]
+  spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
   spinedigest find <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
   spinedigest grep <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
   spinedigest page <archive.sdpub> <id> [--json]
+  spinedigest read <archive.sdpub> <id>
   spinedigest evidence <archive.sdpub> <id> [--json]
   spinedigest related <archive.sdpub> <node:id> [--json]
   spinedigest pack <archive.sdpub> <id> [--budget <chars>] [--json]
@@ -39,6 +40,7 @@ Command shapes:
 
 Direct digest and maintenance:
   spinedigest transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <planned|sourced|graphed|summarized>] [--verbose]
+  spinedigest ls <archive.sdpub> [chapters|nodes|edges|evidence|summaries|meta] [--json]
   spinedigest sdpub <subcommand> ...
   spinedigest config status [--llm <json>]
 

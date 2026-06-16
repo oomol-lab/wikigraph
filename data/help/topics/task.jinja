@@ -18,12 +18,14 @@ Build scoped knowledge:
 Browse an existing archive:
   spinedigest status book.sdpub
   spinedigest index book.sdpub
-  spinedigest ls book.sdpub chapters
-  spinedigest ls book.sdpub nodes
+  spinedigest list book.sdpub --type chapter
+  spinedigest list book.sdpub --type node --chapter 3
 
 Search and read:
   spinedigest find book.sdpub "RAG"
+  spinedigest grep book.sdpub "exact source phrase"
   spinedigest page book.sdpub node:84
+  spinedigest read book.sdpub chapter:3
   spinedigest evidence book.sdpub node:84
 
 Navigate graph knowledge:
@@ -31,7 +33,6 @@ Navigate graph knowledge:
   spinedigest backlinks book.sdpub node:84
   spinedigest related book.sdpub node:84
   spinedigest path book.sdpub node:84 node:120 --chapter 3
-  spinedigest map book.sdpub
 
 Pack deterministic context:
   spinedigest pack book.sdpub node:84 --budget 5000
