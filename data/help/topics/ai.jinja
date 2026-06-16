@@ -7,6 +7,7 @@ Primary contract:
   - Treat `.sdpub` as an LLM Wiki archive managed by SpineDigest.
   - Use `spinedigest index/list/find/grep/page/read/links/backlinks/export` before unpacking or inspecting ZIP internals.
   - Choose one of three exploration modes first: search mode (`find`/`grep`), structure mode (`list`/`page`), or reading mode (`read`).
+  - In search mode, treat untyped `find` as broad candidate discovery. For content understanding, choose a search lens: `--type node`, `--type summary`, or `--type fragment`.
   - Prefer `--json` when composing with tools.
   - Do not inspect `database.db` for routine retrieval.
   - Do not launch full-archive LLM-backed builds without estimating first.
@@ -22,6 +23,9 @@ Safe first moves:
     spinedigest page <archive.sdpub> node:<id>
   - Locate candidate chapters or verify missing concepts:
     spinedigest find <archive.sdpub> <query>
+    spinedigest find <archive.sdpub> <query> --type node
+    spinedigest find <archive.sdpub> <query> --type summary
+    spinedigest find <archive.sdpub> <query> --type fragment
     spinedigest grep <archive.sdpub> <exact phrase>
     spinedigest list <archive.sdpub> --type node --chapter <id>
   - Continuous reading after topology selection:
@@ -65,8 +69,9 @@ Maintenance commands:
 Discovery rule:
   If the user question asks for synthesis, a timeline, a process, a relationship map, character development, or conceptual structure, start with `list --type chapter`, then `page chapter:<id>` and inspect `nodeGroups`. Do not flatten the archive into raw text first.
   Use `find` for multi-keyword discovery after the topology pass, or when you need to locate candidate chapters quickly. Whitespace separates keywords, default matching is `--match any`, and stronger matches are ranked first.
+  Untyped `find` is broad candidate discovery across metadata, chapter titles, summaries, nodes, and fragments.
+  For content understanding, choose a search lens: `--type node` for topology / LLM Wiki structure, `--type summary` for quick overview, or `--type fragment` for original source wording.
   Use `find --match all` only when every keyword must appear inside the same returned object.
   Use `grep` only when checking whether an exact continuous phrase exists.
-  Use `--type summary,node` to discover concepts first; use `--type fragment` when tracing exact source wording.
   Use `--chapter`, `--limit`, and returned `nextCursor` to keep retrieval bounded and reproducible.
   Use `read` when the user wants to understand a chapter or fragment as prose rather than navigate object ids.

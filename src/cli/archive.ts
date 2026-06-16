@@ -596,7 +596,7 @@ async function writeFindHits(
         (hit) =>
           `${hit.id}  ${hit.type}/${hit.field}  ${hit.title}\n${formatFindMatchLine(hit)}${hit.snippet}\nNext: spinedigest page <archive.sdpub> ${hit.id}`,
       )
-      .join("\n\n")}${formatNextCursor(result)}\n`,
+      .join("\n\n")}${formatNextCursor(result)}${formatFindLensHint(result)}\n`,
   );
 }
 
@@ -761,14 +761,27 @@ function formatNextCursor(result: ArchiveFindResult): string {
 
 function formatNoMatches(result: ArchiveFindResult): string {
   if (result.match === "all" && result.terms.length > 1) {
-    return `No matches. All ${result.terms.length} terms were required. Try: spinedigest find <archive.sdpub> "${result.query}" --match any\n`;
+    return `No matches. All ${result.terms.length} terms were required. Try: spinedigest find <archive.sdpub> "${result.query}" --match any${formatFindLensHint(result)}\n`;
   }
 
-  return [
+  const lines = [
     "No matches.",
     "Try fewer or broader keywords, `grep` for an exact continuous phrase, or `list --type fragment` to inspect source fragments.",
-    "",
-  ].join("\n");
+  ];
+
+  if (result.lensHint !== null) {
+    lines.push(`Lens hint: ${result.lensHint.message}`);
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatFindLensHint(result: ArchiveFindResult): string {
+  if (result.lensHint === null) {
+    return "";
+  }
+
+  return `\n\nLens hint: ${result.lensHint.message}`;
 }
 
 function formatFindMatchLine(hit: {

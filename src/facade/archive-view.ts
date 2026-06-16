@@ -89,6 +89,8 @@ export interface ArchiveFindPosition {
 export interface ArchiveFindResult {
   readonly chapters: readonly number[] | null;
   readonly items: readonly ArchiveFindHit[];
+  readonly lens: ArchiveFindLens;
+  readonly lensHint: ArchiveFindLensHint | null;
   readonly limit: number;
   readonly match: ArchiveFindMatch;
   readonly nextCursor: string | null;
@@ -96,6 +98,17 @@ export interface ArchiveFindResult {
   readonly query: string;
   readonly terms: readonly string[];
   readonly types: readonly ArchiveFindFilterType[] | null;
+}
+
+export type ArchiveFindLens = "broad" | "exact" | "typed";
+
+export interface ArchiveFindLensHint {
+  readonly lenses: {
+    readonly fragment: string;
+    readonly node: string;
+    readonly summary: string;
+  };
+  readonly message: string;
 }
 
 export interface ArchiveCollectionOptions {
@@ -466,7 +479,13 @@ export async function grepArchiveObjects(
   const search = createPhraseSearch(query);
 
   if (search === undefined) {
-    return createFindResult(query, [], { ...options, match: "all" }, []);
+    return createFindResult(
+      query,
+      [],
+      { ...options, match: "all" },
+      [],
+      "exact",
+    );
   }
 
   const hits: ArchiveFindHit[] = [];
@@ -475,9 +494,13 @@ export async function grepArchiveObjects(
   hits.push(...(await findChapters(document, search)));
   hits.push(...(await findNodes(document, search)));
 
-  return createFindResult(query, hits, { ...options, match: "all" }, [
-    query.trim().toLowerCase(),
-  ]);
+  return createFindResult(
+    query,
+    hits,
+    { ...options, match: "all" },
+    [query.trim().toLowerCase()],
+    "exact",
+  );
 }
 
 export async function readArchiveText(
@@ -1316,6 +1339,16 @@ interface ArchiveTextMatch {
 
 const DEFAULT_FIND_LIMIT = 20;
 
+const BROAD_FIND_LENS_HINT = {
+  lenses: {
+    fragment: "original source wording",
+    node: "topology / LLM Wiki structure",
+    summary: "quick overview",
+  },
+  message:
+    "Untyped find searched broadly. For content understanding, choose --type node, --type summary, or --type fragment as a search lens.",
+} satisfies ArchiveFindLensHint;
+
 function createKeywordSearch(
   query: string,
   match: ArchiveFindMatch,
@@ -1406,6 +1439,7 @@ function createFindResult(
   hits: readonly ArchiveFindHit[],
   options: ArchiveFindOptions,
   terms = createSearchTerms(query),
+  lens: ArchiveFindLens = options.types === undefined ? "broad" : "typed",
 ): ArchiveFindResult {
   const order = options.order ?? "doc-asc";
   const limit = options.limit ?? DEFAULT_FIND_LIMIT;
@@ -1425,6 +1459,8 @@ function createFindResult(
   return {
     chapters,
     items,
+    lens,
+    lensHint: lens === "broad" ? BROAD_FIND_LENS_HINT : null,
     limit,
     match,
     nextCursor:

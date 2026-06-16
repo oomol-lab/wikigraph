@@ -10,6 +10,7 @@ What SpineDigest does:
 Three exploration modes:
   1. Search mode:
      `find` discovers objects by deterministic keywords; `grep` checks exact text phrases.
+     Treat untyped `find` as broad candidate discovery. For content understanding, choose a search lens: `--type node` for topology / LLM Wiki structure, `--type summary` for quick overview, or `--type fragment` for original source wording.
   2. Structure mode:
      `list` returns bounded collections; `page` opens one detailed object with local navigation such as chapter node groups, node source fragments, and node neighbors.
   3. Reading mode:
@@ -39,7 +40,7 @@ Default workflow:
   spinedigest build book.sdpub --stage graph --confirm
   spinedigest index book.sdpub
   spinedigest list book.sdpub --type chapter
-  spinedigest find book.sdpub "keyword"
+  spinedigest find book.sdpub "keyword" --type node
   spinedigest page book.sdpub node:84
   spinedigest read book.sdpub chapter:12
 

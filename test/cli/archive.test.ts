@@ -203,11 +203,27 @@ vi.mock("../../src/facade/index.js", () => ({
     (
       _document: unknown,
       query: string,
-      options: { readonly match?: "all" | "any" },
+      options: {
+        readonly match?: "all" | "any";
+        readonly types?: readonly ("fragment" | "node" | "summary")[];
+      },
     ) =>
       Promise.resolve({
         chapters: null,
         items: archiveMockState.findHits,
+        lens: options.types === undefined ? "broad" : "typed",
+        lensHint:
+          options.types === undefined
+            ? {
+                lenses: {
+                  fragment: "original source wording",
+                  node: "topology / LLM Wiki structure",
+                  summary: "quick overview",
+                },
+                message:
+                  "Untyped find searched broadly. For content understanding, choose --type node, --type summary, or --type fragment as a search lens.",
+              }
+            : null,
         limit: 20,
         match: options.match ?? "any",
         nextCursor: null,
@@ -228,6 +244,8 @@ vi.mock("../../src/facade/index.js", () => ({
     Promise.resolve({
       chapters: null,
       items: archiveMockState.grepHits,
+      lens: "exact",
+      lensHint: null,
       limit: 20,
       match: "any",
       nextCursor: null,
@@ -324,6 +342,9 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain("Matched: rag");
     expect(archiveMockState.textWrites[0]).toContain(
       "Next: spinedigest page <archive.sdpub> node:9",
+    );
+    expect(archiveMockState.textWrites[0]).toContain(
+      "Lens hint: Untyped find searched broadly.",
     );
     expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
       chapters: undefined,
@@ -429,6 +450,7 @@ describe("cli/archive", () => {
       order: "doc-desc",
       types: ["summary", "node"],
     });
+    expect(archiveMockState.textWrites[0]).not.toContain("Lens hint:");
   });
 
   it("prints node page summary and source fragments", async () => {

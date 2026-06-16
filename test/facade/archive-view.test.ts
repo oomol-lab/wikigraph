@@ -21,6 +21,14 @@ describe("facade/archive-view", () => {
 
         const result = await findArchiveObjects(document, "Wiki");
 
+        expect(result.lens).toBe("broad");
+        expect(result.lensHint).toMatchObject({
+          lenses: {
+            fragment: "original source wording",
+            node: "topology / LLM Wiki structure",
+            summary: "quick overview",
+          },
+        });
         expect(result.items).toContainEqual(
           expect.objectContaining({
             field: "source",
@@ -115,6 +123,8 @@ describe("facade/archive-view", () => {
           "朱元璋知道了这个消息",
         );
 
+        expect(result.lens).toBe("exact");
+        expect(result.lensHint).toBeNull();
         expect(result.items).toContainEqual(
           expect.objectContaining({
             field: "source",
@@ -141,6 +151,8 @@ describe("facade/archive-view", () => {
         });
 
         expect(result.chapters).toStrictEqual([1]);
+        expect(result.lens).toBe("typed");
+        expect(result.lensHint).toBeNull();
         expect(result.types).toStrictEqual(["fragment"]);
         expect(result.items).toStrictEqual([
           expect.objectContaining({

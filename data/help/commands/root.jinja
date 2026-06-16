@@ -10,6 +10,10 @@ Purpose:
 Three exploration modes:
   1. Search mode:
      Use `find` for whitespace-separated keyword discovery and `grep` for exact continuous text.
+     Untyped `find` is broad candidate discovery. For content understanding, choose a search lens:
+       --type node      topology / LLM Wiki structure
+       --type summary   quick overview
+       --type fragment  original source wording
   2. Structure mode:
      Use `list` to get bounded object collections and `page` to open one detailed object with local navigation.
   3. Reading mode:
@@ -18,7 +22,7 @@ Three exploration modes:
 Task routing:
   For synthesis, timelines, relationship analysis, process reconstruction, or concept-structure tasks, start with Structure mode:
     status -> index -> list --type chapter -> page chapter:<id>
-  Use `find` to locate candidate chapters or verify missing concepts. Use `grep` only for exact source wording.
+  Use broad `find` to locate candidate chapters or verify missing concepts, then add a search lens (`--type node|summary|fragment`) for content judgments. Use `grep` only for exact source wording.
 
 Archive-first usage:
   spinedigest import <archive.sdpub> [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
@@ -27,7 +31,7 @@ Archive-first usage:
   spinedigest status <archive.sdpub> [--json]
   spinedigest index <archive.sdpub> [--json]
   spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--limit <n>] [--cursor <token>] [--json]
-  spinedigest find <archive.sdpub> <query> [--match <any|all>] [--json]
+  spinedigest find <archive.sdpub> <query> [--match <any|all>] [--type <node|summary|fragment>] [--json]
   spinedigest grep <archive.sdpub> <query> [--json]
   spinedigest page <archive.sdpub> <id> [--json]
   spinedigest read <archive.sdpub> <id>
@@ -71,6 +75,16 @@ Help contract:
   - Append `--help` to commands and subcommands to see command-specific usage.
   - Use `spinedigest help <topic>` for cross-command concepts, constraints, and runtime behavior.
   - Treat `spinedigest --help` as the root page of the same help system.
+
+Search lens examples:
+  spinedigest find book.sdpub "keyword"
+    Broad first pass across metadata, chapter titles, summaries, nodes, and fragments.
+  spinedigest find book.sdpub "keyword" --type node
+    Topology / LLM Wiki structure.
+  spinedigest find book.sdpub "keyword" --type summary
+    Quick overview.
+  spinedigest find book.sdpub "keyword" --type fragment
+    Original source wording.
 
 Help topics:
 {% for topic in helpTopics %}
