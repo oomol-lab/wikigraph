@@ -20,6 +20,7 @@ import {
   type ArchiveListItem,
   type ArchivePack,
   type ArchivePage,
+  grepArchiveObjects,
   type GraphEvidenceLine,
   type GraphNeighbor,
   type GraphPathStep,
@@ -99,10 +100,17 @@ export async function runArchiveCommand(
       });
       return;
     case "find":
-    case "grep":
       await withArchiveDocument(args.archivePath, async (document) => {
         await writeFindHits(
           await findArchiveObjects(document, args.query!),
+          args.json ?? false,
+        );
+      });
+      return;
+    case "grep":
+      await withArchiveDocument(args.archivePath, async (document) => {
+        await writeFindHits(
+          await grepArchiveObjects(document, args.query!),
           args.json ?? false,
         );
       });

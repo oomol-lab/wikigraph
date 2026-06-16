@@ -22,6 +22,8 @@ spinedigest page book.sdpub node:84
 spinedigest evidence book.sdpub node:84
 ```
 
+多关键词发现优先用 `find`。它按空白拆分，并要求所有关键词出现在同一个返回对象中。检查连续精确短语时再用 `grep`。
+
 只有外围系统明确需要进程内集成时，才使用 library API。
 
 ## 最小操作契约

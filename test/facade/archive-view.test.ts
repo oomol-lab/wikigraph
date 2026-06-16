@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { DirectoryDocument } from "../../src/document/index.js";
 import {
   findArchiveObjects,
+  grepArchiveObjects,
   listArchiveObjects,
   readArchivePage,
 } from "../../src/facade/archive-view.js";
@@ -19,6 +20,53 @@ describe("facade/archive-view", () => {
         const hits = await findArchiveObjects(document, "Wiki");
 
         expect(hits).toContainEqual(
+          expect.objectContaining({
+            field: "source",
+            id: "fragment:1:0",
+            type: "fragment",
+          }),
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("finds whitespace-separated keywords inside one archive object", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const hits = await findArchiveObjects(document, "朱元璋 亲自 来到");
+
+        expect(hits).toContainEqual(
+          expect.objectContaining({
+            field: "source",
+            id: "fragment:1:0",
+            type: "fragment",
+          }),
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("greps exact text without splitting whitespace-separated keywords", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(
+          grepArchiveObjects(document, "朱元璋 亲自 来到"),
+        ).resolves.toStrictEqual([]);
+        await expect(
+          grepArchiveObjects(document, "朱元璋知道了这个消息"),
+        ).resolves.toContainEqual(
           expect.objectContaining({
             field: "source",
             id: "fragment:1:0",
@@ -84,6 +132,7 @@ async function seedSourcedDocument(document: DirectoryDocument): Promise<void> {
       "An LLM Wiki exposes pages, links, and evidence to agents.",
       10,
     );
+    draft.addSentence("朱元璋知道了这个消息，随后亲自来到洪都。", 18);
     draft.addSentence("Source-only archives should be searchable.", 6);
     await draft.commit();
     await openedDocument.writeBookMeta({

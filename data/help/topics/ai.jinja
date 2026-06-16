@@ -16,6 +16,7 @@ Safe first moves:
     spinedigest index <archive.sdpub>
   - Need information:
     spinedigest find <archive.sdpub> <query>
+    spinedigest grep <archive.sdpub> <exact phrase>
     spinedigest page <archive.sdpub> <id>
     spinedigest evidence <archive.sdpub> <id>
   - Need graph context:
@@ -56,3 +57,5 @@ Maintenance commands:
 
 Discovery rule:
   If the user question is about what is inside an archive, start with `status`, `index`, `ls`, and `find`; do not unzip first.
+  Use `find` for multi-keyword discovery: whitespace separates keywords and all keywords must appear in one returned object.
+  Use `grep` only when checking whether an exact continuous phrase exists.

@@ -245,17 +245,36 @@ export async function findArchiveObjects(
   document: Document,
   query: string,
 ): Promise<readonly ArchiveFindHit[]> {
-  const needle = query.trim().toLowerCase();
+  const search = createKeywordSearch(query);
 
-  if (needle === "") {
+  if (search === undefined) {
     return [];
   }
 
   const hits: ArchiveFindHit[] = [];
 
-  hits.push(...findMeta(await document.readBookMeta(), needle));
-  hits.push(...(await findChapters(document, needle)));
-  hits.push(...(await findNodes(document, needle)));
+  hits.push(...findMeta(await document.readBookMeta(), search));
+  hits.push(...(await findChapters(document, search)));
+  hits.push(...(await findNodes(document, search)));
+
+  return hits;
+}
+
+export async function grepArchiveObjects(
+  document: Document,
+  query: string,
+): Promise<readonly ArchiveFindHit[]> {
+  const search = createPhraseSearch(query);
+
+  if (search === undefined) {
+    return [];
+  }
+
+  const hits: ArchiveFindHit[] = [];
+
+  hits.push(...findMeta(await document.readBookMeta(), search));
+  hits.push(...(await findChapters(document, search)));
+  hits.push(...(await findNodes(document, search)));
 
   return hits;
 }
@@ -546,14 +565,14 @@ async function listEvidenceObjects(
 
 async function findChapters(
   document: Document,
-  needle: string,
+  search: ArchiveTextSearch,
 ): Promise<readonly ArchiveFindHit[]> {
   const hits: ArchiveFindHit[] = [];
 
   for (const chapter of await listChapters(document)) {
     const title = chapter.title ?? `[chapter ${chapter.chapterId}]`;
 
-    if (matches(title, needle)) {
+    if (matches(title, search)) {
       hits.push({
         field: "title",
         id: formatChapterId(chapter.chapterId),
@@ -565,11 +584,11 @@ async function findChapters(
 
     const summary = await document.readSummary(chapter.chapterId);
 
-    if (summary !== undefined && matches(summary, needle)) {
+    if (summary !== undefined && matches(summary, search)) {
       hits.push({
         field: "summary",
         id: formatSummaryId(chapter.chapterId),
-        snippet: createSnippet(summary, needle),
+        snippet: createSnippet(summary, search.snippetNeedle),
         title,
         type: "summary",
       });
@@ -579,11 +598,11 @@ async function findChapters(
       document,
       chapter.chapterId,
     )) {
-      if (matches(fragment.text, needle)) {
+      if (matches(fragment.text, search)) {
         hits.push({
           field: "source",
           id: fragment.id,
-          snippet: createSnippet(fragment.text, needle),
+          snippet: createSnippet(fragment.text, search.snippetNeedle),
           title,
           type: "fragment",
         });
@@ -656,7 +675,7 @@ function createSourcePreview(
 
 function findMeta(
   meta: BookMeta | undefined,
-  needle: string,
+  search: ArchiveTextSearch,
 ): readonly ArchiveFindHit[] {
   if (meta === undefined) {
     return [];
@@ -674,7 +693,7 @@ function findMeta(
   ].filter(isDefined);
   const content = fields.join("\n");
 
-  if (!matches(content, needle)) {
+  if (!matches(content, search)) {
     return [];
   }
 
@@ -682,7 +701,7 @@ function findMeta(
     {
       field: "metadata",
       id: "meta:book",
-      snippet: createSnippet(content, needle),
+      snippet: createSnippet(content, search.snippetNeedle),
       title: meta.title ?? "Book metadata",
       type: "meta",
     },
@@ -691,12 +710,12 @@ function findMeta(
 
 async function findNodes(
   document: Document,
-  needle: string,
+  search: ArchiveTextSearch,
 ): Promise<readonly ArchiveFindHit[]> {
   const hits: ArchiveFindHit[] = [];
 
   for (const node of await document.chunks.listAll()) {
-    if (matches(node.label, needle)) {
+    if (matches(node.label, search)) {
       hits.push({
         field: "title",
         id: formatNodeId(node.id),
@@ -705,11 +724,11 @@ async function findNodes(
         type: "node",
       });
     }
-    if (matches(node.content, needle)) {
+    if (matches(node.content, search)) {
       hits.push({
         field: "content",
         id: formatNodeId(node.id),
-        snippet: createSnippet(node.content, needle),
+        snippet: createSnippet(node.content, search.snippetNeedle),
         title: node.label,
         type: "node",
       });
@@ -718,11 +737,11 @@ async function findNodes(
     for (const sentenceId of node.sentenceIds) {
       const text = await document.getSentence(sentenceId);
 
-      if (matches(text, needle)) {
+      if (matches(text, search)) {
         hits.push({
           field: "evidence",
           id: formatSentenceId(sentenceId),
-          snippet: createSnippet(text, needle),
+          snippet: createSnippet(text, search.snippetNeedle),
           title: node.label,
           type: "evidence",
         });
@@ -899,8 +918,51 @@ function parseNonNegativeInteger(
   return parsed;
 }
 
-function matches(value: string, needle: string): boolean {
-  return value.toLowerCase().includes(needle);
+interface ArchiveTextSearch {
+  readonly snippetNeedle: string;
+  readonly terms: readonly string[];
+}
+
+function createKeywordSearch(query: string): ArchiveTextSearch | undefined {
+  const terms = query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/u)
+    .filter((term) => term !== "");
+
+  if (terms.length === 0) {
+    return undefined;
+  }
+
+  const [snippetNeedle] = terms;
+
+  if (snippetNeedle === undefined) {
+    return undefined;
+  }
+
+  return {
+    snippetNeedle,
+    terms,
+  };
+}
+
+function createPhraseSearch(query: string): ArchiveTextSearch | undefined {
+  const needle = query.trim().toLowerCase();
+
+  if (needle === "") {
+    return undefined;
+  }
+
+  return {
+    snippetNeedle: needle,
+    terms: [needle],
+  };
+}
+
+function matches(value: string, search: ArchiveTextSearch): boolean {
+  const lower = value.toLowerCase();
+
+  return search.terms.every((term) => lower.includes(term));
 }
 
 function createSnippet(value: string, needle?: string): string {

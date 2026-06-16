@@ -10,8 +10,8 @@ Archive-first commands:
   status      Show archive readiness and object counts.
   index       Show the archive home/index page.
   ls          List chapters, nodes, edges, evidence, summaries, or metadata.
-  find        Search all agent-readable archive objects.
-  grep        Alias for deterministic archive text search.
+  find        Find objects by whitespace-separated keyword AND search.
+  grep        Search objects for one exact continuous text phrase.
   page        Read one object by id.
   evidence    Show source evidence for an object.
   links       Show outgoing node links.
@@ -30,6 +30,7 @@ Command shapes:
   spinedigest index <archive.sdpub> [--json]
   spinedigest ls <archive.sdpub> [chapters|nodes|edges|evidence|summaries|meta] [--json]
   spinedigest find <archive.sdpub> <query> [--json]
+  spinedigest grep <archive.sdpub> <query> [--json]
   spinedigest page <archive.sdpub> <id> [--json]
   spinedigest evidence <archive.sdpub> <id> [--json]
   spinedigest related <archive.sdpub> <node:id> [--json]

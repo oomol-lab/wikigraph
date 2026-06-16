@@ -22,6 +22,8 @@ spinedigest page book.sdpub node:84
 spinedigest evidence book.sdpub node:84
 ```
 
+Use `find` for multi-keyword discovery. It splits on whitespace and requires all keywords inside one returned object. Use `grep` when checking an exact continuous phrase.
+
 Use the library API only when the surrounding system explicitly needs in-process integration.
 
 ## Minimal Operational Contract

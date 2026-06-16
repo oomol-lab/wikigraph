@@ -2,7 +2,7 @@ Help Type: command
 Command: spinedigest grep
 
 Purpose:
-  Alias for deterministic archive text search.
+  Search archive objects for one exact continuous text phrase.
 
 Usage:
   spinedigest grep <archive.sdpub> <query> [--json]
@@ -10,7 +10,13 @@ Usage:
 Contract:
   - Mutates: no.
   - LLM: no.
+  - Searches: metadata, chapter titles, summaries, graph nodes, evidence, and source fragments.
+  - Query: treated as one continuous string; whitespace is not split into keywords.
+  - Matching: case-insensitive substring matching, with no semantic expansion, stemming, fuzzy matching, or vector search.
   - JSON: yes.
+
+Use `find` instead for whitespace-separated keyword discovery.
 
 Examples:
   spinedigest grep book.sdpub "Agent"
+  spinedigest grep book.sdpub "朱元璋知道了这个消息"

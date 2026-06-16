@@ -28,6 +28,12 @@ spinedigest map <archive.sdpub> [--json]
 spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 ```
 
+搜索行为：
+
+- `find` 是确定性的关键词发现。它按空白拆分 query，并返回同一个对象内包含全部关键词的结果。
+- `grep` 是精确文本搜索。它把 query 当作一个连续字符串。
+- 两个命令都不做语义扩展、模糊匹配、词干匹配或向量搜索。
+
 对象 ID：
 
 - `chapter:<id>`

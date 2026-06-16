@@ -17,6 +17,15 @@ const archiveMockState = vi.hoisted(() => ({
       type: "node",
     },
   ],
+  grepHits: [
+    {
+      field: "source",
+      id: "fragment:2:0",
+      snippet: "Exact phrase appears here.",
+      title: "Chapter 2",
+      type: "fragment",
+    },
+  ],
   index: {
     chapters: [
       {
@@ -128,6 +137,7 @@ vi.mock("../../src/facade/index.js", () => ({
   findGraphPath: vi.fn(() => Promise.resolve([])),
   formatNodeId: (id: number) => `node:${id}`,
   getArchiveIndex: vi.fn(() => Promise.resolve(archiveMockState.index)),
+  grepArchiveObjects: vi.fn(() => Promise.resolve(archiveMockState.grepHits)),
   listArchiveLinks: vi.fn(() => Promise.resolve(archiveMockState.links)),
   listArchiveObjects: vi.fn(() => Promise.resolve(archiveMockState.listItems)),
   listRelatedArchiveObjects: vi.fn(() =>
@@ -161,9 +171,14 @@ vi.mock("../../src/cli/sdpub-stage.js", () => ({
 }));
 
 import { runArchiveCommand } from "../../src/cli/archive.js";
+import {
+  findArchiveObjects,
+  grepArchiveObjects,
+} from "../../src/facade/index.js";
 
 describe("cli/archive", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     archiveMockState.editableCalls.length = 0;
     archiveMockState.textWrites.length = 0;
     archiveMockState.links.splice(0, archiveMockState.links.length, {
@@ -206,6 +221,22 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain(
       "Next: spinedigest page <archive.sdpub> node:9",
     );
+    expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG");
+    expect(grepArchiveObjects).not.toHaveBeenCalled();
+  });
+
+  it("routes grep through exact text search", async () => {
+    await runArchiveCommand({
+      action: "grep",
+      archivePath: "/tmp/book.sdpub",
+      query: "exact phrase",
+    });
+
+    expect(archiveMockState.textWrites[0]).toContain(
+      "fragment:2:0  fragment/source",
+    );
+    expect(grepArchiveObjects).toHaveBeenCalledWith({}, "exact phrase");
+    expect(findArchiveObjects).not.toHaveBeenCalled();
   });
 
   it("prints page content and evidence", async () => {

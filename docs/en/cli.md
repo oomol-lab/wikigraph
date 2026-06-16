@@ -28,6 +28,12 @@ spinedigest map <archive.sdpub> [--json]
 spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 ```
 
+Search behavior:
+
+- `find` is deterministic keyword discovery. It splits the query on whitespace and returns objects where every keyword appears in the same object.
+- `grep` is exact text search. It treats the query as one continuous string.
+- Neither command does semantic expansion, fuzzy matching, stemming, or vector search.
+
 Object ids:
 
 - `chapter:<id>`

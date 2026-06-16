@@ -2,7 +2,7 @@ Help Type: command
 Command: spinedigest find
 
 Purpose:
-  Search all agent-readable archive objects, including sourced fragments.
+  Find archive objects by deterministic keyword search.
 
 Usage:
   spinedigest find <archive.sdpub> <query> [--json]
@@ -11,8 +11,12 @@ Contract:
   - Mutates: no.
   - LLM: no.
   - Searches: metadata, chapter titles, summaries, graph nodes, evidence, and source fragments.
+  - Query: split on whitespace into keywords; every keyword must appear inside the same returned object.
+  - Matching: case-insensitive substring matching, with no semantic expansion, stemming, fuzzy matching, or vector search.
   - JSON: yes.
+
+Use `grep` instead when the query must be treated as one exact continuous text phrase.
 
 Examples:
   spinedigest find book.sdpub "Wiki"
-  spinedigest find book.sdpub "evidence" --json
+  spinedigest find book.sdpub "朱元璋 亲自 来到" --json
