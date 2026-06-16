@@ -44,6 +44,7 @@ export {
   resetChapter,
   setChapterSource,
   setChapterSummary,
+  setChapterTitle,
 } from "./chapter.js";
 export {
   findGraphPath,

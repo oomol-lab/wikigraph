@@ -69,6 +69,7 @@ export type CLIArchiveChapterAction =
   | "reset"
   | "set-source"
   | "set-summary"
+  | "set-title"
   | "status";
 
 export interface CLIArchiveChapterArguments {
@@ -1187,7 +1188,7 @@ function parseArchiveChapterArguments(
       withHelpRoute(
         action === undefined
           ? "Missing chapter action."
-          : `Invalid chapter action: ${action}. Expected one of list, status, add, remove, reset, set-source, set-summary.`,
+          : `Invalid chapter action: ${action}. Expected one of list, status, add, remove, reset, set-source, set-summary, set-title.`,
         helpRoute,
       ),
     );
@@ -1454,6 +1455,39 @@ function normalizeArchiveChapterArguments(
         ...(values.input === undefined ? {} : { inputPath: values.input }),
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       };
+    case "set-title":
+      requireChapterId(chapterId, action, helpRoute);
+      if (values.title === undefined) {
+        throw new Error(
+          withHelpRoute(
+            "Missing --title. `chapter set-title` requires a title value.",
+            helpRoute,
+          ),
+        );
+      }
+      rejectActionFlag(values.input, "--input", action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        chapterId,
+        path,
+        title: values.title,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+      };
     case "status":
       requireChapterId(chapterId, action, helpRoute);
       rejectActionFlag(values.input, "--input", action, helpRoute);
@@ -1671,6 +1705,7 @@ function isArchiveChapterAction(
     value === "reset" ||
     value === "set-source" ||
     value === "set-summary" ||
+    value === "set-title" ||
     value === "status"
   );
 }

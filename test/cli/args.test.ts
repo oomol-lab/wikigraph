@@ -547,6 +547,26 @@ describe("cli/args", () => {
       help: false,
       kind: "chapter",
     });
+    expect(
+      parseCLIArguments([
+        "chapter",
+        "set-title",
+        "book.sdpub",
+        "--chapter",
+        "12",
+        "--title",
+        "Renamed Chapter",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "set-title",
+        chapterId: 12,
+        path: "book.sdpub",
+        title: "Renamed Chapter",
+      },
+      help: false,
+      kind: "chapter",
+    });
   });
 
   it("prints archive maintenance help pages", () => {
@@ -567,6 +587,13 @@ describe("cli/args", () => {
       helpText: renderArchiveMaintenanceChapterActionHelpText("set-summary"),
       kind: "chapter",
     });
+    expect(parseCLIArguments(["chapter", "set-title", "--help"])).toStrictEqual(
+      {
+        help: true,
+        helpText: renderArchiveMaintenanceChapterActionHelpText("set-title"),
+        kind: "chapter",
+      },
+    );
   });
 
   it("parses config status and prints config status help text", () => {

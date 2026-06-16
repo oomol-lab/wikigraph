@@ -10,6 +10,7 @@ import {
   resetChapter,
   setChapterSource,
   setChapterSummary,
+  setChapterTitle,
 } from "../../src/facade/chapter.js";
 import { withTempDir } from "../helpers/temp.js";
 
@@ -168,6 +169,65 @@ describe("facade/chapter", () => {
         );
 
         expect(resetToPlanned.stage).toBe("planned");
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("updates and clears chapter titles in the TOC", async () => {
+    await withTempDir("spinedigest-chapter-", async (path) => {
+      const document = await DirectoryDocument.open(path);
+
+      try {
+        const chapter = await addChapter(document, {
+          title: "Original",
+        });
+
+        await expect(
+          setChapterTitle(document, chapter.chapterId, "  Renamed  "),
+        ).resolves.toMatchObject({
+          chapterId: chapter.chapterId,
+          title: "Renamed",
+        });
+        await expect(listChapters(document)).resolves.toMatchObject([
+          {
+            chapterId: chapter.chapterId,
+            title: "Renamed",
+            tocPath: ["Renamed"],
+          },
+        ]);
+        await expect(document.readToc()).resolves.toMatchObject({
+          items: [
+            {
+              serialId: chapter.chapterId,
+              title: "Renamed",
+            },
+          ],
+        });
+
+        await expect(
+          setChapterTitle(document, chapter.chapterId, "   "),
+        ).resolves.toMatchObject({
+          chapterId: chapter.chapterId,
+          title: null,
+        });
+        await expect(listChapters(document)).resolves.toMatchObject([
+          {
+            chapterId: chapter.chapterId,
+            title: null,
+            tocPath: [`Chapter ${chapter.chapterId}`],
+          },
+        ]);
+        expect(await document.readToc()).toStrictEqual({
+          items: [
+            {
+              children: [],
+              serialId: chapter.chapterId,
+            },
+          ],
+          version: 1,
+        });
       } finally {
         await document.release();
       }

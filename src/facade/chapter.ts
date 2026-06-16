@@ -358,6 +358,26 @@ export async function setChapterSummary(
   });
 }
 
+export async function setChapterTitle(
+  document: Document,
+  chapterId: number,
+  title: string | null | undefined,
+): Promise<ChapterDetails> {
+  return await document.openSession(async (openedDocument) => {
+    const toc = await normalizeChapterToc(openedDocument);
+    const normalizedTitle = normalizeTitle(title);
+
+    if (!setChapterTitleInItems(toc.items, chapterId, normalizedTitle)) {
+      throw new Error(
+        `Chapter ${chapterId} does not exist. Use \`spinedigest list <archive.sdpub> --type chapter\` to discover chapter ids.`,
+      );
+    }
+
+    await openedDocument.replaceToc(toc);
+    return await getChapterDetails(openedDocument, chapterId);
+  });
+}
+
 async function normalizeChapterToc(
   document: Document,
 ): Promise<MutableTocFile> {
@@ -734,6 +754,29 @@ function removeChapterFromItems(
     items: nextItems,
     removed,
   };
+}
+
+function setChapterTitleInItems(
+  items: readonly MutableTocItem[],
+  chapterId: number,
+  title: string | undefined,
+): boolean {
+  for (const item of items) {
+    if (item.serialId === chapterId) {
+      if (title === undefined) {
+        delete item.title;
+      } else {
+        item.title = title;
+      }
+      return true;
+    }
+
+    if (setChapterTitleInItems(item.children, chapterId, title)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function collectChapterIds(

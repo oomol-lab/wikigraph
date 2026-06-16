@@ -12,6 +12,7 @@ import {
   resetChapter,
   setChapterSource,
   setChapterSummary,
+  setChapterTitle,
   type ChapterDetails,
   type ChapterEntry,
 } from "../facade/index.js";
@@ -111,6 +112,17 @@ export async function runArchiveChapterCommand(
           document,
           args.chapterId!,
           await readContentText(args),
+        );
+
+        await writeChapterDetails(details);
+      });
+      return;
+    case "set-title":
+      await runEditableCommand(args.path, async (document) => {
+        const details = await setChapterTitle(
+          document,
+          args.chapterId!,
+          args.title,
         );
 
         await writeChapterDetails(details);
