@@ -18,20 +18,25 @@ Build scoped knowledge:
 Browse an existing archive:
   spinedigest status book.sdpub
   spinedigest index book.sdpub
-  spinedigest ls book.sdpub chapters
-  spinedigest ls book.sdpub nodes
+  spinedigest list book.sdpub --type chapter
+  spinedigest list book.sdpub --type node --chapter 3
+
+Understand a chapter as wiki topology:
+  spinedigest page book.sdpub chapter:3 --json
+  Inspect `nodeGroups` to choose the relevant knowledge nodes.
+  spinedigest page book.sdpub node:84
 
 Search and read:
   spinedigest find book.sdpub "RAG"
+  spinedigest grep book.sdpub "exact source phrase"
   spinedigest page book.sdpub node:84
-  spinedigest evidence book.sdpub node:84
+  spinedigest read book.sdpub chapter:3
 
 Navigate graph knowledge:
   spinedigest links book.sdpub node:84
   spinedigest backlinks book.sdpub node:84
   spinedigest related book.sdpub node:84
   spinedigest path book.sdpub node:84 node:120 --chapter 3
-  spinedigest map book.sdpub
 
 Pack deterministic context:
   spinedigest pack book.sdpub node:84 --budget 5000
@@ -42,4 +47,4 @@ Export projections:
   spinedigest export book.sdpub --output-format epub --output digest.epub
 
 Lower-level maintenance:
-  Use `spinedigest sdpub ...` when you need lower-level chapter editing, metadata mutation, cover extraction, or graph maintenance commands not yet promoted to top-level archive commands.
+  Use `spinedigest meta`, `spinedigest cover`, and `spinedigest chapter` only when you need metadata mutation, cover extraction, or chapter tree edits.

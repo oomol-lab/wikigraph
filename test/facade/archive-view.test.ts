@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { DirectoryDocument } from "../../src/document/index.js";
 import {
   findArchiveObjects,
+  grepArchiveObjects,
+  listArchiveCollection,
   listArchiveObjects,
+  readArchiveText,
   readArchivePage,
 } from "../../src/facade/archive-view.js";
 import { withTempDir } from "../helpers/temp.js";
@@ -16,15 +19,192 @@ describe("facade/archive-view", () => {
       try {
         await seedSourcedDocument(document);
 
-        const hits = await findArchiveObjects(document, "Wiki");
+        const result = await findArchiveObjects(document, "Wiki");
 
-        expect(hits).toContainEqual(
+        expect(result.lens).toBe("broad");
+        expect(result.lensHint).toMatchObject({
+          lenses: {
+            fragment: "original source wording",
+            node: "topology / LLM Wiki structure",
+            summary: "quick overview",
+          },
+        });
+        expect(result.items).toContainEqual(
           expect.objectContaining({
             field: "source",
             id: "fragment:1:0",
             type: "fragment",
           }),
         );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("finds any whitespace-separated keyword by default", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const result = await findArchiveObjects(
+          document,
+          "朱元璋 不存在的关键词",
+        );
+
+        expect(result.match).toBe("any");
+        expect(result.items).toContainEqual(
+          expect.objectContaining({
+            field: "source",
+            id: "fragment:1:0",
+            matchedTerms: ["朱元璋"],
+            missingTerms: ["不存在的关键词"],
+            type: "fragment",
+          }),
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("supports all-keyword find matching when requested", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const noMatch = await findArchiveObjects(
+          document,
+          "朱元璋 不存在的关键词",
+          { match: "all" },
+        );
+        const result = await findArchiveObjects(document, "朱元璋 亲自 来到", {
+          match: "all",
+        });
+
+        expect(noMatch).toMatchObject({
+          items: [],
+          match: "all",
+          terms: ["朱元璋", "不存在的关键词"],
+        });
+        expect(result.items).toContainEqual(
+          expect.objectContaining({
+            field: "source",
+            id: "fragment:1:0",
+            matchCount: 3,
+            matchedTerms: ["朱元璋", "亲自", "来到"],
+            missingTerms: [],
+            type: "fragment",
+          }),
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("greps exact text without splitting whitespace-separated keywords", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(
+          grepArchiveObjects(document, "朱元璋 亲自 来到"),
+        ).resolves.toMatchObject({ items: [] });
+
+        const result = await grepArchiveObjects(
+          document,
+          "朱元璋知道了这个消息",
+        );
+
+        expect(result.lens).toBe("exact");
+        expect(result.lensHint).toBeNull();
+        expect(result.items).toContainEqual(
+          expect.objectContaining({
+            field: "source",
+            id: "fragment:1:0",
+            type: "fragment",
+          }),
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("filters search results by type and chapter", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const result = await findArchiveObjects(document, "Wiki", {
+          chapters: [1],
+          types: ["fragment"],
+        });
+
+        expect(result.chapters).toStrictEqual([1]);
+        expect(result.lens).toBe("typed");
+        expect(result.lensHint).toBeNull();
+        expect(result.types).toStrictEqual(["fragment"]);
+        expect(result.items).toStrictEqual([
+          expect.objectContaining({
+            chapter: 1,
+            id: "fragment:1:0",
+            position: { chapter: 1, fragment: 0 },
+            type: "fragment",
+          }),
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("paginates search results with stable cursors", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const firstPage = await findArchiveObjects(document, "Wiki", {
+          limit: 1,
+        });
+        const secondPage = await findArchiveObjects(document, "Wiki", {
+          ...(firstPage.nextCursor === null
+            ? {}
+            : { cursor: firstPage.nextCursor }),
+          limit: 1,
+        });
+
+        expect(firstPage.items).toHaveLength(1);
+        expect(firstPage.nextCursor).not.toBeNull();
+        expect(secondPage.items).toHaveLength(1);
+        expect(secondPage.items[0]?.id).not.toBe(firstPage.items[0]?.id);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("rejects invalid search cursors", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(
+          findArchiveObjects(document, "Wiki", { cursor: "not-a-cursor" }),
+        ).rejects.toThrow("Invalid search cursor.");
       } finally {
         await document.release();
       }
@@ -73,19 +253,212 @@ describe("facade/archive-view", () => {
       }
     });
   });
+
+  it("shows chapter node groups and fragment related nodes", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const chapterPage = await readArchivePage(document, "chapter:1");
+        const fragmentPage = await readArchivePage(document, "fragment:1:0");
+
+        expect(chapterPage).toMatchObject({
+          nodeCount: 2,
+          nodeGroups: [
+            expect.objectContaining({
+              nodeCount: 2,
+              nodes: [
+                expect.objectContaining({
+                  id: "node:100",
+                  title: "Wiki pages",
+                }),
+                expect.objectContaining({
+                  id: "node:101",
+                  title: "Source search",
+                }),
+              ],
+            }),
+          ],
+          type: "chapter",
+        });
+        expect(fragmentPage).toMatchObject({
+          nodes: [
+            expect.objectContaining({ id: "node:100", title: "Wiki pages" }),
+            expect.objectContaining({ id: "node:101", title: "Source search" }),
+          ],
+          type: "fragment",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("shows node pages with generated summaries and source fragments", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const page = await readArchivePage(document, "node:100");
+
+        expect(page.type).toBe("node");
+        if (page.type !== "node") {
+          throw new Error("Expected node page");
+        }
+        expect(page.generatedNodeSummary).toBe(
+          "Pages and links make archive navigation explicit.",
+        );
+        expect(page.id).toBe("node:100");
+        expect(page.sourceFragments[0]?.id).toBe("fragment:1:0");
+        expect(page.sourceFragments[0]?.text).toContain(
+          "An LLM Wiki exposes pages",
+        );
+        expect(page.title).toBe("Wiki pages");
+        expect(JSON.stringify(page)).not.toContain("sentence:");
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("groups chapter nodes by fragment when topology groups are absent", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document, { withSnake: false });
+
+        const chapterPage = await readArchivePage(document, "chapter:1");
+
+        expect(chapterPage).toMatchObject({
+          nodeCount: 2,
+          nodeGroups: [
+            expect.objectContaining({
+              id: "node-group:1:fragment:0",
+              nodeCount: 2,
+              nodes: [
+                expect.objectContaining({
+                  id: "node:100",
+                  title: "Wiki pages",
+                }),
+                expect.objectContaining({
+                  id: "node:101",
+                  title: "Source search",
+                }),
+              ],
+            }),
+          ],
+          type: "chapter",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("lists objects as a pageable collection", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const result = await listArchiveCollection(document, {
+          chapters: [1],
+          types: ["node"],
+        });
+
+        expect(result.items).toStrictEqual([
+          expect.objectContaining({ id: "node:100", type: "node" }),
+          expect.objectContaining({ id: "node:101", type: "node" }),
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("reads archive objects as continuous text", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(readArchiveText(document, "chapter:1")).resolves.toContain(
+          "An LLM Wiki exposes pages",
+        );
+        await expect(readArchiveText(document, "node:100")).resolves.toBe(
+          "Pages and links make archive navigation explicit.",
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
 });
 
-async function seedSourcedDocument(document: DirectoryDocument): Promise<void> {
+async function seedSourcedDocument(
+  document: DirectoryDocument,
+  options: { readonly withSnake?: boolean } = {},
+): Promise<void> {
   await document.openSession(async (openedDocument) => {
     await openedDocument.createSerial();
     const draft = await openedDocument.getSerialFragments(1).createDraft();
 
     draft.addSentence(
-      "An LLM Wiki exposes pages, links, and evidence to agents.",
+      "An LLM Wiki exposes pages, links, and source fragments to agents.",
       10,
     );
+    draft.addSentence("朱元璋知道了这个消息，随后亲自来到洪都。", 18);
     draft.addSentence("Source-only archives should be searchable.", 6);
     await draft.commit();
+    await openedDocument.chunks.save({
+      content: "Pages and links make archive navigation explicit.",
+      generation: 0,
+      id: 100,
+      label: "Wiki pages",
+      sentenceId: [1, 0, 0],
+      sentenceIds: [[1, 0, 0]],
+      wordsCount: 7,
+      weight: 1,
+    });
+    await openedDocument.chunks.save({
+      content: "Source search remains available before graph summaries.",
+      generation: 0,
+      id: 101,
+      label: "Source search",
+      sentenceId: [1, 0, 2],
+      sentenceIds: [[1, 0, 2]],
+      wordsCount: 7,
+      weight: 1,
+    });
+    if (options.withSnake !== false) {
+      const snakeId = await openedDocument.snakes.create({
+        firstLabel: "Wiki pages",
+        groupId: 0,
+        lastLabel: "Source search",
+        localSnakeId: 0,
+        serialId: 1,
+        size: 2,
+        wordsCount: 14,
+        weight: 2,
+      });
+      await openedDocument.snakeChunks.save({
+        chunkId: 100,
+        position: 0,
+        snakeId,
+      });
+      await openedDocument.snakeChunks.save({
+        chunkId: 101,
+        position: 1,
+        snakeId,
+      });
+    }
     await openedDocument.writeBookMeta({
       authors: [],
       description: null,
@@ -94,7 +467,7 @@ async function seedSourcedDocument(document: DirectoryDocument): Promise<void> {
       publishedAt: null,
       publisher: null,
       sourceFormat: "markdown",
-      title: "Archive View Fixture",
+      title: "Archive Wiki Fixture",
       version: 1,
     });
     await openedDocument.writeToc({

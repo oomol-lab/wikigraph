@@ -3,23 +3,19 @@ import { parseArgs } from "util";
 import { type CLIFormat, parseCLIFormat } from "./formats.js";
 import {
   CLI_HELP_ROUTES,
-  sdpubSubcommandHelpRoute,
+  archiveMaintenanceHelpRoute,
   withHelpRoute,
 } from "./errors.js";
 import { CHAPTER_STAGES, type ChapterStage } from "../facade/index.js";
 import {
   parseHelpTopic,
   renderArchiveCommandHelpText,
+  renderArchiveMaintenanceCommandHelpText,
   renderHelpTopicText,
   renderMainHelpText,
-  renderSdpubChapterActionHelpText,
-  renderSdpubGraphActionHelpText,
+  renderArchiveMaintenanceChapterActionHelpText,
   renderStatusHelpText,
-  renderSdpubStageActionHelpText,
-  renderSdpubHelpText,
-  renderSdpubSubcommandHelpText,
-  SDPUB_SUBCOMMANDS,
-  type SDPubSubcommand,
+  renderTransformHelpText,
 } from "./help.js";
 
 export interface CLIArguments {
@@ -35,16 +31,19 @@ export interface CLIArguments {
   readonly verbose: boolean;
 }
 
-export interface CLISdpubArguments {
+export interface CLIArchiveMetadataArguments {
   readonly inputPath: string;
   readonly json?: boolean;
   readonly llmJSON?: string;
-  readonly metaPatch?: SdpubMetaPatch;
-  readonly chapterId?: number;
-  readonly subcommand: Exclude<SDPubSubcommand, "chapter">;
+  readonly metaPatch?: ArchiveMetaPatch;
 }
 
-export interface SdpubMetaPatch {
+export interface CLIArchiveCoverArguments {
+  readonly inputPath: string;
+  readonly llmJSON?: string;
+}
+
+export interface ArchiveMetaPatch {
   readonly authors?: readonly string[];
   readonly clearAuthors?: boolean;
   readonly clearDescription?: boolean;
@@ -61,7 +60,7 @@ export interface SdpubMetaPatch {
   readonly title?: string;
 }
 
-export type CLISdpubChapterAction =
+export type CLIArchiveChapterAction =
   | "add"
   | "generate-graph"
   | "generate-summary"
@@ -70,10 +69,11 @@ export type CLISdpubChapterAction =
   | "reset"
   | "set-source"
   | "set-summary"
+  | "set-title"
   | "status";
 
-export interface CLISdpubChapterArguments {
-  readonly action: CLISdpubChapterAction;
+export interface CLIArchiveChapterArguments {
+  readonly action: CLIArchiveChapterAction;
   readonly chapterId?: number;
   readonly inputFormat?: Extract<CLIFormat, "markdown" | "txt">;
   readonly inputPath?: string;
@@ -90,70 +90,45 @@ export interface CLIStatusArguments {
   readonly llmJSON?: string;
 }
 
-export type CLISdpubStageAction = "advance" | "pending";
-
-export interface CLISdpubStageArguments {
-  readonly action: CLISdpubStageAction;
-  readonly chapterId?: number;
-  readonly llmJSON?: string;
-  readonly path: string;
-  readonly prompt?: string;
-  readonly targetStage?: ChapterStage;
-}
-
-export type CLISdpubGraphAction =
-  | "blame"
-  | "grep"
-  | "log"
-  | "neighbors"
-  | "path"
-  | "show"
-  | "status";
-
-export interface CLISdpubGraphArguments {
-  readonly action: CLISdpubGraphAction;
-  readonly chapterId: number;
-  readonly fromNodeId?: number;
-  readonly limit?: number;
-  readonly llmJSON?: string;
-  readonly nodeId?: number;
-  readonly path: string;
-  readonly pattern?: string;
-  readonly toNodeId?: number;
-}
-
 export type CLIArchiveAction =
   | "backlinks"
   | "build"
   | "estimate"
-  | "evidence"
   | "export"
   | "find"
   | "grep"
   | "import"
   | "index"
   | "links"
+  | "list"
   | "ls"
   | "map"
   | "page"
   | "pack"
   | "path"
+  | "read"
   | "related"
   | "status";
+
+export type CLIArchiveMaintenanceCommand = "chapter" | "cover" | "meta";
 
 export interface CLIArchiveArguments {
   readonly action: CLIArchiveAction;
   readonly archivePath: string;
   readonly budget?: number;
+  readonly chapters?: readonly number[];
   readonly chapterId?: number;
   readonly confirm?: boolean;
+  readonly cursor?: string;
   readonly fromNodeId?: number;
   readonly inputFormat?: CLIFormat;
   readonly json?: boolean;
+  readonly ids?: readonly string[];
+  readonly limit?: number;
+  readonly match?: "all" | "any";
   readonly listKind?:
     | "chapters"
     | "edges"
-    | "evidence"
     | "fragments"
     | "meta"
     | "nodes"
@@ -164,12 +139,20 @@ export interface CLIArchiveArguments {
   readonly outputPath?: string;
   readonly prompt?: string;
   readonly query?: string;
+  readonly searchOrder?: "doc-asc" | "doc-desc";
+  readonly searchTypes?: readonly (
+    | "chapter"
+    | "fragment"
+    | "meta"
+    | "node"
+    | "summary"
+  )[];
   readonly sourcePath?: string;
   readonly targetStage?: ChapterStage | "ready" | "source";
   readonly toNodeId?: number;
 }
 
-interface SdpubMetaFlagValues {
+interface ArchiveMetaFlagValues {
   readonly author?: readonly string[];
   readonly "clear-authors"?: boolean;
   readonly "clear-description"?: boolean;
@@ -186,20 +169,26 @@ interface SdpubMetaFlagValues {
   readonly title?: string;
 }
 
-interface ArchiveArgumentValues {
+interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly budget?: string;
   readonly chapter?: string;
   readonly confirm?: boolean;
+  readonly cursor?: string;
+  readonly "digest-dir"?: string;
   readonly help?: boolean;
   readonly input?: string;
   readonly "input-format"?: string;
+  readonly id?: string;
   readonly json?: boolean;
   readonly limit?: string;
   readonly llm?: string;
+  readonly match?: string;
   readonly output?: string;
   readonly "output-format"?: string;
+  readonly order?: string;
   readonly prompt?: string;
   readonly stage?: string;
+  readonly type?: string;
   readonly to?: string;
   readonly verbose?: boolean;
 }
@@ -221,45 +210,30 @@ export type ParsedCLIArguments =
       readonly kind: "convert";
     }
   | {
-      readonly args: CLISdpubArguments;
+      readonly args: CLIArchiveMetadataArguments;
       readonly help: false;
-      readonly kind: "sdpub";
+      readonly kind: "meta";
     }
   | {
-      readonly args?: CLISdpubArguments;
+      readonly args: CLIArchiveCoverArguments;
+      readonly help: false;
+      readonly kind: "cover";
+    }
+  | {
+      readonly args?: CLIArchiveMetadataArguments | CLIArchiveCoverArguments;
       readonly help: true;
       readonly helpText: string;
-      readonly kind: "sdpub";
+      readonly kind: "maintenance";
     }
   | {
-      readonly args: CLISdpubChapterArguments;
+      readonly args: CLIArchiveChapterArguments;
       readonly help: false;
-      readonly kind: "sdpub-chapter";
-    }
-  | {
-      readonly help: true;
-      readonly helpText: string;
-      readonly kind: "sdpub-chapter";
-    }
-  | {
-      readonly args: CLISdpubStageArguments;
-      readonly help: false;
-      readonly kind: "sdpub-stage";
+      readonly kind: "chapter";
     }
   | {
       readonly help: true;
       readonly helpText: string;
-      readonly kind: "sdpub-stage";
-    }
-  | {
-      readonly args: CLISdpubGraphArguments;
-      readonly help: false;
-      readonly kind: "sdpub-graph";
-    }
-  | {
-      readonly help: true;
-      readonly helpText: string;
-      readonly kind: "sdpub-graph";
+      readonly kind: "chapter";
     }
   | {
       readonly args: CLIArchiveArguments;
@@ -274,13 +248,13 @@ export type ParsedCLIArguments =
   | {
       readonly args: CLIStatusArguments;
       readonly help: false;
-      readonly kind: "status";
+      readonly kind: "config-status";
     }
   | {
       readonly args: CLIStatusArguments;
       readonly help: true;
       readonly helpText: string;
-      readonly kind: "status";
+      readonly kind: "config-status";
     };
 
 export function parseCLIArguments(
@@ -331,6 +305,9 @@ export function parseCLIArguments(
       identifier: {
         type: "string",
       },
+      id: {
+        type: "string",
+      },
       input: {
         type: "string",
       },
@@ -347,6 +324,9 @@ export function parseCLIArguments(
         type: "boolean",
       },
       llm: {
+        type: "string",
+      },
+      match: {
         type: "string",
       },
       output: {
@@ -367,6 +347,12 @@ export function parseCLIArguments(
       confirm: {
         type: "boolean",
       },
+      cursor: {
+        type: "string",
+      },
+      order: {
+        type: "string",
+      },
       parent: {
         type: "string",
       },
@@ -380,6 +366,9 @@ export function parseCLIArguments(
         type: "boolean",
       },
       title: {
+        type: "string",
+      },
+      type: {
         type: "string",
       },
       to: {
@@ -407,30 +396,42 @@ export function parseCLIArguments(
     return parseHelpArguments(positionals.slice(1), values);
   }
 
-  if (positionals[0] === "sdpub") {
-    return parseSdpubArguments(positionals.slice(1), values);
+  if (positionals[0] === "config") {
+    return parseConfigArguments(positionals.slice(1), values);
   }
 
-  if (
-    isArchiveAction(positionals[0]) &&
-    !(positionals[0] === "status" && positionals.length === 1)
-  ) {
+  if (positionals[0] === "transform") {
+    return parseConvertArguments(positionals.slice(1), values, "transform");
+  }
+
+  if (isArchiveMaintenanceCommand(positionals[0])) {
+    return parseArchiveMaintenanceArguments(
+      positionals[0],
+      positionals.slice(1),
+      values,
+    );
+  }
+
+  if (isArchiveAction(positionals[0])) {
     return parseArchiveArguments(positionals[0], positionals.slice(1), values);
   }
 
-  if (positionals[0] === "status") {
-    return parseStatusArguments(positionals.slice(1), values);
-  }
+  return parseConvertArguments(positionals, values, "bare");
+}
 
+function parseConvertArguments(
+  positionals: readonly string[],
+  values: ArchiveArgumentValues,
+  command: "bare" | "transform",
+): ParsedCLIArguments {
   if (positionals.length > 0) {
     throw new Error(
       withHelpRoute(
-        `Unexpected positional argument or unknown command: ${positionals.join(" ")}. The default command reads from stdin or --input; it does not accept positional input paths. Use --input <path>, or see available subcommands with \`spinedigest --help\`.`,
+        `Unexpected positional argument or unknown command: ${positionals.join(" ")}. The direct digest command reads from stdin or --input; it does not accept positional input paths. Use \`spinedigest transform --input <path>\`, or see available subcommands with \`spinedigest --help\`.`,
         CLI_HELP_ROUTES.command,
       ),
     );
   }
-
   rejectConvertMetaFlags(values);
   rejectConvertFlag("budget", values.budget);
   rejectConvertFlag("confirm", values.confirm);
@@ -474,7 +475,10 @@ export function parseCLIArguments(
     return {
       args,
       help: true,
-      helpText: renderMainHelpText(),
+      helpText:
+        command === "transform"
+          ? renderTransformHelpText()
+          : renderMainHelpText(),
       kind: "convert",
     };
   }
@@ -486,239 +490,181 @@ export function parseCLIArguments(
   };
 }
 
-function parseSdpubArguments(
+function parseConfigArguments(
   positionals: readonly string[],
-  values: {
-    readonly author?: readonly string[];
-    readonly chapter?: string;
-    readonly "clear-authors"?: boolean;
-    readonly "clear-description"?: boolean;
-    readonly "clear-identifier"?: boolean;
-    readonly "clear-language"?: boolean;
-    readonly "clear-published-at"?: boolean;
-    readonly "clear-publisher"?: boolean;
-    readonly "clear-title"?: boolean;
-    readonly description?: string;
-    readonly "digest-dir"?: string;
-    readonly help?: boolean;
-    readonly identifier?: string;
-    readonly input?: string;
-    readonly "input-format"?: string;
-    readonly json?: boolean;
-    readonly language?: string;
-    readonly limit?: string;
-    readonly llm?: string;
-    readonly output?: string;
-    readonly "output-format"?: string;
-    readonly parent?: string;
-    readonly "published-at"?: string;
-    readonly publisher?: string;
-    readonly prompt?: string;
-    readonly recursive?: boolean;
-    readonly stage?: string;
-    readonly title?: string;
-    readonly to?: string;
-    readonly verbose?: boolean;
-  },
+  values: ArchiveArgumentValues & ArchiveMetaFlagValues,
 ): ParsedCLIArguments {
-  const help = values.help ?? false;
-  const subcommand = positionals[0];
-  const isKnownSubcommand =
-    subcommand !== undefined &&
-    SDPUB_SUBCOMMANDS.includes(subcommand as SDPubSubcommand);
+  const action = positionals[0];
 
-  if (subcommand === "chapter") {
-    return parseSdpubChapterArguments(positionals.slice(1), values);
-  }
-  if (subcommand === "stage") {
-    return parseSdpubStageArguments(positionals.slice(1), values);
-  }
-  if (subcommand === "graph") {
-    return parseSdpubGraphArguments(positionals.slice(1), values);
+  if (values.help === true && action === undefined) {
+    return {
+      args: {},
+      help: true,
+      helpText: renderStatusHelpText(),
+      kind: "config-status",
+    };
   }
 
-  if (positionals.length > 1) {
-    const message = isKnownSubcommand
-      ? `Unexpected positional arguments: ${positionals.slice(1).join(" ")}. The \`sdpub ${subcommand}\` subcommand uses --input <path>; it does not accept a positional archive path.`
-      : `Unexpected positional arguments: ${positionals.slice(1).join(" ")}.`;
-
+  if (action !== "status") {
     throw new Error(
       withHelpRoute(
-        message,
-        isKnownSubcommand
-          ? sdpubSubcommandHelpRoute(subcommand)
-          : CLI_HELP_ROUTES.sdpub,
+        action === undefined
+          ? "Missing config action. Expected status."
+          : `Invalid config action: ${action}. Expected status.`,
+        "spinedigest config status --help",
       ),
     );
   }
 
-  if (subcommand === undefined) {
-    if (help) {
-      return {
-        help: true,
-        helpText: renderSdpubHelpText(),
-        kind: "sdpub",
-      };
-    }
+  return parseConfigStatusArguments(positionals.slice(1), values);
+}
 
+function parseArchiveMaintenanceArguments(
+  command: CLIArchiveMaintenanceCommand,
+  positionals: readonly string[],
+  values: ArchiveArgumentValues,
+): ParsedCLIArguments {
+  switch (command) {
+    case "chapter":
+      return parseArchiveChapterArguments(positionals, values);
+    case "cover":
+      return parseArchiveCoverArguments(positionals, values);
+    case "meta":
+      return parseArchiveMetaArguments(positionals, values);
+  }
+}
+
+function parseArchiveMetaArguments(
+  positionals: readonly string[],
+  values: ArchiveArgumentValues,
+): ParsedCLIArguments {
+  const helpRoute = "spinedigest meta --help";
+
+  if (values.help === true) {
+    return {
+      help: true,
+      helpText: renderArchiveMaintenanceCommandHelpText("meta"),
+      kind: "maintenance",
+    };
+  }
+
+  const archivePath = positionals[0];
+  if (archivePath === undefined || archivePath === "-") {
     throw new Error(
       withHelpRoute(
-        `Missing sdpub subcommand. Expected one of ${SDPUB_SUBCOMMANDS.join(", ")}.`,
-        CLI_HELP_ROUTES.sdpub,
+        "Missing archive path. Use `spinedigest meta <archive.sdpub>`.",
+        helpRoute,
+      ),
+    );
+  }
+  rejectArchiveMaintenanceExtraPositionals("meta", positionals, 1, helpRoute);
+  rejectMetaCommandFlag("budget", values.budget, helpRoute);
+  rejectMetaCommandFlag("chapter", values.chapter, helpRoute);
+  rejectMetaCommandFlag("cursor", values.cursor, helpRoute);
+  rejectMetaCommandFlag("digest-dir", values["digest-dir"], helpRoute);
+  rejectMetaCommandFlag("id", values.id, helpRoute);
+  rejectMetaCommandFlag("input", values.input, helpRoute);
+  rejectMetaCommandFlag("input-format", values["input-format"], helpRoute);
+  rejectMetaCommandFlag("limit", values.limit, helpRoute);
+  rejectMetaCommandFlag("match", values.match, helpRoute);
+  rejectMetaCommandFlag("order", values.order, helpRoute);
+  rejectMetaCommandFlag("output", values.output, helpRoute);
+  rejectMetaCommandFlag("output-format", values["output-format"], helpRoute);
+  rejectMetaCommandFlag("prompt", values.prompt, helpRoute);
+  rejectMetaCommandFlag("stage", values.stage, helpRoute);
+  rejectMetaCommandFlag("to", values.to, helpRoute);
+  rejectMetaCommandFlag("type", values.type, helpRoute);
+  rejectMetaCommandBooleanFlag("confirm", values.confirm, helpRoute);
+  if (values.verbose === true) {
+    throw new Error(
+      withHelpRoute(
+        "The `meta` command does not support --verbose.",
+        helpRoute,
       ),
     );
   }
 
-  if (!SDPUB_SUBCOMMANDS.includes(subcommand as SDPubSubcommand)) {
-    throw new Error(
-      withHelpRoute(
-        `Invalid sdpub subcommand: ${subcommand}. Expected one of ${SDPUB_SUBCOMMANDS.join(", ")}.`,
-        CLI_HELP_ROUTES.sdpub,
-      ),
-    );
-  }
-
-  const parsedSubcommand = subcommand as Exclude<SDPubSubcommand, "chapter">;
-
-  if (values["digest-dir"] !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        "The `sdpub` subcommands do not support --digest-dir. Use the main command for digest generation.",
-        CLI_HELP_ROUTES.sdpub,
-      ),
-    );
-  }
-  if (values["input-format"] !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        "The `sdpub` subcommands do not support --input-format. They always read .sdpub archives.",
-        CLI_HELP_ROUTES.sdpub,
-      ),
-    );
-  }
-  if (values.output !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        "The `sdpub` subcommands do not support --output. Use stdout redirection or pipes instead.",
-        CLI_HELP_ROUTES.sdpub,
-      ),
-    );
-  }
-  if (values["output-format"] !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        "The `sdpub` subcommands do not support --output-format. Their output format is fixed by the subcommand.",
-        CLI_HELP_ROUTES.sdpub,
-      ),
-    );
-  }
-  if (values.prompt !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        "The `sdpub` subcommands do not support --prompt. It only applies to digest generation from source inputs.",
-        CLI_HELP_ROUTES.sdpub,
-      ),
-    );
-  }
-  if (values.stage !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        "The `sdpub` subcommands do not support --stage. Use the main command when creating .sdpub output.",
-        CLI_HELP_ROUTES.sdpub,
-      ),
-    );
-  }
-  const metaPatch = parseSdpubMetaPatch(values, parsedSubcommand);
-  if (
-    values.json === true &&
-    parsedSubcommand !== "list" &&
-    parsedSubcommand !== "meta"
-  ) {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub ${parsedSubcommand}\` subcommand does not support --json.`,
-        sdpubSubcommandHelpRoute(parsedSubcommand),
-      ),
-    );
-  }
+  const metaPatch = parseArchiveMetaPatch(values, "meta");
   if (values.json === true && metaPatch !== undefined) {
     throw new Error(
       withHelpRoute(
-        "`sdpub meta --json` is read-only and cannot be combined with metadata edit flags.",
-        sdpubSubcommandHelpRoute("meta"),
+        "`meta --json` is read-only and cannot be combined with metadata edit flags.",
+        helpRoute,
       ),
     );
-  }
-  if (values.verbose) {
-    throw new Error(
-      withHelpRoute(
-        "The `sdpub` subcommands do not support --verbose.",
-        CLI_HELP_ROUTES.sdpub,
-      ),
-    );
-  }
-
-  const chapterId =
-    values.chapter === undefined
-      ? undefined
-      : parseSerialId(
-          values.chapter,
-          "--chapter",
-          sdpubSubcommandHelpRoute(parsedSubcommand),
-        );
-
-  if (parsedSubcommand === "cat" && chapterId === undefined && !help) {
-    throw new Error(
-      withHelpRoute(
-        "Missing --chapter. `spinedigest sdpub cat` requires a chapter id.",
-        sdpubSubcommandHelpRoute("cat"),
-      ),
-    );
-  }
-  if (parsedSubcommand !== "cat" && chapterId !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub ${parsedSubcommand}\` subcommand does not support --chapter.`,
-        sdpubSubcommandHelpRoute(parsedSubcommand),
-      ),
-    );
-  }
-
-  const inputPath = values.input;
-
-  if (!help) {
-    if (inputPath === undefined || inputPath === "-") {
-      throw new Error(
-        withHelpRoute(
-          "The `sdpub` subcommands require --input <path>. stdin is not supported.",
-          sdpubSubcommandHelpRoute(parsedSubcommand),
-        ),
-      );
-    }
-    if (parseCLIFormat("sdpub", "--input-format") !== "sdpub") {
-      throw new Error("Internal error: failed to resolve sdpub input format.");
-    }
-  }
-
-  if (help) {
-    return {
-      help: true,
-      helpText: renderSdpubSubcommandHelpText(parsedSubcommand),
-      kind: "sdpub",
-    };
   }
 
   return {
     args: {
-      inputPath: inputPath!,
+      inputPath: archivePath,
       ...(values.json === undefined ? {} : { json: values.json }),
       ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       ...(metaPatch === undefined ? {} : { metaPatch }),
-      ...(chapterId === undefined ? {} : { chapterId }),
-      subcommand: parsedSubcommand,
     },
     help: false,
-    kind: "sdpub",
+    kind: "meta",
+  };
+}
+
+function parseArchiveCoverArguments(
+  positionals: readonly string[],
+  values: ArchiveArgumentValues,
+): ParsedCLIArguments {
+  const helpRoute = "spinedigest cover --help";
+
+  if (values.help === true) {
+    return {
+      help: true,
+      helpText: renderArchiveMaintenanceCommandHelpText("cover"),
+      kind: "maintenance",
+    };
+  }
+
+  const archivePath = positionals[0];
+  if (archivePath === undefined || archivePath === "-") {
+    throw new Error(
+      withHelpRoute(
+        "Missing archive path. Use `spinedigest cover <archive.sdpub>`.",
+        helpRoute,
+      ),
+    );
+  }
+  rejectArchiveMaintenanceExtraPositionals("cover", positionals, 1, helpRoute);
+  rejectCoverCommandFlag("budget", values.budget, helpRoute);
+  rejectCoverCommandFlag("chapter", values.chapter, helpRoute);
+  rejectCoverCommandFlag("cursor", values.cursor, helpRoute);
+  rejectCoverCommandFlag("digest-dir", values["digest-dir"], helpRoute);
+  rejectCoverCommandFlag("id", values.id, helpRoute);
+  rejectCoverCommandFlag("input", values.input, helpRoute);
+  rejectCoverCommandFlag("input-format", values["input-format"], helpRoute);
+  rejectCoverCommandFlag("limit", values.limit, helpRoute);
+  rejectCoverCommandFlag("match", values.match, helpRoute);
+  rejectCoverCommandFlag("order", values.order, helpRoute);
+  rejectCoverCommandFlag("output", values.output, helpRoute);
+  rejectCoverCommandFlag("output-format", values["output-format"], helpRoute);
+  rejectCoverCommandFlag("prompt", values.prompt, helpRoute);
+  rejectCoverCommandFlag("stage", values.stage, helpRoute);
+  rejectCoverCommandFlag("to", values.to, helpRoute);
+  rejectCoverCommandFlag("type", values.type, helpRoute);
+  rejectCoverCommandBooleanFlag("confirm", values.confirm, helpRoute);
+  rejectCoverCommandBooleanFlag("json", values.json, helpRoute);
+  rejectCoverMetaFlags(values);
+  if (values.verbose === true) {
+    throw new Error(
+      withHelpRoute(
+        "The `cover` command does not support --verbose.",
+        helpRoute,
+      ),
+    );
+  }
+
+  return {
+    args: {
+      inputPath: archivePath,
+      ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+    },
+    help: false,
+    kind: "cover",
   };
 }
 
@@ -949,6 +895,43 @@ function parseArchiveArguments(
         kind: "archive",
       };
     }
+    case "list": {
+      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
+      rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      return {
+        args: {
+          action,
+          archivePath,
+          ...(values.chapter === undefined
+            ? {}
+            : { chapters: parseArchiveSearchChapters(values.chapter) }),
+          ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
+          ...(values.id === undefined
+            ? {}
+            : { ids: parseArchiveIds(values.id) }),
+          ...(values.json === undefined ? {} : { json: values.json }),
+          ...(values.limit === undefined
+            ? {}
+            : {
+                limit: parsePositiveIntegerFlag(
+                  values.limit,
+                  "--limit",
+                  helpRoute,
+                ),
+              }),
+          ...(values.order === undefined
+            ? {}
+            : { searchOrder: parseArchiveSearchOrder(values.order) }),
+          ...(values.type === undefined
+            ? {}
+            : { searchTypes: parseArchiveCollectionTypes(values.type) }),
+        },
+        help: false,
+        kind: "archive",
+      };
+    }
     case "find":
     case "grep": {
       const query = positionals[1];
@@ -965,19 +948,63 @@ function parseArchiveArguments(
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      if (action === "grep") {
+        rejectArchiveFlag(action, "--match", values.match, helpRoute);
+      }
       return {
         args: {
           action,
           archivePath,
+          ...(values.chapter === undefined
+            ? {}
+            : { chapters: parseArchiveSearchChapters(values.chapter) }),
+          ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
           ...(values.json === undefined ? {} : { json: values.json }),
+          ...(values.limit === undefined
+            ? {}
+            : {
+                limit: parsePositiveIntegerFlag(
+                  values.limit,
+                  "--limit",
+                  helpRoute,
+                ),
+              }),
           query,
+          ...(action === "find" && values.match !== undefined
+            ? { match: parseArchiveFindMatch(values.match) }
+            : {}),
+          ...(values.order === undefined
+            ? {}
+            : { searchOrder: parseArchiveSearchOrder(values.order) }),
+          ...(values.type === undefined
+            ? {}
+            : { searchTypes: parseArchiveSearchTypes(values.type) }),
         },
         help: false,
         kind: "archive",
       };
     }
+    case "read":
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
+      rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
+      if (positionals[1] === undefined) {
+        throw new Error(
+          withHelpRoute("`spinedigest read` requires an object id.", helpRoute),
+        );
+      }
+      return {
+        args: {
+          action,
+          archivePath,
+          objectId: positionals[1],
+        },
+        help: false,
+        kind: "archive",
+      };
     case "page":
-    case "evidence":
     case "links":
     case "backlinks":
     case "related": {
@@ -1076,7 +1103,7 @@ function parseArchiveArguments(
   }
 }
 
-function parseSdpubChapterArguments(
+function parseArchiveChapterArguments(
   positionals: readonly string[],
   values: {
     readonly author?: readonly string[];
@@ -1114,54 +1141,54 @@ function parseSdpubChapterArguments(
   const help = values.help ?? false;
   const action = positionals[0];
   const path = positionals[1];
-  const helpRoute = "spinedigest sdpub chapter --help";
+  const helpRoute = "spinedigest chapter --help";
 
-  rejectSdpubChapterFlag("digest-dir", values["digest-dir"]);
-  rejectSdpubChapterFlag("json", values.json);
-  rejectSdpubChapterFlag("limit", values.limit);
-  rejectSdpubChapterFlag("output", values.output);
-  rejectSdpubChapterFlag("output-format", values["output-format"]);
-  rejectSdpubChapterFlag("stage", values.stage);
-  rejectSdpubChapterMetaFlags(values);
+  rejectArchiveChapterFlag("digest-dir", values["digest-dir"]);
+  rejectArchiveChapterFlag("json", values.json);
+  rejectArchiveChapterFlag("limit", values.limit);
+  rejectArchiveChapterFlag("output", values.output);
+  rejectArchiveChapterFlag("output-format", values["output-format"]);
+  rejectArchiveChapterFlag("stage", values.stage);
+  rejectArchiveChapterMetaFlags(values);
   if (values.verbose) {
     throw new Error(
       withHelpRoute(
-        "The `sdpub chapter` command does not support --verbose.",
+        "The `chapter` command does not support --verbose.",
         helpRoute,
       ),
     );
   }
 
-  if (help && isSdpubChapterAction(action)) {
+  if (help && isArchiveChapterAction(action)) {
     if (action === "generate-graph" || action === "generate-summary") {
       return {
         help: true,
-        helpText: renderSdpubSubcommandHelpText("chapter"),
-        kind: "sdpub-chapter",
+        helpText: renderArchiveMaintenanceCommandHelpText("chapter"),
+        kind: "chapter",
       };
     }
 
     return {
       help: true,
-      helpText: renderSdpubChapterActionHelpText(action),
-      kind: "sdpub-chapter",
+      helpText: renderArchiveMaintenanceChapterActionHelpText(action),
+      kind: "chapter",
     };
   }
 
   if (help && action === undefined) {
     return {
       help: true,
-      helpText: renderSdpubSubcommandHelpText("chapter"),
-      kind: "sdpub-chapter",
+      helpText: renderArchiveMaintenanceCommandHelpText("chapter"),
+      kind: "chapter",
     };
   }
 
-  if (!isSdpubChapterAction(action)) {
+  if (!isArchiveChapterAction(action)) {
     throw new Error(
       withHelpRoute(
         action === undefined
-          ? "Missing sdpub chapter action."
-          : `Invalid sdpub chapter action: ${action}. Expected one of list, status, add, remove, reset, set-source, set-summary.`,
+          ? "Missing chapter action."
+          : `Invalid chapter action: ${action}. Expected one of list, status, add, remove, reset, set-source, set-summary, set-title.`,
         helpRoute,
       ),
     );
@@ -1169,7 +1196,7 @@ function parseSdpubChapterArguments(
   if (path === undefined || path === "-") {
     throw new Error(
       withHelpRoute(
-        "`spinedigest sdpub chapter` requires a .sdpub path positional argument.",
+        "`spinedigest chapter` requires a .sdpub path positional argument.",
         helpRoute,
       ),
     );
@@ -1184,267 +1211,14 @@ function parseSdpubChapterArguments(
   }
 
   return {
-    args: normalizeSdpubChapterArguments(action, path, values, helpRoute),
+    args: normalizeArchiveChapterArguments(action, path, values, helpRoute),
     help: false,
-    kind: "sdpub-chapter",
+    kind: "chapter",
   };
 }
 
-function parseSdpubStageArguments(
-  positionals: readonly string[],
-  values: {
-    readonly author?: readonly string[];
-    readonly chapter?: string;
-    readonly "clear-authors"?: boolean;
-    readonly "clear-description"?: boolean;
-    readonly "clear-identifier"?: boolean;
-    readonly "clear-language"?: boolean;
-    readonly "clear-published-at"?: boolean;
-    readonly "clear-publisher"?: boolean;
-    readonly "clear-title"?: boolean;
-    readonly description?: string;
-    readonly "digest-dir"?: string;
-    readonly help?: boolean;
-    readonly identifier?: string;
-    readonly input?: string;
-    readonly "input-format"?: string;
-    readonly json?: boolean;
-    readonly language?: string;
-    readonly limit?: string;
-    readonly llm?: string;
-    readonly output?: string;
-    readonly "output-format"?: string;
-    readonly parent?: string;
-    readonly "published-at"?: string;
-    readonly publisher?: string;
-    readonly prompt?: string;
-    readonly recursive?: boolean;
-    readonly stage?: string;
-    readonly title?: string;
-    readonly to?: string;
-    readonly verbose?: boolean;
-  },
-): ParsedCLIArguments {
-  const help = values.help ?? false;
-  const action = positionals[0];
-  const path = positionals[1];
-  const helpRoute = "spinedigest sdpub stage --help";
-
-  rejectSdpubStageFlag("digest-dir", values["digest-dir"]);
-  rejectSdpubStageFlag("input", values.input);
-  rejectSdpubStageFlag("input-format", values["input-format"]);
-  rejectSdpubStageFlag("json", values.json);
-  rejectSdpubStageFlag("limit", values.limit);
-  rejectSdpubStageFlag("output", values.output);
-  rejectSdpubStageFlag("output-format", values["output-format"]);
-  rejectSdpubStageFlag("parent", values.parent);
-  rejectSdpubStageFlag("recursive", values.recursive);
-  rejectSdpubStageFlag("stage", values.stage);
-  rejectSdpubStageFlag("title", values.title);
-  rejectSdpubStageMetaFlags(values);
-  if (values.verbose) {
-    throw new Error(
-      withHelpRoute(
-        "The `sdpub stage` command does not support --verbose.",
-        helpRoute,
-      ),
-    );
-  }
-
-  if (help && isSdpubStageAction(action)) {
-    return {
-      help: true,
-      helpText: renderSdpubStageActionHelpText(action),
-      kind: "sdpub-stage",
-    };
-  }
-
-  if (help && action === undefined) {
-    return {
-      help: true,
-      helpText: renderSdpubSubcommandHelpText("stage"),
-      kind: "sdpub-stage",
-    };
-  }
-
-  if (!isSdpubStageAction(action)) {
-    throw new Error(
-      withHelpRoute(
-        action === undefined
-          ? "Missing sdpub stage action."
-          : `Invalid sdpub stage action: ${action}. Expected one of advance, pending.`,
-        helpRoute,
-      ),
-    );
-  }
-  if (path === undefined || path === "-") {
-    throw new Error(
-      withHelpRoute(
-        "`spinedigest sdpub stage` requires a .sdpub path positional argument.",
-        helpRoute,
-      ),
-    );
-  }
-  if (positionals.length > 2) {
-    throw new Error(
-      withHelpRoute(
-        `Unexpected positional arguments: ${positionals.slice(2).join(" ")}.`,
-        helpRoute,
-      ),
-    );
-  }
-
-  const chapterId =
-    values.chapter === undefined
-      ? undefined
-      : parseSerialId(values.chapter, "--chapter", helpRoute);
-  const targetStage =
-    values.to === undefined
-      ? undefined
-      : parseChapterStage(values.to, "--to", helpRoute);
-
-  switch (action) {
-    case "advance":
-      return {
-        args: {
-          action,
-          ...(chapterId === undefined ? {} : { chapterId }),
-          ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-          path,
-          ...(values.prompt === undefined ? {} : { prompt: values.prompt }),
-          ...(targetStage === undefined ? {} : { targetStage }),
-        },
-        help: false,
-        kind: "sdpub-stage",
-      };
-    case "pending":
-      rejectSdpubStageActionFlag(values.chapter, "--chapter", action);
-      rejectSdpubStageActionFlag(values.prompt, "--prompt", action);
-      rejectSdpubStageActionFlag(values.to, "--to", action);
-      return {
-        args: {
-          action,
-          ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-          path,
-        },
-        help: false,
-        kind: "sdpub-stage",
-      };
-  }
-}
-
-function parseSdpubGraphArguments(
-  positionals: readonly string[],
-  values: {
-    readonly author?: readonly string[];
-    readonly chapter?: string;
-    readonly "clear-authors"?: boolean;
-    readonly "clear-description"?: boolean;
-    readonly "clear-identifier"?: boolean;
-    readonly "clear-language"?: boolean;
-    readonly "clear-published-at"?: boolean;
-    readonly "clear-publisher"?: boolean;
-    readonly "clear-title"?: boolean;
-    readonly description?: string;
-    readonly "digest-dir"?: string;
-    readonly help?: boolean;
-    readonly identifier?: string;
-    readonly input?: string;
-    readonly "input-format"?: string;
-    readonly json?: boolean;
-    readonly language?: string;
-    readonly limit?: string;
-    readonly llm?: string;
-    readonly output?: string;
-    readonly "output-format"?: string;
-    readonly parent?: string;
-    readonly "published-at"?: string;
-    readonly publisher?: string;
-    readonly prompt?: string;
-    readonly recursive?: boolean;
-    readonly stage?: string;
-    readonly title?: string;
-    readonly to?: string;
-    readonly verbose?: boolean;
-  },
-): ParsedCLIArguments {
-  const help = values.help ?? false;
-  const action = positionals[0];
-  const path = positionals[1];
-  const helpRoute = "spinedigest sdpub graph --help";
-
-  rejectSdpubGraphFlag("digest-dir", values["digest-dir"]);
-  rejectSdpubGraphFlag("input", values.input);
-  rejectSdpubGraphFlag("input-format", values["input-format"]);
-  rejectSdpubGraphFlag("json", values.json);
-  rejectSdpubGraphFlag("output", values.output);
-  rejectSdpubGraphFlag("output-format", values["output-format"]);
-  rejectSdpubGraphFlag("parent", values.parent);
-  rejectSdpubGraphFlag("prompt", values.prompt);
-  rejectSdpubGraphFlag("recursive", values.recursive);
-  rejectSdpubGraphFlag("stage", values.stage);
-  rejectSdpubGraphFlag("title", values.title);
-  rejectSdpubGraphFlag("to", values.to);
-  rejectSdpubGraphMetaFlags(values);
-  if (values.verbose) {
-    throw new Error(
-      withHelpRoute(
-        "The `sdpub graph` command does not support --verbose.",
-        helpRoute,
-      ),
-    );
-  }
-
-  if (help && isSdpubGraphAction(action)) {
-    return {
-      help: true,
-      helpText: renderSdpubGraphActionHelpText(action),
-      kind: "sdpub-graph",
-    };
-  }
-
-  if (help && action === undefined) {
-    return {
-      help: true,
-      helpText: renderSdpubSubcommandHelpText("graph"),
-      kind: "sdpub-graph",
-    };
-  }
-
-  if (!isSdpubGraphAction(action)) {
-    throw new Error(
-      withHelpRoute(
-        action === undefined
-          ? "Missing sdpub graph action."
-          : `Invalid sdpub graph action: ${action}. Expected one of status, log, show, grep, neighbors, blame, path.`,
-        helpRoute,
-      ),
-    );
-  }
-  if (path === undefined || path === "-") {
-    throw new Error(
-      withHelpRoute(
-        "`spinedigest sdpub graph` requires a .sdpub path positional argument.",
-        helpRoute,
-      ),
-    );
-  }
-
-  return {
-    args: normalizeSdpubGraphArguments(
-      action,
-      path,
-      positionals.slice(2),
-      values,
-      helpRoute,
-    ),
-    help: false,
-    kind: "sdpub-graph",
-  };
-}
-
-function normalizeSdpubChapterArguments(
-  action: CLISdpubChapterAction,
+function normalizeArchiveChapterArguments(
+  action: CLIArchiveChapterAction,
   path: string,
   values: {
     readonly chapter?: string;
@@ -1458,7 +1232,7 @@ function normalizeSdpubChapterArguments(
     readonly to?: string;
   },
   helpRoute: string,
-): CLISdpubChapterArguments {
+): CLIArchiveChapterArguments {
   const chapterId =
     values.chapter === undefined
       ? undefined
@@ -1600,7 +1374,7 @@ function normalizeSdpubChapterArguments(
       if (resetStage === undefined) {
         throw new Error(
           withHelpRoute(
-            "Missing --to. `sdpub chapter reset` requires planned, sourced, or graphed.",
+            "Missing --to. `chapter reset` requires planned, sourced, or graphed.",
             helpRoute,
           ),
         );
@@ -1633,7 +1407,7 @@ function normalizeSdpubChapterArguments(
       if (inputFormat === undefined) {
         throw new Error(
           withHelpRoute(
-            "Missing --input-format. `sdpub chapter set-source` requires txt or markdown.",
+            "Missing --input-format. `chapter set-source` requires txt or markdown.",
             helpRoute,
           ),
         );
@@ -1681,6 +1455,39 @@ function normalizeSdpubChapterArguments(
         ...(values.input === undefined ? {} : { inputPath: values.input }),
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       };
+    case "set-title":
+      requireChapterId(chapterId, action, helpRoute);
+      if (values.title === undefined) {
+        throw new Error(
+          withHelpRoute(
+            "Missing --title. `chapter set-title` requires a title value.",
+            helpRoute,
+          ),
+        );
+      }
+      rejectActionFlag(values.input, "--input", action, helpRoute);
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
+      rejectActionFlag(values.parent, "--parent", action, helpRoute);
+      rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.to, "--to", action, helpRoute);
+      rejectActionBooleanFlag(
+        values.recursive,
+        "--recursive",
+        action,
+        helpRoute,
+      );
+      return {
+        action,
+        chapterId,
+        path,
+        title: values.title,
+        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+      };
     case "status":
       requireChapterId(chapterId, action, helpRoute);
       rejectActionFlag(values.input, "--input", action, helpRoute);
@@ -1705,114 +1512,6 @@ function normalizeSdpubChapterArguments(
         chapterId,
         path,
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-      };
-  }
-}
-
-function normalizeSdpubGraphArguments(
-  action: CLISdpubGraphAction,
-  path: string,
-  actionPositionals: readonly string[],
-  values: {
-    readonly chapter?: string;
-    readonly limit?: string;
-    readonly llm?: string;
-  },
-  helpRoute: string,
-): CLISdpubGraphArguments {
-  const chapterId =
-    values.chapter === undefined
-      ? undefined
-      : parseSerialId(values.chapter, "--chapter", helpRoute);
-  const limit =
-    values.limit === undefined
-      ? undefined
-      : parsePositiveInteger(values.limit, "--limit", helpRoute);
-
-  if (chapterId === undefined) {
-    throw new Error(
-      withHelpRoute(
-        "Missing --chapter. `sdpub graph` requires a chapter id.",
-        helpRoute,
-      ),
-    );
-  }
-
-  switch (action) {
-    case "status":
-      rejectGraphActionPositionals(actionPositionals, action, helpRoute);
-      rejectGraphActionLimit(limit, action, helpRoute);
-      return {
-        action,
-        chapterId,
-        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-        path,
-      };
-    case "log":
-      rejectGraphActionPositionals(actionPositionals, action, helpRoute);
-      return {
-        action,
-        chapterId,
-        ...(limit === undefined ? {} : { limit }),
-        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-        path,
-      };
-    case "show":
-    case "neighbors":
-    case "blame":
-      rejectGraphActionLimit(limit, action, helpRoute);
-      if (actionPositionals.length !== 1) {
-        throw new Error(
-          withHelpRoute(
-            `\`sdpub graph ${action}\` requires exactly one node id.`,
-            helpRoute,
-          ),
-        );
-      }
-
-      return {
-        action,
-        chapterId,
-        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-        nodeId: parseSerialId(actionPositionals[0]!, "<node>", helpRoute),
-        path,
-      };
-    case "grep":
-      rejectGraphActionLimit(limit, action, helpRoute);
-      if (actionPositionals.length !== 1) {
-        throw new Error(
-          withHelpRoute(
-            "`sdpub graph grep` requires exactly one search pattern.",
-            helpRoute,
-          ),
-        );
-      }
-
-      return {
-        action,
-        chapterId,
-        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-        path,
-        pattern: actionPositionals[0]!,
-      };
-    case "path":
-      rejectGraphActionLimit(limit, action, helpRoute);
-      if (actionPositionals.length !== 2) {
-        throw new Error(
-          withHelpRoute(
-            "`sdpub graph path` requires exactly two node ids.",
-            helpRoute,
-          ),
-        );
-      }
-
-      return {
-        action,
-        chapterId,
-        fromNodeId: parseSerialId(actionPositionals[0]!, "<from>", helpRoute),
-        ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-        path,
-        toNodeId: parseSerialId(actionPositionals[1]!, "<to>", helpRoute),
       };
   }
 }
@@ -1900,7 +1599,7 @@ function parseHelpArguments(
   };
 }
 
-function parseStatusArguments(
+function parseConfigStatusArguments(
   positionals: readonly string[],
   values: {
     readonly author?: readonly string[];
@@ -1944,8 +1643,8 @@ function parseStatusArguments(
   if (values.verbose) {
     throw new Error(
       withHelpRoute(
-        "The `status` command does not support --verbose.",
-        "spinedigest status --help",
+        "The `config status` command does not support --verbose.",
+        "spinedigest config status --help",
       ),
     );
   }
@@ -1954,7 +1653,7 @@ function parseStatusArguments(
     throw new Error(
       withHelpRoute(
         `Unexpected positional arguments: ${positionals.join(" ")}.`,
-        "spinedigest status --help",
+        "spinedigest config status --help",
       ),
     );
   }
@@ -1968,14 +1667,14 @@ function parseStatusArguments(
       args,
       help: true,
       helpText: renderStatusHelpText(),
-      kind: "status",
+      kind: "config-status",
     };
   }
 
   return {
     args,
     help: false,
-    kind: "status",
+    kind: "config-status",
   };
 }
 
@@ -1994,9 +1693,9 @@ function parseSerialId(value: string, flag: string, helpRoute: string): number {
   return Number(normalized);
 }
 
-function isSdpubChapterAction(
+function isArchiveChapterAction(
   value: string | undefined,
-): value is CLISdpubChapterAction {
+): value is CLIArchiveChapterAction {
   return (
     value === "add" ||
     value === "generate-graph" ||
@@ -2006,28 +1705,15 @@ function isSdpubChapterAction(
     value === "reset" ||
     value === "set-source" ||
     value === "set-summary" ||
+    value === "set-title" ||
     value === "status"
   );
 }
 
-function isSdpubStageAction(
+function isArchiveMaintenanceCommand(
   value: string | undefined,
-): value is CLISdpubStageAction {
-  return value === "advance" || value === "pending";
-}
-
-function isSdpubGraphAction(
-  value: string | undefined,
-): value is CLISdpubGraphAction {
-  return (
-    value === "blame" ||
-    value === "grep" ||
-    value === "log" ||
-    value === "neighbors" ||
-    value === "path" ||
-    value === "show" ||
-    value === "status"
-  );
+): value is CLIArchiveMaintenanceCommand {
+  return value === "chapter" || value === "cover" || value === "meta";
 }
 
 function parseChapterStage(
@@ -2061,29 +1747,10 @@ function parseChapterInputFormat(
 
   throw new Error(
     withHelpRoute(
-      `Invalid --input-format for sdpub chapter source: ${value}. Expected txt or markdown.`,
+      `Invalid --input-format for chapter source: ${value}. Expected txt or markdown.`,
       helpRoute,
     ),
   );
-}
-
-function parsePositiveInteger(
-  value: string,
-  flag: string,
-  helpRoute: string,
-): number {
-  const parsed = parseSerialId(value, flag, helpRoute);
-
-  if (parsed === 0) {
-    throw new Error(
-      withHelpRoute(
-        `Invalid ${flag}: ${value}. Expected a positive integer.`,
-        helpRoute,
-      ),
-    );
-  }
-
-  return parsed;
 }
 
 function parseResetStage(
@@ -2102,7 +1769,7 @@ function parseResetStage(
   if (CHAPTER_STAGES.includes(normalized as ChapterStage)) {
     throw new Error(
       withHelpRoute(
-        "`sdpub chapter reset` does not support --to summarized.",
+        "`chapter reset` does not support --to summarized.",
         helpRoute,
       ),
     );
@@ -2116,48 +1783,44 @@ function parseResetStage(
   );
 }
 
-function parseSdpubMetaPatch(
-  values: SdpubMetaFlagValues,
-  subcommand: Exclude<SDPubSubcommand, "chapter">,
-): SdpubMetaPatch | undefined {
-  const helpRoute = sdpubSubcommandHelpRoute(subcommand);
+function parseArchiveMetaPatch(
+  values: ArchiveMetaFlagValues,
+  command: "meta",
+): ArchiveMetaPatch | undefined {
+  const helpRoute = archiveMaintenanceHelpRoute(command);
   const patch = {
-    ...parseSdpubStringMetaPatch(values, "title", "title", helpRoute),
-    ...parseSdpubStringMetaPatch(values, "language", "language", helpRoute),
-    ...parseSdpubStringMetaPatch(values, "identifier", "identifier", helpRoute),
-    ...parseSdpubStringMetaPatch(values, "publisher", "publisher", helpRoute),
-    ...parseSdpubStringMetaPatch(
+    ...parseArchiveStringMetaPatch(values, "title", "title", helpRoute),
+    ...parseArchiveStringMetaPatch(values, "language", "language", helpRoute),
+    ...parseArchiveStringMetaPatch(
+      values,
+      "identifier",
+      "identifier",
+      helpRoute,
+    ),
+    ...parseArchiveStringMetaPatch(values, "publisher", "publisher", helpRoute),
+    ...parseArchiveStringMetaPatch(
       values,
       "publishedAt",
       "published-at",
       helpRoute,
     ),
-    ...parseSdpubStringMetaPatch(
+    ...parseArchiveStringMetaPatch(
       values,
       "description",
       "description",
       helpRoute,
     ),
-    ...parseSdpubAuthorsMetaPatch(values, helpRoute),
-  } satisfies SdpubMetaPatch;
+    ...parseArchiveAuthorsMetaPatch(values, helpRoute),
+  } satisfies ArchiveMetaPatch;
 
   if (Object.keys(patch).length === 0) {
     return undefined;
   }
-  if (subcommand !== "meta") {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub ${subcommand}\` subcommand does not support metadata edit flags.`,
-        sdpubSubcommandHelpRoute(subcommand),
-      ),
-    );
-  }
-
   return patch;
 }
 
-function parseSdpubStringMetaPatch(
-  values: SdpubMetaFlagValues,
+function parseArchiveStringMetaPatch(
+  values: ArchiveMetaFlagValues,
   key:
     | "description"
     | "identifier"
@@ -2173,9 +1836,9 @@ function parseSdpubStringMetaPatch(
     | "publisher"
     | "title",
   helpRoute: string,
-): Partial<SdpubMetaPatch> {
+): Partial<ArchiveMetaPatch> {
   const value = values[flag];
-  const clearFlag = `clear-${flag}` as keyof SdpubMetaFlagValues;
+  const clearFlag = `clear-${flag}` as keyof ArchiveMetaFlagValues;
   const clearValue = values[clearFlag];
 
   if (value !== undefined && clearValue === true) {
@@ -2202,16 +1865,16 @@ function parseSdpubStringMetaPatch(
 
     return {
       [clearKey]: true,
-    } as Partial<SdpubMetaPatch>;
+    } as Partial<ArchiveMetaPatch>;
   }
 
   return {};
 }
 
-function parseSdpubAuthorsMetaPatch(
-  values: SdpubMetaFlagValues,
+function parseArchiveAuthorsMetaPatch(
+  values: ArchiveMetaFlagValues,
   helpRoute: string,
-): Partial<SdpubMetaPatch> {
+): Partial<ArchiveMetaPatch> {
   if (values.author !== undefined && values["clear-authors"] === true) {
     throw new Error(
       withHelpRoute("Cannot combine --author with --clear-authors.", helpRoute),
@@ -2256,7 +1919,7 @@ function rejectActionFlag(
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(
-        `The \`sdpub chapter ${action}\` action does not support ${flag}.`,
+        `The \`chapter ${action}\` action does not support ${flag}.`,
         helpRoute,
       ),
     );
@@ -2272,7 +1935,7 @@ function rejectActionBooleanFlag(
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(
-        `The \`sdpub chapter ${action}\` action does not support ${flag}.`,
+        `The \`chapter ${action}\` action does not support ${flag}.`,
         helpRoute,
       ),
     );
@@ -2293,64 +1956,21 @@ function rejectConvertFlag(
   }
 }
 
-function rejectSdpubStageActionFlag(
-  value: string | undefined,
-  flag: string,
-  action: CLISdpubStageAction,
-): void {
-  if (value !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub stage ${action}\` action does not support ${flag}.`,
-        "spinedigest sdpub stage --help",
-      ),
-    );
-  }
-}
-
-function rejectSdpubChapterFlag(
+function rejectArchiveChapterFlag(
   name: string,
   value: boolean | string | undefined,
 ): void {
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(
-        `The \`sdpub chapter\` command does not support --${name}.`,
-        "spinedigest sdpub chapter --help",
+        `The \`chapter\` command does not support --${name}.`,
+        "spinedigest chapter --help",
       ),
     );
   }
 }
 
-function rejectSdpubStageFlag(
-  name: string,
-  value: boolean | string | undefined,
-): void {
-  if (value !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub stage\` command does not support --${name}.`,
-        "spinedigest sdpub stage --help",
-      ),
-    );
-  }
-}
-
-function rejectSdpubGraphFlag(
-  name: string,
-  value: boolean | string | undefined,
-): void {
-  if (value !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub graph\` command does not support --${name}.`,
-        "spinedigest sdpub graph --help",
-      ),
-    );
-  }
-}
-
-function rejectConvertMetaFlags(values: SdpubMetaFlagValues): void {
+function rejectConvertMetaFlags(values: ArchiveMetaFlagValues): void {
   for (const flag of listPresentMetaFlags(values)) {
     throw new Error(
       withHelpRoute(
@@ -2361,40 +1981,18 @@ function rejectConvertMetaFlags(values: SdpubMetaFlagValues): void {
   }
 }
 
-function rejectSdpubChapterMetaFlags(values: SdpubMetaFlagValues): void {
+function rejectArchiveChapterMetaFlags(values: ArchiveMetaFlagValues): void {
   for (const flag of listPresentMetaFlags(values, { includeTitle: false })) {
     throw new Error(
       withHelpRoute(
-        `The \`sdpub chapter\` command does not support ${flag}.`,
-        "spinedigest sdpub chapter --help",
+        `The \`chapter\` command does not support ${flag}.`,
+        "spinedigest chapter --help",
       ),
     );
   }
 }
 
-function rejectSdpubStageMetaFlags(values: SdpubMetaFlagValues): void {
-  for (const flag of listPresentMetaFlags(values)) {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub stage\` command does not support ${flag}.`,
-        "spinedigest sdpub stage --help",
-      ),
-    );
-  }
-}
-
-function rejectSdpubGraphMetaFlags(values: SdpubMetaFlagValues): void {
-  for (const flag of listPresentMetaFlags(values)) {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub graph\` command does not support ${flag}.`,
-        "spinedigest sdpub graph --help",
-      ),
-    );
-  }
-}
-
-function rejectHelpMetaFlags(values: SdpubMetaFlagValues): void {
+function rejectHelpMetaFlags(values: ArchiveMetaFlagValues): void {
   for (const flag of listPresentMetaFlags(values)) {
     throw new Error(
       withHelpRoute(
@@ -2405,19 +2003,19 @@ function rejectHelpMetaFlags(values: SdpubMetaFlagValues): void {
   }
 }
 
-function rejectStatusMetaFlags(values: SdpubMetaFlagValues): void {
+function rejectStatusMetaFlags(values: ArchiveMetaFlagValues): void {
   for (const flag of listPresentMetaFlags(values)) {
     throw new Error(
       withHelpRoute(
-        `The \`status\` command does not support ${flag}.`,
-        "spinedigest status --help",
+        `The \`config status\` command does not support ${flag}.`,
+        "spinedigest config status --help",
       ),
     );
   }
 }
 
 function listPresentMetaFlags(
-  values: SdpubMetaFlagValues,
+  values: ArchiveMetaFlagValues,
   options: { readonly includeTitle?: boolean } = {},
 ): readonly string[] {
   const includeTitle = options.includeTitle ?? true;
@@ -2451,43 +2049,13 @@ function listPresentMetaFlags(
 
 function requireChapterId(
   chapterId: number | undefined,
-  action: CLISdpubChapterAction,
+  action: CLIArchiveChapterAction,
   helpRoute: string,
 ): asserts chapterId is number {
   if (chapterId === undefined) {
     throw new Error(
       withHelpRoute(
-        `Missing --chapter. \`sdpub chapter ${action}\` requires a chapter id.`,
-        helpRoute,
-      ),
-    );
-  }
-}
-
-function rejectGraphActionPositionals(
-  actionPositionals: readonly string[],
-  action: CLISdpubGraphAction,
-  helpRoute: string,
-): void {
-  if (actionPositionals.length > 0) {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub graph ${action}\` action does not accept node or pattern arguments.`,
-        helpRoute,
-      ),
-    );
-  }
-}
-
-function rejectGraphActionLimit(
-  limit: number | undefined,
-  action: CLISdpubGraphAction,
-  helpRoute: string,
-): void {
-  if (limit !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        `The \`sdpub graph ${action}\` action does not support --limit.`,
+        `Missing --chapter. \`chapter ${action}\` requires a chapter id.`,
         helpRoute,
       ),
     );
@@ -2515,8 +2083,8 @@ function rejectStatusFlag(
   if (value !== undefined) {
     throw new Error(
       withHelpRoute(
-        `The \`status\` command does not support --${name}.`,
-        "spinedigest status --help",
+        `The \`config status\` command does not support --${name}.`,
+        "spinedigest config status --help",
       ),
     );
   }
@@ -2527,7 +2095,6 @@ function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
     value === "backlinks" ||
     value === "build" ||
     value === "estimate" ||
-    value === "evidence" ||
     value === "fragments" ||
     value === "export" ||
     value === "find" ||
@@ -2535,11 +2102,13 @@ function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
     value === "import" ||
     value === "index" ||
     value === "links" ||
+    value === "list" ||
     value === "ls" ||
     value === "map" ||
     value === "page" ||
     value === "pack" ||
     value === "path" ||
+    value === "read" ||
     value === "related" ||
     value === "status"
   );
@@ -2590,7 +2159,6 @@ function parseArchiveListKind(
   if (
     value === "chapters" ||
     value === "edges" ||
-    value === "evidence" ||
     value === "fragments" ||
     value === "meta" ||
     value === "nodes" ||
@@ -2601,8 +2169,143 @@ function parseArchiveListKind(
 
   throw new Error(
     withHelpRoute(
-      `Invalid list kind: ${value}. Expected chapters, nodes, edges, evidence, fragments, summaries, or meta.`,
+      `Invalid list kind: ${value}. Expected chapters, nodes, edges, fragments, summaries, or meta.`,
       "spinedigest ls --help",
+    ),
+  );
+}
+
+function parseArchiveSearchChapters(value: string): readonly number[] {
+  const chapters = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "")
+    .map((item) =>
+      parsePositiveIntegerFlag(item, "--chapter", CLI_HELP_ROUTES.command),
+    );
+
+  if (chapters.length === 0) {
+    throw new Error(
+      withHelpRoute("--chapter cannot be empty.", CLI_HELP_ROUTES.command),
+    );
+  }
+
+  return [...new Set(chapters)];
+}
+
+function parseArchiveIds(value: string): readonly string[] {
+  const ids = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "");
+
+  if (ids.length === 0) {
+    throw new Error(
+      withHelpRoute("--id cannot be empty.", CLI_HELP_ROUTES.command),
+    );
+  }
+
+  return [...new Set(ids)];
+}
+
+function parseArchiveSearchOrder(
+  value: string,
+): NonNullable<CLIArchiveArguments["searchOrder"]> {
+  if (value === "doc-asc" || value === "doc-desc") {
+    return value;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --order: ${value}. Expected doc-asc or doc-desc.`,
+      CLI_HELP_ROUTES.command,
+    ),
+  );
+}
+
+function parseArchiveFindMatch(
+  value: string,
+): NonNullable<CLIArchiveArguments["match"]> {
+  if (value === "any" || value === "all") {
+    return value;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --match: ${value}. Expected any or all.`,
+      "spinedigest find --help",
+    ),
+  );
+}
+
+function parseArchiveSearchTypes(
+  value: string,
+): NonNullable<CLIArchiveArguments["searchTypes"]> {
+  const types = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "")
+    .map(parseArchiveSearchType);
+
+  if (types.length === 0) {
+    throw new Error(
+      withHelpRoute("--type cannot be empty.", CLI_HELP_ROUTES.command),
+    );
+  }
+
+  return [...new Set(types)];
+}
+
+function parseArchiveSearchType(
+  value: string,
+): NonNullable<CLIArchiveArguments["searchTypes"]>[number] {
+  if (value === "fragment" || value === "node" || value === "summary") {
+    return value;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --type: ${value}. Expected summary, node, or fragment.`,
+      CLI_HELP_ROUTES.command,
+    ),
+  );
+}
+
+function parseArchiveCollectionTypes(
+  value: string,
+): NonNullable<CLIArchiveArguments["searchTypes"]> {
+  const types = value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item !== "")
+    .map(parseArchiveCollectionType);
+
+  if (types.length === 0) {
+    throw new Error(
+      withHelpRoute("--type cannot be empty.", CLI_HELP_ROUTES.command),
+    );
+  }
+
+  return [...new Set(types)];
+}
+
+function parseArchiveCollectionType(
+  value: string,
+): NonNullable<CLIArchiveArguments["searchTypes"]>[number] {
+  if (
+    value === "chapter" ||
+    value === "fragment" ||
+    value === "meta" ||
+    value === "node" ||
+    value === "summary"
+  ) {
+    return value;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --type: ${value}. Expected chapter, summary, node, fragment, or meta.`,
+      CLI_HELP_ROUTES.command,
     ),
   );
 }
@@ -2648,7 +2351,10 @@ function normalizeArchiveInlineOptions(
   readonly values: ArchiveArgumentValues;
 } {
   const normalizedPositionals: string[] = [];
-  const normalizedValues: Record<string, boolean | string | undefined> = {
+  const normalizedValues: Record<
+    string,
+    boolean | readonly string[] | string | undefined
+  > = {
     ...values,
   };
 
@@ -2666,14 +2372,19 @@ function normalizeArchiveInlineOptions(
         continue;
       case "--budget":
       case "--chapter":
+      case "--cursor":
+      case "--id":
       case "--input":
       case "--input-format":
       case "--limit":
       case "--llm":
+      case "--match":
+      case "--order":
       case "--output":
       case "--output-format":
       case "--prompt":
       case "--stage":
+      case "--type":
       case "--to": {
         const value = positionals[index + 1];
 
@@ -2708,6 +2419,93 @@ function rejectArchiveExtraPositionals(
       withHelpRoute(
         `Unexpected positional arguments for \`${action}\`: ${positionals.slice(allowed).join(" ")}.`,
         helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectArchiveMaintenanceExtraPositionals(
+  command: CLIArchiveMaintenanceCommand,
+  positionals: readonly string[],
+  allowed: number,
+  helpRoute: string,
+): void {
+  if (positionals.length > allowed) {
+    throw new Error(
+      withHelpRoute(
+        `Unexpected positional arguments for \`${command}\`: ${positionals.slice(allowed).join(" ")}.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectMetaCommandFlag(
+  name: string,
+  value: string | undefined,
+  helpRoute: string,
+): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The \`meta\` command does not support --${name}.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectMetaCommandBooleanFlag(
+  name: string,
+  value: boolean | undefined,
+  helpRoute: string,
+): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The \`meta\` command does not support --${name}.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectCoverCommandFlag(
+  name: string,
+  value: string | undefined,
+  helpRoute: string,
+): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The \`cover\` command does not support --${name}.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectCoverCommandBooleanFlag(
+  name: string,
+  value: boolean | undefined,
+  helpRoute: string,
+): void {
+  if (value !== undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The \`cover\` command does not support --${name}.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectCoverMetaFlags(values: ArchiveMetaFlagValues): void {
+  for (const flag of listPresentMetaFlags(values)) {
+    throw new Error(
+      withHelpRoute(
+        `The \`cover\` command does not support ${flag}.`,
+        "spinedigest cover --help",
       ),
     );
   }

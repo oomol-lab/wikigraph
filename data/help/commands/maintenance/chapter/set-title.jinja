@@ -1,0 +1,28 @@
+Help Type: command
+Command: spinedigest chapter set-title
+
+chapter set-title
+
+Purpose:
+  Rename an existing chapter in the archive TOC.
+
+Usage:
+  spinedigest chapter set-title <path> --chapter <id> --title <title> [--llm <json>] [--help|-h]
+
+Behavior:
+  - Updates only the chapter title stored in the TOC.
+  - Does not change source text, graph nodes, summaries, or metadata.
+  - Pass an empty or whitespace-only `--title` value to clear the title and show `[untitled]`.
+  - Does not call an LLM provider.
+
+Output shape:
+  Prints the updated chapter status.
+
+Examples:
+  spinedigest chapter set-title book.sdpub --chapter 12 --title "New Chapter Title"
+  spinedigest chapter set-title book.sdpub --chapter 12 --title ""
+
+See also:
+  - spinedigest chapter list --help
+  - spinedigest chapter status --help
+  - spinedigest help command

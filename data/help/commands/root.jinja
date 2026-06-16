@@ -5,7 +5,24 @@ SpineDigest CLI
 
 Purpose:
   Build portable LLM Wiki archives for AI agents.
-  Treat `.sdpub` as the primary knowledge archive: import sources, build derived knowledge, then search, browse, trace evidence, navigate links, and export projections without unpacking it.
+  Treat `.sdpub` as the primary knowledge archive: import sources, build derived knowledge, then search, browse, read source fragments, navigate links, and export projections without unpacking it.
+
+Three exploration modes:
+  1. Search mode:
+     Use `find` for whitespace-separated keyword discovery and `grep` for exact continuous text.
+     Untyped `find` is broad candidate discovery. For content understanding, choose a search lens:
+       --type node      topology / LLM Wiki structure
+       --type summary   quick overview
+       --type fragment  original source wording
+  2. Structure mode:
+     Use `list` to get bounded object collections and `page` to open one detailed object with local navigation.
+  3. Reading mode:
+     Use `read` to print chapter, summary, fragment, or node text as continuous plain text.
+
+Task routing:
+  For synthesis, timelines, relationship analysis, process reconstruction, or concept-structure tasks, start with Structure mode:
+    status -> index -> list --type chapter -> page chapter:<id>
+  Use broad `find` to locate candidate chapters or verify missing concepts, then add a search lens (`--type node|summary|fragment`) for content judgments. Use `grep` only for exact source wording.
 
 Archive-first usage:
   spinedigest import <archive.sdpub> [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
@@ -13,50 +30,61 @@ Archive-first usage:
   spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--json]
   spinedigest status <archive.sdpub> [--json]
   spinedigest index <archive.sdpub> [--json]
-  spinedigest ls <archive.sdpub> [chapters|nodes|edges|evidence|summaries|meta] [--json]
-  spinedigest find <archive.sdpub> <query> [--json]
+  spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--limit <n>] [--cursor <token>] [--json]
+  spinedigest find <archive.sdpub> <query> [--match <any|all>] [--type <node|summary|fragment>] [--json]
   spinedigest grep <archive.sdpub> <query> [--json]
   spinedigest page <archive.sdpub> <id> [--json]
-  spinedigest evidence <archive.sdpub> <id> [--json]
+  spinedigest read <archive.sdpub> <id>
   spinedigest links <archive.sdpub> <node:id> [--json]
   spinedigest backlinks <archive.sdpub> <node:id> [--json]
   spinedigest related <archive.sdpub> <node:id> [--json]
   spinedigest path <archive.sdpub> <node:id> <node:id> --chapter <id>
-  spinedigest map <archive.sdpub> [--json]
   spinedigest pack <archive.sdpub> <id> [--budget <chars>] [--json]
   spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 
 Direct digest command:
-  `spinedigest` without a subcommand is the direct one-shot digest/export command.
+  `spinedigest transform` is the direct one-shot digest/export command.
   It reads from `--input <path>`, or from stdin when `--input` is omitted.
   It writes to `--output <path>`, or to stdout when `--output` is omitted.
+  A bare non-interactive `spinedigest` invocation still runs the same direct digest command for compatibility.
   Prefer the archive-first commands for new automation.
 
 Direct and maintenance usage:
-  spinedigest [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose|-v] [--help|-h] [--version]
-  spinedigest status [--llm <json>]
-  spinedigest sdpub <info|toc|list|cat|cover|meta> --input <path> [options] [--help|-h]
-  spinedigest sdpub chapter <action> <path> [options] [--help|-h]
-  spinedigest sdpub stage <action> <path> [options] [--help|-h]
-  spinedigest sdpub graph <action> <path> --chapter <id> [options] [--help|-h]
+  spinedigest transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose|-v] [--help|-h]
+  spinedigest meta <archive.sdpub> [metadata options] [--json] [--llm <json>] [--help|-h]
+  spinedigest cover <archive.sdpub> [--llm <json>] [--help|-h]
+  spinedigest chapter <action> <archive.sdpub> [options] [--llm <json>] [--help|-h]
+  spinedigest config status [--llm <json>] [--help|-h]
   spinedigest help [topic] [--help|-h]
+
+  Maintenance commands are for metadata, cover extraction, and chapter tree edits. Routine archive exploration should use `index`, `list`, `page`, `find`, `grep`, and `read`.
 
 Core object ids:
   chapter:<id>     A chapter-like archive page.
   node:<id>        A graph knowledge node.
-  sentence:a:b:c   A source evidence sentence.
+  fragment:a:b     A source reading fragment.
   summary:<id>     A chapter summary projection.
   meta:book        Archive metadata.
 
 Cost contract:
   Import is cheap when it stops at source.
-  Search, page, evidence, links, map, and export are cheap after build.
+  List, search, page, read, links, and export are cheap after build.
   Build can call an LLM and may be expensive. Run `spinedigest estimate <archive.sdpub>` before full-archive graph, summary, or ready builds, then rerun `build` with `--confirm`.
 
 Help contract:
   - Append `--help` to commands and subcommands to see command-specific usage.
   - Use `spinedigest help <topic>` for cross-command concepts, constraints, and runtime behavior.
   - Treat `spinedigest --help` as the root page of the same help system.
+
+Search lens examples:
+  spinedigest find book.sdpub "keyword"
+    Broad first pass across metadata, chapter titles, summaries, nodes, and fragments.
+  spinedigest find book.sdpub "keyword" --type node
+    Topology / LLM Wiki structure.
+  spinedigest find book.sdpub "keyword" --type summary
+    Quick overview.
+  spinedigest find book.sdpub "keyword" --type fragment
+    Original source wording.
 
 Help topics:
 {% for topic in helpTopics %}
@@ -71,4 +99,3 @@ Start here:
   - Read `spinedigest help overview` for the archive-first mental model.
   - Read `spinedigest help ai` for the agent operating contract.
   - Read `spinedigest help command` for command shapes.
-  - Read `spinedigest help sdpub` when maintaining lower-level archive scripts that still use `sdpub ...`.

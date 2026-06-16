@@ -19,14 +19,17 @@ Estimate a full ready build:
 Build one chapter graph:
   spinedigest build book.sdpub --stage graph --chapter 3 --confirm
 
-Find and read evidence-backed knowledge:
+Find and read source-backed knowledge:
   spinedigest find book.sdpub "knowledge graph"
   spinedigest page book.sdpub node:84
-  spinedigest evidence book.sdpub node:84
 
 List archive objects as JSON:
-  spinedigest ls book.sdpub nodes --json
+  spinedigest list book.sdpub --type node --json
+  spinedigest list book.sdpub --type node --chapter 3 --json
   spinedigest find book.sdpub "RAG" --json
+
+Read one chapter as continuous text:
+  spinedigest read book.sdpub chapter:3
 
 Export a Markdown projection:
   spinedigest export book.sdpub --output-format markdown --output digest.md
@@ -41,4 +44,4 @@ Pipe extracted webpage text into an archive:
   curl -L https://example.com/post | defuddle | spinedigest import article.sdpub --input-format markdown
 
 One-shot stream digest:
-  cat chapter.txt | spinedigest --input-format txt --output-format markdown
+  cat chapter.txt | spinedigest transform --input-format txt --output-format markdown

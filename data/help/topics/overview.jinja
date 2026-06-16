@@ -7,15 +7,29 @@ What SpineDigest does:
   SpineDigest builds portable LLM Wiki archives for AI agents.
   It imports EPUB, Markdown, plain text, URL-ready text, or stdin into `.sdpub`, then exposes archive objects through deterministic CLI primitives.
 
+Three exploration modes:
+  1. Search mode:
+     `find` discovers objects by deterministic keywords; `grep` checks exact text phrases.
+     Treat untyped `find` as broad candidate discovery. For content understanding, choose a search lens: `--type node` for topology / LLM Wiki structure, `--type summary` for quick overview, or `--type fragment` for original source wording.
+  2. Structure mode:
+     `list` returns bounded collections; `page` opens one detailed object with local navigation such as chapter node groups, node source fragments, and node neighbors.
+  3. Reading mode:
+     `read` prints continuous plain text for a chapter, summary, fragment, or node.
+
+Priority:
+  For synthesis, timelines, relationships, process reconstruction, or concept-structure tasks, use Structure mode first:
+    list --type chapter -> page chapter:<id>
+  Treat `find` as candidate discovery and verification, not as the default way to flatten a `.sdpub` into plain text.
+
 Mental model:
   1. Archive object:
      `.sdpub` is the primary object. Treat it as a managed knowledge archive, not as a ZIP file to inspect manually.
   2. Source layer:
      Import stores normalized source material and metadata. This stage is cheap and safe to run by default.
   3. Knowledge layer:
-     Build derives graph nodes, summaries, links, and evidence-backed reading surfaces. Graph and summary stages may call an LLM.
+     Build derives graph nodes, summaries, links, and source-backed reading surfaces. Graph and summary stages may call an LLM.
   4. Retrieval layer:
-     `index`, `ls`, `find`, `page`, `evidence`, `links`, `backlinks`, `path`, and `map` project existing archive data into an agent-friendly Wiki-like interface.
+     `index`, `list`, `find`, `grep`, `page`, `read`, `links`, and `backlinks` project existing archive data into an agent-friendly Wiki-like interface.
   5. Projection layer:
      `export` writes Markdown, txt, EPUB, or other supported projections. Export is not the core archive object.
 
@@ -25,9 +39,10 @@ Default workflow:
   spinedigest estimate book.sdpub --stage ready
   spinedigest build book.sdpub --stage graph --confirm
   spinedigest index book.sdpub
-  spinedigest find book.sdpub "keyword"
+  spinedigest list book.sdpub --type chapter
+  spinedigest find book.sdpub "keyword" --type node
   spinedigest page book.sdpub node:84
-  spinedigest evidence book.sdpub node:84
+  spinedigest read book.sdpub chapter:12
 
 Cost model:
   - Import/source: cheap, no LLM when kept at source.
@@ -35,7 +50,7 @@ Cost model:
   - Graph/summary/ready build: may call an LLM; estimate first.
 
 Compatibility:
-  The direct `spinedigest --input ... --output ...` digest command and `spinedigest sdpub ...` maintenance command family still exist for scripts and lower-level archive work.
+  The direct `spinedigest transform --input ... --output ...` digest command still exists for one-shot workflows.
   New automation should prefer archive-first commands.
 
 Where to go next:
@@ -47,5 +62,3 @@ Where to go next:
     spinedigest help command
   - Need format constraints:
     spinedigest help format
-  - Need sdpub maintenance details:
-    spinedigest help sdpub

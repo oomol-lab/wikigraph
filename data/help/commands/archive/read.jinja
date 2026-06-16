@@ -1,0 +1,21 @@
+Help Type: command
+Command: spinedigest read
+
+Purpose:
+  Print one archive object as continuous reading text.
+
+Usage:
+  spinedigest read <archive.sdpub> <id>
+
+Contract:
+  - Mutates: no.
+  - LLM: no.
+  - Output: plain text only.
+  - Reads: chapter source text, fragment source text, summary text, generated node summary, or metadata JSON text.
+
+Use `page` for object details and local navigation. Use `read` when the task is immersive reading rather than object exploration.
+
+Examples:
+  spinedigest read book.sdpub chapter:12
+  spinedigest read book.sdpub summary:12
+  spinedigest read book.sdpub fragment:12:0

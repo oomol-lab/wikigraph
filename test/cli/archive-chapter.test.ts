@@ -34,6 +34,7 @@ const chapterMockState = vi.hoisted(() => ({
     readonly streamText: string;
   }>,
   setSummaryCalls: [] as unknown[],
+  setTitleCalls: [] as unknown[],
   sourceFileStream: ["source file content"],
   stdinStream: ["stdin content"],
   textWrites: [] as string[],
@@ -160,6 +161,18 @@ vi.mock("../../src/facade/index.js", () => ({
       });
     },
   ),
+  setChapterTitle: vi.fn(
+    (_document: unknown, chapterId: number, title: string) => {
+      chapterMockState.setTitleCalls.push({
+        chapterId,
+        title,
+      });
+      return Promise.resolve({
+        ...chapterDetails,
+        title: title.trim() === "" ? null : title.trim(),
+      });
+    },
+  ),
 }));
 
 vi.mock("../../src/cli/config.js", () => ({
@@ -207,9 +220,9 @@ vi.mock("fs", () => ({
   createReadStream: vi.fn(() => chapterMockState.sourceFileStream),
 }));
 
-import { runSdpubChapterCommand } from "../../src/cli/sdpub-chapter.js";
+import { runArchiveChapterCommand } from "../../src/cli/archive-chapter.js";
 
-describe("cli/sdpub-chapter", () => {
+describe("cli/archive-chapter", () => {
   const originalStdinIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
@@ -222,6 +235,7 @@ describe("cli/sdpub-chapter", () => {
     chapterMockState.resetCalls.length = 0;
     chapterMockState.setSourceCalls.length = 0;
     chapterMockState.setSummaryCalls.length = 0;
+    chapterMockState.setTitleCalls.length = 0;
     chapterMockState.textWrites.length = 0;
     setStdinTTY(false);
   });
@@ -231,7 +245,7 @@ describe("cli/sdpub-chapter", () => {
   });
 
   it("prints chapter list with stages", async () => {
-    await runSdpubChapterCommand({
+    await runArchiveChapterCommand({
       action: "list",
       path: "/tmp/book.sdpub",
     });
@@ -243,7 +257,7 @@ describe("cli/sdpub-chapter", () => {
   });
 
   it("adds a chapter and prints the new chapter id", async () => {
-    await runSdpubChapterCommand({
+    await runArchiveChapterCommand({
       action: "add",
       parentChapterId: 1,
       path: "/tmp/book.sdpub",
@@ -260,7 +274,7 @@ describe("cli/sdpub-chapter", () => {
   });
 
   it("reads source content from --input", async () => {
-    await runSdpubChapterCommand({
+    await runArchiveChapterCommand({
       action: "set-source",
       chapterId: 2,
       inputFormat: "markdown",
@@ -277,7 +291,7 @@ describe("cli/sdpub-chapter", () => {
   });
 
   it("reads summary content from --input", async () => {
-    await runSdpubChapterCommand({
+    await runArchiveChapterCommand({
       action: "set-summary",
       chapterId: 2,
       inputPath: "/tmp/summary.txt",
@@ -292,8 +306,25 @@ describe("cli/sdpub-chapter", () => {
     ]);
   });
 
+  it("sets a chapter title", async () => {
+    await runArchiveChapterCommand({
+      action: "set-title",
+      chapterId: 2,
+      path: "/tmp/book.sdpub",
+      title: "Renamed Chapter",
+    });
+
+    expect(chapterMockState.setTitleCalls).toStrictEqual([
+      {
+        chapterId: 2,
+        title: "Renamed Chapter",
+      },
+    ]);
+    expect(chapterMockState.textWrites[0]).toContain("Title: Renamed Chapter");
+  });
+
   it("passes prompt to generate-graph", async () => {
-    await runSdpubChapterCommand({
+    await runArchiveChapterCommand({
       action: "generate-graph",
       chapterId: 2,
       path: "/tmp/book.sdpub",
@@ -310,7 +341,7 @@ describe("cli/sdpub-chapter", () => {
   });
 
   it("removes chapters recursively when requested", async () => {
-    await runSdpubChapterCommand({
+    await runArchiveChapterCommand({
       action: "remove",
       chapterId: 1,
       path: "/tmp/book.sdpub",

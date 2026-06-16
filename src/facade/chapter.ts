@@ -166,7 +166,7 @@ export async function addChapter(
       !appendChildToChapter(toc.items, options.parentChapterId, chapterItem)
     ) {
       throw new Error(
-        `Chapter ${options.parentChapterId} does not exist. Use \`spinedigest sdpub chapter list <path>\` to discover chapter ids.`,
+        `Chapter ${options.parentChapterId} does not exist. Use \`spinedigest list <archive.sdpub> --type chapter\` to discover chapter ids.`,
       );
     }
 
@@ -246,7 +246,7 @@ export async function getChapterDetails(
 
   if (entry === undefined) {
     throw new Error(
-      `Chapter ${chapterId} does not exist. Use \`spinedigest sdpub chapter list <path>\` to discover chapter ids.`,
+      `Chapter ${chapterId} does not exist. Use \`spinedigest list <archive.sdpub> --type chapter\` to discover chapter ids.`,
     );
   }
 
@@ -283,7 +283,7 @@ export async function removeChapter(
 
     if (!result.removed) {
       throw new Error(
-        `Chapter ${chapterId} does not exist. Use \`spinedigest sdpub chapter list <path>\` to discover chapter ids.`,
+        `Chapter ${chapterId} does not exist. Use \`spinedigest list <archive.sdpub> --type chapter\` to discover chapter ids.`,
       );
     }
 
@@ -354,6 +354,26 @@ export async function setChapterSummary(
     }
 
     await openedDocument.writeSummary(chapterId, summary);
+    return await getChapterDetails(openedDocument, chapterId);
+  });
+}
+
+export async function setChapterTitle(
+  document: Document,
+  chapterId: number,
+  title: string | null | undefined,
+): Promise<ChapterDetails> {
+  return await document.openSession(async (openedDocument) => {
+    const toc = await normalizeChapterToc(openedDocument);
+    const normalizedTitle = normalizeTitle(title);
+
+    if (!setChapterTitleInItems(toc.items, chapterId, normalizedTitle)) {
+      throw new Error(
+        `Chapter ${chapterId} does not exist. Use \`spinedigest list <archive.sdpub> --type chapter\` to discover chapter ids.`,
+      );
+    }
+
+    await openedDocument.replaceToc(toc);
     return await getChapterDetails(openedDocument, chapterId);
   });
 }
@@ -525,7 +545,7 @@ async function selectChapterEntries(
 
   if (selectedIds.size === 0) {
     throw new Error(
-      `Chapter ${chapterId} does not exist. Use \`spinedigest sdpub chapter list <path>\` to discover chapter ids.`,
+      `Chapter ${chapterId} does not exist. Use \`spinedigest list <archive.sdpub> --type chapter\` to discover chapter ids.`,
     );
   }
 
@@ -734,6 +754,29 @@ function removeChapterFromItems(
     items: nextItems,
     removed,
   };
+}
+
+function setChapterTitleInItems(
+  items: readonly MutableTocItem[],
+  chapterId: number,
+  title: string | undefined,
+): boolean {
+  for (const item of items) {
+    if (item.serialId === chapterId) {
+      if (title === undefined) {
+        delete item.title;
+      } else {
+        item.title = title;
+      }
+      return true;
+    }
+
+    if (setChapterTitleInItems(item.children, chapterId, title)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function collectChapterIds(
