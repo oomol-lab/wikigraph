@@ -284,6 +284,28 @@ describe("cli/args", () => {
 
     expect(
       parseCLIArguments([
+        "find",
+        "book.sdpub",
+        "朱元璋 洪都",
+        "--match",
+        "all",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "find",
+        archivePath: "book.sdpub",
+        match: "all",
+        query: "朱元璋 洪都",
+      },
+      help: false,
+      kind: "archive",
+    });
+    expect(() =>
+      parseCLIArguments(["find", "book.sdpub", "RAG", "--match", "strict"]),
+    ).toThrow("Invalid --match: strict. Expected any or all.");
+
+    expect(
+      parseCLIArguments([
         "grep",
         "book.sdpub",
         "exact phrase",
@@ -314,6 +336,15 @@ describe("cli/args", () => {
       help: false,
       kind: "archive",
     });
+    expect(() =>
+      parseCLIArguments([
+        "grep",
+        "book.sdpub",
+        "exact phrase",
+        "--match",
+        "all",
+      ]),
+    ).toThrow("The `grep` command does not support --match.");
 
     expect(
       parseCLIArguments([

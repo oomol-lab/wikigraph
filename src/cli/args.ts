@@ -157,6 +157,7 @@ export interface CLIArchiveArguments {
   readonly json?: boolean;
   readonly ids?: readonly string[];
   readonly limit?: number;
+  readonly match?: "all" | "any";
   readonly listKind?:
     | "chapters"
     | "edges"
@@ -215,6 +216,7 @@ interface ArchiveArgumentValues extends SdpubMetaFlagValues {
   readonly json?: boolean;
   readonly limit?: string;
   readonly llm?: string;
+  readonly match?: string;
   readonly output?: string;
   readonly "output-format"?: string;
   readonly order?: string;
@@ -371,6 +373,9 @@ export function parseCLIArguments(
         type: "boolean",
       },
       llm: {
+        type: "string",
+      },
+      match: {
         type: "string",
       },
       output: {
@@ -1075,6 +1080,9 @@ function parseArchiveArguments(
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      if (action === "grep") {
+        rejectArchiveFlag(action, "--match", values.match, helpRoute);
+      }
       return {
         args: {
           action,
@@ -1094,6 +1102,9 @@ function parseArchiveArguments(
                 ),
               }),
           query,
+          ...(action === "find" && values.match !== undefined
+            ? { match: parseArchiveFindMatch(values.match) }
+            : {}),
           ...(values.order === undefined
             ? {}
             : { searchOrder: parseArchiveSearchOrder(values.order) }),
@@ -2806,6 +2817,21 @@ function parseArchiveSearchOrder(
   );
 }
 
+function parseArchiveFindMatch(
+  value: string,
+): NonNullable<CLIArchiveArguments["match"]> {
+  if (value === "any" || value === "all") {
+    return value;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --match: ${value}. Expected any or all.`,
+      "spinedigest find --help",
+    ),
+  );
+}
+
 function parseArchiveSearchTypes(
   value: string,
 ): NonNullable<CLIArchiveArguments["searchTypes"]> {
@@ -2952,6 +2978,7 @@ function normalizeArchiveInlineOptions(
       case "--input-format":
       case "--limit":
       case "--llm":
+      case "--match":
       case "--order":
       case "--output":
       case "--output-format":

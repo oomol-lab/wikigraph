@@ -5,13 +5,15 @@ Purpose:
   Find archive objects by deterministic keyword search.
 
 Usage:
-  spinedigest find <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
+  spinedigest find <archive.sdpub> <query> [--match <any|all>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 
 Contract:
   - Mutates: no.
   - LLM: no.
   - Searches: metadata, chapter titles, summaries, graph nodes, evidence, and source fragments.
-  - Query: split on whitespace into keywords; every keyword must appear inside the same returned object.
+  - Query: split on whitespace into keywords.
+  - Match: default `--match any` returns objects containing at least one keyword and ranks stronger matches first.
+  - Strict match: `--match all` requires every keyword to appear inside the same returned object.
   - Scope: `--chapter 12` or `--chapter 11,12` limits results to chapters.
   - Types: `--type summary,node,fragment,sentence` limits result object types.
   - Order: `doc-asc` or `doc-desc`; default `doc-asc`.
@@ -23,5 +25,6 @@ Use `grep` instead when the query must be treated as one exact continuous text p
 
 Examples:
   spinedigest find book.sdpub "Wiki"
-  spinedigest find book.sdpub "朱元璋 亲自 来到" --json
+  spinedigest find book.sdpub "朱元璋 濠州 和州 集庆 应天 洪都 鄱阳湖" --json
+  spinedigest find book.sdpub "朱元璋 亲自 来到" --match all --json
   spinedigest find book.sdpub "张定边" --chapter 12 --type summary,node --limit 10 --json

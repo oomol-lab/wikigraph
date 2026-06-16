@@ -13,7 +13,11 @@ const archiveMockState = vi.hoisted(() => ({
       chapter: 2,
       field: "content",
       id: "node:9",
+      matchCount: 1,
+      matchedTerms: ["rag"],
+      missingTerms: [],
       position: { chapter: 2, fragment: 0, sentence: 1 },
+      score: 1,
       snippet: "RAG appears in this node.",
       title: "Retrieval design",
       type: "node",
@@ -91,7 +95,11 @@ const archiveMockState = vi.hoisted(() => ({
         chapter: 2,
         field: "content",
         id: "node:9",
+        matchCount: 1,
+        matchedTerms: ["rag"],
+        missingTerms: [],
         position: { chapter: 2, fragment: 0, sentence: 1 },
+        score: 1,
         snippet: "RAG appears in this node.",
         title: "Retrieval design",
         type: "node",
@@ -203,16 +211,27 @@ vi.mock("../../src/facade/index.js", () => ({
       targetStage: "ready",
     }),
   ),
-  findArchiveObjects: vi.fn(() =>
-    Promise.resolve({
-      chapters: null,
-      items: archiveMockState.findHits,
-      limit: 20,
-      nextCursor: null,
-      order: "doc-asc",
-      query: "RAG",
-      types: null,
-    }),
+  findArchiveObjects: vi.fn(
+    (
+      _document: unknown,
+      query: string,
+      options: { readonly match?: "all" | "any" },
+    ) =>
+      Promise.resolve({
+        chapters: null,
+        items: archiveMockState.findHits,
+        limit: 20,
+        match: options.match ?? "any",
+        nextCursor: null,
+        order: "doc-asc",
+        query,
+        terms: query
+          .trim()
+          .toLowerCase()
+          .split(/\s+/u)
+          .filter((term) => term !== ""),
+        types: null,
+      }),
   ),
   findGraphPath: vi.fn(() => Promise.resolve([])),
   formatNodeId: (id: number) => `node:${id}`,
@@ -222,9 +241,11 @@ vi.mock("../../src/facade/index.js", () => ({
       chapters: null,
       items: archiveMockState.grepHits,
       limit: 20,
+      match: "any",
       nextCursor: null,
       order: "doc-asc",
       query: "exact phrase",
+      terms: ["exact", "phrase"],
       types: null,
     }),
   ),
@@ -318,6 +339,7 @@ describe("cli/archive", () => {
     });
 
     expect(archiveMockState.textWrites[0]).toContain("node:9  node/content");
+    expect(archiveMockState.textWrites[0]).toContain("Matched: rag");
     expect(archiveMockState.textWrites[0]).toContain(
       "Next: spinedigest page <archive.sdpub> node:9",
     );
@@ -325,6 +347,7 @@ describe("cli/archive", () => {
       chapters: undefined,
       cursor: undefined,
       limit: undefined,
+      match: undefined,
       order: undefined,
       types: undefined,
     });
@@ -374,10 +397,34 @@ describe("cli/archive", () => {
       chapters: undefined,
       cursor: undefined,
       limit: undefined,
+      match: undefined,
       order: undefined,
       types: undefined,
     });
     expect(findArchiveObjects).not.toHaveBeenCalled();
+  });
+
+  it("explains empty all-keyword find results", async () => {
+    archiveMockState.findHits.splice(0, archiveMockState.findHits.length);
+
+    await runArchiveCommand({
+      action: "find",
+      archivePath: "/tmp/book.sdpub",
+      match: "all",
+      query: "one two",
+    });
+
+    expect(archiveMockState.textWrites[0]).toContain(
+      "All 2 terms were required",
+    );
+    expect(findArchiveObjects).toHaveBeenCalledWith({}, "one two", {
+      chapters: undefined,
+      cursor: undefined,
+      limit: undefined,
+      match: "all",
+      order: undefined,
+      types: undefined,
+    });
   });
 
   it("passes search controls to find", async () => {
@@ -396,6 +443,7 @@ describe("cli/archive", () => {
       chapters: [11, 12],
       cursor: "cursor-token",
       limit: 10,
+      match: undefined,
       order: "doc-desc",
       types: ["summary", "node"],
     });

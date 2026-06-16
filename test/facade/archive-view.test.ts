@@ -34,19 +34,62 @@ describe("facade/archive-view", () => {
     });
   });
 
-  it("finds whitespace-separated keywords inside one archive object", async () => {
+  it("finds any whitespace-separated keyword by default", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
 
       try {
         await seedSourcedDocument(document);
 
-        const result = await findArchiveObjects(document, "朱元璋 亲自 来到");
+        const result = await findArchiveObjects(
+          document,
+          "朱元璋 不存在的关键词",
+        );
 
+        expect(result.match).toBe("any");
         expect(result.items).toContainEqual(
           expect.objectContaining({
             field: "source",
             id: "fragment:1:0",
+            matchedTerms: ["朱元璋"],
+            missingTerms: ["不存在的关键词"],
+            type: "fragment",
+          }),
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("supports all-keyword find matching when requested", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const noMatch = await findArchiveObjects(
+          document,
+          "朱元璋 不存在的关键词",
+          { match: "all" },
+        );
+        const result = await findArchiveObjects(document, "朱元璋 亲自 来到", {
+          match: "all",
+        });
+
+        expect(noMatch).toMatchObject({
+          items: [],
+          match: "all",
+          terms: ["朱元璋", "不存在的关键词"],
+        });
+        expect(result.items).toContainEqual(
+          expect.objectContaining({
+            field: "source",
+            id: "fragment:1:0",
+            matchCount: 3,
+            matchedTerms: ["朱元璋", "亲自", "来到"],
+            missingTerms: [],
             type: "fragment",
           }),
         );

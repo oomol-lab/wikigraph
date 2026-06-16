@@ -24,7 +24,7 @@ spinedigest read book.sdpub chapter:12
 spinedigest evidence book.sdpub node:84
 ```
 
-Use three exploration modes. Search mode uses `find` for multi-keyword discovery and `grep` for exact phrases. Structure mode uses `list` for bounded collections and `page` for one detailed object. Reading mode uses `read` when the user needs prose flow rather than object navigation.
+Use three exploration modes. Search mode uses `find` for multi-keyword discovery and `grep` for exact phrases. `find` defaults to `--match any`; use `--match all` only when every keyword must appear in the same object. Structure mode uses `list` for bounded collections and `page` for one detailed object. Reading mode uses `read` when the user needs prose flow rather than object navigation.
 
 Add `--type summary,node` for concept discovery, `--type fragment,sentence` for source wording, and `--chapter`, `--limit`, and `--cursor` to keep retrieval bounded.
 

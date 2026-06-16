@@ -17,7 +17,7 @@ spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--j
 spinedigest status <archive.sdpub> [--json]
 spinedigest index <archive.sdpub> [--json]
 spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
-spinedigest find <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
+spinedigest find <archive.sdpub> <query> [--match <any|all>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest grep <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest page <archive.sdpub> <id> [--json]
 spinedigest read <archive.sdpub> <id>
@@ -36,7 +36,8 @@ Exploration modes:
 
 Search and collection behavior:
 
-- `find` is deterministic keyword discovery. It splits the query on whitespace and returns objects where every keyword appears in the same object.
+- `find` is deterministic keyword discovery. It splits the query on whitespace, defaults to `--match any`, and ranks objects that match more terms first.
+- `find --match all` is the strict mode where every keyword must appear in the same object.
 - `grep` is exact text search. It treats the query as one continuous string.
 - `--chapter 12` or `--chapter 11,12` limits results to chapters.
 - `--type chapter,summary,node,fragment,sentence,meta` limits `list`; `find` and `grep` search `summary,node,fragment,sentence`.

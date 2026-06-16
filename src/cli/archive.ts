@@ -314,6 +314,7 @@ function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
     ...(args.ids === undefined ? {} : { ids: args.ids }),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
+    ...(args.match === undefined ? {} : { match: args.match }),
     ...(args.searchOrder === undefined ? {} : { order: args.searchOrder }),
     ...(args.searchTypes === undefined
       ? {}
@@ -475,7 +476,7 @@ async function writeFindHits(
   }
 
   if (result.items.length === 0) {
-    await writeTextToStdout("No matches.\n");
+    await writeTextToStdout(formatNoMatches(result));
     return;
   }
 
@@ -483,7 +484,7 @@ async function writeFindHits(
     `${result.items
       .map(
         (hit) =>
-          `${hit.id}  ${hit.type}/${hit.field}  ${hit.title}\n${hit.snippet}\nNext: spinedigest page <archive.sdpub> ${hit.id}`,
+          `${hit.id}  ${hit.type}/${hit.field}  ${hit.title}\n${formatFindMatchLine(hit)}${hit.snippet}\nNext: spinedigest page <archive.sdpub> ${hit.id}`,
       )
       .join("\n\n")}${formatNextCursor(result)}\n`,
   );
@@ -669,6 +670,28 @@ function formatNextCursor(result: ArchiveFindResult): string {
   }
 
   return `\n\nNext page: add --cursor ${result.nextCursor}`;
+}
+
+function formatNoMatches(result: ArchiveFindResult): string {
+  if (result.match === "all" && result.terms.length > 1) {
+    return `No matches. All ${result.terms.length} terms were required. Try: spinedigest find <archive.sdpub> "${result.query}" --match any\n`;
+  }
+
+  return [
+    "No matches.",
+    "Try fewer or broader keywords, `grep` for an exact continuous phrase, or `list --type fragment` to inspect source fragments.",
+    "",
+  ].join("\n");
+}
+
+function formatFindMatchLine(hit: {
+  readonly matchedTerms?: readonly string[];
+}): string {
+  if (hit.matchedTerms === undefined || hit.matchedTerms.length === 0) {
+    return "";
+  }
+
+  return `Matched: ${hit.matchedTerms.join(", ")}\n`;
 }
 
 function formatCollectionCursor(result: ArchiveCollectionResult): string {

@@ -59,7 +59,11 @@ export interface ArchiveFindHit {
   readonly chapter?: number;
   readonly field: ArchiveFindField;
   readonly id: string;
+  readonly matchCount?: number;
+  readonly matchedTerms?: readonly string[];
+  readonly missingTerms?: readonly string[];
   readonly position?: ArchiveFindPosition;
+  readonly score?: number;
   readonly snippet: string;
   readonly title: string;
   readonly type: ArchiveFindObjectType;
@@ -78,11 +82,13 @@ export interface ArchiveFindOptions {
   readonly cursor?: string;
   readonly ids?: readonly string[];
   readonly limit?: number;
+  readonly match?: ArchiveFindMatch;
   readonly order?: ArchiveFindOrder;
   readonly types?: readonly ArchiveFindFilterType[];
 }
 
 export type ArchiveFindOrder = "doc-asc" | "doc-desc";
+export type ArchiveFindMatch = "all" | "any";
 
 export interface ArchiveFindPosition {
   readonly chapter: number;
@@ -94,9 +100,11 @@ export interface ArchiveFindResult {
   readonly chapters: readonly number[] | null;
   readonly items: readonly ArchiveFindHit[];
   readonly limit: number;
+  readonly match: ArchiveFindMatch;
   readonly nextCursor: string | null;
   readonly order: ArchiveFindOrder;
   readonly query: string;
+  readonly terms: readonly string[];
   readonly types: readonly ArchiveFindFilterType[] | null;
 }
 
@@ -469,7 +477,7 @@ export async function findArchiveObjects(
   query: string,
   options: ArchiveFindOptions = {},
 ): Promise<ArchiveFindResult> {
-  const search = createKeywordSearch(query);
+  const search = createKeywordSearch(query, options.match ?? "any");
 
   if (search === undefined) {
     return createFindResult(query, [], options);
@@ -492,7 +500,7 @@ export async function grepArchiveObjects(
   const search = createPhraseSearch(query);
 
   if (search === undefined) {
-    return createFindResult(query, [], options);
+    return createFindResult(query, [], { ...options, match: "all" }, []);
   }
 
   const hits: ArchiveFindHit[] = [];
@@ -501,7 +509,9 @@ export async function grepArchiveObjects(
   hits.push(...(await findChapters(document, search)));
   hits.push(...(await findNodes(document, search)));
 
-  return createFindResult(query, hits, options);
+  return createFindResult(query, hits, { ...options, match: "all" }, [
+    query.trim().toLowerCase(),
+  ]);
 }
 
 export async function readArchiveText(
@@ -867,12 +877,14 @@ async function findChapters(
 
   for (const chapter of await listChapters(document)) {
     const title = chapter.title ?? `[chapter ${chapter.chapterId}]`;
+    const titleMatch = matchText(title, search);
 
-    if (matches(title, search)) {
+    if (titleMatch !== undefined) {
       hits.push({
         chapter: chapter.chapterId,
         field: "title",
         id: formatChapterId(chapter.chapterId),
+        ...createFindMatchFields(titleMatch),
         position: {
           chapter: chapter.chapterId,
         },
@@ -883,16 +895,19 @@ async function findChapters(
     }
 
     const summary = await document.readSummary(chapter.chapterId);
+    const summaryMatch =
+      summary === undefined ? undefined : matchText(summary, search);
 
-    if (summary !== undefined && matches(summary, search)) {
+    if (summary !== undefined && summaryMatch !== undefined) {
       hits.push({
         chapter: chapter.chapterId,
         field: "summary",
         id: formatSummaryId(chapter.chapterId),
+        ...createFindMatchFields(summaryMatch),
         position: {
           chapter: chapter.chapterId,
         },
-        snippet: createSnippet(summary, search.snippetNeedle),
+        snippet: createSnippet(summary, getSnippetNeedle(summaryMatch)),
         title,
         type: "summary",
       });
@@ -902,16 +917,22 @@ async function findChapters(
       document,
       chapter.chapterId,
     )) {
-      if (matches(fragment.text, search)) {
+      const fragmentMatch = matchText(fragment.text, search);
+
+      if (fragmentMatch !== undefined) {
         hits.push({
           chapter: chapter.chapterId,
           field: "source",
           id: fragment.id,
+          ...createFindMatchFields(fragmentMatch),
           position: {
             chapter: chapter.chapterId,
             fragment: fragment.fragmentId,
           },
-          snippet: createSnippet(fragment.text, search.snippetNeedle),
+          snippet: createSnippet(
+            fragment.text,
+            getSnippetNeedle(fragmentMatch),
+          ),
           title,
           type: "fragment",
         });
@@ -1147,8 +1168,9 @@ function findMeta(
     meta.sourceFormat,
   ].filter(isDefined);
   const content = fields.join("\n");
+  const contentMatch = matchText(content, search);
 
-  if (!matches(content, search)) {
+  if (contentMatch === undefined) {
     return [];
   }
 
@@ -1156,7 +1178,8 @@ function findMeta(
     {
       field: "metadata",
       id: "meta:book",
-      snippet: createSnippet(content, search.snippetNeedle),
+      ...createFindMatchFields(contentMatch),
+      snippet: createSnippet(content, getSnippetNeedle(contentMatch)),
       title: meta.title ?? "Book metadata",
       type: "meta",
     },
@@ -1171,25 +1194,30 @@ async function findNodes(
 
   for (const node of await document.chunks.listAll()) {
     const position = createNodePosition(node.sentenceIds);
+    const labelMatch = matchText(node.label, search);
 
-    if (matches(node.label, search)) {
+    if (labelMatch !== undefined) {
       hits.push({
         chapter: node.sentenceId[0],
         field: "title",
         id: formatNodeId(node.id),
+        ...createFindMatchFields(labelMatch),
         ...(position === undefined ? {} : { position }),
         snippet: node.label,
         title: node.label,
         type: "node",
       });
     }
-    if (matches(node.content, search)) {
+    const contentMatch = matchText(node.content, search);
+
+    if (contentMatch !== undefined) {
       hits.push({
         chapter: node.sentenceId[0],
         field: "content",
         id: formatNodeId(node.id),
+        ...createFindMatchFields(contentMatch),
         ...(position === undefined ? {} : { position }),
-        snippet: createSnippet(node.content, search.snippetNeedle),
+        snippet: createSnippet(node.content, getSnippetNeedle(contentMatch)),
         title: node.label,
         type: "node",
       });
@@ -1197,14 +1225,16 @@ async function findNodes(
 
     for (const sentenceId of node.sentenceIds) {
       const text = await document.getSentence(sentenceId);
+      const textMatch = matchText(text, search);
 
-      if (matches(text, search)) {
+      if (textMatch !== undefined) {
         hits.push({
           chapter: sentenceId[0],
           field: "evidence",
           id: formatSentenceId(sentenceId),
+          ...createFindMatchFields(textMatch),
           position: createSentencePosition(sentenceId),
-          snippet: createSnippet(text, search.snippetNeedle),
+          snippet: createSnippet(text, getSnippetNeedle(textMatch)),
           title: node.label,
           type: "sentence",
         });
@@ -1382,13 +1412,23 @@ function parseNonNegativeInteger(
 }
 
 interface ArchiveTextSearch {
-  readonly snippetNeedle: string;
+  readonly match: ArchiveFindMatch;
   readonly terms: readonly string[];
+}
+
+interface ArchiveTextMatch {
+  readonly matchCount: number;
+  readonly matchedTerms: readonly string[];
+  readonly missingTerms: readonly string[];
+  readonly score: number;
 }
 
 const DEFAULT_FIND_LIMIT = 20;
 
-function createKeywordSearch(query: string): ArchiveTextSearch | undefined {
+function createKeywordSearch(
+  query: string,
+  match: ArchiveFindMatch,
+): ArchiveTextSearch | undefined {
   const terms = query
     .trim()
     .toLowerCase()
@@ -1399,14 +1439,8 @@ function createKeywordSearch(query: string): ArchiveTextSearch | undefined {
     return undefined;
   }
 
-  const [snippetNeedle] = terms;
-
-  if (snippetNeedle === undefined) {
-    return undefined;
-  }
-
   return {
-    snippetNeedle,
+    match,
     terms,
   };
 }
@@ -1419,25 +1453,73 @@ function createPhraseSearch(query: string): ArchiveTextSearch | undefined {
   }
 
   return {
-    snippetNeedle: needle,
+    match: "all",
     terms: [needle],
   };
 }
 
-function matches(value: string, search: ArchiveTextSearch): boolean {
+function matchText(
+  value: string,
+  search: ArchiveTextSearch,
+): ArchiveTextMatch | undefined {
   const lower = value.toLowerCase();
+  const matchedTerms = search.terms.filter((term) => lower.includes(term));
+  const missingTerms = search.terms.filter((term) => !lower.includes(term));
 
-  return search.terms.every((term) => lower.includes(term));
+  if (search.match === "all" && missingTerms.length > 0) {
+    return undefined;
+  }
+  if (search.match === "any" && matchedTerms.length === 0) {
+    return undefined;
+  }
+  const [snippetNeedle] = matchedTerms;
+
+  if (snippetNeedle === undefined) {
+    return undefined;
+  }
+
+  return {
+    matchCount: matchedTerms.length,
+    matchedTerms,
+    missingTerms,
+    score: matchedTerms.length / search.terms.length,
+  };
+}
+
+function createFindMatchFields(
+  match: ArchiveTextMatch,
+): Pick<
+  ArchiveFindHit,
+  "matchCount" | "matchedTerms" | "missingTerms" | "score"
+> {
+  return {
+    matchCount: match.matchCount,
+    matchedTerms: match.matchedTerms,
+    missingTerms: match.missingTerms,
+    score: match.score,
+  };
+}
+
+function getSnippetNeedle(match: ArchiveTextMatch): string {
+  const [needle] = match.matchedTerms;
+
+  if (needle === undefined) {
+    throw new Error("Internal error: missing matched search term.");
+  }
+
+  return needle;
 }
 
 function createFindResult(
   query: string,
   hits: readonly ArchiveFindHit[],
   options: ArchiveFindOptions,
+  terms = createSearchTerms(query),
 ): ArchiveFindResult {
   const order = options.order ?? "doc-asc";
   const limit = options.limit ?? DEFAULT_FIND_LIMIT;
   const chapters = options.chapters ?? null;
+  const match = options.match ?? "any";
   const types = options.types ?? null;
   const ids = options.ids ?? null;
   const start = decodeFindCursor(options.cursor);
@@ -1453,10 +1535,12 @@ function createFindResult(
     chapters,
     items,
     limit,
+    match,
     nextCursor:
       nextOffset < filtered.length ? encodeFindCursor(nextOffset) : null,
     order,
     query,
+    terms,
     types,
   };
 }
@@ -1533,14 +1617,25 @@ function compareFindHits(
   order: ArchiveFindOrder,
 ): number {
   const direction = order === "doc-asc" ? 1 : -1;
-  const compared =
+  const relevance =
+    compareNumbers(right.score ?? 0, left.score ?? 0) ||
+    compareNumbers(right.matchCount ?? 0, left.matchCount ?? 0);
+  const position =
     compareNumbers(getPositionChapter(left), getPositionChapter(right)) ||
     compareNumbers(getPositionFragment(left), getPositionFragment(right)) ||
     compareNumbers(getPositionSentence(left), getPositionSentence(right)) ||
     compareNumbers(getTypeOrder(left.type), getTypeOrder(right.type)) ||
     left.id.localeCompare(right.id);
 
-  return compared * direction;
+  return relevance || position * direction;
+}
+
+function createSearchTerms(query: string): readonly string[] {
+  return query
+    .trim()
+    .toLowerCase()
+    .split(/\s+/u)
+    .filter((term) => term !== "");
 }
 
 function getPositionChapter(hit: ArchiveFindHit): number {

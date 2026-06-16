@@ -17,7 +17,7 @@ spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--j
 spinedigest status <archive.sdpub> [--json]
 spinedigest index <archive.sdpub> [--json]
 spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
-spinedigest find <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
+spinedigest find <archive.sdpub> <query> [--match <any|all>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest grep <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest page <archive.sdpub> <id> [--json]
 spinedigest read <archive.sdpub> <id>
@@ -36,7 +36,8 @@ spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 
 搜索与集合行为：
 
-- `find` 是确定性的关键词发现。它按空白拆分 query，并返回同一个对象内包含全部关键词的结果。
+- `find` 是确定性的关键词发现。它按空白拆分 query，默认 `--match any`，并优先返回命中更多关键词的对象。
+- `find --match all` 是严格模式，要求同一个对象内包含全部关键词。
 - `grep` 是精确文本搜索。它把 query 当作一个连续字符串。
 - `--chapter 12` 或 `--chapter 11,12` 用于限定章节。
 - `--type chapter,summary,node,fragment,sentence,meta` 用于限定 `list`；`find` 和 `grep` 搜索 `summary,node,fragment,sentence`。

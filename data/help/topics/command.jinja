@@ -10,7 +10,7 @@ Archive-first commands:
   status      Show archive readiness and object counts.
   index       Show the archive home/index page.
   list        List archive objects with filters, stable order, and cursor paging.
-  find        Find objects by whitespace-separated keyword AND search.
+  find        Find objects by whitespace-separated keyword discovery.
   grep        Search objects for one exact continuous text phrase.
   page        Open one detailed object page by id.
   read        Print one object as continuous plain text.
@@ -29,7 +29,7 @@ Command shapes:
   spinedigest status <archive.sdpub> [--json]
   spinedigest index <archive.sdpub> [--json]
   spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
-  spinedigest find <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
+  spinedigest find <archive.sdpub> <query> [--match <any|all>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
   spinedigest grep <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
   spinedigest page <archive.sdpub> <id> [--json]
   spinedigest read <archive.sdpub> <id>
