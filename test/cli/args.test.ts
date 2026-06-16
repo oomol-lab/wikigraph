@@ -113,6 +113,20 @@ describe("cli/args", () => {
     expect(helpTopic.helpText).toContain("stdin: supported");
   });
 
+  it("renders archive-first stdin import recipes", () => {
+    const recipeHelp = parseCLIArguments(["help", "recipe"]);
+
+    expect(recipeHelp.help).toBe(true);
+    expect(recipeHelp.kind).toBe("help");
+    if (!recipeHelp.help || recipeHelp.kind !== "help") {
+      throw new Error("Expected recipe help");
+    }
+    expect(recipeHelp.helpText).toContain(
+      "cat article.md | spinedigest import article.sdpub --input-format markdown",
+    );
+    expect(recipeHelp.helpText).toContain("Legacy one-shot stream digest");
+  });
+
   it("parses --prompt for the main convert command", () => {
     expect(parseCLIArguments(["--prompt", "Keep dialogue only"])).toStrictEqual(
       {
