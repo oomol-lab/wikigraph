@@ -5,7 +5,7 @@ SpineDigest CLI
 
 Purpose:
   Build portable LLM Wiki archives for AI agents.
-  Treat `.sdpub` as the primary knowledge archive: import sources, build derived knowledge, then search, browse, trace evidence, navigate links, and export projections without unpacking it.
+  Treat `.sdpub` as the primary knowledge archive: import sources, build derived knowledge, then search, browse, read source fragments, navigate links, and export projections without unpacking it.
 
 Three exploration modes:
   1. Search mode:
@@ -13,7 +13,7 @@ Three exploration modes:
   2. Structure mode:
      Use `list` to get bounded object collections and `page` to open one detailed object with local navigation.
   3. Reading mode:
-     Use `read` to print chapter, summary, fragment, node, or sentence text as continuous plain text.
+     Use `read` to print chapter, summary, fragment, or node text as continuous plain text.
 
 Task routing:
   For synthesis, timelines, relationship analysis, process reconstruction, or concept-structure tasks, start with Structure mode:
@@ -31,7 +31,6 @@ Archive-first usage:
   spinedigest grep <archive.sdpub> <query> [--json]
   spinedigest page <archive.sdpub> <id> [--json]
   spinedigest read <archive.sdpub> <id>
-  spinedigest evidence <archive.sdpub> <id> [--json]
   spinedigest links <archive.sdpub> <node:id> [--json]
   spinedigest backlinks <archive.sdpub> <node:id> [--json]
   spinedigest related <archive.sdpub> <node:id> [--json]
@@ -54,19 +53,18 @@ Direct and maintenance usage:
   spinedigest config status [--llm <json>] [--help|-h]
   spinedigest help [topic] [--help|-h]
 
-  Maintenance commands are for metadata, cover extraction, and chapter tree edits. Routine archive exploration should use `index`, `list`, `page`, `find`, `grep`, `read`, and `evidence`.
+  Maintenance commands are for metadata, cover extraction, and chapter tree edits. Routine archive exploration should use `index`, `list`, `page`, `find`, `grep`, and `read`.
 
 Core object ids:
   chapter:<id>     A chapter-like archive page.
   node:<id>        A graph knowledge node.
   fragment:a:b     A source reading fragment.
-  sentence:a:b:c   A source evidence sentence.
   summary:<id>     A chapter summary projection.
   meta:book        Archive metadata.
 
 Cost contract:
   Import is cheap when it stops at source.
-  List, search, page, read, evidence, links, and export are cheap after build.
+  List, search, page, read, links, and export are cheap after build.
   Build can call an LLM and may be expensive. Run `spinedigest estimate <archive.sdpub>` before full-archive graph, summary, or ready builds, then rerun `build` with `--confirm`.
 
 Help contract:

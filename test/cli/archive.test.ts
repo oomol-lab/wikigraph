@@ -2,12 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const archiveMockState = vi.hoisted(() => ({
   editableCalls: [] as string[],
-  evidence: [
-    {
-      sentenceId: [2, 0, 1],
-      text: "RAG evidence sentence.",
-    },
-  ],
   findHits: [
     {
       chapter: 2,
@@ -16,7 +10,7 @@ const archiveMockState = vi.hoisted(() => ({
       matchCount: 1,
       matchedTerms: ["rag"],
       missingTerms: [],
-      position: { chapter: 2, fragment: 0, sentence: 1 },
+      position: { chapter: 2, fragment: 0 },
       score: 1,
       snippet: "RAG appears in this node.",
       title: "Retrieval design",
@@ -98,7 +92,7 @@ const archiveMockState = vi.hoisted(() => ({
         matchCount: 1,
         matchedTerms: ["rag"],
         missingTerms: [],
-        position: { chapter: 2, fragment: 0, sentence: 1 },
+        position: { chapter: 2, fragment: 0 },
         score: 1,
         snippet: "RAG appears in this node.",
         title: "Retrieval design",
@@ -111,25 +105,19 @@ const archiveMockState = vi.hoisted(() => ({
     types: ["node"],
   },
   page: {
-    evidence: [
-      {
-        sentenceId: [2, 0, 1],
-        text: "RAG evidence sentence.",
-      },
-    ],
+    generatedNodeSummary: "RAG appears in this node.",
     id: "node:9",
     incoming: [],
     neighbors: [],
-    node: {
-      content: "RAG appears in this node.",
-      id: 9,
-      label: "Retrieval design",
-      sentenceIds: [[2, 0, 1]],
-      weight: 0.7,
-      wordsCount: 5,
-    },
     outgoing: [],
-    position: { chapter: 2, fragment: 0, sentence: 1 },
+    position: { chapter: 2, fragment: 0 },
+    sourceFragments: [
+      {
+        id: "fragment:2:0",
+        text: "RAG original source fragment.",
+        truncated: false,
+      },
+    ],
     title: "Retrieval design",
     type: "node",
   },
@@ -155,18 +143,18 @@ const archiveMockState = vi.hoisted(() => ({
         nodes: [
           {
             id: "node:9",
-            position: { chapter: 2, fragment: 0, sentence: 1 },
+            position: { chapter: 2, fragment: 0 },
             title: "Retrieval design",
           },
           {
             id: "node:11",
-            position: { chapter: 2, fragment: 0, sentence: 2 },
+            position: { chapter: 2, fragment: 0 },
             title: "Related",
           },
         ],
         span: {
-          end: { chapter: 2, fragment: 0, sentence: 2 },
-          start: { chapter: 2, fragment: 0, sentence: 1 },
+          end: { chapter: 2, fragment: 0 },
+          start: { chapter: 2, fragment: 0 },
         },
         weight: 1,
         wordsCount: 7,
@@ -261,11 +249,9 @@ vi.mock("../../src/facade/index.js", () => ({
     Promise.resolve({
       anchor: archiveMockState.page,
       budget: 1000,
-      evidence: archiveMockState.evidence,
       links: archiveMockState.links,
     }),
   ),
-  readArchiveEvidence: vi.fn(() => Promise.resolve(archiveMockState.evidence)),
   readArchivePage: vi.fn((_document: unknown, id: string) =>
     Promise.resolve(
       id === "chapter:2" ? archiveMockState.chapterPage : archiveMockState.page,
@@ -445,7 +431,7 @@ describe("cli/archive", () => {
     });
   });
 
-  it("prints page content and evidence", async () => {
+  it("prints node page summary and source fragments", async () => {
     await runArchiveCommand({
       action: "page",
       archivePath: "/tmp/book.sdpub",
@@ -453,8 +439,11 @@ describe("cli/archive", () => {
     });
 
     expect(archiveMockState.textWrites[0]).toContain("node:9");
+    expect(archiveMockState.textWrites[0]).toContain("Generated Node Summary:");
     expect(archiveMockState.textWrites[0]).toContain("RAG appears");
-    expect(archiveMockState.textWrites[0]).toContain("sentence:2:0:1");
+    expect(archiveMockState.textWrites[0]).toContain("Source Fragments:");
+    expect(archiveMockState.textWrites[0]).toContain("fragment:2:0");
+    expect(archiveMockState.textWrites[0]).not.toContain("sentence:");
   });
 
   it("prints chapter node groups before truncated summary", async () => {
@@ -472,19 +461,6 @@ describe("cli/archive", () => {
     expect(output).toContain("node:9  Retrieval design");
     expect(output).toContain("Source Preview:");
     expect(output.length).toBeLessThan(1800);
-  });
-
-  it("prints JSON evidence", async () => {
-    await runArchiveCommand({
-      action: "evidence",
-      archivePath: "/tmp/book.sdpub",
-      json: true,
-      objectId: "node:9",
-    });
-
-    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
-      evidence: archiveMockState.evidence,
-    });
   });
 
   it("prints related nodes", async () => {
@@ -523,6 +499,6 @@ describe("cli/archive", () => {
 
     expect(archiveMockState.textWrites[0]).toContain("Pack Budget: 1000");
     expect(archiveMockState.textWrites[0]).toContain("# Anchor");
-    expect(archiveMockState.textWrites[0]).toContain("# Evidence");
+    expect(archiveMockState.textWrites[0]).toContain("Source Fragments:");
   });
 });

@@ -93,7 +93,6 @@ export type CLIArchiveAction =
   | "backlinks"
   | "build"
   | "estimate"
-  | "evidence"
   | "export"
   | "find"
   | "grep"
@@ -129,7 +128,6 @@ export interface CLIArchiveArguments {
   readonly listKind?:
     | "chapters"
     | "edges"
-    | "evidence"
     | "fragments"
     | "meta"
     | "nodes"
@@ -146,7 +144,6 @@ export interface CLIArchiveArguments {
     | "fragment"
     | "meta"
     | "node"
-    | "sentence"
     | "summary"
   )[];
   readonly sourcePath?: string;
@@ -1007,7 +1004,6 @@ function parseArchiveArguments(
         kind: "archive",
       };
     case "page":
-    case "evidence":
     case "links":
     case "backlinks":
     case "related": {
@@ -2064,7 +2060,6 @@ function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
     value === "backlinks" ||
     value === "build" ||
     value === "estimate" ||
-    value === "evidence" ||
     value === "fragments" ||
     value === "export" ||
     value === "find" ||
@@ -2129,7 +2124,6 @@ function parseArchiveListKind(
   if (
     value === "chapters" ||
     value === "edges" ||
-    value === "evidence" ||
     value === "fragments" ||
     value === "meta" ||
     value === "nodes" ||
@@ -2140,7 +2134,7 @@ function parseArchiveListKind(
 
   throw new Error(
     withHelpRoute(
-      `Invalid list kind: ${value}. Expected chapters, nodes, edges, evidence, fragments, summaries, or meta.`,
+      `Invalid list kind: ${value}. Expected chapters, nodes, edges, fragments, summaries, or meta.`,
       "spinedigest ls --help",
     ),
   );
@@ -2230,18 +2224,13 @@ function parseArchiveSearchTypes(
 function parseArchiveSearchType(
   value: string,
 ): NonNullable<CLIArchiveArguments["searchTypes"]>[number] {
-  if (
-    value === "fragment" ||
-    value === "node" ||
-    value === "sentence" ||
-    value === "summary"
-  ) {
+  if (value === "fragment" || value === "node" || value === "summary") {
     return value;
   }
 
   throw new Error(
     withHelpRoute(
-      `Invalid --type: ${value}. Expected summary, node, fragment, or sentence.`,
+      `Invalid --type: ${value}. Expected summary, node, or fragment.`,
       CLI_HELP_ROUTES.command,
     ),
   );
@@ -2273,7 +2262,6 @@ function parseArchiveCollectionType(
     value === "fragment" ||
     value === "meta" ||
     value === "node" ||
-    value === "sentence" ||
     value === "summary"
   ) {
     return value;
@@ -2281,7 +2269,7 @@ function parseArchiveCollectionType(
 
   throw new Error(
     withHelpRoute(
-      `Invalid --type: ${value}. Expected chapter, summary, node, fragment, sentence, or meta.`,
+      `Invalid --type: ${value}. Expected chapter, summary, node, fragment, or meta.`,
       CLI_HELP_ROUTES.command,
     ),
   );

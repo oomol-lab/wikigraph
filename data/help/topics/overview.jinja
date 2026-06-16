@@ -11,9 +11,9 @@ Three exploration modes:
   1. Search mode:
      `find` discovers objects by deterministic keywords; `grep` checks exact text phrases.
   2. Structure mode:
-     `list` returns bounded collections; `page` opens one detailed object with local navigation such as chapter node groups, node evidence, and node neighbors.
+     `list` returns bounded collections; `page` opens one detailed object with local navigation such as chapter node groups, node source fragments, and node neighbors.
   3. Reading mode:
-     `read` prints continuous plain text for a chapter, summary, fragment, node, or sentence.
+     `read` prints continuous plain text for a chapter, summary, fragment, or node.
 
 Priority:
   For synthesis, timelines, relationships, process reconstruction, or concept-structure tasks, use Structure mode first:
@@ -26,9 +26,9 @@ Mental model:
   2. Source layer:
      Import stores normalized source material and metadata. This stage is cheap and safe to run by default.
   3. Knowledge layer:
-     Build derives graph nodes, summaries, links, and evidence-backed reading surfaces. Graph and summary stages may call an LLM.
+     Build derives graph nodes, summaries, links, and source-backed reading surfaces. Graph and summary stages may call an LLM.
   4. Retrieval layer:
-     `index`, `list`, `find`, `grep`, `page`, `read`, `evidence`, `links`, and `backlinks` project existing archive data into an agent-friendly Wiki-like interface.
+     `index`, `list`, `find`, `grep`, `page`, `read`, `links`, and `backlinks` project existing archive data into an agent-friendly Wiki-like interface.
   5. Projection layer:
      `export` writes Markdown, txt, EPUB, or other supported projections. Export is not the core archive object.
 
@@ -42,7 +42,6 @@ Default workflow:
   spinedigest find book.sdpub "keyword"
   spinedigest page book.sdpub node:84
   spinedigest read book.sdpub chapter:12
-  spinedigest evidence book.sdpub node:84
 
 Cost model:
   - Import/source: cheap, no LLM when kept at source.

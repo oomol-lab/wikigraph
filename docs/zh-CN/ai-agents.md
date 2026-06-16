@@ -21,12 +21,11 @@ spinedigest list book.sdpub --type chapter
 spinedigest find book.sdpub "keyword"
 spinedigest page book.sdpub node:84
 spinedigest read book.sdpub chapter:12
-spinedigest evidence book.sdpub node:84
 ```
 
 优先先选择三种探索模式之一。对于综合理解、时间线、关系分析、过程梳理或概念结构任务，先走结构模式：`list --type chapter`，再 `page chapter:<id>` 并检查 `nodeGroups`。搜索模式用 `find` 做候选定位，用 `grep` 检查连续精确短语。`find` 默认是 `--match any`；只有必须要求全部关键词出现在同一个对象内时，才使用 `--match all`。阅读模式适合在选定相关 chapter、fragment 或 node 后用 `read` 输出连续文本。
 
-概念发现可加 `--type summary,node`，追原文可加 `--type fragment,sentence`，并用 `--chapter`、`--limit`、`--cursor` 控制检索范围。
+概念发现可加 `--type summary,node`，追原文可加 `--type fragment`，并用 `--chapter`、`--limit`、`--cursor` 控制检索范围。
 
 只有外围系统明确需要进程内集成时，才使用 library API。
 
@@ -34,8 +33,8 @@ spinedigest evidence book.sdpub node:84
 
 - 主对象：`.sdpub`
 - 导入源：EPUB、Markdown、TXT 和文本管道
-- 可读对象：`chapter:<id>`、`node:<id>`、`fragment:<serial>:<fragment>`、`sentence:<serial>:<fragment>:<index>`、`summary:<id>`、`meta:book`
-- 便宜操作：`status`、`index`、`list`、`find`、`grep`、`page`、`read`、`evidence`、`links`、`backlinks`、`export`
+- 可读对象：`chapter:<id>`、`node:<id>`、`fragment:<serial>:<fragment>`、`summary:<id>`、`meta:book`
+- 便宜操作：`status`、`index`、`list`、`find`、`grep`、`page`、`read`、`links`、`backlinks`、`export`
 - 昂贵操作：graph、summary 或 ready `build`
 - 先估算：`spinedigest estimate <archive.sdpub> --stage ready`
 - 机器消费：组合工具时传 `--json`
@@ -46,11 +45,10 @@ spinedigest evidence book.sdpub node:84
 2. 对理解型任务，先用 `list --type chapter`，再在关键词搜索前使用 `page chapter:<id>`。
 3. 检查 chapter 的 `nodeGroups`，再对相关知识节点使用 `page node:<id>`。
 4. 用 `find` 或 `grep` 定位候选章节、验证缺失概念，或检查精确原文。
-5. 当用户需要按 prose 理解章节、片段、summary、node 或 sentence 时，用 `read`。
-6. 引用或形成有来源支撑的判断前，先用 `evidence`。
-7. 用 `links`、`backlinks` 或 `path` 导航图上下文。
-8. 只有用户需要 projection 时才 `export`。
-9. `build` 前先 `estimate`；如果估算超出当前交互预算，先询问用户。
+5. 选定相关 node 或 chapter 后，当用户需要原文 prose 时，用 `read fragment:<id>`。
+6. 用 `links`、`backlinks` 或 `path` 导航图上下文。
+7. 只有用户需要 projection 时才 `export`。
+8. `build` 前先 `estimate`；如果估算超出当前交互预算，先询问用户。
 
 ## 构建流程
 

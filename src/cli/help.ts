@@ -37,7 +37,6 @@ export const ARCHIVE_COMMANDS = [
   "grep",
   "page",
   "read",
-  "evidence",
   "links",
   "backlinks",
   "related",

@@ -64,7 +64,6 @@ spinedigest build ./book.sdpub --stage graph --chapter 3 --confirm
 ```bash
 spinedigest find ./book.sdpub "central argument"
 spinedigest page ./book.sdpub node:84
-spinedigest evidence ./book.sdpub node:84
 spinedigest links ./book.sdpub node:84
 ```
 

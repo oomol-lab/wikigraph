@@ -21,7 +21,6 @@ spinedigest find <archive.sdpub> <query> [--match <any|all>] [--chapter <ids>] [
 spinedigest grep <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest page <archive.sdpub> <id> [--json]
 spinedigest read <archive.sdpub> <id>
-spinedigest evidence <archive.sdpub> <id> [--json]
 spinedigest links <archive.sdpub> <node:id> [--json]
 spinedigest backlinks <archive.sdpub> <node:id> [--json]
 spinedigest path <archive.sdpub> <node:id> <node:id> --chapter <id>
@@ -40,7 +39,7 @@ Search and collection behavior:
 - `find --match all` is the strict mode where every keyword must appear in the same object.
 - `grep` is exact text search. It treats the query as one continuous string.
 - `--chapter 12` or `--chapter 11,12` limits results to chapters.
-- `--type chapter,summary,node,fragment,sentence,meta` limits `list`; `find` and `grep` search `summary,node,fragment,sentence`.
+- `--type chapter,summary,node,fragment,meta` limits `list`; `find` and `grep` search `summary,node,fragment`.
 - `--order doc-asc|doc-desc` sorts by stable document position. Default is `doc-asc`.
 - `--limit` defaults to `20`; pass returned `nextCursor` back through `--cursor` for the next page.
 - Neither command does semantic expansion, fuzzy matching, stemming, or vector search.
@@ -50,7 +49,6 @@ Object ids:
 - `chapter:<id>`
 - `node:<id>`
 - `fragment:<serial>:<fragment>`
-- `sentence:<serial>:<fragment>:<index>`
 - `summary:<id>`
 - `meta:book`
 
@@ -59,7 +57,7 @@ Object ids:
 User-facing stages:
 
 - `source`: imported normalized source data
-- `graph`: graph nodes, edges, and evidence-backed knowledge units
+- `graph`: graph nodes, edges, and source-backed knowledge units
 - `summary`: readable chapter summaries
 - `ready`: full ready archive projection
 
@@ -88,7 +86,6 @@ Read/search/navigation commands support `--json` for machine consumption:
 ```bash
 spinedigest find book.sdpub "RAG" --json
 spinedigest page book.sdpub node:84 --json
-spinedigest evidence book.sdpub node:84 --json
 ```
 
 Human-readable stdout is Markdown-like text with stable ids and suggested next commands.

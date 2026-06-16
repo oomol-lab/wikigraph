@@ -10,12 +10,12 @@ Usage:
 Contract:
   - Mutates: no.
   - LLM: no.
-  - Searches: metadata, chapter titles, summaries, graph nodes, evidence, and source fragments.
+  - Searches: metadata, chapter titles, summaries, graph node summaries, and source fragments.
   - Query: split on whitespace into keywords.
   - Match: default `--match any` returns objects containing at least one keyword and ranks stronger matches first.
   - Strict match: `--match all` requires every keyword to appear inside the same returned object.
   - Scope: `--chapter 12` or `--chapter 11,12` limits results to chapters.
-  - Types: `--type summary,node,fragment,sentence` limits result object types.
+  - Types: `--type summary,node,fragment` limits result object types.
   - Order: `doc-asc` or `doc-desc`; default `doc-asc`.
   - Pagination: default `--limit 20`; pass returned `nextCursor` back with `--cursor`.
   - Matching: case-insensitive substring matching, with no semantic expansion, stemming, fuzzy matching, or vector search.

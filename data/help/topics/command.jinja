@@ -14,7 +14,6 @@ Archive-first commands:
   grep        Search objects for one exact continuous text phrase.
   page        Open one detailed object page by id.
   read        Print one object as continuous plain text.
-  evidence    Show source evidence for an object.
   links       Show outgoing node links.
   backlinks   Show incoming node links.
   related     Show graph-adjacent knowledge units.
@@ -33,14 +32,13 @@ Command shapes:
   spinedigest grep <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
   spinedigest page <archive.sdpub> <id> [--json]
   spinedigest read <archive.sdpub> <id>
-  spinedigest evidence <archive.sdpub> <id> [--json]
   spinedigest related <archive.sdpub> <node:id> [--json]
   spinedigest pack <archive.sdpub> <id> [--budget <chars>] [--json]
   spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 
 Direct digest and maintenance:
   spinedigest transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <planned|sourced|graphed|summarized>] [--verbose]
-  spinedigest ls <archive.sdpub> [chapters|nodes|edges|evidence|summaries|meta] [--json]
+  spinedigest ls <archive.sdpub> [chapters|nodes|edges|fragments|summaries|meta] [--json]
   spinedigest meta <archive.sdpub> [metadata options] [--json]
   spinedigest cover <archive.sdpub>
   spinedigest chapter <action> <archive.sdpub> [options]

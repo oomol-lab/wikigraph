@@ -13,7 +13,6 @@ import {
   listArchiveObjects,
   listRelatedArchiveObjects,
   packArchiveContext,
-  readArchiveEvidence,
   readArchivePage,
   readArchiveText,
   estimateArchiveBuild,
@@ -29,7 +28,6 @@ import {
   type ArchivePack,
   type ArchivePage,
   grepArchiveObjects,
-  type GraphEvidenceLine,
   type GraphNeighbor,
   type GraphPathStep,
   type ChapterEntry,
@@ -149,14 +147,6 @@ export async function runArchiveCommand(
       await withArchiveDocument(args.archivePath, async (document) => {
         await writeTextToStdout(
           `${await readArchiveText(document, args.objectId!)}\n`,
-        );
-      });
-      return;
-    case "evidence":
-      await withArchiveDocument(args.archivePath, async (document) => {
-        await writeEvidence(
-          await readArchiveEvidence(document, args.objectId!),
-          args.json ?? false,
         );
       });
       return;
@@ -635,9 +625,6 @@ async function writePage(page: ArchivePage, json: boolean): Promise<void> {
         ].join("\n") + "\n",
       );
       return;
-    case "evidence":
-      await writeTextToStdout(`${page.id}\n${page.text}\n`);
-      return;
     case "meta":
       await writeTextToStdout(
         page.meta === undefined
@@ -663,15 +650,15 @@ async function writePage(page: ArchivePage, json: boolean): Promise<void> {
     case "node":
       await writeTextToStdout(
         [
-          `${page.id}  ${page.node.label}`,
+          `${page.id}  ${page.title}`,
           `Chapter: ${page.position === undefined ? "[unknown]" : `chapter:${page.position.chapter}`}`,
           `Position: ${formatPosition(page.position)}`,
           "",
-          "Content:",
-          page.node.content,
+          "Generated Node Summary:",
+          page.generatedNodeSummary,
           "",
-          "Evidence:",
-          ...formatEvidenceLines(page.evidence),
+          "Source Fragments:",
+          ...formatSourceFragmentLines(page.sourceFragments),
           "",
           "Outgoing Nodes:",
           ...formatNeighborLines(page.outgoing),
@@ -685,23 +672,6 @@ async function writePage(page: ArchivePage, json: boolean): Promise<void> {
       await writeTextToStdout(`${page.id}  ${page.title}\n\n${page.content}\n`);
       return;
   }
-}
-
-async function writeEvidence(
-  evidence: readonly GraphEvidenceLine[],
-  json: boolean,
-): Promise<void> {
-  if (json) {
-    await writeTextToStdout(`${JSON.stringify({ evidence }, null, 2)}\n`);
-    return;
-  }
-
-  if (evidence.length === 0) {
-    await writeTextToStdout("No source evidence.\n");
-    return;
-  }
-
-  await writeTextToStdout(`${formatEvidenceLines(evidence).join("\n")}\n`);
 }
 
 async function writeLinks(
@@ -764,9 +734,6 @@ async function writePack(pack: ArchivePack, json: boolean): Promise<void> {
     "# Anchor",
     formatPackAnchor(pack.anchor),
     "",
-    "# Evidence",
-    ...formatEvidenceLines(pack.evidence),
-    "",
     "# Links",
     ...formatNeighborLines(pack.links),
   ];
@@ -825,12 +792,7 @@ function formatCollectionCursor(result: ArchiveCollectionResult): string {
 function isSearchFilterType(
   type: NonNullable<CLIArchiveArguments["searchTypes"]>[number],
 ): type is NonNullable<ArchiveFindOptions["types"]>[number] {
-  return (
-    type === "fragment" ||
-    type === "node" ||
-    type === "sentence" ||
-    type === "summary"
-  );
+  return type === "fragment" || type === "node" || type === "summary";
 }
 
 function formatNeighborLines(neighbors: readonly GraphNeighbor[]): string[] {
@@ -881,14 +843,17 @@ function formatNodeLabels(
   return nodes.map((node) => `  ${node.id}  ${node.title}`);
 }
 
-function formatEvidenceLines(evidence: readonly GraphEvidenceLine[]): string[] {
-  if (evidence.length === 0) {
+function formatSourceFragmentLines(
+  fragments: Extract<ArchivePage, { readonly type: "node" }>["sourceFragments"],
+): string[] {
+  if (fragments.length === 0) {
     return ["  [none]"];
   }
 
-  return evidence.map(
-    (line) => `  sentence:${line.sentenceId.join(":")}  ${line.text}`,
-  );
+  return fragments.flatMap((fragment) => [
+    `  ${fragment.id}${fragment.truncated ? "  [excerpt]" : ""}`,
+    ...fragment.text.split("\n").map((line) => `    ${line}`),
+  ]);
 }
 
 function formatPosition(
@@ -896,7 +861,6 @@ function formatPosition(
     | {
         readonly chapter: number;
         readonly fragment?: number;
-        readonly sentence?: number;
       }
     | undefined,
 ): string {
@@ -909,9 +873,6 @@ function formatPosition(
     position.fragment === undefined
       ? undefined
       : `fragment ${position.fragment}`,
-    position.sentence === undefined
-      ? undefined
-      : `sentence ${position.sentence}`,
   ]
     .filter((part): part is string => part !== undefined)
     .join(", ");
@@ -921,12 +882,10 @@ function formatSpan(span: {
   readonly end?: {
     readonly chapter: number;
     readonly fragment?: number;
-    readonly sentence?: number;
   };
   readonly start?: {
     readonly chapter: number;
     readonly fragment?: number;
-    readonly sentence?: number;
   };
 }): string {
   if (span.start === undefined && span.end === undefined) {
@@ -1012,14 +971,20 @@ function formatPackAnchor(anchor: ArchivePage): string {
   switch (anchor.type) {
     case "chapter":
       return `${anchor.id} ${anchor.title}\n${anchor.content ?? "[summary missing]"}`;
-    case "evidence":
-      return `${anchor.id}\n${anchor.text}`;
     case "fragment":
       return `${anchor.id}\n${anchor.fragment.text}`;
     case "meta":
       return `${anchor.id}\n${JSON.stringify(anchor.meta, null, 2)}`;
     case "node":
-      return `${anchor.id} ${anchor.node.label}\n${anchor.node.content}`;
+      return [
+        `${anchor.id} ${anchor.title}`,
+        "",
+        "Generated Node Summary:",
+        anchor.generatedNodeSummary,
+        "",
+        "Source Fragments:",
+        ...formatSourceFragmentLines(anchor.sourceFragments),
+      ].join("\n");
     case "summary":
       return `${anchor.id} ${anchor.title}\n${anchor.content}`;
   }

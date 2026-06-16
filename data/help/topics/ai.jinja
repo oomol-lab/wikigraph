@@ -5,7 +5,7 @@ AI Agent Guide
 
 Primary contract:
   - Treat `.sdpub` as an LLM Wiki archive managed by SpineDigest.
-  - Use `spinedigest index/list/find/grep/page/read/evidence/links/backlinks/export` before unpacking or inspecting ZIP internals.
+  - Use `spinedigest index/list/find/grep/page/read/links/backlinks/export` before unpacking or inspecting ZIP internals.
   - Choose one of three exploration modes first: search mode (`find`/`grep`), structure mode (`list`/`page`), or reading mode (`read`).
   - Prefer `--json` when composing with tools.
   - Do not inspect `database.db` for routine retrieval.
@@ -20,7 +20,6 @@ Safe first moves:
     spinedigest page <archive.sdpub> chapter:<id>
     # inspect nodeGroups, then:
     spinedigest page <archive.sdpub> node:<id>
-    spinedigest evidence <archive.sdpub> node:<id>
   - Locate candidate chapters or verify missing concepts:
     spinedigest find <archive.sdpub> <query>
     spinedigest grep <archive.sdpub> <exact phrase>
@@ -48,7 +47,6 @@ Object ids:
   - chapter:<id> for chapter-like archive pages
   - node:<id> for graph knowledge nodes
   - fragment:<serial>:<fragment> for source reading fragments
-  - sentence:<serial>:<fragment>:<index> for source evidence
   - summary:<id> for chapter summaries
   - meta:book for metadata
 
@@ -57,7 +55,7 @@ Stable terms:
   - source: imported normalized source material
   - chapter: current top-level readable unit inside the archive
   - node: graph knowledge unit surfaced as an agent-readable page
-  - evidence: source sentence backing a node
+  - source fragment: original text excerpt backing a node page
   - projection: exported Markdown, txt, EPUB, JSON, or graph output
 
 Maintenance commands:
@@ -69,6 +67,6 @@ Discovery rule:
   Use `find` for multi-keyword discovery after the topology pass, or when you need to locate candidate chapters quickly. Whitespace separates keywords, default matching is `--match any`, and stronger matches are ranked first.
   Use `find --match all` only when every keyword must appear inside the same returned object.
   Use `grep` only when checking whether an exact continuous phrase exists.
-  Use `--type summary,node` to discover concepts first; use `--type fragment,sentence` when tracing wording or evidence.
+  Use `--type summary,node` to discover concepts first; use `--type fragment` when tracing exact source wording.
   Use `--chapter`, `--limit`, and returned `nextCursor` to keep retrieval bounded and reproducible.
   Use `read` when the user wants to understand a chapter or fragment as prose rather than navigate object ids.

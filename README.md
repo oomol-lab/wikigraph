@@ -10,13 +10,13 @@
 
 ![SpineDigest Terminal Demo](./docs/images/terminal-en.png)
 
-**SpineDigest builds portable LLM Wiki archives for AI agents.** It imports long-form sources into `.sdpub`, then lets agents search, browse, trace evidence, follow graph links, and export projections without unpacking the archive.
+**SpineDigest builds portable LLM Wiki archives for AI agents.** It imports long-form sources into `.sdpub`, then lets agents search, browse, read source fragments, follow graph links, and export projections without unpacking the archive.
 
 For agents, `.sdpub` exploration has three primary modes:
 
 - **Search mode:** use `find` for whitespace-separated keyword discovery and `grep` for exact continuous text.
 - **Structure mode:** use `list` for bounded object collections and `page` for one detailed object with local navigation.
-- **Reading mode:** use `read` to print chapter, summary, fragment, node, or sentence text as continuous plain text.
+- **Reading mode:** use `read` to print chapter, summary, fragment, or node text as continuous plain text.
 
 For synthesis, timelines, relationship analysis, process reconstruction, or concept-structure tasks, start with Structure mode: `list --type chapter`, then `page chapter:<id>` and inspect `nodeGroups`. Use search to locate candidates or verify exact wording.
 
@@ -86,7 +86,6 @@ spinedigest find ./book.sdpub "RAG"
 spinedigest grep ./book.sdpub "exact source phrase"
 spinedigest page ./book.sdpub node:84
 spinedigest read ./book.sdpub chapter:12
-spinedigest evidence ./book.sdpub node:84
 spinedigest links ./book.sdpub node:84
 spinedigest related ./book.sdpub node:84
 spinedigest pack ./book.sdpub node:84 --budget 5000
@@ -136,7 +135,7 @@ Your intent runs through the whole pipeline. During the reading phase, the AI's 
 
 ## The `.sdpub` Format
 
-`.sdpub` is the core SpineDigest knowledge archive. It holds source-derived structure, chapter-like pages, graph nodes, evidence pointers, summaries, and metadata that the CLI can expose as an Agent-readable LLM Wiki.
+`.sdpub` is the core SpineDigest knowledge archive. It holds source-derived structure, chapter-like pages, graph nodes, source fragment pointers, summaries, and metadata that the CLI can expose as an Agent-readable LLM Wiki.
 
 With that archive on hand, agents can search and navigate the knowledge structure directly:
 
@@ -149,7 +148,7 @@ spinedigest page ./book.sdpub chapter:12
 spinedigest read ./book.sdpub chapter:12
 ```
 
-Markdown, EPUB, txt, and JSON-style outputs are projections of the archive. They are useful for portability, but they do not replace the `.sdpub` object when graph links and evidence matter.
+Markdown, EPUB, txt, and JSON-style outputs are projections of the archive. They are useful for portability, but they do not replace the `.sdpub` object when graph links and source fragments matter.
 
 To open a `.sdpub` file, use **[Inkora](http://inkora.oomol.com/download/sdpub)** — a free app built specifically for it, with chapter topology and knowledge graph views.
 
@@ -166,7 +165,7 @@ For the internal layout and parser guidance, see the [format spec](./docs/sdpub.
 | `stdin` (txt / md) | compatibility | —                 |
 | `stdout`           | —             | ✓                 |
 
-Requirements: Node `>=22.12.0`. LLM credentials are required for graph and summary builds, not for `.sdpub` inspection, search, evidence lookup, navigation, or export.
+Requirements: Node `>=22.12.0`. LLM credentials are required for graph and summary builds, not for `.sdpub` inspection, search, reading, navigation, or export.
 
 ## Library Usage
 
@@ -187,7 +186,7 @@ SpineDigest's CLI-first design exposes `.sdpub` as a managed LLM Wiki archive.
 - **Prefer `--json`.** Use it when composing with tools.
 - **Estimate before build.** Do not run full-archive graph, summary, or ready builds without `spinedigest estimate`.
 - **Check exit codes.** Success returns `0`; failure returns non-zero with a plain-text error on `stderr`.
-- **Do not inspect `database.db` routinely.** Use `list`, `page`, `read`, `evidence`, and graph navigation commands instead.
+- **Do not inspect `database.db` routinely.** Use `list`, `page`, `read`, and graph navigation commands instead.
 
 Useful help entry points:
 

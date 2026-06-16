@@ -10,7 +10,6 @@ import type { BookMeta } from "../source/index.js";
 import {
   getGraphNode,
   listGraphNeighbors,
-  type GraphEvidenceLine,
   type GraphNeighbor,
   type GraphNode,
 } from "./graph.js";
@@ -19,7 +18,6 @@ import { listChapters, type ChapterEntry } from "./chapter.js";
 export type ArchiveObjectType =
   | "chapter"
   | "edge"
-  | "evidence"
   | "fragment"
   | "meta"
   | "node"
@@ -30,7 +28,6 @@ export type ArchiveCollectionType =
   | "fragment"
   | "meta"
   | "node"
-  | "sentence"
   | "summary";
 
 export type ArchiveFindObjectType =
@@ -38,14 +35,9 @@ export type ArchiveFindObjectType =
   | "fragment"
   | "meta"
   | "node"
-  | "sentence"
   | "summary";
 
-export type ArchiveFindFilterType =
-  | "fragment"
-  | "node"
-  | "sentence"
-  | "summary";
+export type ArchiveFindFilterType = "fragment" | "node" | "summary";
 
 export interface ArchiveIndex {
   readonly chapters: readonly ChapterEntry[];
@@ -71,7 +63,6 @@ export interface ArchiveFindHit {
 
 export type ArchiveFindField =
   | "content"
-  | "evidence"
   | "metadata"
   | "source"
   | "summary"
@@ -93,7 +84,6 @@ export type ArchiveFindMatch = "all" | "any";
 export interface ArchiveFindPosition {
   readonly chapter: number;
   readonly fragment?: number;
-  readonly sentence?: number;
 }
 
 export interface ArchiveFindResult {
@@ -130,7 +120,6 @@ export interface ArchiveCollectionResult {
 export type ArchiveListKind =
   | "chapters"
   | "edges"
-  | "evidence"
   | "fragments"
   | "meta"
   | "nodes"
@@ -156,13 +145,13 @@ export type ArchivePage =
       readonly type: "chapter";
     }
   | {
-      readonly evidence: readonly GraphEvidenceLine[];
+      readonly generatedNodeSummary: string;
       readonly id: string;
       readonly incoming: readonly GraphNeighbor[];
       readonly neighbors: readonly GraphNeighbor[];
-      readonly node: GraphNode;
       readonly outgoing: readonly GraphNeighbor[];
       readonly position: ArchiveFindPosition | undefined;
+      readonly sourceFragments: readonly ArchiveNodeSourceFragment[];
       readonly title: string;
       readonly type: "node";
     }
@@ -174,13 +163,6 @@ export type ArchivePage =
       readonly previousFragmentId: string | undefined;
       readonly title: string;
       readonly type: "fragment";
-    }
-  | {
-      readonly id: string;
-      readonly sentenceId: SentenceId;
-      readonly text: string;
-      readonly title: string;
-      readonly type: "evidence";
     }
   | {
       readonly content: string;
@@ -218,7 +200,6 @@ export interface ArchiveEstimate {
 export interface ArchivePack {
   readonly anchor: ArchivePage;
   readonly budget: number;
-  readonly evidence: readonly GraphEvidenceLine[];
   readonly links: readonly GraphNeighbor[];
 }
 
@@ -248,6 +229,12 @@ export interface ArchiveSourceFragment {
   readonly sentenceCount: number;
   readonly text: string;
   readonly wordsCount: number;
+}
+
+export interface ArchiveNodeSourceFragment {
+  readonly id: string;
+  readonly text: string;
+  readonly truncated: boolean;
 }
 
 export async function getArchiveIndex(
@@ -289,8 +276,6 @@ export async function listArchiveObjects(
         summary: `weight ${formatWeight(edge.weight)}`,
         type: "edge",
       }));
-    case "evidence":
-      return await listEvidenceObjects(document);
     case "meta":
       return [
         {
@@ -359,7 +344,6 @@ export async function listArchiveCollection(
     "node",
     "summary",
     "fragment",
-    "sentence",
     "meta",
   ];
 
@@ -435,37 +419,19 @@ export async function listArchiveCollection(
     }
   }
 
-  if (types.includes("node") || types.includes("sentence")) {
+  if (types.includes("node")) {
     for (const node of await document.chunks.listAll()) {
       const position = createNodePosition(node.sentenceIds);
 
-      if (types.includes("node")) {
-        items.push({
-          chapter: node.sentenceId[0],
-          field: "content",
-          id: formatNodeId(node.id),
-          ...(position === undefined ? {} : { position }),
-          snippet: createSnippet(node.content),
-          title: node.label,
-          type: "node",
-        });
-      }
-
-      if (types.includes("sentence")) {
-        for (const sentenceId of node.sentenceIds) {
-          const text = await document.getSentence(sentenceId);
-
-          items.push({
-            chapter: sentenceId[0],
-            field: "evidence",
-            id: formatSentenceId(sentenceId),
-            position: createSentencePosition(sentenceId),
-            snippet: createSnippet(text),
-            title: node.label,
-            type: "sentence",
-          });
-        }
-      }
+      items.push({
+        chapter: node.sentenceId[0],
+        field: "content",
+        id: formatNodeId(node.id),
+        ...(position === undefined ? {} : { position }),
+        snippet: createSnippet(node.content),
+        title: node.label,
+        type: "node",
+      });
     }
   }
 
@@ -547,8 +513,6 @@ export async function readArchiveText(
 
       return node.content;
     }
-    case "evidence":
-      return await document.getSentence(reference.sentenceId);
     case "meta": {
       const meta = await document.readBookMeta();
 
@@ -582,17 +546,6 @@ export async function readArchivePage(
         sourcePreview: createSourcePreview(fragments),
         title: chapter.title ?? `[chapter ${reference.id}]`,
         type: "chapter",
-      };
-    }
-    case "evidence": {
-      const text = await document.getSentence(reference.sentenceId);
-
-      return {
-        id: formatSentenceId(reference.sentenceId),
-        sentenceId: reference.sentenceId,
-        text,
-        title: formatSentenceId(reference.sentenceId),
-        type: "evidence",
       };
     }
     case "fragment": {
@@ -634,9 +587,9 @@ export async function readArchivePage(
       };
     case "node": {
       const { chapterId, node } = await requireNode(document, reference.id);
-      const [neighbors, evidence] = await Promise.all([
+      const [neighbors, sourceFragments] = await Promise.all([
         listGraphNeighbors(document, chapterId, reference.id),
-        readNodeEvidence(document, node),
+        readNodeSourceFragments(document, node),
       ]);
       const outgoing = neighbors.filter(
         (neighbor) => neighbor.direction === "outgoing",
@@ -646,13 +599,13 @@ export async function readArchivePage(
       );
 
       return {
-        evidence,
+        generatedNodeSummary: node.content,
         id: formatNodeId(node.id),
         incoming,
         neighbors,
-        node,
         outgoing,
         position: createNodePosition(node.sentenceIds),
+        sourceFragments,
         title: node.label,
         type: "node",
       };
@@ -672,33 +625,6 @@ export async function readArchivePage(
         type: "summary",
       };
     }
-  }
-}
-
-export async function readArchiveEvidence(
-  document: Document,
-  id: string,
-): Promise<readonly GraphEvidenceLine[]> {
-  const reference = parseArchiveReference(id);
-
-  switch (reference.type) {
-    case "node":
-      return await readNodeEvidence(
-        document,
-        (await requireNode(document, reference.id)).node,
-      );
-    case "evidence":
-      return [
-        {
-          sentenceId: reference.sentenceId,
-          text: await document.getSentence(reference.sentenceId),
-        },
-      ];
-    case "chapter":
-    case "fragment":
-    case "meta":
-    case "summary":
-      return [];
   }
 }
 
@@ -756,15 +682,11 @@ export async function packArchiveContext(
   budget: number,
 ): Promise<ArchivePack> {
   const anchor = await readArchivePage(document, id);
-  const [evidence, links] = await Promise.all([
-    readArchiveEvidence(document, id),
-    listAllArchiveLinks(document, id),
-  ]);
+  const links = await listAllArchiveLinks(document, id);
 
   return {
     anchor,
     budget,
-    evidence,
     links,
   };
 }
@@ -837,36 +759,12 @@ export function formatNodeId(nodeId: number): string {
   return `node:${nodeId}`;
 }
 
-export function formatSentenceId(sentenceId: SentenceId): string {
-  return `sentence:${sentenceId.join(":")}`;
-}
-
 export function formatSummaryId(chapterId: number): string {
   return `summary:${chapterId}`;
 }
 
 export function formatFragmentId(serialId: number, fragmentId: number): string {
   return `fragment:${serialId}:${fragmentId}`;
-}
-
-async function listEvidenceObjects(
-  document: Document,
-): Promise<readonly ArchiveListItem[]> {
-  const nodes = await document.chunks.listAll();
-  const items: ArchiveListItem[] = [];
-
-  for (const node of nodes) {
-    for (const sentenceId of node.sentenceIds) {
-      items.push({
-        id: formatSentenceId(sentenceId),
-        label: formatSentenceId(sentenceId),
-        summary: await document.getSentence(sentenceId),
-        type: "evidence",
-      });
-    }
-  }
-
-  return items;
 }
 
 async function findChapters(
@@ -1222,24 +1120,6 @@ async function findNodes(
         type: "node",
       });
     }
-
-    for (const sentenceId of node.sentenceIds) {
-      const text = await document.getSentence(sentenceId);
-      const textMatch = matchText(text, search);
-
-      if (textMatch !== undefined) {
-        hits.push({
-          chapter: sentenceId[0],
-          field: "evidence",
-          id: formatSentenceId(sentenceId),
-          ...createFindMatchFields(textMatch),
-          position: createSentencePosition(sentenceId),
-          snippet: createSnippet(text, getSnippetNeedle(textMatch)),
-          title: node.label,
-          type: "sentence",
-        });
-      }
-    }
   }
 
   return hits;
@@ -1303,16 +1183,48 @@ async function requireNode(
   };
 }
 
-async function readNodeEvidence(
+async function readNodeSourceFragments(
   document: Document,
   node: GraphNode,
-): Promise<readonly GraphEvidenceLine[]> {
+): Promise<readonly ArchiveNodeSourceFragment[]> {
   return await Promise.all(
-    node.sentenceIds.map(async (sentenceId) => ({
-      sentenceId,
-      text: await document.getSentence(sentenceId),
-    })),
+    collectNodeSourceFragmentIds(node).map(async ([chapterId, fragmentId]) => {
+      const fragment = await readSourceFragment(
+        document,
+        chapterId,
+        fragmentId,
+      );
+      const text = truncateSourceExcerpt(fragment.text);
+
+      return {
+        id: fragment.id,
+        text,
+        truncated: text.length < fragment.text.length,
+      };
+    }),
   );
+}
+
+function collectNodeSourceFragmentIds(
+  node: Pick<GraphNode, "sentenceIds">,
+): readonly (readonly [number, number])[] {
+  const seen = new Set<string>();
+  const fragmentIds: (readonly [number, number])[] = [];
+
+  for (const [chapterId, fragmentId] of node.sentenceIds) {
+    const key = `${chapterId}:${fragmentId}`;
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      fragmentIds.push([chapterId, fragmentId]);
+    }
+  }
+
+  return fragmentIds;
+}
+
+function truncateSourceExcerpt(text: string): string {
+  return text.length <= 1200 ? text : `${text.slice(0, 1200)}...`;
 }
 
 function parseArchiveReference(id: string):
@@ -1328,10 +1240,6 @@ function parseArchiveReference(id: string):
       readonly fragmentId: number;
       readonly serialId: number;
       readonly type: "fragment";
-    }
-  | {
-      readonly sentenceId: SentenceId;
-      readonly type: "evidence";
     }
   | {
       readonly type: "meta";
@@ -1368,23 +1276,6 @@ function parseArchiveReference(id: string):
       type: "fragment",
     };
   }
-  if (type === "sentence") {
-    const parts = normalized.slice("sentence:".length).split(":");
-
-    if (parts.length !== 3) {
-      throw new Error(`Invalid archive object id: ${id}`);
-    }
-
-    return {
-      sentenceId: [
-        parsePositiveInteger(parts[0], normalized),
-        parseNonNegativeInteger(parts[1], normalized),
-        parseNonNegativeInteger(parts[2], normalized),
-      ],
-      type: "evidence",
-    };
-  }
-
   throw new Error(`Invalid archive object id: ${id}`);
 }
 
@@ -1623,7 +1514,6 @@ function compareFindHits(
   const position =
     compareNumbers(getPositionChapter(left), getPositionChapter(right)) ||
     compareNumbers(getPositionFragment(left), getPositionFragment(right)) ||
-    compareNumbers(getPositionSentence(left), getPositionSentence(right)) ||
     compareNumbers(getTypeOrder(left.type), getTypeOrder(right.type)) ||
     left.id.localeCompare(right.id);
 
@@ -1646,10 +1536,6 @@ function getPositionFragment(hit: ArchiveFindHit): number {
   return hit.position?.fragment ?? 0;
 }
 
-function getPositionSentence(hit: ArchiveFindHit): number {
-  return hit.position?.sentence ?? 0;
-}
-
 function getTypeOrder(type: ArchiveFindObjectType): number {
   switch (type) {
     case "chapter":
@@ -1660,10 +1546,8 @@ function getTypeOrder(type: ArchiveFindObjectType): number {
       return 2;
     case "fragment":
       return 3;
-    case "sentence":
-      return 4;
     case "meta":
-      return 5;
+      return 4;
   }
 }
 
@@ -1679,7 +1563,6 @@ function createSentencePosition(sentenceId: SentenceId): ArchiveFindPosition {
   return {
     chapter: sentenceId[0],
     fragment: sentenceId[1],
-    sentence: sentenceId[2],
   };
 }
 
@@ -1697,8 +1580,7 @@ function compareArchivePositions(
 ): number {
   return (
     compareNumbers(left.chapter, right.chapter) ||
-    compareNumbers(left.fragment ?? 0, right.fragment ?? 0) ||
-    compareNumbers(left.sentence ?? 0, right.sentence ?? 0)
+    compareNumbers(left.fragment ?? 0, right.fragment ?? 0)
   );
 }
 
@@ -1709,12 +1591,7 @@ function compareNumbers(left: number, right: number): number {
 function isFindFilterType(
   type: ArchiveFindObjectType,
 ): type is ArchiveFindFilterType {
-  return (
-    type === "fragment" ||
-    type === "node" ||
-    type === "sentence" ||
-    type === "summary"
-  );
+  return type === "fragment" || type === "node" || type === "summary";
 }
 
 function encodeFindCursor(offset: number): string {

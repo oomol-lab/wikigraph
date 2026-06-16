@@ -21,12 +21,11 @@ spinedigest list book.sdpub --type chapter
 spinedigest find book.sdpub "keyword"
 spinedigest page book.sdpub node:84
 spinedigest read book.sdpub chapter:12
-spinedigest evidence book.sdpub node:84
 ```
 
 Use three exploration modes. For synthesis, timelines, relationship analysis, process reconstruction, or concept-structure tasks, start with Structure mode: `list --type chapter`, then `page chapter:<id>` and inspect `nodeGroups`. Search mode uses `find` for candidate discovery and `grep` for exact phrases. `find` defaults to `--match any`; use `--match all` only when every keyword must appear in the same object. Reading mode uses `read` after the relevant chapter, fragment, or node has been selected.
 
-Add `--type summary,node` for concept discovery, `--type fragment,sentence` for source wording, and `--chapter`, `--limit`, and `--cursor` to keep retrieval bounded.
+Add `--type summary,node` for concept discovery, `--type fragment` for source wording, and `--chapter`, `--limit`, and `--cursor` to keep retrieval bounded.
 
 Use the library API only when the surrounding system explicitly needs in-process integration.
 
@@ -34,8 +33,8 @@ Use the library API only when the surrounding system explicitly needs in-process
 
 - Primary object: `.sdpub`
 - Import sources: EPUB, Markdown, TXT, and text pipelines
-- Read objects: `chapter:<id>`, `node:<id>`, `fragment:<serial>:<fragment>`, `sentence:<serial>:<fragment>:<index>`, `summary:<id>`, `meta:book`
-- Cheap operations: `status`, `index`, `list`, `find`, `grep`, `page`, `read`, `evidence`, `links`, `backlinks`, `export`
+- Read objects: `chapter:<id>`, `node:<id>`, `fragment:<serial>:<fragment>`, `summary:<id>`, `meta:book`
+- Cheap operations: `status`, `index`, `list`, `find`, `grep`, `page`, `read`, `links`, `backlinks`, `export`
 - Expensive operations: graph, summary, or ready `build`
 - Estimate first: `spinedigest estimate <archive.sdpub> --stage ready`
 - JSON: pass `--json` when composing with tools
@@ -46,11 +45,10 @@ Use the library API only when the surrounding system explicitly needs in-process
 2. For understanding tasks, use `list --type chapter`, then `page chapter:<id>` before keyword search.
 3. Inspect chapter `nodeGroups`, then use `page node:<id>` for relevant knowledge nodes.
 4. Use `find` or `grep` to locate candidate chapters, verify missing concepts, or check exact source wording.
-5. Use `read` when the user needs chapter, fragment, summary, node, or sentence text as prose.
-6. Use `evidence` before quoting or making source-backed claims.
-7. Use `links`, `backlinks`, or `path` to navigate graph context.
-8. Use `export` only when the user needs a projection.
-9. Before `build`, run `estimate`; if the estimate is too large for the session, ask the user.
+5. Use `read fragment:<id>` when the user needs original source prose after selecting a relevant node or chapter.
+6. Use `links`, `backlinks`, or `path` to navigate graph context.
+7. Use `export` only when the user needs a projection.
+8. Before `build`, run `estimate`; if the estimate is too large for the session, ask the user.
 
 ## Build Workflow
 

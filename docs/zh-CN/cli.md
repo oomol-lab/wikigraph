@@ -21,7 +21,6 @@ spinedigest find <archive.sdpub> <query> [--match <any|all>] [--chapter <ids>] [
 spinedigest grep <archive.sdpub> <query> [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
 spinedigest page <archive.sdpub> <id> [--json]
 spinedigest read <archive.sdpub> <id>
-spinedigest evidence <archive.sdpub> <id> [--json]
 spinedigest links <archive.sdpub> <node:id> [--json]
 spinedigest backlinks <archive.sdpub> <node:id> [--json]
 spinedigest path <archive.sdpub> <node:id> <node:id> --chapter <id>
@@ -40,7 +39,7 @@ spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 - `find --match all` 是严格模式，要求同一个对象内包含全部关键词。
 - `grep` 是精确文本搜索。它把 query 当作一个连续字符串。
 - `--chapter 12` 或 `--chapter 11,12` 用于限定章节。
-- `--type chapter,summary,node,fragment,sentence,meta` 用于限定 `list`；`find` 和 `grep` 搜索 `summary,node,fragment,sentence`。
+- `--type chapter,summary,node,fragment,meta` 用于限定 `list`；`find` 和 `grep` 搜索 `summary,node,fragment`。
 - `--order doc-asc|doc-desc` 按稳定文档位置排序，默认 `doc-asc`。
 - `--limit` 默认 `20`；下一页把返回的 `nextCursor` 传给 `--cursor`。
 - 两个命令都不做语义扩展、模糊匹配、词干匹配或向量搜索。
@@ -50,7 +49,6 @@ spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 - `chapter:<id>`
 - `node:<id>`
 - `fragment:<serial>:<fragment>`
-- `sentence:<serial>:<fragment>:<index>`
 - `summary:<id>`
 - `meta:book`
 
@@ -59,7 +57,7 @@ spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 面向用户的阶段：
 
 - `source`：已导入的规范化源数据
-- `graph`：graph node、edge 和 evidence-backed knowledge unit
+- `graph`：graph node、edge 和 source-backed knowledge unit
 - `summary`：可读的章节 summary
 - `ready`：完整 ready 归档投影
 
@@ -88,7 +86,6 @@ spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 ```bash
 spinedigest find book.sdpub "RAG" --json
 spinedigest page book.sdpub node:84 --json
-spinedigest evidence book.sdpub node:84 --json
 ```
 
 默认 stdout 是适合人和 Agent 阅读的 Markdown-like 文本，包含稳定 ID 和下一步命令提示。

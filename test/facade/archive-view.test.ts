@@ -284,6 +284,35 @@ describe("facade/archive-view", () => {
     });
   });
 
+  it("shows node pages with generated summaries and source fragments", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const page = await readArchivePage(document, "node:100");
+
+        expect(page.type).toBe("node");
+        if (page.type !== "node") {
+          throw new Error("Expected node page");
+        }
+        expect(page.generatedNodeSummary).toBe(
+          "Pages and links make archive navigation explicit.",
+        );
+        expect(page.id).toBe("node:100");
+        expect(page.sourceFragments[0]?.id).toBe("fragment:1:0");
+        expect(page.sourceFragments[0]?.text).toContain(
+          "An LLM Wiki exposes pages",
+        );
+        expect(page.title).toBe("Wiki pages");
+        expect(JSON.stringify(page)).not.toContain("sentence:");
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("groups chapter nodes by fragment when topology groups are absent", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
@@ -370,7 +399,7 @@ async function seedSourcedDocument(
     const draft = await openedDocument.getSerialFragments(1).createDraft();
 
     draft.addSentence(
-      "An LLM Wiki exposes pages, links, and evidence to agents.",
+      "An LLM Wiki exposes pages, links, and source fragments to agents.",
       10,
     );
     draft.addSentence("朱元璋知道了这个消息，随后亲自来到洪都。", 18);

@@ -20,7 +20,6 @@ export {
   formatChapterId,
   formatEdgeId,
   formatNodeId,
-  formatSentenceId,
   formatSummaryId,
   getArchiveIndex,
   grepArchiveObjects,
@@ -30,7 +29,6 @@ export {
   listArchiveObjects,
   listRelatedArchiveObjects,
   packArchiveContext,
-  readArchiveEvidence,
   readArchivePage,
   readArchiveText,
 } from "./archive-view.js";
@@ -69,6 +67,7 @@ export type {
   ArchiveListKind,
   ArchiveNodeGroup,
   ArchiveNodeLabel,
+  ArchiveNodeSourceFragment,
   ArchiveFindObjectType,
   ArchiveFindOptions,
   ArchiveFindOrder,
