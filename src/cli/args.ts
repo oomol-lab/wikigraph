@@ -2459,31 +2459,6 @@ function parseArchiveEstimateStage(value: string | undefined): ChapterStage {
   return parseChapterStage(value, "--stage", CLI_HELP_ROUTES.command);
 }
 
-function parseArchiveListKind(
-  value: string | undefined,
-): NonNullable<CLIArchiveArguments["listKind"]> {
-  if (value === undefined) {
-    return "chapters";
-  }
-  if (
-    value === "chapters" ||
-    value === "edges" ||
-    value === "fragments" ||
-    value === "meta" ||
-    value === "nodes" ||
-    value === "summaries"
-  ) {
-    return value;
-  }
-
-  throw new Error(
-    withHelpRoute(
-      `Invalid list kind: ${value}. Expected chapters, nodes, edges, fragments, summaries, or meta.`,
-      "spinedigest list --help",
-    ),
-  );
-}
-
 function parseArchiveSearchChapters(value: string): readonly number[] {
   const chapters = value
     .split(",")

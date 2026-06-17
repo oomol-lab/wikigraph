@@ -69,7 +69,7 @@ describe("facade/chapter", () => {
     });
   });
 
-  it("normalizes legacy grouping nodes into planned chapters", async () => {
+  it("normalizes serial-less grouping nodes into planned chapters", async () => {
     await withTempDir("spinedigest-chapter-", async (path) => {
       const document = await DirectoryDocument.open(path);
 
