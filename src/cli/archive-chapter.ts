@@ -1,5 +1,6 @@
 import { createReadStream } from "fs";
 import { readFile } from "fs/promises";
+import { Readable } from "stream";
 
 import type { DirectoryDocument } from "../document/index.js";
 import {
@@ -32,12 +33,20 @@ export async function runArchiveChapterCommand(
   switch (args.action) {
     case "add":
       await runEditableCommand(args.path, async (document) => {
-        const details = await addChapter(document, {
+        let details = await addChapter(document, {
           ...(args.parentChapterId === undefined
             ? {}
             : { parentChapterId: args.parentChapterId }),
           ...(args.title === undefined ? {} : { title: args.title }),
         });
+
+        if (args.addStage === "sourced") {
+          details = await setChapterSource(
+            document,
+            details.chapterId,
+            Readable.from([await readRequiredSourceText(args)]),
+          );
+        }
 
         await writeChapterDetails(details);
       });
@@ -100,7 +109,7 @@ export async function runArchiveChapterCommand(
         const details = await setChapterSource(
           document,
           args.chapterId!,
-          createContentStream(args),
+          Readable.from([await readRequiredSourceText(args)]),
         );
 
         await writeChapterDetails(details);
@@ -177,11 +186,25 @@ async function readContentText(
   return content;
 }
 
+async function readRequiredSourceText(
+  args: Pick<CLIArchiveChapterArguments, "inputPath">,
+): Promise<string> {
+  const content = await readContentText(args);
+
+  if (content.trim() === "") {
+    throw new Error(
+      "Source input is empty. Pass non-empty text with --input <path> or pipe text into stdin.",
+    );
+  }
+
+  return content;
+}
+
 async function writeChapterDetails(details: ChapterDetails): Promise<void> {
   const lines = [
     `Chapter: ${details.chapterId}`,
     `Title: ${details.title ?? "[untitled]"}`,
-    `Stage: ${details.stage}`,
+    `Stage: ${formatStage(details.stage)}`,
     `Source Units: ${details.fragmentCount}`,
     `Children: ${details.childCount}`,
     `Graph: ${details.graphReady ? "yes" : "no"}`,
@@ -203,8 +226,21 @@ async function writeChapterList(
     `${entries
       .map(
         (entry) =>
-          `${"  ".repeat(entry.depth)}[${entry.chapterId}] ${entry.stage.padEnd(10)} ${entry.title ?? "[untitled]"}`,
+          `${"  ".repeat(entry.depth)}[${entry.chapterId}] ${formatStage(entry.stage).padEnd(8)} ${entry.title ?? "[untitled]"}`,
       )
       .join("\n")}\n`,
   );
+}
+
+function formatStage(stage: ChapterEntry["stage"]): string {
+  switch (stage) {
+    case "planned":
+      return "planned";
+    case "sourced":
+      return "source";
+    case "graphed":
+      return "graph";
+    case "summarized":
+      return "summary";
+  }
 }

@@ -31,6 +31,7 @@ import {
   type GraphNeighbor,
   type GraphPathStep,
   type ChapterEntry,
+  type ChapterStage,
 } from "../facade/index.js";
 import { SpineDigestFile } from "../facade/spine-digest-file.js";
 import type { Document } from "../document/index.js";
@@ -77,7 +78,10 @@ export async function runArchiveCommand(
     case "estimate":
       await withArchiveDocument(args.archivePath, async (document) => {
         await writeEstimate(
-          await estimateArchiveBuild(document, args.targetStage ?? "ready"),
+          await estimateArchiveBuild(
+            document,
+            args.targetStage ?? "summarized",
+          ),
           args.json ?? false,
         );
       });
@@ -327,12 +331,7 @@ function createCollectionOptions(
 }
 
 async function buildArchive(args: CLIArchiveArguments): Promise<void> {
-  const targetStage =
-    args.targetStage === "ready" ||
-    args.targetStage === "source" ||
-    args.targetStage === undefined
-      ? "summarized"
-      : args.targetStage;
+  const targetStage = args.targetStage ?? "summarized";
 
   if (targetStage === "planned") {
     await writeAdvanceResult({
@@ -421,7 +420,7 @@ function createStageAdvanceProgressWriter(input?: {
       switch (event.type) {
         case "selected":
           await writeLine(
-            `Selected ${event.totalChapters} ${event.totalChapters === 1 ? "chapter" : "chapters"}; target: ${event.targetStage}.`,
+            `Selected ${event.totalChapters} ${event.totalChapters === 1 ? "chapter" : "chapters"}; target: ${formatStage(event.targetStage)}.`,
           );
           return;
         case "skipped":
@@ -477,7 +476,7 @@ async function writeIndex(
       "",
       "Graph note:",
       "  No graph nodes are currently available. If graph build already ran, the source may be too short, too sparse, or no stable knowledge units were extracted.",
-      "  Next: inspect a chapter with `spinedigest page <archive.sdpub> chapter:<id>` or build `--stage ready` if you need summaries.",
+      "  Next: inspect a chapter with `spinedigest page <archive.sdpub> chapter:<id>` or build `--stage summary` if you need summaries.",
     );
   } else if (index.edgeCount === 0) {
     lines.push(
@@ -492,7 +491,7 @@ async function writeIndex(
     lines.push("", "Entry Points:");
     for (const chapter of index.chapters.slice(0, 12)) {
       lines.push(
-        `  chapter:${chapter.chapterId}  ${chapter.title ?? "[untitled]"} (${chapter.stage})`,
+        `  chapter:${chapter.chapterId}  ${chapter.title ?? "[untitled]"} (${formatStage(chapter.stage)})`,
       );
     }
     lines.push(
@@ -518,7 +517,7 @@ async function writeEstimate(
 
   await writeTextToStdout(
     [
-      `Target stage: ${estimate.targetStage}`,
+      `Target stage: ${formatEstimateStage(estimate.targetStage)}`,
       `Source words: ${estimate.sourceWords}`,
       `Estimated LLM calls: ${estimate.estimatedLlmCalls}`,
       `Estimated tokens: ${estimate.estimatedTokens.input} input / ${estimate.estimatedTokens.output} output`,
@@ -611,7 +610,7 @@ async function writePage(page: ArchivePage, json: boolean): Promise<void> {
       await writeTextToStdout(
         [
           `${page.id}  ${page.title}`,
-          `Stage: ${page.chapter.stage}`,
+          `Stage: ${formatStage(page.chapter.stage)}`,
           `Fragments: ${page.chapter.fragmentCount}`,
           `Nodes: ${page.nodeCount}`,
           "",
@@ -930,7 +929,7 @@ async function writeAdvanceResult(
 }
 
 function formatBuildChapterEntry(entry: ChapterEntry): string {
-  return `[${entry.chapterId}] ${entry.stage.padEnd(10)} ${formatTocPath(entry)}`;
+  return `[${entry.chapterId}] ${formatStage(entry.stage).padEnd(8)} ${formatTocPath(entry)}`;
 }
 
 function formatTocPath(entry: ChapterEntry): string {
@@ -1017,6 +1016,38 @@ function isUrl(value: string): boolean {
 
 function formatFetchedUrlSource(url: string, text: string): string {
   return [`# ${url}`, "", text].join("\n");
+}
+
+function formatStage(stage: ChapterStage): string {
+  switch (stage) {
+    case "planned":
+      return "planned";
+    case "sourced":
+      return "source";
+    case "graphed":
+      return "graph";
+    case "summarized":
+      return "summary";
+  }
+}
+
+function formatEstimateStage(stage: ArchiveEstimate["targetStage"]): string {
+  switch (stage) {
+    case "planned":
+      return "planned";
+    case "source":
+    case "sourced":
+      return "source";
+    case "graph":
+    case "graphed":
+      return "graph";
+    case "ready":
+    case "summary":
+    case "summarized":
+      return "summary";
+    default:
+      return stage;
+  }
 }
 
 async function readAllText(stream: AsyncIterable<string>): Promise<string> {

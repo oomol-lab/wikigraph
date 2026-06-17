@@ -25,13 +25,13 @@ Export rules:
 
 Readiness by archive stage:
   - planned: chapter exists, but no source is available.
-  - sourced: source fragments are searchable and readable; graph and summary may be missing.
-  - graphed: graph nodes, links, and source fragment pointers are available; summary may be missing.
-  - summarized: summaries and export projections are ready.
+  - source: source fragments are searchable and readable; graph and summary may be missing.
+  - graph: graph nodes, links, and source fragment pointers are available; summary may be missing.
+  - summary: summaries and export projections are ready.
 
 LLM usage:
   - Import/source does not call an LLM.
-  - Graph, summary, and ready builds may call an LLM and require `--confirm`.
+  - Graph and summary builds may call an LLM and require `--confirm`.
   - List, search, page, read, navigation, pack, and export do not call an LLM.
 
 Direct digest and maintenance commands:

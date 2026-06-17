@@ -12,8 +12,8 @@ spinedigest <action> <archive.sdpub> ...
 
 ```bash
 spinedigest import <archive.sdpub> [source] [--input-format <format>] [--llm <json>] [--prompt <text>] [--confirm]
-spinedigest build <archive.sdpub> [--stage <source|graph|summary|ready>] [--chapter <id>] [--llm <json>] [--prompt <text>] [--confirm]
-spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--json]
+spinedigest build <archive.sdpub> [--stage <source|graph|summary>] [--chapter <id>] [--llm <json>] [--prompt <text>] [--confirm]
+spinedigest estimate <archive.sdpub> [--stage <source|graph|summary>] [--json]
 spinedigest status <archive.sdpub> [--json]
 spinedigest index <archive.sdpub> [--json]
 spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
@@ -63,9 +63,8 @@ User-facing stages:
 - `source`: imported normalized source data
 - `graph`: graph nodes, edges, and source-backed knowledge units
 - `summary`: readable chapter summaries
-- `ready`: full ready archive projection
 
-`source` is cheap. `graph`, `summary`, and `ready` may call an LLM provider. Run `estimate` first for full-archive builds.
+`source` is cheap. `graph` and `summary` may call an LLM provider. Run `estimate` first for full-archive builds.
 
 ## Formats
 
@@ -99,7 +98,7 @@ Human-readable stdout is Markdown-like text with stable ids and suggested next c
 The direct one-shot digest command remains available:
 
 ```bash
-spinedigest transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--confirm] [--stage <planned|sourced|graphed|summarized>] [--verbose]
+spinedigest transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--confirm] [--stage <planned|source|graph|summary>] [--verbose]
 ```
 
 Archive maintenance commands remain available as top-level commands:

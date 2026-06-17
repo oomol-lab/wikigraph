@@ -15,7 +15,7 @@ Exit behavior:
   - Failures return non-zero and print a plain-text error to stderr.
 
 Build safety:
-  - `build --stage graph|summary|ready` may call an LLM and requires `--confirm`.
+  - `build --stage graph|summary` may call an LLM and requires `--confirm`.
   - Run `estimate` before full-archive LLM-backed builds.
   - Prefer `--chapter <id>` for scoped build work.
 

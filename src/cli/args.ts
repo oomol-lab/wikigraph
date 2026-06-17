@@ -6,7 +6,7 @@ import {
   archiveMaintenanceHelpRoute,
   withHelpRoute,
 } from "./errors.js";
-import { CHAPTER_STAGES, type ChapterStage } from "../facade/index.js";
+import { type ChapterStage } from "../facade/index.js";
 import {
   parseHelpTopic,
   renderArchiveCommandHelpText,
@@ -74,6 +74,7 @@ export type CLIArchiveChapterAction =
 
 export interface CLIArchiveChapterArguments {
   readonly action: CLIArchiveChapterAction;
+  readonly addStage?: Extract<ChapterStage, "planned" | "sourced">;
   readonly chapterId?: number;
   readonly inputFormat?: Extract<CLIFormat, "markdown" | "txt">;
   readonly inputPath?: string;
@@ -148,7 +149,7 @@ export interface CLIArchiveArguments {
     | "summary"
   )[];
   readonly sourcePath?: string;
-  readonly targetStage?: ChapterStage | "ready" | "source";
+  readonly targetStage?: ChapterStage;
   readonly toNodeId?: number;
 }
 
@@ -788,7 +789,7 @@ function parseArchiveArguments(
       if (targetStage !== "sourced" && values.confirm !== true) {
         throw new Error(
           withHelpRoute(
-            "This build may call an LLM. Run `spinedigest estimate <archive.sdpub> --stage ready`, then rerun build with --confirm.",
+            "This build may call an LLM. Run `spinedigest estimate <archive.sdpub> --stage summary`, then rerun build with --confirm.",
             helpRoute,
           ),
         );
@@ -1148,7 +1149,6 @@ function parseArchiveChapterArguments(
   rejectArchiveChapterFlag("limit", values.limit);
   rejectArchiveChapterFlag("output", values.output);
   rejectArchiveChapterFlag("output-format", values["output-format"]);
-  rejectArchiveChapterFlag("stage", values.stage);
   rejectArchiveChapterMetaFlags(values);
   if (values.verbose) {
     throw new Error(
@@ -1228,6 +1228,7 @@ function normalizeArchiveChapterArguments(
     readonly parent?: string;
     readonly prompt?: string;
     readonly recursive?: boolean;
+    readonly stage?: string;
     readonly title?: string;
     readonly to?: string;
   },
@@ -1245,19 +1246,16 @@ function normalizeArchiveChapterArguments(
     values["input-format"] === undefined
       ? undefined
       : parseChapterInputFormat(values["input-format"], helpRoute);
+  const addStage =
+    values.stage === undefined
+      ? undefined
+      : parseChapterAddStage(values.stage, helpRoute);
   const resetStage =
     values.to === undefined ? undefined : parseResetStage(values.to, helpRoute);
 
   switch (action) {
     case "add":
       rejectActionFlag(values.chapter, "--chapter", action, helpRoute);
-      rejectActionFlag(values.input, "--input", action, helpRoute);
-      rejectActionFlag(
-        values["input-format"],
-        "--input-format",
-        action,
-        helpRoute,
-      );
       rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
       rejectActionFlag(values.to, "--to", action, helpRoute);
       rejectActionBooleanFlag(
@@ -1266,15 +1264,43 @@ function normalizeArchiveChapterArguments(
         action,
         helpRoute,
       );
+      if (addStage === undefined) {
+        throw new Error(
+          withHelpRoute(
+            "Missing --stage. `chapter add` requires planned or source.",
+            helpRoute,
+          ),
+        );
+      }
+      if (addStage === "planned") {
+        rejectActionFlag(values.input, "--input", action, helpRoute);
+        rejectActionFlag(
+          values["input-format"],
+          "--input-format",
+          action,
+          helpRoute,
+        );
+      } else if (addStage === "sourced" && inputFormat === undefined) {
+        throw new Error(
+          withHelpRoute(
+            "Missing --input-format. `chapter add --stage source` requires txt or markdown.",
+            helpRoute,
+          ),
+        );
+      }
       return {
         action,
         path,
+        ...(addStage === undefined ? {} : { addStage }),
+        ...(inputFormat === undefined ? {} : { inputFormat }),
+        ...(values.input === undefined ? {} : { inputPath: values.input }),
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
         ...(parentChapterId === undefined ? {} : { parentChapterId }),
         ...(values.title === undefined ? {} : { title: values.title }),
       };
     case "generate-graph":
       requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       rejectActionFlag(values.input, "--input", action, helpRoute);
       rejectActionFlag(
         values["input-format"],
@@ -1300,6 +1326,7 @@ function normalizeArchiveChapterArguments(
       };
     case "generate-summary":
       requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       rejectActionFlag(values.input, "--input", action, helpRoute);
       rejectActionFlag(
         values["input-format"],
@@ -1324,6 +1351,7 @@ function normalizeArchiveChapterArguments(
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       };
     case "list":
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       rejectActionFlag(values.chapter, "--chapter", action, helpRoute);
       rejectActionFlag(values.input, "--input", action, helpRoute);
       rejectActionFlag(
@@ -1349,6 +1377,7 @@ function normalizeArchiveChapterArguments(
       };
     case "remove":
       requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       rejectActionFlag(values.input, "--input", action, helpRoute);
       rejectActionFlag(
         values["input-format"],
@@ -1371,10 +1400,11 @@ function normalizeArchiveChapterArguments(
       };
     case "reset":
       requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       if (resetStage === undefined) {
         throw new Error(
           withHelpRoute(
-            "Missing --to. `chapter reset` requires planned, sourced, or graphed.",
+            "Missing --to. `chapter reset` requires planned, source, or graph.",
             helpRoute,
           ),
         );
@@ -1404,6 +1434,7 @@ function normalizeArchiveChapterArguments(
       };
     case "set-source":
       requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       if (inputFormat === undefined) {
         throw new Error(
           withHelpRoute(
@@ -1432,6 +1463,7 @@ function normalizeArchiveChapterArguments(
       };
     case "set-summary":
       requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       rejectActionFlag(
         values["input-format"],
         "--input-format",
@@ -1457,6 +1489,7 @@ function normalizeArchiveChapterArguments(
       };
     case "set-title":
       requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       if (values.title === undefined) {
         throw new Error(
           withHelpRoute(
@@ -1490,6 +1523,7 @@ function normalizeArchiveChapterArguments(
       };
     case "status":
       requireChapterId(chapterId, action, helpRoute);
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       rejectActionFlag(values.input, "--input", action, helpRoute);
       rejectActionFlag(
         values["input-format"],
@@ -1721,15 +1755,15 @@ function parseChapterStage(
   flag: string,
   helpRoute: string,
 ): ChapterStage {
-  const normalized = value.trim().toLowerCase();
+  const stage = parseExternalChapterStage(value);
 
-  if (CHAPTER_STAGES.includes(normalized as ChapterStage)) {
-    return normalized as ChapterStage;
+  if (stage !== undefined) {
+    return stage;
   }
 
   throw new Error(
     withHelpRoute(
-      `Invalid ${flag}: ${value}. Expected planned, sourced, graphed, or summarized.`,
+      `Invalid ${flag}: ${value}. Expected planned, source, graph, or summary.`,
       helpRoute,
     ),
   );
@@ -1753,23 +1787,37 @@ function parseChapterInputFormat(
   );
 }
 
+function parseChapterAddStage(
+  value: string,
+  helpRoute: string,
+): Extract<ChapterStage, "planned" | "sourced"> {
+  const stage = parseExternalChapterStage(value);
+
+  if (stage === "planned" || stage === "sourced") {
+    return stage;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --stage: ${value}. chapter add accepts planned or source.`,
+      helpRoute,
+    ),
+  );
+}
+
 function parseResetStage(
   value: string,
   helpRoute: string,
 ): Exclude<ChapterStage, "summarized"> {
-  const normalized = value.trim().toLowerCase();
+  const stage = parseExternalChapterStage(value);
 
-  if (
-    normalized === "planned" ||
-    normalized === "sourced" ||
-    normalized === "graphed"
-  ) {
-    return normalized;
+  if (stage === "planned" || stage === "sourced" || stage === "graphed") {
+    return stage;
   }
-  if (CHAPTER_STAGES.includes(normalized as ChapterStage)) {
+  if (stage !== undefined) {
     throw new Error(
       withHelpRoute(
-        "`chapter reset` does not support --to summarized.",
+        "`chapter reset` does not support --to summary.",
         helpRoute,
       ),
     );
@@ -1777,10 +1825,25 @@ function parseResetStage(
 
   throw new Error(
     withHelpRoute(
-      `Invalid --to: ${value}. Expected planned, sourced, or graphed.`,
+      `Invalid --to: ${value}. Expected planned, source, or graph.`,
       helpRoute,
     ),
   );
+}
+
+function parseExternalChapterStage(value: string): ChapterStage | undefined {
+  switch (value.trim().toLowerCase()) {
+    case "planned":
+      return "planned";
+    case "source":
+      return "sourced";
+    case "graph":
+      return "graphed";
+    case "summary":
+      return "summarized";
+    default:
+      return undefined;
+  }
 }
 
 function parseArchiveMetaPatch(
@@ -2115,35 +2178,23 @@ function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
 }
 
 function parseArchiveBuildStage(value: string | undefined): ChapterStage {
-  if (value === undefined || value === "ready") {
+  if (value === undefined) {
     return "summarized";
   }
-  if (value === "source") {
-    return "sourced";
-  }
-  if (value === "graph") {
-    return "graphed";
-  }
-  if (value === "summary") {
-    return "summarized";
+  if (value.trim().toLowerCase() === "planned") {
+    throw new Error(
+      withHelpRoute(
+        "Invalid --stage: planned. `build` advances existing source to graph or summary.",
+        CLI_HELP_ROUTES.command,
+      ),
+    );
   }
 
   return parseChapterStage(value, "--stage", CLI_HELP_ROUTES.command);
 }
 
-function parseArchiveEstimateStage(
-  value: string | undefined,
-): ChapterStage | "ready" | "source" {
+function parseArchiveEstimateStage(value: string | undefined): ChapterStage {
   if (value === undefined) {
-    return "ready";
-  }
-  if (value === "ready" || value === "source") {
-    return value;
-  }
-  if (value === "graph") {
-    return "graphed";
-  }
-  if (value === "summary") {
     return "summarized";
   }
 

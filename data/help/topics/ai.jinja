@@ -41,8 +41,8 @@ Safe first moves:
 
 Build safety:
   - Safe default: import source into `.sdpub`.
-  - Before any graph, summary, or ready build, run:
-    spinedigest estimate <archive.sdpub> --stage ready
+  - Before any graph or summary build, run:
+    spinedigest estimate <archive.sdpub> --stage summary
   - If estimated time or cost exceeds the interactive task budget, stop and ask.
   - Prefer scoped builds with `--chapter <id>`.
   - LLM-backed `build` requires `--confirm` after estimation.

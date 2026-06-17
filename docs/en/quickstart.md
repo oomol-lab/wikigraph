@@ -42,10 +42,10 @@ Import creates or replaces a `.sdpub` archive at source stage. It does not mean 
 ```bash
 spinedigest status ./book.sdpub
 spinedigest index ./book.sdpub
-spinedigest estimate ./book.sdpub --stage ready
+spinedigest estimate ./book.sdpub --stage summary
 ```
 
-Use the estimate before full-archive graph, summary, or ready builds.
+Use the estimate before full-archive graph or summary builds.
 
 ## 5. Build Knowledge
 

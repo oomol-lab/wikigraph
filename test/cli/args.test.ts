@@ -147,7 +147,7 @@ describe("cli/args", () => {
         "--output",
         "book.sdpub",
         "--stage",
-        "sourced",
+        "source",
       ]),
     ).toStrictEqual({
       args: {
@@ -512,6 +512,8 @@ describe("cli/args", () => {
         "chapter",
         "add",
         "book.sdpub",
+        "--stage",
+        "planned",
         "--title",
         "Chapter 1",
         "--parent",
@@ -520,6 +522,7 @@ describe("cli/args", () => {
     ).toStrictEqual({
       args: {
         action: "add",
+        addStage: "planned",
         parentChapterId: 3,
         path: "book.sdpub",
         title: "Chapter 1",
@@ -535,7 +538,7 @@ describe("cli/args", () => {
         "--chapter",
         "12",
         "--to",
-        "sourced",
+        "source",
       ]),
     ).toStrictEqual({
       args: {
@@ -701,7 +704,7 @@ describe("cli/args", () => {
         "summarized",
       ]),
     ).toThrow(
-      "`chapter reset` does not support --to summarized.\nSee: spinedigest chapter --help",
+      "Invalid --to: summarized. Expected planned, source, or graph.\nSee: spinedigest chapter --help",
     );
   });
 
@@ -774,7 +777,7 @@ describe("cli/args", () => {
       "Treat `.sdpub` as an LLM Wiki archive",
     );
     expect(renderHelpTopicText("ai")).toContain(
-      "spinedigest estimate <archive.sdpub> --stage ready",
+      "spinedigest estimate <archive.sdpub> --stage summary",
     );
     expect(commandHelpText).toContain("Archive-first commands:");
     expect(commandHelpText).toContain("spinedigest import <archive.sdpub>");
@@ -816,7 +819,7 @@ describe("cli/args", () => {
     );
     expect(
       renderArchiveMaintenanceChapterActionHelpText("set-summary"),
-    ).toContain("The chapter must be `graphed`");
+    ).toContain("The chapter must be `graph`");
     expect(renderArchiveMaintenanceCommandHelpText("cover")).toContain(
       "refuses to write binary data to an interactive terminal",
     );

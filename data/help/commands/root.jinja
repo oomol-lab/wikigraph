@@ -26,8 +26,8 @@ Task routing:
 
 Archive-first usage:
   spinedigest import <archive.sdpub> [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
-  spinedigest build <archive.sdpub> [--stage <source|graph|summary|ready>] [--chapter <id>] [--llm <json>] [--prompt <text>] [--confirm]
-  spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--json]
+  spinedigest build <archive.sdpub> [--stage <source|graph|summary>] [--chapter <id>] [--llm <json>] [--prompt <text>] [--confirm]
+  spinedigest estimate <archive.sdpub> [--stage <source|graph|summary>] [--json]
   spinedigest status <archive.sdpub> [--json]
   spinedigest index <archive.sdpub> [--json]
   spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--limit <n>] [--cursor <token>] [--json]
@@ -69,7 +69,7 @@ Core object ids:
 Cost contract:
   Import is cheap when it stops at source.
   List, search, page, read, links, and export are cheap after build.
-  Build can call an LLM and may be expensive. Run `spinedigest estimate <archive.sdpub>` before full-archive graph, summary, or ready builds, then rerun `build` with `--confirm`.
+  Build can call an LLM and may be expensive. Run `spinedigest estimate <archive.sdpub> --stage summary` before full-archive graph or summary builds, then rerun `build` with `--confirm`.
 
 Help contract:
   - Append `--help` to commands and subcommands to see command-specific usage.

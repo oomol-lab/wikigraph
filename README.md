@@ -69,7 +69,7 @@ Inspect the archive before expensive work:
 ```bash
 spinedigest status ./book.sdpub
 spinedigest index ./book.sdpub
-spinedigest estimate ./book.sdpub --stage ready
+spinedigest estimate ./book.sdpub --stage summary
 ```
 
 Build derived knowledge when you intend to spend LLM time:
@@ -184,7 +184,7 @@ SpineDigest's CLI-first design exposes `.sdpub` as a managed LLM Wiki archive.
 - **Choose an exploration mode first.** For synthesis and structural understanding, start with `list/page`; use `find/grep` for candidate discovery and exact wording; use `read` for continuous prose after selecting the relevant object.
 - **Use help as the discovery surface.** Start with `spinedigest --help` as the root page, then follow `spinedigest help ai`, topic pages, or command-specific `--help` before guessing behavior.
 - **Prefer `--json`.** Use it when composing with tools.
-- **Estimate before build.** Do not run full-archive graph, summary, or ready builds without `spinedigest estimate`.
+- **Estimate before build.** Do not run full-archive graph or summary builds without `spinedigest estimate`.
 - **Check exit codes.** Success returns `0`; failure returns non-zero with a plain-text error on `stderr`.
 - **Do not inspect `database.db` routinely.** Use `list`, `page`, `read`, and graph navigation commands instead.
 

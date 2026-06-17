@@ -145,7 +145,11 @@ vi.mock("../../src/facade/index.js", () => ({
         chapterId,
         streamText,
       });
-      return chapterDetails;
+      return {
+        ...chapterDetails,
+        chapterId,
+        stage: "sourced",
+      };
     },
   ),
   setChapterSummary: vi.fn(
@@ -252,13 +256,14 @@ describe("cli/archive-chapter", () => {
 
     expect(chapterMockState.editableCalls).toStrictEqual(["/tmp/book.sdpub"]);
     expect(chapterMockState.textWrites).toStrictEqual([
-      "[1] planned    Part I\n  [2] sourced    Chapter 1\n",
+      "[1] planned  Part I\n  [2] source   Chapter 1\n",
     ]);
   });
 
   it("adds a chapter and prints the new chapter id", async () => {
     await runArchiveChapterCommand({
       action: "add",
+      addStage: "planned",
       parentChapterId: 1,
       path: "/tmp/book.sdpub",
       title: "New Chapter",
@@ -273,6 +278,30 @@ describe("cli/archive-chapter", () => {
     expect(chapterMockState.textWrites[0]).toContain("Chapter: 3\n");
   });
 
+  it("adds a sourced chapter from --input", async () => {
+    await runArchiveChapterCommand({
+      action: "add",
+      addStage: "sourced",
+      inputFormat: "markdown",
+      inputPath: "/tmp/chapter.md",
+      path: "/tmp/book.sdpub",
+      title: "New Chapter",
+    });
+
+    expect(chapterMockState.addCalls).toStrictEqual([
+      {
+        title: "New Chapter",
+      },
+    ]);
+    expect(chapterMockState.setSourceCalls).toStrictEqual([
+      {
+        chapterId: 3,
+        streamText: "file content",
+      },
+    ]);
+    expect(chapterMockState.textWrites[0]).toContain("Stage: source\n");
+  });
+
   it("reads source content from --input", async () => {
     await runArchiveChapterCommand({
       action: "set-source",
@@ -285,7 +314,7 @@ describe("cli/archive-chapter", () => {
     expect(chapterMockState.setSourceCalls).toStrictEqual([
       {
         chapterId: 2,
-        streamText: "source file content",
+        streamText: "file content",
       },
     ]);
   });

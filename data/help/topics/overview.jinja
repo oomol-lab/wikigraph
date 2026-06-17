@@ -36,7 +36,7 @@ Mental model:
 Default workflow:
   spinedigest import book.sdpub ./book.epub
   spinedigest status book.sdpub
-  spinedigest estimate book.sdpub --stage ready
+  spinedigest estimate book.sdpub --stage summary
   spinedigest build book.sdpub --stage graph --confirm
   spinedigest index book.sdpub
   spinedigest list book.sdpub --type chapter
@@ -47,7 +47,7 @@ Default workflow:
 Cost model:
   - Import/source: cheap, no LLM when kept at source.
   - Search/read/navigation/export: cheap after data exists.
-  - Graph/summary/ready build: may call an LLM; estimate first.
+  - Graph/summary build: may call an LLM; estimate first.
 
 Compatibility:
   The direct `spinedigest transform --input ... --output ...` digest command still exists for one-shot workflows.

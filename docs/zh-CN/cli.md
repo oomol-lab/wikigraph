@@ -12,8 +12,8 @@ spinedigest <action> <archive.sdpub> ...
 
 ```bash
 spinedigest import <archive.sdpub> [source] [--input-format <format>] [--llm <json>] [--prompt <text>] [--confirm]
-spinedigest build <archive.sdpub> [--stage <source|graph|summary|ready>] [--chapter <id>] [--llm <json>] [--prompt <text>] [--confirm]
-spinedigest estimate <archive.sdpub> [--stage <source|graph|summary|ready>] [--json]
+spinedigest build <archive.sdpub> [--stage <source|graph|summary>] [--chapter <id>] [--llm <json>] [--prompt <text>] [--confirm]
+spinedigest estimate <archive.sdpub> [--stage <source|graph|summary>] [--json]
 spinedigest status <archive.sdpub> [--json]
 spinedigest index <archive.sdpub> [--json]
 spinedigest list <archive.sdpub> [--id <ids>] [--chapter <ids>] [--type <types>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
@@ -63,9 +63,8 @@ spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
 - `source`：已导入的规范化源数据
 - `graph`：graph node、edge 和 source-backed knowledge unit
 - `summary`：可读的章节 summary
-- `ready`：完整 ready 归档投影
 
-`source` 便宜。`graph`、`summary` 和 `ready` 可能调用 LLM provider。整份归档构建前先运行 `estimate`。
+`source` 便宜。`graph` 和 `summary` 可能调用 LLM provider。整份归档构建前先运行 `estimate`。
 
 ## 格式
 
@@ -99,7 +98,7 @@ spinedigest page book.sdpub chapter:3 --json
 直接一次性 digest/export 命令仍然可用：
 
 ```bash
-spinedigest transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--confirm] [--stage <planned|sourced|graphed|summarized>] [--verbose]
+spinedigest transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--confirm] [--stage <planned|source|graph|summary>] [--verbose]
 ```
 
 归档维护命令以一级命令暴露：
