@@ -5,13 +5,19 @@ import { Readable } from "stream";
 import type { DirectoryDocument } from "../document/index.js";
 import {
   addChapter,
+  applyChapterTree,
   getChapterDetails,
+  getChapterTree,
   listChapters,
+  moveChapter,
+  parseChapterTreeInput,
   removeChapter,
   resetChapter,
   setChapterSource,
   setChapterSummary,
   setChapterTitle,
+  type ChapterTree,
+  type ChapterTreeApplyResult,
   type ChapterDetails,
   type ChapterEntry,
 } from "../facade/index.js";
@@ -50,6 +56,26 @@ export async function runArchiveChapterCommand(
           await writeChapterList(await listChapters(document));
         },
       );
+      return;
+    case "move":
+      await runEditableCommand(args.path, async (document) => {
+        const details = await moveChapter(document, args.chapterId!, {
+          ...(args.afterChapterId === undefined
+            ? {}
+            : { afterChapterId: args.afterChapterId }),
+          ...(args.beforeChapterId === undefined
+            ? {}
+            : { beforeChapterId: args.beforeChapterId }),
+          ...(args.first === undefined ? {} : { first: args.first }),
+          ...(args.last === undefined ? {} : { last: args.last }),
+          ...(args.moveToRoot === undefined ? {} : { root: args.moveToRoot }),
+          ...(args.parentChapterId === undefined
+            ? {}
+            : { parentChapterId: args.parentChapterId }),
+        });
+
+        await writeChapterDetails(details);
+      });
       return;
     case "remove":
       await runEditableCommand(args.path, async (document) => {
@@ -97,7 +123,7 @@ export async function runArchiveChapterCommand(
         const details = await setChapterTitle(
           document,
           args.chapterId!,
-          args.title,
+          args.clearTitle === true ? null : args.title,
         );
 
         await writeChapterDetails(details);
@@ -109,6 +135,27 @@ export async function runArchiveChapterCommand(
           await writeChapterDetails(
             await getChapterDetails(document, args.chapterId!),
           );
+        },
+      );
+      return;
+    case "tree":
+      if (args.treeAction === "apply") {
+        await runEditableCommand(args.path, async (document) => {
+          await writeChapterTreeApplyResult(
+            await applyChapterTree(
+              document,
+              parseChapterTreeInput(JSON.parse(await readContentText(args))),
+              { dryRun: args.dryRun ?? false },
+            ),
+            args.dryRun ?? false,
+          );
+        });
+        return;
+      }
+
+      await new SpineDigestFile(args.path).openEditableSession(
+        async (document) => {
+          await writeChapterTree(await getChapterTree(document));
         },
       );
       return;
@@ -196,6 +243,48 @@ async function writeChapterList(
       )
       .join("\n")}\n`,
   );
+}
+
+async function writeChapterTree(tree: ChapterTree): Promise<void> {
+  await writeTextToStdout(`${JSON.stringify(tree, null, 2)}\n`);
+}
+
+async function writeChapterTreeApplyResult(
+  result: ChapterTreeApplyResult,
+  dryRun: boolean,
+): Promise<void> {
+  const lines = [
+    dryRun ? "Dry run: chapter tree not changed." : "Applied chapter tree.",
+    `Changed: ${result.changed ? "yes" : "no"}`,
+    `Moved: ${result.moved.length}`,
+    `Renamed: ${result.renamed.length}`,
+    `Unchanged: ${result.unchanged}`,
+  ];
+
+  for (const move of result.moved) {
+    lines.push(
+      `Move ${move.chapterId}: ${formatPath(move.oldPath)} [parent ${formatParent(move.oldParentChapterId)}, index ${move.oldIndex}] -> ${formatPath(move.newPath)} [parent ${formatParent(move.newParentChapterId)}, index ${move.newIndex}]`,
+    );
+  }
+  for (const rename of result.renamed) {
+    lines.push(
+      `Rename ${rename.chapterId}: ${formatTitle(rename.oldTitle)} -> ${formatTitle(rename.newTitle)}`,
+    );
+  }
+
+  await writeTextToStdout(`${lines.join("\n")}\n`);
+}
+
+function formatParent(parentChapterId: number | null): string {
+  return parentChapterId === null ? "root" : String(parentChapterId);
+}
+
+function formatPath(path: readonly string[]): string {
+  return path.join(" / ");
+}
+
+function formatTitle(title: string | null): string {
+  return title === null ? "null" : JSON.stringify(title);
 }
 
 function formatStage(stage: ChapterEntry["stage"]): string {

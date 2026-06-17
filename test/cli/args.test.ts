@@ -436,6 +436,49 @@ describe("cli/args", () => {
     expect(
       parseCLIArguments([
         "chapter",
+        "move",
+        "book.sdpub",
+        "--chapter",
+        "8",
+        "--parent",
+        "3",
+        "--first",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "move",
+        chapterId: 8,
+        first: true,
+        parentChapterId: 3,
+        path: "book.sdpub",
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments([
+        "chapter",
+        "move",
+        "book.sdpub",
+        "--chapter",
+        "8",
+        "--root",
+        "--last",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "move",
+        chapterId: 8,
+        last: true,
+        moveToRoot: true,
+        path: "book.sdpub",
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments([
+        "chapter",
         "reset",
         "book.sdpub",
         "--chapter",
@@ -460,6 +503,76 @@ describe("cli/args", () => {
         "book.sdpub",
         "--chapter",
         "12",
+        "--clear",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "set-title",
+        chapterId: 12,
+        clearTitle: true,
+        path: "book.sdpub",
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments(["chapter", "tree", "book.sdpub", "--json"]),
+    ).toStrictEqual({
+      args: {
+        action: "tree",
+        json: true,
+        path: "book.sdpub",
+        treeAction: "show",
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments([
+        "chapter",
+        "tree",
+        "apply",
+        "book.sdpub",
+        "--input",
+        "tree.json",
+        "--dry-run",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "tree",
+        dryRun: true,
+        inputPath: "tree.json",
+        path: "book.sdpub",
+        treeAction: "apply",
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments([
+        "chapter",
+        "tree",
+        "apply",
+        "book.sdpub",
+        "--dry-run",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "tree",
+        dryRun: true,
+        path: "book.sdpub",
+        treeAction: "apply",
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments([
+        "chapter",
+        "set-title",
+        "book.sdpub",
+        "--chapter",
+        "12",
         "--title",
         "Renamed Chapter",
       ]),
@@ -473,6 +586,30 @@ describe("cli/args", () => {
       help: false,
       kind: "chapter",
     });
+    expect(() =>
+      parseCLIArguments([
+        "chapter",
+        "move",
+        "book.sdpub",
+        "--chapter",
+        "8",
+        "--parent",
+        "3",
+        "--root",
+      ]),
+    ).toThrow("Choose only one parent target");
+    expect(() =>
+      parseCLIArguments([
+        "chapter",
+        "set-title",
+        "book.sdpub",
+        "--chapter",
+        "12",
+        "--title",
+        "Title",
+        "--clear",
+      ]),
+    ).toThrow("cannot combine --title with --clear");
   });
 
   it("prints archive maintenance help pages", () => {

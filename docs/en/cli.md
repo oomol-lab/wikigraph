@@ -110,10 +110,10 @@ Archive maintenance commands are top-level commands:
 ```bash
 spinedigest meta <archive.sdpub> [metadata options] [--json]
 spinedigest cover <archive.sdpub>
-spinedigest chapter <list|status|add|remove|reset|set-source|set-summary|set-title> <path> [options]
+spinedigest chapter <list|status|add|move|remove|reset|set-source|set-summary|set-title|tree> <path> [options]
 ```
 
-Use archive-first commands for routine exploration. Maintenance commands are for metadata edits, cover extraction, and chapter tree edits.
+Use archive-first commands for routine exploration. Maintenance commands are for metadata edits, cover extraction, and chapter tree edits. `chapter tree` prints a stable JSON tree with `title: null` for untitled chapters; `chapter tree apply` can reorder chapters and change titles when `title` is present.
 
 `spinedigest config status` prints configuration status. `spinedigest status <archive.sdpub>` prints archive status.
 

@@ -7,11 +7,14 @@ Usage:
   spinedigest chapter list <path> [--llm <json>] [--help|-h]
   spinedigest chapter status <path> --chapter <id> [--llm <json>] [--help|-h]
   spinedigest chapter add <path> --stage <planned|source> [--title <title>] [--parent <id>] [--input <path>] [--input-format <format>] [--llm <json>] [--help|-h]
+  spinedigest chapter move <path> --chapter <id> (--parent <id>|--root|--before <id>|--after <id>|--first|--last) [--llm <json>] [--help|-h]
   spinedigest chapter remove <path> --chapter <id> [--recursive] [--llm <json>] [--help|-h]
   spinedigest chapter reset <path> --chapter <id> --to <planned|source|graph> [--llm <json>] [--help|-h]
   spinedigest chapter set-source <path> --chapter <id> [--input <path>] --input-format <format> [--llm <json>] [--help|-h]
   spinedigest chapter set-summary <path> --chapter <id> [--input <path>] [--llm <json>] [--help|-h]
-  spinedigest chapter set-title <path> --chapter <id> --title <title> [--llm <json>] [--help|-h]
+  spinedigest chapter set-title <path> --chapter <id> (--title <title>|--clear) [--llm <json>] [--help|-h]
+  spinedigest chapter tree <path> [--json] [--llm <json>] [--help|-h]
+  spinedigest chapter tree apply <path> [--input <path>] [--dry-run] [--llm <json>] [--help|-h]
 
 Chapter stages:
   planned     TOC chapter exists, but no source is stored.
@@ -26,7 +29,10 @@ Input rules:
   - `add --stage source` creates a chapter and fills it from `--input <path>` or stdin.
   - `set-source` and `set-summary` read `--input <path>` when provided, otherwise stdin.
   - `set-source` accepts only `txt` or `markdown` for `--input-format`.
-  - `set-title` renames a chapter in the TOC; pass an empty or whitespace-only title to clear the title.
+  - `set-title --title` renames a chapter in the tree; `set-title --clear` removes the explicit title.
+  - `move` changes parent/order only; it does not edit source, graph, or summary data.
+  - `tree` prints the chapter tree as JSON with `title: null` for untitled chapters.
+  - `tree apply` applies a complete chapter tree JSON. It can reorder chapters and change titles when a node includes `title`.
   - `reset --to` accepts `planned`, `source`, or `graph`.
   - Structure edits, `set-title`, `set-source`, `set-summary`, and `reset` do not call an LLM provider.
   - To generate graph or summary for a chapter, use `spinedigest build <path> --chapter <id> --stage graph --confirm` or `--stage summary --confirm`.
@@ -34,6 +40,8 @@ Input rules:
 
 See also:
   - spinedigest chapter list <path>
+  - spinedigest chapter move --help
+  - spinedigest chapter tree --help
   - spinedigest chapter set-title --help
   - spinedigest chapter set-source --help
   - spinedigest chapter set-summary --help

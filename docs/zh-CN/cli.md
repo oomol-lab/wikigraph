@@ -110,10 +110,10 @@ spinedigest transform [--input <path>] [--output <path>] [--input-format <format
 ```bash
 spinedigest meta <archive.sdpub> [metadata options] [--json]
 spinedigest cover <archive.sdpub>
-spinedigest chapter <list|status|add|remove|reset|set-source|set-summary|set-title> <path> [options]
+spinedigest chapter <list|status|add|move|remove|reset|set-source|set-summary|set-title|tree> <path> [options]
 ```
 
-常规探索请使用 archive-first commands。维护命令用于 metadata 编辑、cover 提取和 chapter tree 编辑。
+常规探索请使用 archive-first commands。维护命令用于 metadata 编辑、cover 提取和 chapter tree 编辑。`chapter tree` 输出稳定 JSON tree，未命名章节会显示 `title: null`；`chapter tree apply` 可以重排章节，并在节点包含 `title` 时修改标题。
 
 `spinedigest config status` 输出配置状态。`spinedigest status <archive.sdpub>` 输出归档状态。
 
