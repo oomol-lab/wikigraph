@@ -6,13 +6,14 @@ import {
   archiveMaintenanceHelpRoute,
   withHelpRoute,
 } from "./errors.js";
-import { type ChapterStage } from "../facade/index.js";
+import { type BuildJobTarget, type ChapterStage } from "../facade/index.js";
 import {
   parseHelpTopic,
   renderArchiveCommandHelpText,
   renderArchiveMaintenanceCommandHelpText,
   renderHelpTopicText,
   renderMainHelpText,
+  renderQueueCommandHelpText,
   renderArchiveMaintenanceChapterActionHelpText,
   renderStatusHelpText,
   renderTransformHelpText,
@@ -100,6 +101,34 @@ export interface CLIStatusArguments {
   readonly llmJSON?: string;
 }
 
+export type CLIQueueAction =
+  | "add"
+  | "boost"
+  | "cancel"
+  | "clean"
+  | "list"
+  | "pause"
+  | "resume"
+  | "status"
+  | "target"
+  | "watch"
+  | "worker";
+
+export interface CLIQueueArguments {
+  readonly action: CLIQueueAction;
+  readonly activeOnly?: boolean;
+  readonly all?: boolean;
+  readonly archivePath?: string;
+  readonly boost?: boolean;
+  readonly chapterId?: number;
+  readonly from?: "beginning" | "now";
+  readonly jobId?: string;
+  readonly jsonl?: boolean;
+  readonly llmJSON?: string;
+  readonly prompt?: string;
+  readonly target?: BuildJobTarget;
+}
+
 export type CLIArchiveAction =
   | "backlinks"
   | "build"
@@ -179,8 +208,11 @@ interface ArchiveMetaFlagValues {
 }
 
 interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
+  readonly active?: boolean;
   readonly after?: string;
+  readonly all?: boolean;
   readonly before?: string;
+  readonly boost?: boolean;
   readonly budget?: string;
   readonly chapter?: string;
   readonly clear?: boolean;
@@ -196,6 +228,7 @@ interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly "input-format"?: string;
   readonly id?: string;
   readonly json?: boolean;
+  readonly jsonl?: boolean;
   readonly limit?: string;
   readonly llm?: string;
   readonly match?: string;
@@ -261,6 +294,11 @@ export type ParsedCLIArguments =
       readonly args: CLIArchiveArguments;
       readonly help: false;
       readonly kind: "archive";
+    }
+  | {
+      readonly args: CLIQueueArguments;
+      readonly help: false;
+      readonly kind: "queue";
     }
   | {
       readonly help: true;
@@ -336,6 +374,15 @@ export function parseCLIArguments(
       "dry-run": {
         type: "boolean",
       },
+      active: {
+        type: "boolean",
+      },
+      all: {
+        type: "boolean",
+      },
+      boost: {
+        type: "boolean",
+      },
       first: {
         type: "boolean",
       },
@@ -364,6 +411,9 @@ export function parseCLIArguments(
         type: "string",
       },
       json: {
+        type: "boolean",
+      },
+      jsonl: {
         type: "boolean",
       },
       llm: {
@@ -464,6 +514,10 @@ export function parseCLIArguments(
 
   if (positionals[0] === "config") {
     return parseConfigArguments(positionals.slice(1), values);
+  }
+
+  if (positionals[0] === "queue") {
+    return parseQueueArguments(positionals.slice(1), values);
   }
 
   if (positionals[0] === "transform") {
@@ -593,6 +647,158 @@ function parseConfigArguments(
   }
 
   return parseConfigStatusArguments(positionals.slice(1), values);
+}
+
+function parseQueueArguments(
+  positionals: readonly string[],
+  values: ArchiveArgumentValues,
+): ParsedCLIArguments {
+  const action = positionals[0];
+  const helpRoute = "spinedigest queue --help";
+
+  if (values.help === true) {
+    return {
+      help: true,
+      helpText: renderQueueCommandHelpText(),
+      kind: "help",
+    };
+  }
+  if (!isQueueAction(action)) {
+    throw new Error(
+      withHelpRoute(
+        action === undefined
+          ? "Missing queue action."
+          : `Invalid queue action: ${action}. Expected add, list, status, watch, pause, resume, cancel, boost, target, clean, or worker.`,
+        helpRoute,
+      ),
+    );
+  }
+  if (values.verbose === true) {
+    throw new Error(
+      withHelpRoute(
+        "The `queue` command does not support --verbose.",
+        helpRoute,
+      ),
+    );
+  }
+
+  switch (action) {
+    case "add": {
+      const archivePath = positionals[1];
+
+      if (archivePath === undefined || archivePath === "-") {
+        throw new Error(
+          withHelpRoute(
+            "`spinedigest queue add` requires <archive.sdpub>.",
+            helpRoute,
+          ),
+        );
+      }
+      rejectQueueExtraPositionals(action, positionals, 2, helpRoute);
+      const chapterId =
+        values.chapter === undefined
+          ? undefined
+          : parseSerialId(values.chapter, "--chapter", helpRoute);
+
+      if (chapterId === undefined) {
+        throw new Error(
+          withHelpRoute(
+            "`spinedigest queue add` requires --chapter <id>.",
+            helpRoute,
+          ),
+        );
+      }
+
+      return {
+        args: {
+          action,
+          archivePath,
+          ...(values.boost === undefined ? {} : { boost: values.boost }),
+          chapterId,
+          ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+          ...(values.prompt === undefined ? {} : { prompt: values.prompt }),
+          target: parseBuildJobTarget(values.to ?? values.stage),
+        },
+        help: false,
+        kind: "queue",
+      };
+    }
+    case "list":
+      rejectQueueExtraPositionals(action, positionals, 1, helpRoute);
+      return {
+        args: {
+          action,
+          ...(values.active === undefined ? {} : { activeOnly: values.active }),
+          ...(values.all === undefined ? {} : { all: values.all }),
+          ...(values.input === undefined ? {} : { archivePath: values.input }),
+        },
+        help: false,
+        kind: "queue",
+      };
+    case "status":
+    case "watch":
+    case "pause":
+    case "resume":
+    case "cancel":
+    case "boost": {
+      const jobId = positionals[1];
+
+      if (jobId === undefined) {
+        throw new Error(
+          withHelpRoute(
+            `\`spinedigest queue ${action}\` requires <job-id>.`,
+            helpRoute,
+          ),
+        );
+      }
+      rejectQueueExtraPositionals(action, positionals, 2, helpRoute);
+      const watchFrom = parseWatchFrom(values.from, helpRoute);
+
+      return {
+        args: {
+          action,
+          jobId,
+          ...(watchFrom === undefined ? {} : { from: watchFrom }),
+          ...(values.jsonl === undefined ? {} : { jsonl: values.jsonl }),
+        },
+        help: false,
+        kind: "queue",
+      };
+    }
+    case "target": {
+      const jobId = positionals[1];
+
+      if (jobId === undefined) {
+        throw new Error(
+          withHelpRoute(
+            "`spinedigest queue target` requires <job-id>.",
+            helpRoute,
+          ),
+        );
+      }
+      rejectQueueExtraPositionals(action, positionals, 2, helpRoute);
+      return {
+        args: {
+          action,
+          jobId,
+          target: parseBuildJobTarget(values.to ?? values.stage),
+        },
+        help: false,
+        kind: "queue",
+      };
+    }
+    case "clean":
+    case "worker":
+      rejectQueueExtraPositionals(action, positionals, 1, helpRoute);
+      return {
+        args: {
+          action,
+          ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
+        },
+        help: false,
+        kind: "queue",
+      };
+  }
 }
 
 function parseArchiveMaintenanceArguments(
@@ -2498,6 +2704,22 @@ function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
   );
 }
 
+function isQueueAction(value: string | undefined): value is CLIQueueAction {
+  return (
+    value === "add" ||
+    value === "boost" ||
+    value === "cancel" ||
+    value === "clean" ||
+    value === "list" ||
+    value === "pause" ||
+    value === "resume" ||
+    value === "status" ||
+    value === "target" ||
+    value === "watch" ||
+    value === "worker"
+  );
+}
+
 function parseArchiveBuildStage(value: string | undefined): ChapterStage {
   if (value === undefined) {
     return "summarized";
@@ -2512,6 +2734,44 @@ function parseArchiveBuildStage(value: string | undefined): ChapterStage {
   }
 
   return parseChapterStage(value, "--stage", CLI_HELP_ROUTES.command);
+}
+
+function parseBuildJobTarget(value: string | undefined): BuildJobTarget {
+  switch (value) {
+    case undefined:
+    case "summary":
+    case "summarized":
+      return "summary";
+    case "graph":
+    case "graphed":
+      return "graph";
+    default:
+      throw new Error(
+        withHelpRoute(
+          `Invalid queue target: ${value}. Expected graph or summary.`,
+          "spinedigest queue --help",
+        ),
+      );
+  }
+}
+
+function parseWatchFrom(
+  value: string | undefined,
+  helpRoute: string,
+): "beginning" | "now" | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "beginning" || value === "now") {
+    return value;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `Invalid --from: ${value}. Expected beginning or now.`,
+      helpRoute,
+    ),
+  );
 }
 
 function parseArchiveEstimateStage(value: string | undefined): ChapterStage {
@@ -2973,6 +3233,22 @@ function rejectArchiveExtraPositionals(
     throw new Error(
       withHelpRoute(
         `Unexpected positional arguments for \`${action}\`: ${positionals.slice(allowed).join(" ")}.`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function rejectQueueExtraPositionals(
+  action: CLIQueueAction,
+  positionals: readonly string[],
+  allowed: number,
+  helpRoute: string,
+): void {
+  if (positionals.length > allowed) {
+    throw new Error(
+      withHelpRoute(
+        `Unexpected positional arguments for \`queue ${action}\`: ${positionals.slice(allowed).join(" ")}.`,
         helpRoute,
       ),
     );

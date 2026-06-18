@@ -7,6 +7,7 @@ import {
   renderArchiveMaintenanceCommandHelpText,
   renderHelpTopicText,
   renderMainHelpText,
+  renderQueueCommandHelpText,
   renderStatusHelpText,
   renderTransformHelpText,
 } from "../../src/cli/help.js";
@@ -75,6 +76,60 @@ describe("cli/args", () => {
       },
       help: false,
       kind: "config-status",
+    });
+  });
+
+  it("parses queue commands", () => {
+    expect(
+      parseCLIArguments([
+        "queue",
+        "add",
+        "book.sdpub",
+        "--chapter",
+        "12",
+        "--to",
+        "summary",
+        "--boost",
+        "--llm",
+        '{"model":"cli-model"}',
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "add",
+        archivePath: "book.sdpub",
+        boost: true,
+        chapterId: 12,
+        llmJSON: '{"model":"cli-model"}',
+        target: "summary",
+      },
+      help: false,
+      kind: "queue",
+    });
+
+    expect(
+      parseCLIArguments([
+        "queue",
+        "watch",
+        "job-1",
+        "--jsonl",
+        "--from",
+        "now",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "watch",
+        from: "now",
+        jobId: "job-1",
+        jsonl: true,
+      },
+      help: false,
+      kind: "queue",
+    });
+
+    expect(parseCLIArguments(["queue", "--help"])).toStrictEqual({
+      help: true,
+      helpText: renderQueueCommandHelpText(),
+      kind: "help",
     });
   });
 
@@ -876,7 +931,7 @@ describe("cli/args", () => {
     expect(rootHelpText).toContain(
       "Read `spinedigest help overview` for the archive-first mental model.",
     );
-    expect(rootHelpText).toContain("Build can call an LLM");
+    expect(rootHelpText).toContain("Queue jobs can call an LLM");
     expect(renderHelpTopicText("runtime")).toContain("Runtime Behavior");
     expect(renderHelpTopicText("config")).toContain("Configuration Overview");
     expect(renderHelpTopicText("command")).toContain("spinedigest status");

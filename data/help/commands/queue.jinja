@@ -1,0 +1,31 @@
+Help Type: command
+Command: spinedigest queue
+
+Purpose:
+  Manage device-local `.sdpub` graph and summary jobs.
+
+Usage:
+  spinedigest queue add <archive.sdpub> --chapter <id> [--to graph|summary] [--boost] [--llm <json>] [--prompt <text>]
+  spinedigest queue list [--all] [--active] [--input <archive.sdpub>]
+  spinedigest queue status <job-id>
+  spinedigest queue watch <job-id> [--jsonl] [--from beginning|now]
+  spinedigest queue pause <job-id>
+  spinedigest queue resume <job-id>
+  spinedigest queue cancel <job-id>
+  spinedigest queue boost <job-id>
+  spinedigest queue target <job-id> --to graph|summary
+  spinedigest queue clean
+
+Scheduling:
+  New jobs are appended to the queue by default.
+  Use `--boost` on add, or `queue boost <job-id>`, to move a queued job to the front.
+  Boosting does not preempt currently running jobs.
+
+Targets:
+  `graph` builds topology for one chapter.
+  `summary` builds graph if needed, then builds the chapter summary.
+  Downgrading from summary to graph is allowed only before summary starts.
+
+Watch:
+  TTY output is human-readable.
+  `--jsonl` prints one structured event per line and is the recommended mode for agents.

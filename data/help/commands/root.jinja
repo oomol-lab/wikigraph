@@ -29,7 +29,9 @@ Task routing:
 
 Archive-first usage:
   spinedigest create <archive.sdpub> [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
-  spinedigest build <archive.sdpub> [--stage <source|graph|summary>] [--chapter <id>] [--llm <json>] [--prompt <text>] [--confirm]
+  spinedigest queue add <archive.sdpub> --chapter <id> [--to graph|summary] [--boost] [--llm <json>] [--prompt <text>]
+  spinedigest queue list [--all] [--active]
+  spinedigest queue watch <job-id> [--jsonl] [--from beginning|now]
   spinedigest estimate <archive.sdpub> [--stage <source|graph|summary>] [--json]
   spinedigest status <archive.sdpub> [--json]
   spinedigest index <archive.sdpub> [--json]
@@ -52,6 +54,7 @@ Maintenance usage:
   spinedigest meta <archive.sdpub> [metadata options] [--json] [--llm <json>] [--help|-h]
   spinedigest cover <archive.sdpub> [--llm <json>] [--help|-h]
   spinedigest chapter <action> <archive.sdpub> [options] [--llm <json>] [--help|-h]
+  spinedigest queue <action> [options] [--help|-h]
   spinedigest config status [--llm <json>] [--help|-h]
   spinedigest help [topic] [--help|-h]
 
@@ -67,7 +70,7 @@ Object selectors:
 Cost contract:
   Create is cheap when it stops at source.
   List, search, page, read, links, and export are cheap after build.
-  Build can call an LLM and may be expensive. Run `spinedigest estimate <archive.sdpub> --stage summary` before full-archive graph or summary builds, then rerun `build` with `--confirm`.
+  Queue jobs can call an LLM and may be expensive. Run `spinedigest estimate <archive.sdpub> --stage summary` before scheduling large graph or summary batches.
 
 Help contract:
   - Append `--help` to commands and subcommands to see command-specific usage.

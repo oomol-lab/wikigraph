@@ -147,6 +147,10 @@ export function renderTransformHelpText(): string {
   return renderHelpTemplate("help/commands/transform");
 }
 
+export function renderQueueCommandHelpText(): string {
+  return renderHelpTemplate("help/commands/queue");
+}
+
 export function renderArchiveCommandHelpText(action: CLIArchiveAction): string {
   return renderHelpTemplate(`help/commands/archive/${action}`);
 }
