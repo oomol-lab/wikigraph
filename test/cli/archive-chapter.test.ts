@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const chapterMockState = vi.hoisted(() => ({
   addCalls: [] as unknown[],
-  editableCalls: [] as string[],
+  readCalls: [] as string[],
+  writeCalls: [] as string[],
   inputFileContent: "file content",
   moveCalls: [] as unknown[],
   treeApplyCalls: [] as unknown[],
@@ -74,10 +75,17 @@ vi.mock("../../src/facade/spine-digest-file.js", () => ({
       this.#path = path;
     }
 
-    public async openEditableSession(
+    public async readDocument(
       operation: (document: unknown) => Promise<unknown>,
     ): Promise<unknown> {
-      chapterMockState.editableCalls.push(this.#path);
+      chapterMockState.readCalls.push(this.#path);
+      return await operation({});
+    }
+
+    public async write(
+      operation: (document: unknown) => Promise<unknown>,
+    ): Promise<unknown> {
+      chapterMockState.writeCalls.push(this.#path);
       return await operation({});
     }
   },
@@ -241,7 +249,8 @@ describe("cli/archive-chapter", () => {
 
   beforeEach(() => {
     chapterMockState.addCalls.length = 0;
-    chapterMockState.editableCalls.length = 0;
+    chapterMockState.readCalls.length = 0;
+    chapterMockState.writeCalls.length = 0;
     chapterMockState.moveCalls.length = 0;
     chapterMockState.removeCalls.length = 0;
     chapterMockState.resetCalls.length = 0;
@@ -263,7 +272,8 @@ describe("cli/archive-chapter", () => {
       path: "/tmp/book.sdpub",
     });
 
-    expect(chapterMockState.editableCalls).toStrictEqual(["/tmp/book.sdpub"]);
+    expect(chapterMockState.readCalls).toStrictEqual(["/tmp/book.sdpub"]);
+    expect(chapterMockState.writeCalls).toStrictEqual([]);
     expect(chapterMockState.textWrites).toStrictEqual([
       "[1] planned  Part I\n  [2] source   Chapter 1\n",
     ]);

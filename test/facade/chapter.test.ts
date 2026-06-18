@@ -69,7 +69,7 @@ describe("facade/chapter", () => {
     });
   });
 
-  it("normalizes serial-less grouping nodes into planned chapters", async () => {
+  it("keeps serial-less grouping nodes read-only when listing chapters", async () => {
     await withTempDir("spinedigest-chapter-", async (path) => {
       const document = await DirectoryDocument.open(path);
 
@@ -95,6 +95,72 @@ describe("facade/chapter", () => {
 
         expect(await listChapters(document)).toMatchObject([
           {
+            chapterId: 1,
+            depth: 1,
+            stage: "planned",
+            title: "Chapter 1",
+            tocPath: ["Part I", "Chapter 1"],
+          },
+        ]);
+        expect(await getChapterTree(document)).toStrictEqual({
+          chapters: [
+            {
+              children: [],
+              id: 1,
+              title: "Chapter 1",
+            },
+          ],
+        });
+        expect(await document.readToc()).toStrictEqual({
+          items: [
+            {
+              children: [
+                {
+                  children: [],
+                  serialId: 1,
+                  title: "Chapter 1",
+                },
+              ],
+              title: "Part I",
+            },
+          ],
+          version: 1,
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("normalizes serial-less grouping nodes before chapter writes", async () => {
+    await withTempDir("spinedigest-chapter-", async (path) => {
+      const document = await DirectoryDocument.open(path);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          await openedDocument.writeToc({
+            items: [
+              {
+                children: [
+                  {
+                    children: [],
+                    serialId: 1,
+                    title: "Chapter 1",
+                  },
+                ],
+                title: "Part I",
+              },
+            ],
+            version: 1,
+          });
+        });
+
+        const added = await addChapter(document, { title: "Chapter 2" });
+
+        expect(added.chapterId).toBe(3);
+        expect(await listChapters(document)).toMatchObject([
+          {
             chapterId: 2,
             depth: 0,
             stage: "planned",
@@ -106,12 +172,22 @@ describe("facade/chapter", () => {
             stage: "planned",
             title: "Chapter 1",
           },
+          {
+            chapterId: 3,
+            depth: 0,
+            stage: "planned",
+            title: "Chapter 2",
+          },
         ]);
         expect(await document.readToc()).toMatchObject({
           items: [
             {
               serialId: 2,
               title: "Part I",
+            },
+            {
+              serialId: 3,
+              title: "Chapter 2",
             },
           ],
         });

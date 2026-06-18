@@ -4,18 +4,21 @@ import {
   addBuildJob,
   assertNoActiveBuildJobs,
   boostBuildJob,
+  buildChapterGraphArtifact,
+  buildChapterSummaryArtifactFromSnapshot,
   cancelBuildJob,
   cleanBuildJobs,
-  generateChapterGraph,
-  generateChapterSummary,
+  commitChapterGraphArtifact,
+  commitChapterSummaryArtifact,
   getBuildJob,
-  getChapterDetails,
   listBuildJobs,
   pauseBuildJob,
+  readChapterBuildInput,
   readBuildJobEvents,
   resumeBuildJob,
   resolveBuildJobId,
   runBuildJobWorker,
+  snapshotChapterSummaryInput,
   updateBuildJobTarget,
   type BuildJob,
   type BuildJobEvent,
@@ -121,7 +124,7 @@ async function resolveQueueJobId(args: CLIQueueArguments): Promise<string> {
 }
 
 async function assertQueueAddReady(args: CLIQueueArguments): Promise<void> {
-  await new SpineDigestFile(args.archivePath!).openSession(async (digest) => {
+  await new SpineDigestFile(args.archivePath!).read(async (digest) => {
     if ((await digest.readChapterStage(args.chapterId!)) === "planned") {
       throw new Error(
         `Chapter ${args.chapterId!} is planned. Set source before queueing a build job.`,
@@ -170,70 +173,104 @@ async function executeBuildJob(
   });
   const prompt = resolveExtractionPrompt(job.prompt ?? config.prompt);
 
-  await new SpineDigestFile(job.archivePath).openEditableSession(
+  const buildInput = await new SpineDigestFile(job.archivePath).readDocument(
+    async (document) => await readChapterBuildInput(document, job.chapterId),
+  );
+  let { details } = buildInput;
+  const { nextChunkId, sourceText } = buildInput;
+
+  await reporter.setTotals({
+    totalGraphWords: details.stage === "sourced" ? details.words : 0,
+    totalSummaryWords:
+      details.stage === "sourced" || details.stage === "graphed"
+        ? details.words
+        : 0,
+  });
+
+  if (details.stage === "planned") {
+    throw new Error(
+      `Chapter ${job.chapterId} is planned. Set source before queueing a build job.`,
+    );
+  }
+  if (details.stage === "sourced") {
+    let graphWords = 0;
+
+    await reporter.stepStarted("graph");
+    const artifact = await buildChapterGraphArtifact(job.chapterId, {
+      extractionPrompt: prompt,
+      llm,
+      nextChunkId,
+      sourceText,
+      workspacePath: job.workspacePath,
+      progressTracker: {
+        async advance(wordsCount) {
+          graphWords += wordsCount;
+          await reporter.updateWords({ graphWords });
+        },
+        async complete(finalWordsCount) {
+          await reporter.updateWords({
+            graphWords: finalWordsCount ?? details.words,
+          });
+        },
+      },
+    });
+    details = await new SpineDigestFile(job.archivePath).write(
+      async (document) => {
+        assertJobStillRunning(await getBuildJob(job.jobId));
+        return await commitChapterGraphArtifact(document, artifact);
+      },
+    );
+    ({ details } = await new SpineDigestFile(job.archivePath).readDocument(
+      async (document) => await readChapterBuildInput(document, job.chapterId),
+    ));
+    await reporter.updateWords({ graphWords: details.words });
+    await reporter.stepCompleted("graph");
+  }
+
+  const latestJob = await getBuildJob(job.jobId);
+
+  assertJobStillRunning(latestJob);
+  if (latestJob.target === "graph" || details.stage === "summarized") {
+    return;
+  }
+  if (details.stage !== "graphed") {
+    ({ details } = await new SpineDigestFile(job.archivePath).readDocument(
+      async (document) => await readChapterBuildInput(document, job.chapterId),
+    ));
+  }
+  if (details.stage !== "graphed") {
+    throw new Error(
+      `Chapter ${job.chapterId} is ${details.stage}. Cannot generate summary.`,
+    );
+  }
+
+  await reporter.stepStarted("summary");
+  const summaryInput = await new SpineDigestFile(job.archivePath).readDocument(
+    async (document) =>
+      await snapshotChapterSummaryInput(
+        document,
+        job.chapterId,
+        job.workspacePath,
+      ),
+  );
+  const summary = await buildChapterSummaryArtifactFromSnapshot(job.chapterId, {
+    llm,
+    sourceDocumentPath: summaryInput.documentPath,
+    workspacePath: job.workspacePath,
+  });
+  details = await new SpineDigestFile(job.archivePath).write(
     async (document) => {
-      let details = await getChapterDetails(document, job.chapterId);
-
-      await reporter.setTotals({
-        totalGraphWords: details.stage === "sourced" ? details.words : 0,
-        totalSummaryWords:
-          details.stage === "sourced" || details.stage === "graphed"
-            ? details.words
-            : 0,
-      });
-
-      if (details.stage === "planned") {
-        throw new Error(
-          `Chapter ${job.chapterId} is planned. Set source before queueing a build job.`,
-        );
-      }
-      if (details.stage === "sourced") {
-        let graphWords = 0;
-
-        await reporter.stepStarted("graph");
-        details = await generateChapterGraph(document, job.chapterId, {
-          extractionPrompt: prompt,
-          llm,
-          progressTracker: {
-            async advance(wordsCount) {
-              graphWords += wordsCount;
-              await reporter.updateWords({ graphWords });
-            },
-            async complete(finalWordsCount) {
-              await reporter.updateWords({
-                graphWords: finalWordsCount ?? details.words,
-              });
-            },
-          },
-        });
-        await reporter.updateWords({ graphWords: details.words });
-        await reporter.stepCompleted("graph");
-      }
-
-      const latestJob = await getBuildJob(job.jobId);
-
-      assertJobStillRunning(latestJob);
-      if (latestJob.target === "graph" || details.stage === "summarized") {
-        return;
-      }
-      if (details.stage !== "graphed") {
-        details = await getChapterDetails(document, job.chapterId);
-      }
-      if (details.stage !== "graphed") {
-        throw new Error(
-          `Chapter ${job.chapterId} is ${details.stage}. Cannot generate summary.`,
-        );
-      }
-
-      await reporter.stepStarted("summary");
-      details = await generateChapterSummary(document, job.chapterId, {
-        llm,
-      });
-      await reporter.updateWords({ summaryWords: details.words });
-      await reporter.stepCompleted("summary");
       assertJobStillRunning(await getBuildJob(job.jobId));
+      return await commitChapterSummaryArtifact(
+        document,
+        job.chapterId,
+        summary,
+      );
     },
   );
+  await reporter.updateWords({ summaryWords: details.words });
+  await reporter.stepCompleted("summary");
+  assertJobStillRunning(await getBuildJob(job.jobId));
 }
 
 function assertJobStillRunning(job: BuildJob): void {

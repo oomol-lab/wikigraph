@@ -1,6 +1,6 @@
 import type {
   ChunkRecord,
-  Document,
+  ReadonlyDocument,
   KnowledgeEdgeRecord,
   SentenceId,
   SnakeRecord,
@@ -247,7 +247,7 @@ export interface ArchiveNodeSourceFragment {
 }
 
 export async function getArchiveIndex(
-  document: Document,
+  document: ReadonlyDocument,
 ): Promise<ArchiveIndex> {
   const [chapters, meta, nodes, edges] = await Promise.all([
     listChapters(document),
@@ -267,7 +267,7 @@ export async function getArchiveIndex(
 }
 
 export async function listArchiveObjects(
-  document: Document,
+  document: ReadonlyDocument,
   kind: ArchiveListKind,
 ): Promise<readonly ArchiveListItem[]> {
   switch (kind) {
@@ -344,7 +344,7 @@ export async function listArchiveObjects(
 }
 
 export async function listArchiveCollection(
-  document: Document,
+  document: ReadonlyDocument,
   options: ArchiveCollectionOptions = {},
 ): Promise<ArchiveCollectionResult> {
   const items: ArchiveFindHit[] = [];
@@ -448,7 +448,7 @@ export async function listArchiveCollection(
 }
 
 export async function findArchiveObjects(
-  document: Document,
+  document: ReadonlyDocument,
   query: string,
   options: ArchiveFindOptions = {},
 ): Promise<ArchiveFindResult> {
@@ -468,7 +468,7 @@ export async function findArchiveObjects(
 }
 
 export async function grepArchiveObjects(
-  document: Document,
+  document: ReadonlyDocument,
   query: string,
   options: ArchiveFindOptions = {},
 ): Promise<ArchiveFindResult> {
@@ -500,7 +500,7 @@ export async function grepArchiveObjects(
 }
 
 export async function readArchiveText(
-  document: Document,
+  document: ReadonlyDocument,
   id: string,
 ): Promise<string> {
   const reference = parseArchiveReference(id);
@@ -541,7 +541,7 @@ export async function readArchiveText(
 }
 
 export async function readArchivePage(
-  document: Document,
+  document: ReadonlyDocument,
   id: string,
 ): Promise<ArchivePage> {
   const reference = parseArchiveReference(id);
@@ -649,7 +649,7 @@ export async function readArchivePage(
 }
 
 export async function listArchiveLinks(
-  document: Document,
+  document: ReadonlyDocument,
   id: string,
   direction: "backlinks" | "links",
 ): Promise<readonly GraphNeighbor[]> {
@@ -661,7 +661,7 @@ export async function listArchiveLinks(
 }
 
 export async function listAllArchiveLinks(
-  document: Document,
+  document: ReadonlyDocument,
   id: string,
 ): Promise<readonly GraphNeighbor[]> {
   const reference = parseArchiveReference(id);
@@ -675,7 +675,7 @@ export async function listAllArchiveLinks(
 }
 
 export async function listRelatedArchiveObjects(
-  document: Document,
+  document: ReadonlyDocument,
   id: string,
 ): Promise<readonly ArchiveListItem[]> {
   const reference = parseArchiveReference(id);
@@ -697,7 +697,7 @@ export async function listRelatedArchiveObjects(
 }
 
 export async function packArchiveContext(
-  document: Document,
+  document: ReadonlyDocument,
   id: string,
   budget: number,
 ): Promise<ArchivePack> {
@@ -712,7 +712,7 @@ export async function packArchiveContext(
 }
 
 export async function estimateArchiveBuild(
-  document: Document,
+  document: ReadonlyDocument,
   targetStage: string,
 ): Promise<ArchiveEstimate> {
   const chapters = await listChapters(document);
@@ -788,7 +788,7 @@ export function formatFragmentId(serialId: number, fragmentId: number): string {
 }
 
 async function findChapters(
-  document: Document,
+  document: ReadonlyDocument,
   search: ArchiveTextSearch,
 ): Promise<readonly ArchiveFindHit[]> {
   const hits: ArchiveFindHit[] = [];
@@ -862,7 +862,7 @@ async function findChapters(
 }
 
 async function listChapterSourceFragments(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
 ): Promise<readonly ArchiveSourceFragment[]> {
   const fragments = document.getSerialFragments(chapterId);
@@ -890,7 +890,7 @@ async function listChapterSourceFragments(
 }
 
 async function readSourceFragment(
-  document: Document,
+  document: ReadonlyDocument,
   serialId: number,
   fragmentId: number,
 ): Promise<ArchiveSourceFragment> {
@@ -913,7 +913,7 @@ async function readSourceFragment(
 }
 
 async function listChapterNodeGroups(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
 ): Promise<readonly ArchiveNodeGroup[]> {
   const snakes = await document.snakes.listBySerial(chapterId);
@@ -935,7 +935,7 @@ async function listChapterNodeGroups(
 }
 
 async function listChapterNodeGroupsByFragment(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
 ): Promise<readonly ArchiveNodeGroup[]> {
   const nodes = (await document.chunks.listBySerial(chapterId))
@@ -975,7 +975,7 @@ function createArchiveNodeGroup(input: {
 }
 
 async function listSnakeNodeLabels(
-  document: Document,
+  document: ReadonlyDocument,
   snake: SnakeRecord,
 ): Promise<readonly ArchiveNodeLabel[]> {
   return (
@@ -997,7 +997,7 @@ async function listSnakeNodeLabels(
 }
 
 async function listFragmentNodes(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
   fragmentId: number,
 ): Promise<readonly ArchiveNodeLabel[]> {
@@ -1078,7 +1078,7 @@ function findMeta(
 }
 
 async function findNodes(
-  document: Document,
+  document: ReadonlyDocument,
   search: ArchiveTextSearch,
 ): Promise<readonly ArchiveFindHit[]> {
   const hits: ArchiveFindHit[] = [];
@@ -1119,7 +1119,7 @@ async function findNodes(
 }
 
 async function estimateSourceWords(
-  document: Document,
+  document: ReadonlyDocument,
   chapters: readonly ChapterEntry[],
 ): Promise<number> {
   let words = 0;
@@ -1141,7 +1141,7 @@ async function estimateSourceWords(
 }
 
 async function requireChapter(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
 ): Promise<ChapterEntry> {
   const chapter = (await listChapters(document)).find(
@@ -1156,7 +1156,7 @@ async function requireChapter(
 }
 
 async function requireNode(
-  document: Document,
+  document: ReadonlyDocument,
   nodeId: number,
 ): Promise<{
   readonly chapterId: number;
@@ -1177,7 +1177,7 @@ async function requireNode(
 }
 
 async function readNodeSourceFragments(
-  document: Document,
+  document: ReadonlyDocument,
   node: GraphNode,
 ): Promise<readonly ArchiveNodeSourceFragment[]> {
   return await Promise.all(

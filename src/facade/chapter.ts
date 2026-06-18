@@ -1,4 +1,4 @@
-import type { Document } from "../document/index.js";
+import type { Document, ReadonlyDocument } from "../document/index.js";
 import type { Language } from "../common/language.js";
 import type { SpineDigestScope } from "../common/llm-scope.js";
 import type { LLM } from "../llm/index.js";
@@ -345,7 +345,7 @@ export async function generateChapterSummary(
 }
 
 export async function getChapterDetails(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
 ): Promise<ChapterDetails> {
   const entries = await listChapters(document);
@@ -368,18 +368,20 @@ export async function getChapterDetails(
 }
 
 export async function listChapters(
-  document: Document,
+  document: ReadonlyDocument,
 ): Promise<readonly ChapterEntry[]> {
-  const toc = await normalizeChapterToc(document);
+  const toc = await readChapterToc(document);
 
   return await collectChapterEntries(document, toc.items);
 }
 
-export async function getChapterTree(document: Document): Promise<ChapterTree> {
-  const toc = await normalizeChapterToc(document);
+export async function getChapterTree(
+  document: ReadonlyDocument,
+): Promise<ChapterTree> {
+  const toc = await readChapterToc(document);
 
   return {
-    chapters: toc.items.map(toChapterTreeNode),
+    chapters: toc.items.flatMap(toChapterTreeNodes),
   };
 }
 
@@ -549,13 +551,7 @@ async function normalizeChapterToc(
   document: Document,
 ): Promise<MutableTocFile> {
   const existingToc = await document.readToc();
-  const toc: MutableTocFile =
-    existingToc === undefined
-      ? { items: [], version: TOC_FILE_VERSION }
-      : {
-          items: existingToc.items.map(cloneTocItem),
-          version: existingToc.version,
-        };
+  const toc = await readChapterToc(document);
   let changed = false;
 
   const normalizeItems = async (items: MutableTocItem[]): Promise<void> => {
@@ -580,8 +576,21 @@ async function normalizeChapterToc(
   return toc;
 }
 
+async function readChapterToc(
+  document: ReadonlyDocument,
+): Promise<MutableTocFile> {
+  const toc = await document.readToc();
+
+  return toc === undefined
+    ? { items: [], version: TOC_FILE_VERSION }
+    : {
+        items: toc.items.map(cloneTocItem),
+        version: toc.version,
+      };
+}
+
 async function collectChapterEntries(
-  document: Document,
+  document: ReadonlyDocument,
   items: readonly TocItem[],
   ancestorTitles: readonly string[] = [],
   depth = 0,
@@ -589,12 +598,24 @@ async function collectChapterEntries(
   const entries: ChapterEntry[] = [];
 
   for (const item of items) {
+    const title = normalizeTitle(item.title) ?? null;
+    const tocPath =
+      item.serialId === undefined
+        ? [...ancestorTitles, ...(title === null ? [] : [title])]
+        : [...ancestorTitles, title ?? `Chapter ${item.serialId}`];
+
     if (item.serialId === undefined) {
+      entries.push(
+        ...(await collectChapterEntries(
+          document,
+          item.children,
+          tocPath,
+          depth + 1,
+        )),
+      );
       continue;
     }
 
-    const title = normalizeTitle(item.title) ?? null;
-    const tocPath = [...ancestorTitles, title ?? `Chapter ${item.serialId}`];
     const serialFragments = document.getSerialFragments(item.serialId);
     const fragmentIds = await serialFragments.listFragmentIds();
     const fragmentCount = fragmentIds.length;
@@ -733,7 +754,7 @@ async function advanceEntriesToSummarized(
 }
 
 async function selectChapterEntries(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number | undefined,
 ): Promise<readonly ChapterEntry[]> {
   const entries = await listChapters(document);
@@ -794,10 +815,10 @@ function createAdvanceProgressState(
 }
 
 async function collectChapterSubtreeIds(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
 ): Promise<ReadonlySet<number>> {
-  const toc = await normalizeChapterToc(document);
+  const toc = await readChapterToc(document);
   const selectedIds = new Set<number>();
 
   for (const item of toc.items) {
@@ -865,7 +886,7 @@ async function emitAdvanceProgress(
 }
 
 async function resolveChapterStage(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
   fragmentCount: number,
 ): Promise<ChapterStage> {
@@ -889,7 +910,7 @@ async function resolveChapterStage(
 }
 
 async function requireChapterDetails(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
 ): Promise<ChapterDetails> {
   return await getChapterDetails(document, chapterId);
@@ -1278,10 +1299,16 @@ function toChapterTreeNode(item: MutableTocItem): ChapterTreeNode {
   }
 
   return {
-    children: item.children.map(toChapterTreeNode),
+    children: item.children.flatMap(toChapterTreeNodes),
     id: item.serialId,
     title: normalizeTitle(item.title) ?? null,
   };
+}
+
+function toChapterTreeNodes(item: MutableTocItem): ChapterTreeNode[] {
+  return item.serialId === undefined
+    ? item.children.flatMap(toChapterTreeNodes)
+    : [toChapterTreeNode(item)];
 }
 
 function createTopologyOptions(
@@ -1296,7 +1323,7 @@ function createTopologyOptions(
 }
 
 async function* readChapterSource(
-  document: Document,
+  document: ReadonlyDocument,
   chapterId: number,
 ): ReaderTextStream {
   const fragments = document.getSerialFragments(chapterId);

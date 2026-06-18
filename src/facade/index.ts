@@ -58,6 +58,20 @@ export type {
   BuildJobWorkerOptions,
 } from "./build-queue.js";
 export {
+  buildChapterGraphArtifact,
+  buildChapterSummaryArtifact,
+  buildChapterSummaryArtifactFromSnapshot,
+  commitChapterGraphArtifact,
+  commitChapterSummaryArtifact,
+  readChapterBuildInput,
+  snapshotChapterSummaryInput,
+} from "./chapter-build.js";
+export type {
+  BuildChapterGraphArtifactOptions,
+  BuildChapterSummaryArtifactOptions,
+  ChapterGraphBuildArtifact,
+} from "./chapter-build.js";
+export {
   addChapter,
   advanceChapterStages,
   applyChapterTree,

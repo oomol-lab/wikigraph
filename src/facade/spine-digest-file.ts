@@ -13,19 +13,35 @@ export class SpineDigestFile {
     this.#path = resolve(path);
   }
 
-  public async openSession<T>(
+  public async read<T>(
     operation: (digest: SpineDigest) => Promise<T> | T,
     options: {
       readonly documentDirPath?: string;
     } = {},
   ): Promise<T> {
-    return await this.#coordinator.openSession(
+    return await this.readDocument(
+      async (document, directoryPath) =>
+        await operation(new SpineDigest(document, directoryPath)),
+      options,
+    );
+  }
+
+  public async readDocument<T>(
+    operation: (
+      document: DirectoryDocument,
+      directoryPath: string,
+    ) => Promise<T> | T,
+    options: {
+      readonly documentDirPath?: string;
+    } = {},
+  ): Promise<T> {
+    return await this.#coordinator.withReadWorkspace(
       this.#path,
       async (directoryPath) => {
         const document = await DirectoryDocument.open(directoryPath);
 
         try {
-          return await operation(new SpineDigest(document, directoryPath));
+          return await operation(document, directoryPath);
         } finally {
           await document.release();
         }
@@ -34,10 +50,10 @@ export class SpineDigestFile {
     );
   }
 
-  public async openEditableSession<T>(
+  public async write<T>(
     operation: (document: DirectoryDocument) => Promise<T> | T,
   ): Promise<T> {
-    return await this.#coordinator.openEditableSession(
+    return await this.#coordinator.withWriteWorkspace(
       this.#path,
       async (directoryPath) => {
         const document = await DirectoryDocument.open(directoryPath);

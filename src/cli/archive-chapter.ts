@@ -52,11 +52,9 @@ export async function runArchiveChapterCommand(
       });
       return;
     case "list":
-      await new SpineDigestFile(args.path).openEditableSession(
-        async (document) => {
-          await writeChapterList(await listChapters(document));
-        },
-      );
+      await new SpineDigestFile(args.path).readDocument(async (document) => {
+        await writeChapterList(await listChapters(document));
+      });
       return;
     case "move":
       await runEditableCommand(args.path, async (document) => {
@@ -162,13 +160,11 @@ export async function runArchiveChapterCommand(
       });
       return;
     case "status":
-      await new SpineDigestFile(args.path).openEditableSession(
-        async (document) => {
-          await writeChapterDetails(
-            await getChapterDetails(document, args.chapterId!),
-          );
-        },
-      );
+      await new SpineDigestFile(args.path).readDocument(async (document) => {
+        await writeChapterDetails(
+          await getChapterDetails(document, args.chapterId!),
+        );
+      });
       return;
     case "tree":
       if (args.treeAction === "apply") {
@@ -185,11 +181,9 @@ export async function runArchiveChapterCommand(
         return;
       }
 
-      await new SpineDigestFile(args.path).openEditableSession(
-        async (document) => {
-          await writeChapterTree(await getChapterTree(document));
-        },
-      );
+      await new SpineDigestFile(args.path).readDocument(async (document) => {
+        await writeChapterTree(await getChapterTree(document));
+      });
       return;
   }
 }
@@ -198,7 +192,7 @@ async function runEditableCommand(
   path: string,
   operation: (document: DirectoryDocument) => Promise<void> | void,
 ): Promise<void> {
-  await new SpineDigestFile(path).openEditableSession(operation);
+  await new SpineDigestFile(path).write(operation);
 }
 
 function createContentStream(

@@ -479,7 +479,8 @@ export async function runBuildJobWorker(
   const concurrency = Math.max(1, options.concurrency);
   const idleTimeoutMs = options.idleTimeoutMs ?? 10_000;
   let stopping = false;
-  let lastWorkAt = Date.now();
+  let busySlotCount = 0;
+  let idleSince = Date.now();
 
   const stop = (): void => {
     stopping = true;
@@ -499,46 +500,74 @@ export async function runBuildJobWorker(
       return;
     }
 
-    while (!stopping) {
-      await heartbeatBuildWorker(ownerId, state);
-      await recoverStaleBuildJobs(state);
-      const jobs = await claimQueuedBuildJobs(state, ownerId, concurrency);
+    const runSlot = async (): Promise<void> => {
+      while (!stopping) {
+        await heartbeatBuildWorker(ownerId, state);
+        await recoverStaleBuildJobs(state);
 
-      if (jobs.length === 0) {
-        if (Date.now() - lastWorkAt >= idleTimeoutMs) {
-          break;
-        }
-        await delay(500);
-        continue;
-      }
+        busySlotCount += 1;
+        let job: BuildJob | undefined;
 
-      lastWorkAt = Date.now();
-      await Promise.all(
-        jobs.map(async (job) => {
-          const reporter = new BuildJobProgressAccumulator(job);
-
-          try {
-            await appendBuildJobEvent(job, {
-              at: Date.now(),
-              jobId: job.jobId,
-              seq: 0,
-              state: "running",
-              type: "started",
-            });
-            await options.executeJob(job, reporter);
-            await markBuildJobSucceeded(job.jobId, ownerId);
-          } catch (error) {
-            await markBuildJobFailed(job.jobId, ownerId, error);
+        try {
+          job = await claimQueuedBuildJob(state, ownerId);
+        } finally {
+          if (job === undefined) {
+            busySlotCount -= 1;
           }
-        }),
-      );
-    }
+        }
+
+        if (job === undefined) {
+          if (busySlotCount === 0 && Date.now() - idleSince >= idleTimeoutMs) {
+            break;
+          }
+          await delay(500);
+          continue;
+        }
+
+        idleSince = Date.now();
+
+        try {
+          await executeClaimedBuildJob(job, ownerId, options);
+        } finally {
+          busySlotCount -= 1;
+          if (busySlotCount === 0) {
+            idleSince = Date.now();
+          }
+        }
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: concurrency }, async () => await runSlot()),
+    );
   } finally {
     clearInterval(heartbeat);
     process.removeListener("SIGINT", stop);
     process.removeListener("SIGTERM", stop);
     await releaseBuildWorkerLease(state, ownerId);
     await state.close();
+  }
+}
+
+async function executeClaimedBuildJob(
+  job: BuildJob,
+  ownerId: string,
+  options: BuildJobWorkerOptions,
+): Promise<void> {
+  const reporter = new BuildJobProgressAccumulator(job);
+
+  try {
+    await appendBuildJobEvent(job, {
+      at: Date.now(),
+      jobId: job.jobId,
+      seq: 0,
+      state: "running",
+      type: "started",
+    });
+    await options.executeJob(job, reporter);
+    await markBuildJobSucceeded(job.jobId, ownerId);
+  } catch (error) {
+    await markBuildJobFailed(job.jobId, ownerId, error);
   }
 }
 
@@ -728,39 +757,38 @@ WHERE job_id = ?
   }
 }
 
-async function claimQueuedBuildJobs(
+async function claimQueuedBuildJob(
   state: Database,
   ownerId: string,
-  limit: number,
-): Promise<BuildJob[]> {
+): Promise<BuildJob | undefined> {
   return await state.transaction(async () => {
-    const jobs = await state.queryAll(
+    const job = await state.queryOne(
       `
 SELECT *
 FROM build_jobs
 WHERE state = 'queued'
 ORDER BY queue_rank ASC, created_at ASC
-LIMIT ?
+LIMIT 1
 `,
-      [limit],
+      undefined,
       mapBuildJob,
     );
-    const now = Date.now();
 
-    for (const job of jobs) {
-      await state.run(
-        `
+    if (job === undefined) {
+      return undefined;
+    }
+
+    const now = Date.now();
+    await state.run(
+      `
 UPDATE build_jobs
 SET state = 'running', owner_id = ?, owner_pid = ?, updated_at = ?
 WHERE job_id = ? AND state = 'queued'
 `,
-        [ownerId, process.pid, now, job.jobId],
-      );
-    }
-
-    return await Promise.all(
-      jobs.map(async (job) => await requireBuildJobById(state, job.jobId)),
+      [ownerId, process.pid, now, job.jobId],
     );
+
+    return await requireBuildJobById(state, job.jobId);
   });
 }
 

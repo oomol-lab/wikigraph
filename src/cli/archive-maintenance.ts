@@ -50,7 +50,7 @@ async function updateArchiveMeta(
   path: string,
   patch: ArchiveMetaPatch,
 ): Promise<void> {
-  await new SpineDigestFile(path).openEditableSession(async (document) => {
+  await new SpineDigestFile(path).write(async (document) => {
     const meta = await document.readBookMeta();
 
     if (meta === undefined) {

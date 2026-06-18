@@ -185,7 +185,7 @@ export class SpineDigestApp {
     return await this.#withLogging(
       "open-sdpub",
       async () =>
-        await new SpineDigestFile(path).openSession(operation, {
+        await new SpineDigestFile(path).read(operation, {
           ...(options.documentDirPath === undefined
             ? {}
             : { documentDirPath: options.documentDirPath }),

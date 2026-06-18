@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const archiveMockState = vi.hoisted(() => ({
-  editableCalls: [] as string[],
+  readCalls: [] as string[],
   findHits: [
     {
       chapter: 2,
@@ -166,10 +166,10 @@ vi.mock("../../src/facade/spine-digest-file.js", () => ({
       this.#path = path;
     }
 
-    public async openEditableSession(
+    public async readDocument(
       operation: (document: unknown) => Promise<unknown>,
     ): Promise<unknown> {
-      archiveMockState.editableCalls.push(this.#path);
+      archiveMockState.readCalls.push(this.#path);
       return await operation({});
     }
   },
@@ -290,7 +290,7 @@ import {
 describe("cli/archive", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    archiveMockState.editableCalls.length = 0;
+    archiveMockState.readCalls.length = 0;
     archiveMockState.textWrites.length = 0;
     archiveMockState.links.splice(0, archiveMockState.links.length, {
       direction: "outgoing",
@@ -316,7 +316,7 @@ describe("cli/archive", () => {
       archivePath: "/tmp/book.sdpub",
     });
 
-    expect(archiveMockState.editableCalls).toStrictEqual(["/tmp/book.sdpub"]);
+    expect(archiveMockState.readCalls).toStrictEqual(["/tmp/book.sdpub"]);
     expect(archiveMockState.textWrites[0]).toContain("Archive Type: LLM Wiki");
     expect(archiveMockState.textWrites[0]).toContain("chapter:2");
   });
