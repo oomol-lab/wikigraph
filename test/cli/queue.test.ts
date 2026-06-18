@@ -189,6 +189,26 @@ vi.mock("../../src/cli/io.js", () => ({
   }),
 }));
 
+vi.mock("../../src/cli/config.js", () => ({
+  loadCLIConfig: vi.fn(() =>
+    Promise.resolve({
+      request: {
+        concurrent: 2,
+      },
+    }),
+  ),
+}));
+
+vi.mock("../../src/cli/stage-runtime.js", () => ({
+  createStageLLM: vi.fn(() => ({})),
+  loadRequiredStageConfig: vi.fn(() =>
+    Promise.resolve({
+      prompt: "Keep key beats",
+    }),
+  ),
+  resolveExtractionPrompt: vi.fn((prompt: string | undefined) => prompt ?? ""),
+}));
+
 import { runQueueCommand } from "../../src/cli/queue.js";
 
 describe("cli/queue", () => {
