@@ -4,18 +4,40 @@ const queueMockState = vi.hoisted(() => ({
   activeError: undefined as Error | undefined,
   activeJobChecks: [] as unknown[],
   addCalls: [] as unknown[],
+  buildGraphCalls: [] as unknown[],
+  buildSummaryCalls: [] as unknown[],
   chapterStage: "sourced" as "planned" | "sourced" | "graphed" | "summarized",
+  commitGraphCalls: [] as unknown[],
+  commitSummaryCalls: [] as unknown[],
   events: [] as unknown[],
   getJobIds: [] as string[],
+  buildInputStage: "sourced" as
+    | "planned"
+    | "sourced"
+    | "graphed"
+    | "summarized",
   job: {
+    archivePath: "book.sdpub",
+    chapterId: 12,
     eventsPath: "events.ndjson",
     jobId: "job-1",
     state: "succeeded",
+    target: "summary",
+    workspacePath: "/tmp/job-workspace",
   },
+  readDocumentCalls: [] as string[],
   readChapterStageError: undefined as Error | undefined,
   openPaths: [] as string[],
   resolveJobIds: [] as string[],
+  runWorkerOptions: undefined as
+    | {
+        readonly concurrency: number;
+        readonly executeJob: (job: unknown, reporter: unknown) => Promise<void>;
+      }
+    | undefined,
+  stepLog: [] as string[],
   textWrites: [] as string[],
+  writeCalls: [] as string[],
 }));
 
 vi.mock("../../src/facade/spine-digest-file.js", () => ({
@@ -40,6 +62,30 @@ vi.mock("../../src/facade/spine-digest-file.js", () => ({
         },
       });
     }
+
+    public async readDocument(
+      operation: (document: unknown) => Promise<unknown>,
+    ): Promise<unknown> {
+      queueMockState.readDocumentCalls.push(this.#path);
+      queueMockState.stepLog.push("read:start");
+      try {
+        return await operation({});
+      } finally {
+        queueMockState.stepLog.push("read:end");
+      }
+    }
+
+    public async write(
+      operation: (document: unknown) => Promise<unknown>,
+    ): Promise<unknown> {
+      queueMockState.writeCalls.push(this.#path);
+      queueMockState.stepLog.push("write:start");
+      try {
+        return await operation({});
+      } finally {
+        queueMockState.stepLog.push("write:end");
+      }
+    }
   },
 }));
 
@@ -62,10 +108,42 @@ vi.mock("../../src/facade/index.js", () => ({
     return Promise.resolve();
   }),
   boostBuildJob: vi.fn(),
+  buildChapterGraphArtifact: vi.fn((_chapterId: number, options: unknown) => {
+    queueMockState.stepLog.push("build-graph");
+    queueMockState.buildGraphCalls.push(options);
+    return Promise.resolve({
+      chapterId: 12,
+      documentPath: "/tmp/job-workspace/graph-document",
+    });
+  }),
+  buildChapterSummaryArtifactFromSnapshot: vi.fn(
+    (_chapterId: number, options: unknown) => {
+      queueMockState.stepLog.push("build-summary");
+      queueMockState.buildSummaryCalls.push(options);
+      return Promise.resolve("summary text");
+    },
+  ),
   cancelBuildJob: vi.fn(),
   cleanBuildJobs: vi.fn(),
-  generateChapterGraph: vi.fn(),
-  generateChapterSummary: vi.fn(),
+  commitChapterGraphArtifact: vi.fn(() => {
+    queueMockState.stepLog.push("commit-graph");
+    queueMockState.commitGraphCalls.push({});
+    queueMockState.buildInputStage = "graphed";
+    return Promise.resolve({
+      chapterId: 12,
+      stage: "graphed",
+      words: 4,
+    });
+  }),
+  commitChapterSummaryArtifact: vi.fn(() => {
+    queueMockState.stepLog.push("commit-summary");
+    queueMockState.commitSummaryCalls.push({});
+    return Promise.resolve({
+      chapterId: 12,
+      stage: "summarized",
+      words: 4,
+    });
+  }),
   getBuildJob: vi.fn((jobId: string) => {
     queueMockState.getJobIds.push(jobId);
     return Promise.resolve(queueMockState.job);
@@ -78,7 +156,29 @@ vi.mock("../../src/facade/index.js", () => ({
     return Promise.resolve(jobId === "job-1-short" ? "job-1-full" : jobId);
   }),
   resumeBuildJob: vi.fn(),
-  runBuildJobWorker: vi.fn(),
+  runBuildJobWorker: vi.fn(
+    (options: typeof queueMockState.runWorkerOptions) => {
+      queueMockState.runWorkerOptions = options;
+      return Promise.resolve();
+    },
+  ),
+  readChapterBuildInput: vi.fn(() =>
+    Promise.resolve({
+      details: {
+        chapterId: 12,
+        stage: queueMockState.buildInputStage,
+        words: 4,
+      },
+      nextChunkId: 100,
+      sourceText: ["Alpha beta."],
+    }),
+  ),
+  snapshotChapterSummaryInput: vi.fn(() => {
+    queueMockState.stepLog.push("snapshot-summary");
+    return Promise.resolve({
+      documentPath: "/tmp/job-workspace/summary-input-document",
+    });
+  }),
   updateBuildJobTarget: vi.fn(),
 }));
 
@@ -99,18 +199,31 @@ describe("cli/queue", () => {
     queueMockState.activeError = undefined;
     queueMockState.activeJobChecks.length = 0;
     queueMockState.addCalls.length = 0;
+    queueMockState.buildGraphCalls.length = 0;
+    queueMockState.buildSummaryCalls.length = 0;
+    queueMockState.buildInputStage = "sourced";
     queueMockState.chapterStage = "sourced";
+    queueMockState.commitGraphCalls.length = 0;
+    queueMockState.commitSummaryCalls.length = 0;
     queueMockState.events = [];
     queueMockState.getJobIds.length = 0;
     queueMockState.job = {
+      archivePath: "book.sdpub",
+      chapterId: 12,
       eventsPath: "events.ndjson",
       jobId: "job-1",
       state: "succeeded",
+      target: "summary",
+      workspacePath: "/tmp/job-workspace",
     };
     queueMockState.openPaths.length = 0;
+    queueMockState.readDocumentCalls.length = 0;
     queueMockState.readChapterStageError = undefined;
     queueMockState.resolveJobIds.length = 0;
+    queueMockState.runWorkerOptions = undefined;
+    queueMockState.stepLog.length = 0;
     queueMockState.textWrites.length = 0;
+    queueMockState.writeCalls.length = 0;
     process.env.SPINEDIGEST_QUEUE_DISABLE_AUTOSTART = "1";
   });
 
@@ -212,6 +325,54 @@ describe("cli/queue", () => {
       },
     ]);
     expect(queueMockState.textWrites.join("")).toContain("Job job-1 queued");
+  });
+
+  it("runs LLM build work outside archive write scopes", async () => {
+    queueMockState.job = {
+      ...queueMockState.job,
+      state: "running",
+    };
+
+    await runQueueCommand({
+      action: "worker",
+    });
+
+    const reporter = {
+      addOutputCharacters: vi.fn(() => Promise.resolve()),
+      setTotals: vi.fn(() => Promise.resolve()),
+      stepCompleted: vi.fn(() => Promise.resolve()),
+      stepStarted: vi.fn(() => Promise.resolve()),
+      updateWords: vi.fn(() => Promise.resolve()),
+    };
+
+    await queueMockState.runWorkerOptions!.executeJob(
+      queueMockState.job,
+      reporter,
+    );
+
+    expect(queueMockState.stepLog).toStrictEqual([
+      "read:start",
+      "read:end",
+      "build-graph",
+      "write:start",
+      "commit-graph",
+      "write:end",
+      "read:start",
+      "read:end",
+      "read:start",
+      "snapshot-summary",
+      "read:end",
+      "build-summary",
+      "write:start",
+      "commit-summary",
+      "write:end",
+    ]);
+    expect(queueMockState.writeCalls).toStrictEqual([
+      "book.sdpub",
+      "book.sdpub",
+    ]);
+    expect(queueMockState.buildGraphCalls).toHaveLength(1);
+    expect(queueMockState.buildSummaryCalls).toHaveLength(1);
   });
 
   it("writes every watch jsonl event without closing stdout", async () => {

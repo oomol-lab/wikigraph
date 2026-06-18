@@ -54,6 +54,11 @@ import {
   getChapterDetails,
   setChapterSource,
 } from "../../src/facade/chapter.js";
+import {
+  buildChapterGraphArtifact,
+  commitChapterGraphArtifact,
+  readChapterBuildInput,
+} from "../../src/facade/chapter-build.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("facade/chapter graph", () => {
@@ -90,6 +95,44 @@ describe("facade/chapter graph", () => {
           stage: "graphed",
           words: 4,
         });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("commits staged graph output without holding the source document", async () => {
+    await withTempDir("spinedigest-chapter-graph-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/archive`);
+
+      try {
+        const chapter = await addChapter(document, {
+          title: "Chapter 1",
+        });
+        await setChapterSource(document, chapter.chapterId, [
+          "Alpha beta.",
+          "Gamma delta.",
+        ]);
+
+        const input = await readChapterBuildInput(document, chapter.chapterId);
+        const artifact = await buildChapterGraphArtifact(chapter.chapterId, {
+          extractionPrompt: "Keep key beats",
+          llm: {} as never,
+          nextChunkId: input.nextChunkId,
+          sourceText: input.sourceText,
+          workspacePath: `${path}/job-workspace`,
+        });
+
+        await commitChapterGraphArtifact(document, artifact);
+
+        await expect(
+          getChapterDetails(document, chapter.chapterId),
+        ).resolves.toMatchObject({
+          fragmentCount: 2,
+          stage: "graphed",
+          words: 4,
+        });
+        await expect(document.chunks.getMaxId()).resolves.toBe(0);
       } finally {
         await document.release();
       }

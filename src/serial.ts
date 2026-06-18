@@ -84,6 +84,7 @@ export interface SerialGenerationOptions {
   readonly document?: Document;
   readonly llm: LLM<SpineDigestScope>;
   readonly logDirPath?: string;
+  readonly nextChunkId?: number;
   readonly segmenter?: ReaderSegmenter;
   /** @deprecated Use `document` instead. */
   readonly workspace?: Document;
@@ -161,6 +162,7 @@ export class SerialGeneration {
     this.#fragmentGroups = document.fragmentGroups;
     this.#llm = options.llm;
     this.#logDirPath = options.logDirPath;
+    this.#nextChunkId = options.nextChunkId;
     this.#serials = document.serials;
     this.#segmenter = options.segmenter;
     this.#document = document;
