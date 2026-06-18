@@ -217,6 +217,64 @@ describe("facade/build-queue", () => {
       ).toContain("requeued");
     });
   });
+
+  it("refills idle worker slots while other jobs are still running", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+      await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "graph",
+      });
+
+      let firstStarted!: () => void;
+      let secondStarted!: () => void;
+      let releaseFirst!: () => void;
+      let releaseSecond!: () => void;
+      const firstStartedSignal = new Promise<void>((resolveStarted) => {
+        firstStarted = resolveStarted;
+      });
+      const secondStartedSignal = new Promise<void>((resolveStarted) => {
+        secondStarted = resolveStarted;
+      });
+      const firstReleaseSignal = new Promise<void>((resolveRelease) => {
+        releaseFirst = resolveRelease;
+      });
+      const secondReleaseSignal = new Promise<void>((resolveRelease) => {
+        releaseSecond = resolveRelease;
+      });
+
+      const worker = runBuildJobWorker({
+        concurrency: 2,
+        executeJob: async (job) => {
+          if (job.chapterId === 1) {
+            firstStarted();
+            await firstReleaseSignal;
+            return;
+          }
+
+          secondStarted();
+          await secondReleaseSignal;
+        },
+        idleTimeoutMs: 0,
+      });
+
+      await firstStartedSignal;
+      await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 2,
+        target: "graph",
+      });
+      await withTimeout(
+        secondStartedSignal,
+        "Timed out waiting for idle queue slot to claim the second job.",
+      );
+
+      releaseFirst();
+      releaseSecond();
+      await worker;
+    });
+  });
 });
 
 async function forceRunningPid(
@@ -254,4 +312,24 @@ function restoreEnv(key: string, value: string | undefined): void {
   }
 
   process.env[key] = value;
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  message: string,
+): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(message));
+    }, 2_000);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
+  }
 }
