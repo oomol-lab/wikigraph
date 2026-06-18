@@ -8,6 +8,7 @@ import type {
 } from "../source/index.js";
 
 import { readSdpubArchiveFormatVersion, writeSdpubArchive } from "./archive.js";
+import type { ChapterStage } from "./chapter.js";
 import type { SpineDigestSerialEntry } from "./types.js";
 
 export class SpineDigest {
@@ -52,6 +53,41 @@ export class SpineDigest {
     return await readSdpubArchiveFormatVersion(this.#documentDirectoryPath);
   }
 
+  public async readChapterStage(serialId: number): Promise<ChapterStage> {
+    return await this.#document.openSession(async (document) => {
+      const toc = await document.readToc();
+
+      if (toc === undefined) {
+        throw new Error("Document TOC is missing");
+      }
+      if (!toc.items.some((item) => hasSerialId(item, serialId))) {
+        throw new Error(
+          `Chapter ${serialId} does not exist. Use \`spinedigest list <archive.sdpub> --type chapter\` to discover chapter ids.`,
+        );
+      }
+
+      const summary = await document.readSummary(serialId);
+
+      if (summary !== undefined) {
+        return "summarized";
+      }
+
+      const serial = await document.serials.getById(serialId);
+
+      if (serial?.topologyReady === true) {
+        return "graphed";
+      }
+      if (
+        (await document.getSerialFragments(serialId).listFragmentIds()).length >
+        0
+      ) {
+        return "sourced";
+      }
+
+      return "planned";
+    });
+  }
+
   public async listSerials(): Promise<readonly SpineDigestSerialEntry[]> {
     return await this.#document.openSession(async (document) => {
       const toc = await document.readToc();
@@ -90,6 +126,13 @@ export class SpineDigest {
     await flushDocument(this.#document);
     await writeSdpubArchive(this.#documentDirectoryPath, path);
   }
+}
+
+function hasSerialId(item: TocItem, serialId: number): boolean {
+  return (
+    item.serialId === serialId ||
+    item.children.some((child) => hasSerialId(child, serialId))
+  );
 }
 
 async function flushDocument(document: ReadonlyDocument): Promise<void> {

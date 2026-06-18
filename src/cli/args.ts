@@ -116,6 +116,7 @@ export type CLIQueueAction =
 
 export interface CLIQueueArguments {
   readonly action: CLIQueueAction;
+  readonly acceptCost?: boolean;
   readonly activeOnly?: boolean;
   readonly all?: boolean;
   readonly archivePath?: string;
@@ -723,18 +724,12 @@ function parseQueueArguments(
           ),
         );
       }
-      if (values["accept-cost"] !== true) {
-        throw new Error(
-          withHelpRoute(
-            "Queue graph and summary jobs can call an LLM, consume tokens, incur provider charges, and run for minutes to hours on large archives. Run `spinedigest estimate <archive.sdpub> --stage summary`, then rerun `queue add` with --accept-cost if the cost and wait time are acceptable.",
-            helpRoute,
-          ),
-        );
-      }
-
       return {
         args: {
           action,
+          ...(values["accept-cost"] === undefined
+            ? {}
+            : { acceptCost: values["accept-cost"] }),
           archivePath,
           ...(values.boost === undefined ? {} : { boost: values.boost }),
           chapterId,

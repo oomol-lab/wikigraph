@@ -8,6 +8,7 @@ import {
   getBuildJob,
   listBuildJobs,
   readBuildJobEvents,
+  resolveBuildJobId,
   runBuildJobWorker,
   boostBuildJob,
   updateBuildJobTarget,
@@ -62,6 +63,32 @@ describe("facade/build-queue", () => {
         second.jobId,
         first.jobId,
       ]);
+    });
+  });
+
+  it("resolves unique job id prefixes and rejects ambiguous prefixes", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+      const first = await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        jobId: "aaaaaaaa-1111-4111-8111-111111111111",
+        target: "summary",
+      });
+      const second = await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 2,
+        jobId: "aaaaaaaa-2222-4222-8222-222222222222",
+        target: "summary",
+      });
+
+      await expect(resolveBuildJobId("aaaaaaaa-1")).resolves.toBe(first.jobId);
+      await expect(resolveBuildJobId(second.jobId.slice(0, 8))).rejects.toThrow(
+        "ambiguous",
+      );
+      await expect(resolveBuildJobId("missing")).rejects.toThrow(
+        "Build job not found",
+      );
     });
   });
 
@@ -128,6 +155,45 @@ describe("facade/build-queue", () => {
       expect(updated.state).toBe("succeeded");
       expect(events.map((event) => event.type)).toContain("succeeded");
       await expect(access(job.workspacePath)).rejects.toThrow();
+    });
+  });
+
+  it("clamps progress words to configured totals", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+      const job = await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "summary",
+      });
+
+      await runBuildJobWorker({
+        concurrency: 1,
+        executeJob: async (_job, reporter) => {
+          await reporter.setTotals({
+            totalGraphWords: 100,
+            totalSummaryWords: 50,
+          });
+          await reporter.updateWords({
+            graphWords: 150,
+            summaryWords: 75,
+          });
+          await reporter.stepStarted("summary");
+        },
+        idleTimeoutMs: 0,
+      });
+
+      const snapshots = (await readBuildJobEvents(job)).filter(
+        (event) => event.type === "progress_snapshot",
+      );
+      const latest = snapshots.at(-1);
+
+      expect(latest).toMatchObject({
+        graphWords: 100,
+        summaryWords: 50,
+        totalWords: 50,
+        words: 50,
+      });
     });
   });
 

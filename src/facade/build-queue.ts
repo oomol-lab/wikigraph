@@ -86,7 +86,9 @@ export type BuildJobEvent =
       readonly summaryWords: number;
       readonly totalGraphWords: number;
       readonly totalSummaryWords: number;
+      readonly totalWords: number;
       readonly type: "progress_snapshot";
+      readonly words: number;
     }
   | {
       readonly at: number;
@@ -101,6 +103,7 @@ export interface AddBuildJobOptions {
   readonly archivePath: string;
   readonly boost?: boolean;
   readonly chapterId: number;
+  readonly jobId?: string;
   readonly llmJSON?: string;
   readonly prompt?: string;
   readonly target: BuildJobTarget;
@@ -194,7 +197,7 @@ export async function addBuildJob(
       const archivePath = resolve(options.archivePath);
       const archiveKey = createArchiveKey(archivePath);
       const now = Date.now();
-      const jobId = randomUUID();
+      const jobId = options.jobId ?? randomUUID();
       const workspacePath = await createJobWorkspacePath(archiveKey, jobId);
       const eventsPath = await createJobEventsPath(jobId);
       const queueRank =
@@ -288,6 +291,17 @@ export async function getBuildJob(jobId: string): Promise<BuildJob> {
   try {
     await recoverStaleBuildJobs(state);
     return await requireBuildJobById(state, jobId);
+  } finally {
+    await state.close();
+  }
+}
+
+export async function resolveBuildJobId(jobIdPrefix: string): Promise<string> {
+  const state = await openBuildQueueDatabase();
+
+  try {
+    await recoverStaleBuildJobs(state);
+    return await resolveBuildJobIdInState(state, jobIdPrefix);
   } finally {
     await state.close();
   }
@@ -904,6 +918,41 @@ async function requireBuildJobById(
   return job;
 }
 
+async function resolveBuildJobIdInState(
+  state: Database,
+  jobIdPrefix: string,
+): Promise<string> {
+  const normalizedPrefix = jobIdPrefix.trim();
+
+  if (normalizedPrefix === "") {
+    throw new Error("Build job id is empty.");
+  }
+
+  const jobs = await state.queryAll(
+    `
+SELECT job_id
+FROM build_jobs
+WHERE substr(job_id, 1, ?) = ?
+ORDER BY created_at DESC
+`,
+    [normalizedPrefix.length, normalizedPrefix],
+    (row) => getString(row, "job_id"),
+  );
+
+  if (jobs.length === 0) {
+    throw new Error(`Build job not found: ${jobIdPrefix}`);
+  }
+  if (jobs.length > 1) {
+    throw new Error(
+      `Build job id prefix is ambiguous: ${jobIdPrefix}. Matches: ${jobs.join(
+        ", ",
+      )}`,
+    );
+  }
+
+  return jobs[0]!;
+}
+
 async function appendBuildJobEvent(
   job: Pick<BuildJob, "eventsPath" | "jobId">,
   event: BuildJobEvent,
@@ -1179,8 +1228,14 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
     readonly graphWords?: number;
     readonly summaryWords?: number;
   }): Promise<void> {
-    this.#graphWords = input.graphWords ?? this.#graphWords;
-    this.#summaryWords = input.summaryWords ?? this.#summaryWords;
+    this.#graphWords =
+      input.graphWords === undefined
+        ? this.#graphWords
+        : clampProgressWords(input.graphWords, this.#totalGraphWords);
+    this.#summaryWords =
+      input.summaryWords === undefined
+        ? this.#summaryWords
+        : clampProgressWords(input.summaryWords, this.#totalSummaryWords);
     await this.#snapshot();
   }
 
@@ -1204,9 +1259,41 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
       summaryWords: this.#summaryWords,
       totalGraphWords: this.#totalGraphWords,
       totalSummaryWords: this.#totalSummaryWords,
+      totalWords: this.#getCurrentTotalWords(),
       type: "progress_snapshot",
+      words: this.#getCurrentWords(),
     });
   }
+
+  #getCurrentTotalWords(): number {
+    switch (this.#step) {
+      case "graph":
+        return this.#totalGraphWords;
+      case "summary":
+        return this.#totalSummaryWords;
+      case undefined:
+        return 0;
+    }
+  }
+
+  #getCurrentWords(): number {
+    switch (this.#step) {
+      case "graph":
+        return this.#graphWords;
+      case "summary":
+        return this.#summaryWords;
+      case undefined:
+        return 0;
+    }
+  }
+}
+
+function clampProgressWords(words: number, totalWords: number): number {
+  if (totalWords <= 0) {
+    return Math.max(0, words);
+  }
+
+  return Math.min(totalWords, Math.max(0, words));
 }
 
 async function markBuildJobStep(

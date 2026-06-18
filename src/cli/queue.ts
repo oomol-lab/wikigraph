@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 
 import {
   addBuildJob,
+  assertNoActiveBuildJobs,
   boostBuildJob,
   cancelBuildJob,
   cleanBuildJobs,
@@ -13,6 +14,7 @@ import {
   pauseBuildJob,
   readBuildJobEvents,
   resumeBuildJob,
+  resolveBuildJobId,
   runBuildJobWorker,
   updateBuildJobTarget,
   type BuildJob,
@@ -40,6 +42,9 @@ const TERMINAL_STATES = new Set<BuildJobState>([
 export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
   switch (args.action) {
     case "add": {
+      await assertQueueAddReady(args);
+      assertBuildCostAccepted(args);
+
       const job = await addBuildJob({
         archivePath: args.archivePath!,
         boost: args.boost ?? false,
@@ -67,31 +72,38 @@ export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
       );
       return;
     case "status":
-      await writeJobStatus(await getBuildJob(args.jobId!));
+      await writeJobStatus(await getBuildJob(await resolveQueueJobId(args)));
       return;
     case "watch":
-      await watchBuildJob(args.jobId!, {
+      await watchBuildJob(await resolveQueueJobId(args), {
         from: args.from ?? "beginning",
         jsonl: args.jsonl ?? !process.stdout.isTTY,
       });
       return;
     case "pause":
-      await writeJobSummary(await pauseBuildJob(args.jobId!));
+      await writeJobSummary(await pauseBuildJob(await resolveQueueJobId(args)));
       return;
     case "resume":
-      await writeJobSummary(await resumeBuildJob(args.jobId!));
+      await writeJobSummary(
+        await resumeBuildJob(await resolveQueueJobId(args)),
+      );
       tryStartQueueWorker();
       return;
     case "cancel":
-      await writeJobSummary(await cancelBuildJob(args.jobId!));
+      await writeJobSummary(
+        await cancelBuildJob(await resolveQueueJobId(args)),
+      );
       return;
     case "boost":
-      await writeJobSummary(await boostBuildJob(args.jobId!));
+      await writeJobSummary(await boostBuildJob(await resolveQueueJobId(args)));
       tryStartQueueWorker();
       return;
     case "target":
       await writeJobSummary(
-        await updateBuildJobTarget(args.jobId!, args.target ?? "summary"),
+        await updateBuildJobTarget(
+          await resolveQueueJobId(args),
+          args.target ?? "summary",
+        ),
       );
       tryStartQueueWorker();
       return;
@@ -102,6 +114,35 @@ export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
       await runQueueWorker();
       return;
   }
+}
+
+async function resolveQueueJobId(args: CLIQueueArguments): Promise<string> {
+  return await resolveBuildJobId(args.jobId!);
+}
+
+async function assertQueueAddReady(args: CLIQueueArguments): Promise<void> {
+  await new SpineDigestFile(args.archivePath!).openSession(async (digest) => {
+    if ((await digest.readChapterStage(args.chapterId!)) === "planned") {
+      throw new Error(
+        `Chapter ${args.chapterId!} is planned. Set source before queueing a build job.`,
+      );
+    }
+  });
+  await assertNoActiveBuildJobs({
+    archivePath: args.archivePath!,
+    chapterIds: [args.chapterId!],
+    operation: "Queueing build job",
+  });
+}
+
+function assertBuildCostAccepted(args: CLIQueueArguments): void {
+  if (args.acceptCost === true) {
+    return;
+  }
+
+  throw new Error(
+    "Queue graph and summary jobs can call an LLM, consume tokens, incur provider charges, and run for minutes to hours on large archives. Run `spinedigest estimate <archive.sdpub> --stage summary`, then rerun `queue add` with --accept-cost if the cost and wait time are acceptable.",
+  );
 }
 
 async function runQueueWorker(): Promise<void> {
@@ -241,15 +282,15 @@ async function writeWatchEvent(
   jsonl: boolean,
 ): Promise<void> {
   if (jsonl) {
-    await writeTextToStdout(`${JSON.stringify(event)}\n`);
+    await writeTextToStdout(
+      `${JSON.stringify(formatWatchEventJSONL(event))}\n`,
+    );
     return;
   }
 
   switch (event.type) {
     case "progress_snapshot":
-      await writeTextToStdout(
-        `progress ${event.step ?? "-"} graph ${event.graphWords}/${event.totalGraphWords} summary ${event.summaryWords}/${event.totalSummaryWords} output ~${event.outputTokens} tokens\n`,
-      );
+      await writeTextToStdout(`${formatProgressSnapshot(event)}\n`);
       return;
     case "target_changed":
       await writeTextToStdout(`target ${event.from} -> ${event.to}\n`);
@@ -261,6 +302,103 @@ async function writeWatchEvent(
     default:
       await writeTextToStdout(`${event.type}\n`);
   }
+}
+
+function formatWatchEventJSONL(event: BuildJobEvent): unknown {
+  if (event.type !== "progress_snapshot") {
+    return event;
+  }
+
+  const progress = getProgressWords(event);
+
+  return {
+    at: event.at,
+    jobId: event.jobId,
+    outputTokens: event.outputTokens,
+    seq: event.seq,
+    ...(event.step === undefined ? {} : { step: event.step }),
+    totalWords: progress.totalWords,
+    type: event.type,
+    words: clampWords(progress.words, progress.totalWords),
+  };
+}
+
+function formatProgressSnapshot(
+  event: Extract<BuildJobEvent, { readonly type: "progress_snapshot" }>,
+): string {
+  const step = event.step ?? "-";
+  const output = `output ~${event.outputTokens} tokens`;
+
+  switch (event.step) {
+    case "graph":
+      return `progress graph ${formatWords(getProgressWords(event))} ${output}`;
+    case "summary":
+      return `progress summary ${formatWords(getProgressWords(event))} ${output}`;
+    case undefined:
+      return `progress ${step} ${output}`;
+  }
+
+  return `progress ${step} ${output}`;
+}
+
+function getProgressWords(
+  event: Extract<BuildJobEvent, { readonly type: "progress_snapshot" }>,
+): { readonly totalWords: number; readonly words: number } {
+  const legacyEvent = event as Extract<
+    BuildJobEvent,
+    { readonly type: "progress_snapshot" }
+  > & {
+    readonly totalWords?: number;
+    readonly words?: number;
+  };
+
+  if (
+    typeof legacyEvent.words === "number" &&
+    typeof legacyEvent.totalWords === "number"
+  ) {
+    return {
+      totalWords: legacyEvent.totalWords,
+      words: legacyEvent.words,
+    };
+  }
+
+  switch (event.step) {
+    case "graph":
+      return {
+        totalWords: event.totalGraphWords,
+        words: event.graphWords,
+      };
+    case "summary":
+      return {
+        totalWords: event.totalSummaryWords,
+        words: event.summaryWords,
+      };
+    case undefined:
+      return {
+        totalWords: 0,
+        words: 0,
+      };
+  }
+
+  return {
+    totalWords: 0,
+    words: 0,
+  };
+}
+
+function formatWords(input: {
+  readonly totalWords: number;
+  readonly words: number;
+}): string {
+  return `${clampWords(input.words, input.totalWords)}/${input.totalWords}`;
+}
+
+function clampWords(words: number, totalWords: number): number {
+  if (totalWords <= 0) {
+    return Math.max(0, words);
+  }
+
+  return Math.min(totalWords, Math.max(0, words));
 }
 
 async function writeJobList(jobs: readonly BuildJob[]): Promise<void> {

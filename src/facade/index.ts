@@ -43,6 +43,7 @@ export {
   pauseBuildJob,
   readBuildJobEvents,
   resumeBuildJob,
+  resolveBuildJobId,
   runBuildJobWorker,
   updateBuildJobTarget,
 } from "./build-queue.js";

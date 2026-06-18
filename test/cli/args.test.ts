@@ -96,6 +96,7 @@ describe("cli/args", () => {
       ]),
     ).toStrictEqual({
       args: {
+        acceptCost: true,
         action: "add",
         archivePath: "book.sdpub",
         boost: true,
@@ -107,7 +108,7 @@ describe("cli/args", () => {
       kind: "queue",
     });
 
-    expect(() =>
+    expect(
       parseCLIArguments([
         "queue",
         "add",
@@ -117,7 +118,16 @@ describe("cli/args", () => {
         "--to",
         "summary",
       ]),
-    ).toThrow("consume tokens");
+    ).toStrictEqual({
+      args: {
+        action: "add",
+        archivePath: "book.sdpub",
+        chapterId: 12,
+        target: "summary",
+      },
+      help: false,
+      kind: "queue",
+    });
     expect(() =>
       parseCLIArguments(["status", "book.sdpub", "--accept-cost"]),
     ).toThrow("only valid for `spinedigest queue add`");
