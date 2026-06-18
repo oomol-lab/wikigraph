@@ -2,7 +2,8 @@ Help Type: command
 Command: spinedigest queue
 
 Purpose:
-  Manage device-local `.sdpub` graph and summary jobs.
+  Manage device-local graph and summary jobs for `.sdpub` chapters.
+  Use queue jobs for LLM-backed archive generation. Use retrieval commands (`status`, `index`, `list`, `page`, `find`, `grep`, `read`) to inspect data that already exists.
 
 Usage:
   spinedigest queue add <archive.sdpub> --chapter <id> [--to graph|summary] [--boost] [--llm <json>] [--prompt <text>]
@@ -16,16 +17,47 @@ Usage:
   spinedigest queue target <job-id> --to graph|summary
   spinedigest queue clean
 
+Job identity:
+  - One active job may exist for one `(archive, chapter)` pair.
+  - Active states are `queued`, `running`, and `paused`.
+  - Terminal states are `succeeded`, `failed`, and `canceled`.
+  - Terminal records are history and do not block a new job for the same chapter.
+
 Scheduling:
-  New jobs are appended to the queue by default.
-  Use `--boost` on add, or `queue boost <job-id>`, to move a queued job to the front.
-  Boosting does not preempt currently running jobs.
+  - New jobs are appended to the queue by default.
+  - `queue add ... --boost` inserts a new job at the front.
+  - `queue boost <job-id>` moves an existing queued job to the front.
+  - Boosting does not preempt running jobs.
+  - Paused jobs are not scheduled until resumed.
+  - Worker concurrency follows `request.concurrent` from configuration.
 
 Targets:
-  `graph` builds topology for one chapter.
-  `summary` builds graph if needed, then builds the chapter summary.
-  Downgrading from summary to graph is allowed only before summary starts.
+  - `--to graph` generates chapter topology.
+  - `--to summary` generates graph if needed, then generates the chapter summary.
+  - A queued or graph-running summary job can be downgraded to graph.
+  - Downgrading is rejected after summary has started; cancel explicitly if that is what the user wants.
 
-Watch:
-  TTY output is human-readable.
-  `--jsonl` prints one structured event per line and is the recommended mode for agents.
+Watch output:
+  - TTY output is human-readable.
+  - `--jsonl` prints one structured event per line and is the recommended mode for agents.
+  - `--from beginning` replays durable event history before following new events.
+  - `--from now` follows only new events.
+  - `progress_snapshot` events include graph words, summary words, and approximate output tokens.
+
+Agent examples:
+  spinedigest queue add book.sdpub --chapter 3 --to summary
+  spinedigest queue watch <job-id> --jsonl
+  spinedigest queue list --input book.sdpub
+  spinedigest queue status <job-id>
+
+Cleanup:
+  - Succeeded jobs delete their workspace by default.
+  - Failed and canceled jobs keep their workspace for debugging.
+  - `queue clean` removes old terminal job records and their retained files.
+
+Related commands:
+  - Estimate cost before large job batches:
+    spinedigest estimate <archive.sdpub> --stage summary
+  - Discover chapter ids:
+    spinedigest chapter tree <archive.sdpub> --json
+    spinedigest chapter list <archive.sdpub>

@@ -27,7 +27,6 @@ export type HelpTopic = (typeof HELP_TOPICS)[number];
 
 export const ARCHIVE_COMMANDS = [
   "create",
-  "build",
   "estimate",
   "status",
   "index",

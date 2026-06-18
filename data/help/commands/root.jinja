@@ -4,8 +4,8 @@ Command: spinedigest
 SpineDigest CLI
 
 Purpose:
-  Build portable LLM Wiki archives for AI agents.
-  Treat `.sdpub` as the primary knowledge archive: create archives from sources, build derived knowledge, then search, browse, read source fragments, navigate links, and export projections without unpacking it.
+  Create and operate portable LLM Wiki archives for AI agents.
+  Treat `.sdpub` as the primary knowledge archive: create archives from sources, queue derived knowledge generation, then search, browse, read source fragments, navigate links, and export projections without unpacking it.
 
 Agent safety:
   Do not modify `.sdpub` as a ZIP file or edit its internals directly. Use `spinedigest` commands for all archive mutations; direct ZIP edits can break the archive structure and make data unreadable.
@@ -69,7 +69,7 @@ Object selectors:
 
 Cost contract:
   Create is cheap when it stops at source.
-  List, search, page, read, links, and export are cheap after build.
+  List, search, page, read, links, and export are cheap after the needed archive data exists.
   Queue jobs can call an LLM and may be expensive. Run `spinedigest estimate <archive.sdpub> --stage summary` before scheduling large graph or summary batches.
 
 Help contract:

@@ -13,11 +13,18 @@ Check readiness:
   spinedigest status book.sdpub
   spinedigest index book.sdpub
 
-Estimate a full summary build:
+Estimate summary generation:
   spinedigest estimate book.sdpub --stage summary
 
-Build one chapter graph:
-  spinedigest build book.sdpub --stage graph --chapter 3 --confirm
+Queue one chapter summary:
+  spinedigest queue add book.sdpub --chapter 3 --to summary
+
+Queue one chapter graph and watch as JSONL:
+  spinedigest queue add book.sdpub --chapter 3 --to graph
+  spinedigest queue watch <job-id> --jsonl
+
+Prioritize an existing job:
+  spinedigest queue boost <job-id>
 
 Find and read source-backed knowledge:
   spinedigest find book.sdpub "knowledge graph" --type node

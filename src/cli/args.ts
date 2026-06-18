@@ -131,7 +131,6 @@ export interface CLIQueueArguments {
 
 export type CLIArchiveAction =
   | "backlinks"
-  | "build"
   | "create"
   | "estimate"
   | "export"
@@ -1043,58 +1042,6 @@ function parseArchiveArguments(
           ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
           ...(values.prompt === undefined ? {} : { prompt: values.prompt }),
           ...(sourcePath === undefined ? {} : { sourcePath }),
-        },
-        help: false,
-        kind: "archive",
-      };
-    }
-    case "build": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
-      rejectArchiveReadFlags(action, values, helpRoute);
-      rejectArchiveFlag(action, "--input", values.input, helpRoute);
-      rejectArchiveFlag(
-        action,
-        "--input-format",
-        values["input-format"],
-        helpRoute,
-      );
-      rejectArchiveFlag(action, "--output", values.output, helpRoute);
-      rejectArchiveFlag(
-        action,
-        "--output-format",
-        values["output-format"],
-        helpRoute,
-      );
-      rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
-      rejectArchiveSelectorFlags(action, values, helpRoute);
-      const targetStage = parseArchiveBuildStage(values.stage ?? values.to);
-
-      if (targetStage !== "sourced" && values.confirm !== true) {
-        throw new Error(
-          withHelpRoute(
-            "This build may call an LLM. Run `spinedigest estimate <archive.sdpub> --stage summary`, then rerun build with --confirm.",
-            helpRoute,
-          ),
-        );
-      }
-
-      return {
-        args: {
-          action,
-          archivePath,
-          ...(values.chapter === undefined
-            ? {}
-            : {
-                chapterId: parseSerialId(
-                  values.chapter,
-                  "--chapter",
-                  helpRoute,
-                ),
-              }),
-          ...(values.confirm === undefined ? {} : { confirm: values.confirm }),
-          ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-          ...(values.prompt === undefined ? {} : { prompt: values.prompt }),
-          targetStage,
         },
         help: false,
         kind: "archive",
@@ -2685,7 +2632,6 @@ function rejectStatusFlag(
 function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
   return (
     value === "backlinks" ||
-    value === "build" ||
     value === "create" ||
     value === "estimate" ||
     value === "export" ||
@@ -2718,22 +2664,6 @@ function isQueueAction(value: string | undefined): value is CLIQueueAction {
     value === "watch" ||
     value === "worker"
   );
-}
-
-function parseArchiveBuildStage(value: string | undefined): ChapterStage {
-  if (value === undefined) {
-    return "summarized";
-  }
-  if (value.trim().toLowerCase() === "planned") {
-    throw new Error(
-      withHelpRoute(
-        "Invalid --stage: planned. `build` advances existing source to graph or summary.",
-        CLI_HELP_ROUTES.command,
-      ),
-    );
-  }
-
-  return parseChapterStage(value, "--stage", CLI_HELP_ROUTES.command);
 }
 
 function parseBuildJobTarget(value: string | undefined): BuildJobTarget {
@@ -3420,14 +3350,4 @@ function rejectArchiveNonReadFlags(
     helpRoute,
   );
   rejectArchiveFlag(action, "--prompt", values.prompt, helpRoute);
-}
-
-function rejectArchiveReadFlags(
-  action: CLIArchiveAction,
-  values: {
-    readonly json?: boolean;
-  },
-  helpRoute: string,
-): void {
-  rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
 }

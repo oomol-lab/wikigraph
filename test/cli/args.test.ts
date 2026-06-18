@@ -222,27 +222,9 @@ describe("cli/args", () => {
       kind: "archive",
     });
 
-    expect(() =>
-      parseCLIArguments(["build", "book.sdpub", "--stage", "graph"]),
-    ).toThrow("This build may call an LLM.");
-    expect(
-      parseCLIArguments([
-        "build",
-        "book.sdpub",
-        "--stage",
-        "graph",
-        "--confirm",
-      ]),
-    ).toStrictEqual({
-      args: {
-        action: "build",
-        archivePath: "book.sdpub",
-        confirm: true,
-        targetStage: "graphed",
-      },
-      help: false,
-      kind: "archive",
-    });
+    expect(() => parseCLIArguments(["build", "book.sdpub"])).toThrow(
+      "Unknown command: build.",
+    );
 
     expect(
       parseCLIArguments([
