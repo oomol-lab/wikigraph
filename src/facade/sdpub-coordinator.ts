@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS archives (
 const FLUSH_HEARTBEAT_INTERVAL_MS = 5_000;
 
 export class SdpubCoordinator {
-  public async openSession<T>(
+  public async withReadWorkspace<T>(
     archivePath: string,
     operation: (documentDirectoryPath: string) => Promise<T> | T,
     options: {
@@ -57,7 +57,7 @@ export class SdpubCoordinator {
     }
   }
 
-  public async openEditableSession<T>(
+  public async withWriteWorkspace<T>(
     archivePath: string,
     operation: (documentDirectoryPath: string) => Promise<T> | T,
   ): Promise<T> {

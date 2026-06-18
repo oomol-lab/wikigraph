@@ -15,7 +15,7 @@ const archiveMaintenanceMockState = vi.hoisted(() => ({
         readonly path: string;
       }
     | undefined,
-  editableCalls: [] as string[],
+  writeCalls: [] as string[],
   meta: {
     authors: ["Ari Lantern", "Bea North"],
     description: "Fixture description",
@@ -52,10 +52,10 @@ vi.mock("../../src/facade/spine-digest-file.js", () => ({
       this.#path = path;
     }
 
-    public async openEditableSession(
+    public async write(
       operation: (document: MockEditableDocument) => Promise<unknown>,
     ): Promise<unknown> {
-      archiveMaintenanceMockState.editableCalls.push(this.#path);
+      archiveMaintenanceMockState.writeCalls.push(this.#path);
       return await operation({
         readBookMeta: () => Promise.resolve(archiveMaintenanceMockState.meta),
         replaceBookMeta: (meta: unknown) => {
@@ -95,7 +95,7 @@ describe("cli/archive maintenance", () => {
       mediaType: "image/png",
       path: "images/cover.png",
     };
-    archiveMaintenanceMockState.editableCalls.length = 0;
+    archiveMaintenanceMockState.writeCalls.length = 0;
     archiveMaintenanceMockState.meta = {
       authors: ["Ari Lantern", "Bea North"],
       description: "Fixture description",
@@ -170,7 +170,7 @@ describe("cli/archive maintenance", () => {
       },
     });
 
-    expect(archiveMaintenanceMockState.editableCalls).toStrictEqual([
+    expect(archiveMaintenanceMockState.writeCalls).toStrictEqual([
       "/tmp/book.sdpub",
     ]);
     expect(archiveMaintenanceMockState.replacedMeta).toStrictEqual([

@@ -17,7 +17,7 @@ describe("facade/spine-digest-file", () => {
     restoreCoordinatorEnv();
   });
 
-  it("opens a saved archive in a temporary session and exposes digest operations", async () => {
+  it("opens a saved archive for reading and exposes digest operations", async () => {
     await withTempDir("spinedigest-facade-file-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
 
@@ -28,8 +28,8 @@ describe("facade/spine-digest-file", () => {
         await new SpineDigest(document, document.path).saveAs(archivePath);
 
         const digestFile = new SpineDigestFile(archivePath);
-        const exportedText = await digestFile.openSession(async (digest) => {
-          const textPath = `${path}/exports/from-session.txt`;
+        const exportedText = await digestFile.read(async (digest) => {
+          const textPath = `${path}/exports/from-read.txt`;
 
           expect(await digest.readMeta()).toMatchObject({
             title: "Session Fixture",
@@ -62,53 +62,66 @@ describe("facade/spine-digest-file", () => {
         await seedDocument(document);
 
         const archivePath = `${path}/fixture/book.sdpub`;
-        const sessionDir = `${path}/opened-session`;
+        const readDir = `${path}/opened-read`;
 
         await new SpineDigest(document, document.path).saveAs(archivePath);
 
         const digestFile = new SpineDigestFile(archivePath);
-        await digestFile.openSession(
+        await digestFile.read(
           async (digest) => {
             expect(await digest.readMeta()).toMatchObject({
               title: "Session Fixture",
             });
           },
           {
-            documentDirPath: sessionDir,
+            documentDirPath: readDir,
           },
         );
 
         await expect(
-          access(`${sessionDir}/book-meta.json`),
+          access(`${readDir}/book-meta.json`),
         ).resolves.toBeUndefined();
-        expect(
-          await readFile(`${sessionDir}/book-meta.json`, "utf8"),
-        ).toContain("Session Fixture");
+        expect(await readFile(`${readDir}/book-meta.json`, "utf8")).toContain(
+          "Session Fixture",
+        );
       } finally {
         await document.release();
       }
     });
   });
 
-  it("flushes successful editable sessions back to the archive", async () => {
+  it("does not create coordinator state for plain archive reads", async () => {
     await withTempDir("spinedigest-facade-file-", async (path) => {
       useCoordinatorStateDir(`${path}/state`);
       const archivePath = await createSeedArchive(path);
 
-      await new SpineDigestFile(archivePath).openEditableSession(
-        async (document) => {
-          const meta = await document.readBookMeta();
+      await new SpineDigestFile(archivePath).read(async (digest) => {
+        expect(await digest.readMeta()).toMatchObject({
+          title: "Session Fixture",
+        });
+      });
 
-          if (meta === undefined) {
-            throw new Error("Missing test metadata.");
-          }
+      await expect(readCoordinatorArchives(path)).resolves.toStrictEqual([]);
+    });
+  });
 
-          await document.replaceBookMeta({
-            ...meta,
-            title: "Flushed Title",
-          });
-        },
-      );
+  it("flushes successful archive writes back to the archive", async () => {
+    await withTempDir("spinedigest-facade-file-", async (path) => {
+      useCoordinatorStateDir(`${path}/state`);
+      const archivePath = await createSeedArchive(path);
+
+      await new SpineDigestFile(archivePath).write(async (document) => {
+        const meta = await document.readBookMeta();
+
+        if (meta === undefined) {
+          throw new Error("Missing test metadata.");
+        }
+
+        await document.replaceBookMeta({
+          ...meta,
+          title: "Flushed Title",
+        });
+      });
 
       await expect(readCoordinatorArchives(path)).resolves.toStrictEqual([]);
 
@@ -118,27 +131,25 @@ describe("facade/spine-digest-file", () => {
     });
   });
 
-  it("keeps failed editable sessions materialized without flushing", async () => {
+  it("keeps failed archive writes materialized without flushing", async () => {
     await withTempDir("spinedigest-facade-file-", async (path) => {
       useCoordinatorStateDir(`${path}/state`);
       const archivePath = await createSeedArchive(path);
 
       await expect(
-        new SpineDigestFile(archivePath).openEditableSession(
-          async (document) => {
-            const meta = await document.readBookMeta();
+        new SpineDigestFile(archivePath).write(async (document) => {
+          const meta = await document.readBookMeta();
 
-            if (meta === undefined) {
-              throw new Error("Missing test metadata.");
-            }
+          if (meta === undefined) {
+            throw new Error("Missing test metadata.");
+          }
 
-            await document.replaceBookMeta({
-              ...meta,
-              title: "Unflushed Title",
-            });
-            throw new Error("stop before flush");
-          },
-        ),
+          await document.replaceBookMeta({
+            ...meta,
+            title: "Unflushed Title",
+          });
+          throw new Error("stop before flush");
+        }),
       ).rejects.toThrow("stop before flush");
 
       const archives = await readCoordinatorArchives(path);
@@ -163,22 +174,20 @@ describe("facade/spine-digest-file", () => {
       });
       const archivePath = await createSeedArchive(path);
 
-      await new SpineDigestFile(archivePath).openEditableSession(
-        async (document) => {
-          const meta = await document.readBookMeta();
+      await new SpineDigestFile(archivePath).write(async (document) => {
+        const meta = await document.readBookMeta();
 
-          if (meta === undefined) {
-            throw new Error("Missing test metadata.");
-          }
+        if (meta === undefined) {
+          throw new Error("Missing test metadata.");
+        }
 
-          await document.replaceBookMeta({
-            ...meta,
-            title: "Workspace Title",
-          });
-        },
-      );
+        await document.replaceBookMeta({
+          ...meta,
+          title: "Workspace Title",
+        });
+      });
 
-      await new SpineDigestFile(archivePath).openSession(async (digest) => {
+      await new SpineDigestFile(archivePath).read(async (digest) => {
         expect(await digest.readMeta()).toMatchObject({
           title: "Workspace Title",
         });
@@ -189,41 +198,39 @@ describe("facade/spine-digest-file", () => {
     });
   });
 
-  it("rejects concurrent editable sessions for the same archive", async () => {
+  it("rejects concurrent writes for the same archive", async () => {
     await withTempDir("spinedigest-facade-file-", async (path) => {
       useCoordinatorStateDir(`${path}/state`, {
         idleTimeoutMs: 1_000,
         quietPeriodMs: 60_000,
       });
       const archivePath = await createSeedArchive(path);
-      let markFirstSessionEntered!: () => void;
-      let releaseFirstSession!: () => void;
-      const firstSessionEntered = new Promise<void>((resolveEntered) => {
-        markFirstSessionEntered = resolveEntered;
+      let markFirstWriteEntered!: () => void;
+      let releaseFirstWrite!: () => void;
+      const firstWriteEntered = new Promise<void>((resolveEntered) => {
+        markFirstWriteEntered = resolveEntered;
       });
-      const releaseFirstSessionSignal = new Promise<void>((resolveRelease) => {
-        releaseFirstSession = resolveRelease;
+      const releaseFirstWriteSignal = new Promise<void>((resolveRelease) => {
+        releaseFirstWrite = resolveRelease;
       });
 
-      const firstSession = new SpineDigestFile(archivePath).openEditableSession(
-        async () => {
-          markFirstSessionEntered();
-          await releaseFirstSessionSignal;
-        },
-      );
+      const firstWrite = new SpineDigestFile(archivePath).write(async () => {
+        markFirstWriteEntered();
+        await releaseFirstWriteSignal;
+      });
 
-      await firstSessionEntered;
+      await firstWriteEntered;
       await waitForCoordinatorArchive(path);
       await expect(
-        new SpineDigestFile(archivePath).openEditableSession(async () => {}),
+        new SpineDigestFile(archivePath).write(async () => {}),
       ).rejects.toThrow("Archive is already being edited");
 
-      releaseFirstSession();
-      await firstSession;
+      releaseFirstWrite();
+      await firstWrite;
     });
   });
 
-  it("recovers stale editable sessions when the owner process is gone", async () => {
+  it("recovers stale writes when the owner process is gone", async () => {
     await withTempDir("spinedigest-facade-file-", async (path) => {
       useCoordinatorStateDir(`${path}/state`, {
         idleTimeoutMs: 1_000,
@@ -232,33 +239,29 @@ describe("facade/spine-digest-file", () => {
       const archivePath = await createSeedArchive(path);
 
       await expect(
-        new SpineDigestFile(archivePath).openEditableSession(
-          async (document) => {
-            const meta = await document.readBookMeta();
+        new SpineDigestFile(archivePath).write(async (document) => {
+          const meta = await document.readBookMeta();
 
-            if (meta === undefined) {
-              throw new Error("Missing test metadata.");
-            }
+          if (meta === undefined) {
+            throw new Error("Missing test metadata.");
+          }
 
-            await document.replaceBookMeta({
-              ...meta,
-              title: "Interrupted Title",
-            });
-            throw new Error("interrupted");
-          },
-        ),
+          await document.replaceBookMeta({
+            ...meta,
+            title: "Interrupted Title",
+          });
+          throw new Error("interrupted");
+        }),
       ).rejects.toThrow("interrupted");
 
       await setCoordinatorOperationPid(path, -1);
-      await new SpineDigestFile(archivePath).openEditableSession(
-        async (document) => {
-          const meta = await document.readBookMeta();
+      await new SpineDigestFile(archivePath).write(async (document) => {
+        const meta = await document.readBookMeta();
 
-          expect(meta).toMatchObject({
-            title: "Interrupted Title",
-          });
-        },
-      );
+        expect(meta).toMatchObject({
+          title: "Interrupted Title",
+        });
+      });
     });
   });
 });
@@ -328,6 +331,12 @@ async function readCoordinatorArchives(path: string): Promise<
     readonly operationPid: number | null;
   }>
 > {
+  try {
+    await access(`${path}/state/state.sqlite`);
+  } catch {
+    return [];
+  }
+
   const { Database } = await import("../../src/document/index.js");
   const database = await Database.open(
     `${path}/state/state.sqlite`,

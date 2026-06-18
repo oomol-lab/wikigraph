@@ -30,7 +30,7 @@ import {
   type ChapterStage,
 } from "../facade/index.js";
 import { SpineDigestFile } from "../facade/spine-digest-file.js";
-import type { Document } from "../document/index.js";
+import type { ReadonlyDocument } from "../document/index.js";
 
 import type { CLIArchiveArguments } from "./args.js";
 import { runConvertCommand } from "./convert.js";
@@ -59,7 +59,7 @@ export async function runArchiveCommand(
       });
       return;
     case "estimate":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeEstimate(
           await estimateArchiveBuild(
             document,
@@ -73,7 +73,7 @@ export async function runArchiveCommand(
     case "index": {
       const indexAction = args.action;
 
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeIndex(
           await getArchiveIndex(document),
           indexAction,
@@ -83,7 +83,7 @@ export async function runArchiveCommand(
       return;
     }
     case "list":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeCollection(
           await listArchiveCollection(document, createCollectionOptions(args)),
           args.json ?? false,
@@ -91,7 +91,7 @@ export async function runArchiveCommand(
       });
       return;
     case "find":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeFindHits(
           await findArchiveObjects(
             document,
@@ -103,7 +103,7 @@ export async function runArchiveCommand(
       });
       return;
     case "grep":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeFindHits(
           await grepArchiveObjects(
             document,
@@ -115,7 +115,7 @@ export async function runArchiveCommand(
       });
       return;
     case "page":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writePage(
           await readArchivePage(document, args.objectId!),
           args.json ?? false,
@@ -123,7 +123,7 @@ export async function runArchiveCommand(
       });
       return;
     case "read":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeTextToStdout(
           `${await readArchiveText(document, args.objectId!)}\n`,
         );
@@ -133,7 +133,7 @@ export async function runArchiveCommand(
     case "backlinks": {
       const linkDirection = args.action;
 
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeLinks(
           await listArchiveLinks(document, args.objectId!, linkDirection),
           linkDirection,
@@ -143,7 +143,7 @@ export async function runArchiveCommand(
       return;
     }
     case "related":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeList(
           await listRelatedArchiveObjects(document, args.objectId!),
           args.json ?? false,
@@ -151,7 +151,7 @@ export async function runArchiveCommand(
       });
       return;
     case "pack":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writePack(
           await packArchiveContext(
             document,
@@ -163,7 +163,7 @@ export async function runArchiveCommand(
       });
       return;
     case "map":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeMap(
           await listArchiveObjects(document, "edges"),
           args.json ?? false,
@@ -171,7 +171,7 @@ export async function runArchiveCommand(
       });
       return;
     case "path":
-      await withArchiveDocument(args.archivePath, async (document) => {
+      await readArchiveDocument(args.archivePath, async (document) => {
         await writeTextToStdout(
           formatPath(
             await findGraphPath(
@@ -305,11 +305,11 @@ function createCollectionOptions(
   };
 }
 
-async function withArchiveDocument<T>(
+async function readArchiveDocument<T>(
   path: string,
-  operation: (document: Document) => Promise<T> | T,
+  operation: (document: ReadonlyDocument) => Promise<T> | T,
 ): Promise<void> {
-  await new SpineDigestFile(path).openEditableSession(operation);
+  await new SpineDigestFile(path).readDocument(operation);
 }
 
 async function writeIndex(

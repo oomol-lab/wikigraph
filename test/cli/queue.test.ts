@@ -26,7 +26,7 @@ vi.mock("../../src/facade/spine-digest-file.js", () => ({
       this.#path = path;
     }
 
-    public async openSession(
+    public async read(
       operation: (digest: unknown) => Promise<unknown>,
     ): Promise<unknown> {
       queueMockState.openPaths.push(this.#path);
