@@ -13,9 +13,12 @@ export type SqlRow = Record<string, SqlRowValue>;
 
 const SQLITE_BUSY_TIMEOUT_MS = 15 * 60 * 1000;
 
+type DatabaseOperationScope = symbol;
+
 export class Database {
   readonly #database: SqliteDatabase;
-  readonly #operationScope = new AsyncLocalStorage<boolean>();
+  readonly #operationScope = new AsyncLocalStorage<DatabaseOperationScope>();
+  #activeTransactionScope: DatabaseOperationScope | undefined;
   #closed = false;
   #operationChain: Promise<void> = Promise.resolve();
   #transactionDepth = 0;
@@ -77,20 +80,30 @@ export class Database {
     return await this.#runSerialized(async () => {
       this.#assertOpen();
       const isRootTransaction = this.#transactionDepth === 0;
+      const transactionScope =
+        this.#activeTransactionScope ?? Symbol("database transaction scope");
 
       if (isRootTransaction) {
+        this.#activeTransactionScope = transactionScope;
         await this.#executeSql("BEGIN IMMEDIATE");
       }
 
       this.#transactionDepth += 1;
 
       try {
-        const result = await operation();
+        const result = await this.#operationScope.run(
+          transactionScope,
+          operation,
+        );
 
         this.#transactionDepth -= 1;
 
         if (isRootTransaction) {
-          await this.#executeSql("COMMIT");
+          try {
+            await this.#executeSql("COMMIT");
+          } finally {
+            this.#activeTransactionScope = undefined;
+          }
         }
 
         return result;
@@ -98,7 +111,11 @@ export class Database {
         this.#transactionDepth -= 1;
 
         if (isRootTransaction) {
-          await this.#executeSql("ROLLBACK");
+          try {
+            await this.#executeSql("ROLLBACK");
+          } finally {
+            this.#activeTransactionScope = undefined;
+          }
         }
 
         throw error;
@@ -144,13 +161,16 @@ export class Database {
   }
 
   async #runSerialized<T>(operation: () => Promise<T> | T): Promise<T> {
-    if (this.#operationScope.getStore() === true) {
+    const operationScope = this.#operationScope.getStore();
+
+    if (
+      operationScope !== undefined &&
+      operationScope === this.#activeTransactionScope
+    ) {
       return await operation();
     }
 
-    const queuedOperation = this.#operationChain.then(() =>
-      this.#operationScope.run(true, operation),
-    );
+    const queuedOperation = this.#operationChain.then(operation);
 
     this.#operationChain = queuedOperation.then(
       () => undefined,

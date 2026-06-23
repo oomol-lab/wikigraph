@@ -325,7 +325,7 @@ describe("facade/build-queue", () => {
 
       await firstStartedSignal;
       await addBuildJob({
-        archivePath: `${path}/book.sdpub`,
+        archivePath: `${path}/other-book.sdpub`,
         chapterId: 2,
         target: "graph",
       });
@@ -340,7 +340,7 @@ describe("facade/build-queue", () => {
     });
   });
 
-  it("lists multiple running jobs when worker concurrency allows it", async () => {
+  it("does not run multiple jobs for the same archive at the same time", async () => {
     await withTempDir("spinedigest-build-queue-", async (path) => {
       useStateDir(`${path}/state`);
       await addBuildJob({
@@ -350,6 +350,121 @@ describe("facade/build-queue", () => {
       });
       await addBuildJob({
         archivePath: `${path}/book.sdpub`,
+        chapterId: 2,
+        target: "graph",
+      });
+
+      let firstStarted!: () => void;
+      let releaseFirst!: () => void;
+      let releaseSecond!: () => void;
+      const firstStartedSignal = new Promise<void>((resolveStarted) => {
+        firstStarted = resolveStarted;
+      });
+      const firstReleaseSignal = new Promise<void>((resolveRelease) => {
+        releaseFirst = resolveRelease;
+      });
+      const secondReleaseSignal = new Promise<void>((resolveRelease) => {
+        releaseSecond = resolveRelease;
+      });
+      let startedCount = 0;
+
+      const worker = runBuildJobWorker({
+        concurrency: 2,
+        executeJob: async () => {
+          startedCount += 1;
+          if (startedCount === 1) {
+            firstStarted();
+            await firstReleaseSignal;
+            return;
+          }
+
+          await secondReleaseSignal;
+        },
+        idleTimeoutMs: 0,
+      });
+
+      await firstStartedSignal;
+
+      expect((await listBuildJobs()).map((job) => job.state)).toStrictEqual([
+        "running",
+        "queued",
+      ]);
+
+      releaseFirst();
+      await withTimeout(
+        waitForRunningJobCount(1),
+        "Timed out waiting for the second same-archive job to start.",
+      );
+      releaseSecond();
+      await worker;
+    });
+  });
+
+  it("keeps queue reads responsive while idle slots wait for work", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+      await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "graph",
+      });
+
+      let releaseJob!: () => void;
+      const releaseSignal = new Promise<void>((resolveRelease) => {
+        releaseJob = resolveRelease;
+      });
+
+      const worker = runBuildJobWorker({
+        concurrency: 4,
+        executeJob: async () => {
+          await releaseSignal;
+        },
+        idleTimeoutMs: 2_000,
+      });
+
+      await withTimeout(
+        waitForRunningJob(),
+        "Timed out waiting for the first queue slot to become running.",
+      );
+
+      await expect(
+        withTimeout(
+          listBuildJobs({ all: true }),
+          "Timed out waiting for queue list while worker slots were idle.",
+        ),
+      ).resolves.toHaveLength(1);
+
+      releaseJob();
+      await worker;
+    });
+  });
+
+  async function waitForRunningJob(): Promise<void> {
+    await waitForRunningJobCount(1);
+  }
+
+  async function waitForRunningJobCount(count: number): Promise<void> {
+    while (true) {
+      if (
+        (await listBuildJobs()).filter((job) => job.state === "running")
+          .length >= count
+      ) {
+        return;
+      }
+      await delay(50);
+    }
+  }
+
+  it("lists multiple running jobs when worker concurrency allows it", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+      await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "graph",
+      });
+      await addBuildJob({
+        archivePath: `${path}/other-book.sdpub`,
         chapterId: 2,
         target: "graph",
       });
@@ -489,4 +604,10 @@ async function withTimeout<T>(
       clearTimeout(timeout);
     }
   }
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise<void>((resolveDelay) => {
+    setTimeout(resolveDelay, ms);
+  });
 }
