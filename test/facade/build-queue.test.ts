@@ -281,8 +281,10 @@ describe("facade/build-queue", () => {
 
       expect(updated?.state).toBe("queued");
       expect(
-        (await readBuildJobEvents(job)).map((event) => event.type),
-      ).toContain("requeued");
+        (await readBuildJobEvents(job)).filter(
+          (event) => event.type === "requeued",
+        ),
+      ).toHaveLength(1);
     });
   });
 

@@ -802,40 +802,42 @@ WHERE job_id = ? AND state = 'queued'
 }
 
 async function recoverStaleBuildJobs(state: Database): Promise<void> {
-  const jobs = await state.queryAll(
-    `
+  await state.transaction(async () => {
+    const jobs = await state.queryAll(
+      `
 SELECT *
 FROM build_jobs
 WHERE state = 'running'
   AND owner_pid IS NOT NULL
 `,
-    undefined,
-    mapBuildJob,
-  );
+      undefined,
+      mapBuildJob,
+    );
 
-  for (const job of jobs) {
-    if (job.ownerPid !== undefined && isProcessAlive(job.ownerPid)) {
-      continue;
-    }
+    for (const job of jobs) {
+      if (job.ownerPid !== undefined && isProcessAlive(job.ownerPid)) {
+        continue;
+      }
 
-    const now = Date.now();
-    await state.run(
-      `
+      const now = Date.now();
+      await state.run(
+        `
 UPDATE build_jobs
 SET state = 'queued', owner_id = NULL, owner_pid = NULL,
     current_step = NULL, updated_at = ?
 WHERE job_id = ?
 `,
-      [now, job.jobId],
-    );
-    await appendBuildJobEvent(job, {
-      at: now,
-      jobId: job.jobId,
-      seq: 0,
-      state: "queued",
-      type: "requeued",
-    });
-  }
+        [now, job.jobId],
+      );
+      await appendBuildJobEvent(job, {
+        at: now,
+        jobId: job.jobId,
+        seq: 0,
+        state: "queued",
+        type: "requeued",
+      });
+    }
+  });
 }
 
 async function acquireBuildWorkerLease(
