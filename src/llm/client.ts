@@ -469,7 +469,9 @@ function createCache(cacheDirPath?: string): LLMCache | undefined {
 
 function hasVisibleNonSystemContent(messages: readonly LLMessage[]): boolean {
   return messages.some(
-    (message) => message.role !== "system" && message.content.trim() !== "",
+    (message) =>
+      message.role !== "system" &&
+      (typeof message.content !== "string" || message.content.trim() !== ""),
   );
 }
 

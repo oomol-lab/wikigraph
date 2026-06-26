@@ -84,7 +84,6 @@ export interface SerialGenerationOptions {
   readonly document?: Document;
   readonly llm: LLM<SpineDigestScope>;
   readonly logDirPath?: string;
-  readonly nextChunkId?: number;
   readonly segmenter?: ReaderSegmenter;
   /** @deprecated Use `document` instead. */
   readonly workspace?: Document;
@@ -153,7 +152,7 @@ export class SerialGeneration {
   readonly #document: Document;
   readonly #writeSemaphore = new AsyncSemaphore(1);
 
-  #nextChunkId: number | undefined;
+  #nextChunkId = 1;
 
   public constructor(options: SerialGenerationOptions) {
     const document = resolveDocument(options);
@@ -162,7 +161,6 @@ export class SerialGeneration {
     this.#fragmentGroups = document.fragmentGroups;
     this.#llm = options.llm;
     this.#logDirPath = options.logDirPath;
-    this.#nextChunkId = options.nextChunkId;
     this.#serials = document.serials;
     this.#segmenter = options.segmenter;
     this.#document = document;
@@ -249,9 +247,6 @@ export class SerialGeneration {
 
   async #allocateChunkId(): Promise<number> {
     return await this.#idSemaphore.use(async () => {
-      if (this.#nextChunkId === undefined) {
-        this.#nextChunkId = (await this.#chunks.getMaxId()) + 1;
-      }
       const chunkId = this.#nextChunkId;
       this.#nextChunkId += 1;
       return chunkId;
