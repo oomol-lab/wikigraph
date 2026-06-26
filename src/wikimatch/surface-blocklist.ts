@@ -25,7 +25,7 @@ export interface WikimatchSurfaceBlocklistRecord {
 export class WikimatchSurfaceBlocklist {
   readonly #database: Database;
 
-  private constructor(database: Database) {
+  public constructor(database: Database) {
     this.#database = database;
   }
 

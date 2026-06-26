@@ -28,16 +28,14 @@ const DEFAULT_USER_AGENT =
 export class WikipageResolver {
   readonly #cache: WikipageCache;
   readonly #client: WikimediaClient;
-  readonly #language: string;
   readonly #maxBatchSize: number;
   readonly #normalizer: DisambiguationProfileNormalizer | undefined;
   readonly #ownsCache: boolean;
   readonly #wiki: string;
 
-  private constructor(input: {
+  public constructor(input: {
     readonly cache: WikipageCache;
     readonly client: WikimediaClient;
-    readonly language: string;
     readonly maxBatchSize: number;
     readonly normalizer: DisambiguationProfileNormalizer | undefined;
     readonly ownsCache: boolean;
@@ -45,7 +43,6 @@ export class WikipageResolver {
   }) {
     this.#cache = input.cache;
     this.#client = input.client;
-    this.#language = input.language;
     this.#maxBatchSize = input.maxBatchSize;
     this.#normalizer = input.normalizer;
     this.#ownsCache = input.ownsCache;
@@ -70,7 +67,6 @@ export class WikipageResolver {
         wiki,
         ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
       }),
-      language,
       maxBatchSize: normalizeBatchSize(options.maxBatchSize),
       normalizer: options.normalizer,
       ownsCache: true,

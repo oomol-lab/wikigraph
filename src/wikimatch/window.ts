@@ -2,7 +2,6 @@ import { expandRangeByWords } from "./words.js";
 import type {
   BuildWikimatchWindowsOptions,
   WikimatchCandidate,
-  WikimatchConflictGroup,
   WikimatchWindow,
 } from "./types.js";
 

@@ -71,7 +71,11 @@ describe("wikipage/normalizer", () => {
     });
     expect(request).toHaveBeenCalledTimes(2);
     expect(
-      request.mock.calls[1]?.[0].map((message) => message.content).join("\n"),
+      request.mock.calls[1]?.[0]
+        .map((message) =>
+          typeof message.content === "string" ? message.content : "",
+        )
+        .join("\n"),
     ).toContain("Q999, but it is not present");
   });
 });

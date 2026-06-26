@@ -14,10 +14,10 @@ describe("wikipage/resolver", () => {
         fetch,
         language: "en",
         minRequestIntervalMs: 0,
-        normalizer: async (input) => {
+        normalizer: (input) => {
           normalizerCalls.push(input.sourceQid);
 
-          return {
+          return Promise.resolve({
             meanings: [
               {
                 category: "place",
@@ -29,7 +29,7 @@ describe("wikipage/resolver", () => {
             ],
             sourceQid: input.sourceQid,
             ...(input.surface === undefined ? {} : { surface: input.surface }),
-          };
+          });
         },
       });
 
@@ -105,44 +105,50 @@ describe("wikipage/resolver", () => {
 });
 
 function createMockFetch(calls: string[]): typeof fetch {
-  return (async (input: string | URL | Request) => {
+  return ((input: string | URL | Request) => {
     const url = new URL(input instanceof Request ? input.url : input);
     calls.push(url.toString());
 
     if (url.hostname === "www.wikidata.org") {
       const ids = url.searchParams.get("ids")?.split("|") ?? [];
 
-      return jsonResponse({
-        entities: Object.fromEntries(ids.map((qid) => [qid, entity(qid)])),
-      });
+      return Promise.resolve(
+        jsonResponse({
+          entities: Object.fromEntries(ids.map((qid) => [qid, entity(qid)])),
+        }),
+      );
     }
 
     if (url.searchParams.get("action") === "query") {
       const titles = url.searchParams.get("titles")?.split("|") ?? [];
 
-      return jsonResponse({
-        query: {
-          pages: titles.map(page),
-        },
-      });
+      return Promise.resolve(
+        jsonResponse({
+          query: {
+            pages: titles.map(page),
+          },
+        }),
+      );
     }
 
     if (url.searchParams.get("action") === "parse") {
-      return jsonResponse({
-        parse: {
-          pageid: 19007,
-          text: `
+      return Promise.resolve(
+        jsonResponse({
+          parse: {
+            pageid: 19007,
+            text: `
 <ul>
   <li><a href="/wiki/Mercury_(element)" title="Mercury (element)">Mercury</a>, a chemical element</li>
   <li><a href="/wiki/Mercury_(planet)" title="Mercury (planet)">Mercury</a>, the first planet from the Sun</li>
 </ul>
 `,
-          title: "Mercury",
-        },
-      });
+            title: "Mercury",
+          },
+        }),
+      );
     }
 
-    return jsonResponse({}, 404);
+    return Promise.resolve(jsonResponse({}, 404));
   }) as typeof fetch;
 }
 

@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS disambiguation_cache (
 export class WikipageCache {
   readonly #database: Database;
 
-  private constructor(database: Database) {
+  public constructor(database: Database) {
     this.#database = database;
   }
 
@@ -206,7 +206,7 @@ function mapDisambiguationRecord(row: SqlRow): CachedDisambiguationRecord {
 }
 
 function parsePageRecords(value: string): readonly CachedPageRecord[] {
-  const parsed = JSON.parse(value);
+  const parsed: unknown = JSON.parse(value);
 
   if (!Array.isArray(parsed)) {
     return [];
@@ -218,7 +218,7 @@ function parsePageRecords(value: string): readonly CachedPageRecord[] {
 function parseDisambiguationPages(
   value: string,
 ): readonly DisambiguationPageText[] {
-  const parsed = JSON.parse(value);
+  const parsed: unknown = JSON.parse(value);
 
   if (!Array.isArray(parsed)) {
     return [];
@@ -263,7 +263,7 @@ function isDisambiguationPageText(
 }
 
 function parseDisambiguationProfile(value: string): DisambiguationProfile {
-  const parsed = JSON.parse(value);
+  const parsed: unknown = JSON.parse(value);
 
   if (!isDisambiguationProfile(parsed)) {
     throw new Error(

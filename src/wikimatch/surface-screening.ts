@@ -11,7 +11,6 @@ import type { LLMessage } from "../llm/index.js";
 import type {
   WikimatchSurface,
   WikimatchSurfaceScreeningInput,
-  WikimatchSurfaceScreeningItem,
   WikimatchSurfaceScreeningResponse,
   WikimatchSurfaceScreeningResult,
 } from "./types.js";

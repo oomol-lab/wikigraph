@@ -14,7 +14,6 @@ import type {
   WikimatchConflictGroup,
   WikimatchQidOption,
   WikimatchPolicyDecisionOutput,
-  WikimatchPolicyGroupOutput,
   WikimatchPolicyJudgeInput,
   WikimatchPolicyJudgeResult,
   WikimatchPolicyResponse,
@@ -455,7 +454,7 @@ function formatGroupsForPrompt(input: WikimatchPolicyJudgeInput): object[] {
 
       return candidate === undefined
         ? []
-        : [formatCandidateForPrompt(candidate, group, input.window.baseOffset)];
+        : [formatCandidateForPrompt(candidate, group)];
     }),
     groupId: group.id,
     text: input.window.text.slice(
@@ -468,7 +467,6 @@ function formatGroupsForPrompt(input: WikimatchPolicyJudgeInput): object[] {
 function formatCandidateForPrompt(
   candidate: WikimatchCandidate,
   group: WikimatchConflictGroup,
-  baseOffset: number,
 ): object {
   const formattedOptions = formatQidOptions(candidate.qidOptions);
 
