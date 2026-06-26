@@ -24,6 +24,27 @@ export {
   type WikipageSitelink,
 } from "./wikipage/index.js";
 export {
+  buildWikimatchWindows,
+  judgeWikimatchPolicy,
+  parsePolicyResponse,
+  validatePolicyResponse,
+  type BuildWikimatchWindowsOptions,
+  type JudgeWikimatchPolicyOptions,
+  type WikimatchAcceptedMention,
+  type WikimatchCandidate,
+  type WikimatchConflictGroup,
+  type WikimatchPolicyDecision,
+  type WikimatchPolicyDecisionOutput,
+  type WikimatchPolicyFallback,
+  type WikimatchPolicyJudgeInput,
+  type WikimatchPolicyJudgeResult,
+  type WikimatchPolicyResponse,
+  type WikimatchPolicyUpdate,
+  type WikimatchQidOption,
+  type WikimatchTextRange,
+  type WikimatchWindow,
+} from "./wikimatch/index.js";
+export {
   type DigestProgressEvent,
   type SerialDiscoveryItem,
   SpineDigest,
