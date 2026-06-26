@@ -3,55 +3,18 @@ Topic: overview
 
 Overview
 
-What SpineDigest does:
-  SpineDigest creates portable `.sdpub` knowledge archives for AI agents.
-  A `.sdpub` archive stores source text, chapter structure, generated graph nodes, source-backed navigation, summaries, and exportable projections behind deterministic CLI commands.
+SpineDigest creates `.sdpub` archives and exposes them as Wiki Graph object collections.
 
-Primary workflow:
-  1. Create the archive:
-     spinedigest create book.sdpub ./book.epub
-  2. Inspect readiness and chapter ids:
-     spinedigest status book.sdpub
-     spinedigest chapter tree book.sdpub --json
-  3. Estimate graph or summary generation scale:
-     spinedigest estimate book.sdpub --stage summary
-  4. Queue chapter jobs:
-     spinedigest queue add book.sdpub --chapter 3 --to summary --accept-cost
-     spinedigest queue list
-     spinedigest queue watch <job-id> --jsonl
-  5. Retrieve existing archive knowledge:
-     spinedigest page book.sdpub --chapter 3
-     spinedigest list book.sdpub --type node --chapter 3
-     spinedigest page book.sdpub --node 84
+Core object commands:
+  - `search` finds URI-addressable objects.
+  - `get` reads one object.
+  - `related` moves from one object to nearby objects.
+  - `evidence` returns source-backed evidence.
+  - `pack` builds bounded Agent-readable context.
 
-Three exploration modes:
-  1. Search mode:
-     `find` discovers objects by deterministic keywords; `grep` checks exact continuous phrases.
-     Choose a search lens with `--type node`, `--type summary`, or `--type fragment`.
-  2. Structure mode:
-     `chapter tree --json` shows table-of-contents hierarchy; scoped `list --chapter <ids>` expands selected chapters; `page` opens a detailed object with local navigation.
-  3. Reading mode:
-     `read` prints continuous plain text for a chapter, summary, fragment, or node.
+Generation tasks:
+  - `reading-graph` builds the reading-oriented chunk graph.
+  - `summary` builds summaries.
+  - `knowledge-graph` builds entity/triple evidence.
 
-Generation model:
-  - Graph and summary generation are queue jobs.
-  - One active job can exist for a given archive chapter.
-  - Jobs are device-local and stored under `~/.wikigraph/state`.
-  - `watch --jsonl` prints durable structured events for agents.
-  - `queue list` shows running, queued, paused, and historical jobs depending on flags.
-
-Cost model:
-  - Create/source: cheap, no LLM when kept at source.
-  - Search/read/navigation/export: cheap after data exists.
-  - Queue graph/summary jobs: call an LLM, consume tokens, may incur provider charges, and can run for minutes to hours on large archives.
-  - `queue add` requires `--accept-cost`; estimate first for large archives.
-
-Where to go next:
-  - Need agent rules:
-    spinedigest help ai
-  - Need task-level workflows:
-    spinedigest help task
-  - Need command shapes:
-    spinedigest help command
-  - Need queue details:
-    spinedigest queue --help
+Queue tasks may call an LLM. Object inspection commands do not start generation.

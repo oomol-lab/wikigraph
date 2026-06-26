@@ -114,6 +114,14 @@ export type CLIQueueAction =
   | "watch"
   | "worker";
 
+export type CLIObjectKind =
+  | "chunk"
+  | "entity"
+  | "source"
+  | "summary"
+  | "triple";
+export type CLIResultFormat = "json" | "jsonl" | "text";
+
 export interface CLIQueueArguments {
   readonly action: CLIQueueAction;
   readonly acceptCost?: boolean;
@@ -132,22 +140,15 @@ export interface CLIQueueArguments {
 }
 
 export type CLIArchiveAction =
-  | "backlinks"
   | "create"
+  | "evidence"
   | "estimate"
   | "export"
-  | "find"
-  | "grep"
+  | "get"
   | "index"
-  | "links"
-  | "list"
-  | "map"
-  | "page"
   | "pack"
-  | "path"
-  | "read"
   | "related"
-  | "status";
+  | "search";
 
 export type CLIArchiveMaintenanceCommand = "chapter" | "cover" | "meta";
 
@@ -159,36 +160,21 @@ export interface CLIArchiveArguments {
   readonly chapterId?: number;
   readonly confirm?: boolean;
   readonly cursor?: string;
-  readonly fromNodeId?: number;
+  readonly format?: CLIResultFormat;
   readonly inputFormat?: CLIFormat;
   readonly json?: boolean;
-  readonly ids?: readonly string[];
+  readonly jsonl?: boolean;
+  readonly kinds?: readonly CLIObjectKind[];
   readonly limit?: number;
-  readonly match?: "all" | "any";
-  readonly listKind?:
-    | "chapters"
-    | "edges"
-    | "fragments"
-    | "meta"
-    | "nodes"
-    | "summaries";
   readonly llmJSON?: string;
   readonly objectId?: string;
   readonly outputFormat?: CLIFormat;
   readonly outputPath?: string;
   readonly prompt?: string;
+  readonly predicate?: string;
   readonly query?: string;
-  readonly searchOrder?: "doc-asc" | "doc-desc";
-  readonly searchTypes?: readonly (
-    | "chapter"
-    | "fragment"
-    | "meta"
-    | "node"
-    | "summary"
-  )[];
   readonly sourcePath?: string;
   readonly targetStage?: ChapterStage;
-  readonly toNodeId?: number;
 }
 
 interface ArchiveMetaFlagValues {
@@ -239,12 +225,14 @@ interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly "output-format"?: string;
   readonly order?: string;
   readonly parent?: string;
+  readonly predicate?: string;
   readonly prompt?: string;
   readonly root?: boolean;
   readonly stage?: string;
   readonly last?: boolean;
   readonly node?: string;
   readonly summary?: string;
+  readonly task?: string;
   readonly type?: string;
   readonly to?: string;
   readonly verbose?: boolean;
@@ -439,6 +427,9 @@ export function parseCLIArguments(
       prompt: {
         type: "string",
       },
+      predicate: {
+        type: "string",
+      },
       stage: {
         type: "string",
       },
@@ -446,6 +437,9 @@ export function parseCLIArguments(
         type: "string",
       },
       summary: {
+        type: "string",
+      },
+      task: {
         type: "string",
       },
       chapter: {
@@ -710,6 +704,7 @@ function parseQueueArguments(
     case "add": {
       rejectQueueJSONFlag(action, values.json, helpRoute);
       rejectQueueJSONLFlag(action, values.jsonl, helpRoute);
+      rejectQueueFlag(action, "--to", values.to, helpRoute);
       const archivePath = positionals[1];
 
       if (archivePath === undefined || archivePath === "-") {
@@ -745,7 +740,7 @@ function parseQueueArguments(
           chapterId,
           ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
           ...(values.prompt === undefined ? {} : { prompt: values.prompt }),
-          target: parseBuildJobTarget(values.to ?? values.stage),
+          target: parseBuildJobTarget(values.task),
         },
         help: false,
         kind: "queue",
@@ -845,6 +840,7 @@ function parseQueueArguments(
     case "target": {
       rejectQueueJSONFlag(action, values.json, helpRoute);
       rejectQueueJSONLFlag(action, values.jsonl, helpRoute);
+      rejectQueueFlag(action, "--to", values.to, helpRoute);
       const jobId = positionals[1];
 
       if (jobId === undefined) {
@@ -860,7 +856,7 @@ function parseQueueArguments(
         args: {
           action,
           jobId,
-          target: parseBuildJobTarget(values.to ?? values.stage),
+          target: parseBuildJobTarget(values.task),
         },
         help: false,
         kind: "queue",
@@ -911,6 +907,24 @@ function rejectQueueJSONLFlag(
   throw new Error(
     withHelpRoute(
       `\`spinedigest queue ${action}\` does not support --jsonl.`,
+      helpRoute,
+    ),
+  );
+}
+
+function rejectQueueFlag(
+  action: CLIQueueAction,
+  name: string,
+  value: string | undefined,
+  helpRoute: string,
+): void {
+  if (value === undefined) {
+    return;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `\`spinedigest queue ${action}\` does not support ${name}.`,
       helpRoute,
     ),
   );
@@ -1211,9 +1225,7 @@ function parseArchiveArguments(
         help: false,
         kind: "archive",
       };
-    case "status":
     case "index":
-    case "map":
       rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
@@ -1229,53 +1241,13 @@ function parseArchiveArguments(
         help: false,
         kind: "archive",
       };
-    case "list": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
-      rejectArchiveNonReadFlags(action, values, helpRoute);
-      rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
-      rejectArchiveSelectorFlags(action, values, helpRoute);
-      rejectArchiveFlag(action, "--to", values.to, helpRoute);
-      rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
-      const searchTypes = requireArchiveCollectionTypes(values.type, helpRoute);
-
-      return {
-        args: {
-          action,
-          archivePath,
-          ...(values.chapter === undefined
-            ? {}
-            : { chapters: parseArchiveSearchChapters(values.chapter) }),
-          ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
-          ...(values.id === undefined
-            ? {}
-            : { ids: parseArchiveIds(values.id, searchTypes, helpRoute) }),
-          ...(values.json === undefined ? {} : { json: values.json }),
-          ...(values.limit === undefined
-            ? {}
-            : {
-                limit: parsePositiveIntegerFlag(
-                  values.limit,
-                  "--limit",
-                  helpRoute,
-                ),
-              }),
-          ...(values.order === undefined
-            ? {}
-            : { searchOrder: parseArchiveSearchOrder(values.order) }),
-          searchTypes,
-        },
-        help: false,
-        kind: "archive",
-      };
-    }
-    case "find":
-    case "grep": {
+    case "search": {
       const query = positionals[1];
 
       if (query === undefined) {
         throw new Error(
           withHelpRoute(
-            `\`spinedigest ${action}\` requires a search query.`,
+            "`spinedigest search` requires a search query.",
             helpRoute,
           ),
         );
@@ -1287,10 +1259,8 @@ function parseArchiveArguments(
       rejectArchiveSelectorFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
-      if (action === "grep") {
-        rejectArchiveFlag(action, "--match", values.match, helpRoute);
-      }
-      const searchTypes = requireArchiveSearchTypes(values.type, helpRoute);
+      rejectArchiveFlag(action, "--match", values.match, helpRoute);
+      rejectArchiveFlag(action, "--order", values.order, helpRoute);
 
       return {
         args: {
@@ -1300,7 +1270,7 @@ function parseArchiveArguments(
             ? {}
             : { chapters: parseArchiveSearchChapters(values.chapter) }),
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
-          ...(values.json === undefined ? {} : { json: values.json }),
+          format: parseResultFormat(values),
           ...(values.limit === undefined
             ? {}
             : {
@@ -1311,20 +1281,23 @@ function parseArchiveArguments(
                 ),
               }),
           query,
-          ...(action === "find" && values.match !== undefined
-            ? { match: parseArchiveFindMatch(values.match) }
-            : {}),
-          ...(values.order === undefined
+          ...(values.type === undefined
             ? {}
-            : { searchOrder: parseArchiveSearchOrder(values.order) }),
-          searchTypes,
+            : { kinds: parseObjectKinds(values.type) }),
         },
         help: false,
         kind: "archive",
       };
     }
-    case "read": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
+    case "get": {
+      const uri = positionals[1];
+
+      if (uri === undefined) {
+        throw new Error(
+          withHelpRoute("`spinedigest get` requires <uri>.", helpRoute),
+        );
+      }
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--id", values.id, helpRoute);
@@ -1334,76 +1307,76 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--order", values.order, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveSelectorFlags(action, values, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
-      rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
       return {
         args: {
           action,
           archivePath,
-          objectId: parseArchiveObjectSelector(action, values, helpRoute),
+          format: parseResultFormat(values),
+          objectId: uri,
         },
         help: false,
         kind: "archive",
       };
     }
-    case "page":
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
+    case "related":
+    case "evidence": {
+      const uri = positionals[1];
+
+      if (uri === undefined) {
+        throw new Error(
+          withHelpRoute(`\`spinedigest ${action}\` requires <uri>.`, helpRoute),
+        );
+      }
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--id", values.id, helpRoute);
-      rejectArchiveFlag(action, "--type", values.type, helpRoute);
-      rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
-      rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--order", values.order, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveSelectorFlags(action, values, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
           action,
           archivePath,
-          ...(values.json === undefined ? {} : { json: values.json }),
-          objectId: parseArchiveObjectSelector(action, values, helpRoute),
-        },
-        help: false,
-        kind: "archive",
-      };
-    case "links":
-    case "backlinks":
-    case "related": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
-      rejectArchiveNonReadFlags(action, values, helpRoute);
-      rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
-      rejectArchiveFlag(action, "--id", values.id, helpRoute);
-      rejectArchiveFlag(action, "--type", values.type, helpRoute);
-      rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
-      rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
-      rejectArchiveFlag(action, "--order", values.order, helpRoute);
-      rejectArchiveFlag(action, "--from", values.from, helpRoute);
-      rejectArchiveFlag(action, "--to", values.to, helpRoute);
-      rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
-      rejectArchiveFlag(action, "--fragment", values.fragment, helpRoute);
-      rejectArchiveFlag(action, "--meta", values.meta, helpRoute);
-      rejectArchiveFlag(action, "--summary", values.summary, helpRoute);
-      rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
-      return {
-        args: {
-          action,
-          archivePath,
-          ...(values.json === undefined ? {} : { json: values.json }),
-          objectId: formatArchiveSelectorId(
-            "node",
-            requireSelectorValue(action, values.node, "--node", helpRoute),
-            "--node",
-            helpRoute,
-          ),
+          ...(values.chapter === undefined
+            ? {}
+            : { chapters: parseArchiveSearchChapters(values.chapter) }),
+          ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
+          format: parseResultFormat(values),
+          ...(values.limit === undefined
+            ? {}
+            : {
+                limit: parsePositiveIntegerFlag(
+                  values.limit,
+                  "--limit",
+                  helpRoute,
+                ),
+              }),
+          objectId: uri,
+          ...(values.predicate === undefined
+            ? {}
+            : { predicate: values.predicate }),
+          ...(values.type === undefined
+            ? {}
+            : { kinds: parseObjectKinds(values.type) }),
         },
         help: false,
         kind: "archive",
       };
     }
     case "pack": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
+      const uri = positionals[1];
+
+      if (uri === undefined) {
+        throw new Error(
+          withHelpRoute("`spinedigest pack` requires <uri>.", helpRoute),
+        );
+      }
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--id", values.id, helpRoute);
       rejectArchiveFlag(action, "--type", values.type, helpRoute);
@@ -1412,6 +1385,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--order", values.order, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveSelectorFlags(action, values, helpRoute);
       return {
         args: {
           action,
@@ -1420,51 +1394,8 @@ function parseArchiveArguments(
             values.budget === undefined
               ? 5000
               : parsePositiveIntegerFlag(values.budget, "--budget", helpRoute),
-          ...(values.json === undefined ? {} : { json: values.json }),
-          objectId: parseArchiveObjectSelector(action, values, helpRoute),
-        },
-        help: false,
-        kind: "archive",
-      };
-    }
-    case "path": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
-      rejectArchiveNonReadFlags(action, values, helpRoute);
-      rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
-      rejectArchiveFlag(action, "--id", values.id, helpRoute);
-      rejectArchiveFlag(action, "--type", values.type, helpRoute);
-      rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
-      rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
-      rejectArchiveFlag(action, "--order", values.order, helpRoute);
-      rejectArchiveFlag(action, "--node", values.node, helpRoute);
-      rejectArchiveFlag(action, "--fragment", values.fragment, helpRoute);
-      rejectArchiveFlag(action, "--meta", values.meta, helpRoute);
-      rejectArchiveFlag(action, "--summary", values.summary, helpRoute);
-      rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
-      const fromNodeId = requireNodeSelector(values.from, "--from", helpRoute);
-      const toNodeId = requireNodeSelector(values.to, "--to", helpRoute);
-      const chapterId =
-        values.chapter === undefined
-          ? undefined
-          : parseSerialId(values.chapter, "--chapter", helpRoute);
-
-      if (chapterId === undefined) {
-        throw new Error(
-          withHelpRoute(
-            "`spinedigest path` requires --chapter because graph paths are chapter-scoped.",
-            helpRoute,
-          ),
-        );
-      }
-
-      return {
-        args: {
-          action,
-          archivePath,
-          chapterId,
-          fromNodeId,
-          ...(values.json === undefined ? {} : { json: values.json }),
-          toNodeId,
+          format: parseResultFormat(values),
+          objectId: uri,
         },
         help: false,
         kind: "archive",
@@ -2747,22 +2678,15 @@ function rejectStatusFlag(
 
 function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
   return (
-    value === "backlinks" ||
     value === "create" ||
+    value === "evidence" ||
     value === "estimate" ||
     value === "export" ||
-    value === "find" ||
-    value === "grep" ||
+    value === "get" ||
     value === "index" ||
-    value === "links" ||
-    value === "list" ||
-    value === "map" ||
-    value === "page" ||
     value === "pack" ||
-    value === "path" ||
-    value === "read" ||
     value === "related" ||
-    value === "status"
+    value === "search"
   );
 }
 
@@ -2786,15 +2710,20 @@ function parseBuildJobTarget(value: string | undefined): BuildJobTarget {
   switch (value) {
     case undefined:
     case "summary":
-    case "summarized":
       return "summary";
-    case "graph":
-    case "graphed":
+    case "reading-graph":
       return "graph";
+    case "knowledge-graph":
+      throw new Error(
+        withHelpRoute(
+          "Knowledge graph queue tasks are not implemented yet.",
+          "spinedigest queue --help",
+        ),
+      );
     default:
       throw new Error(
         withHelpRoute(
-          `Invalid queue target: ${value}. Expected graph or summary.`,
+          `Invalid queue task: ${value}. Expected reading-graph, summary, or knowledge-graph.`,
           "spinedigest queue --help",
         ),
       );
@@ -2846,326 +2775,62 @@ function parseArchiveSearchChapters(value: string): readonly number[] {
   return [...new Set(chapters)];
 }
 
-function parseArchiveIds(
-  value: string,
-  types: readonly NonNullable<CLIArchiveArguments["searchTypes"]>[number][],
-  helpRoute: string,
-): readonly string[] {
-  if (types.length !== 1) {
-    throw new Error(
-      withHelpRoute(
-        "`spinedigest list --id` requires exactly one --type.",
-        helpRoute,
-      ),
-    );
-  }
-
-  const type = types[0];
-  if (type === undefined) {
-    throw new Error("Internal error: missing --type.");
-  }
-  const ids = value
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item !== "");
-
-  if (ids.length === 0) {
-    throw new Error(
-      withHelpRoute("--id cannot be empty.", CLI_HELP_ROUTES.command),
-    );
-  }
-
-  return [
-    ...new Set(
-      ids.map((id) => formatArchiveSelectorId(type, id, "--id", helpRoute)),
-    ),
-  ];
-}
-
-function parseArchiveSearchOrder(
-  value: string,
-): NonNullable<CLIArchiveArguments["searchOrder"]> {
-  if (value === "doc-asc" || value === "doc-desc") {
-    return value;
-  }
-
-  throw new Error(
-    withHelpRoute(
-      `Invalid --order: ${value}. Expected doc-asc or doc-desc.`,
-      CLI_HELP_ROUTES.command,
-    ),
-  );
-}
-
-function parseArchiveFindMatch(
-  value: string,
-): NonNullable<CLIArchiveArguments["match"]> {
-  if (value === "any" || value === "all") {
-    return value;
-  }
-
-  throw new Error(
-    withHelpRoute(
-      `Invalid --match: ${value}. Expected any or all.`,
-      "spinedigest find --help",
-    ),
-  );
-}
-
-function parseArchiveSearchTypes(
-  value: string,
-): NonNullable<CLIArchiveArguments["searchTypes"]> {
-  const types = value
+function parseObjectKinds(value: string): readonly CLIObjectKind[] {
+  const kinds = value
     .split(",")
     .map((item) => item.trim())
     .filter((item) => item !== "")
-    .map(parseArchiveSearchType);
+    .map(parseObjectKind);
 
-  if (types.length === 0) {
+  if (kinds.length === 0) {
     throw new Error(
       withHelpRoute("--type cannot be empty.", CLI_HELP_ROUTES.command),
     );
   }
 
-  return [...new Set(types)];
+  return [...new Set(kinds)];
 }
 
-function requireArchiveSearchTypes(
-  value: string | undefined,
-  helpRoute: string,
-): NonNullable<CLIArchiveArguments["searchTypes"]> {
-  if (value === undefined) {
-    throw new Error(withHelpRoute("--type is required.", helpRoute));
-  }
-
-  return parseArchiveSearchTypes(value);
-}
-
-function parseArchiveSearchType(
-  value: string,
-): NonNullable<CLIArchiveArguments["searchTypes"]>[number] {
-  if (value === "fragment" || value === "node" || value === "summary") {
-    return value;
-  }
-
-  throw new Error(
-    withHelpRoute(
-      `Invalid --type: ${value}. Expected summary, node, or fragment.`,
-      CLI_HELP_ROUTES.command,
-    ),
-  );
-}
-
-function parseArchiveCollectionTypes(
-  value: string,
-): NonNullable<CLIArchiveArguments["searchTypes"]> {
-  const types = value
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item !== "")
-    .map(parseArchiveCollectionType);
-
-  if (types.length === 0) {
-    throw new Error(
-      withHelpRoute("--type cannot be empty.", CLI_HELP_ROUTES.command),
-    );
-  }
-
-  return [...new Set(types)];
-}
-
-function requireArchiveCollectionTypes(
-  value: string | undefined,
-  helpRoute: string,
-): NonNullable<CLIArchiveArguments["searchTypes"]> {
-  if (value === undefined) {
-    throw new Error(withHelpRoute("--type is required.", helpRoute));
-  }
-
-  return parseArchiveCollectionTypes(value);
-}
-
-function parseArchiveCollectionType(
-  value: string,
-): NonNullable<CLIArchiveArguments["searchTypes"]>[number] {
+function parseObjectKind(value: string): CLIObjectKind {
   if (
-    value === "chapter" ||
-    value === "fragment" ||
-    value === "meta" ||
-    value === "node" ||
-    value === "summary"
+    value === "chunk" ||
+    value === "entity" ||
+    value === "source" ||
+    value === "summary" ||
+    value === "triple"
   ) {
     return value;
   }
 
   throw new Error(
     withHelpRoute(
-      `Invalid --type: ${value}. Expected chapter, summary, node, fragment, or meta.`,
+      `Invalid --type: ${value}. Expected entity, triple, source, summary, or chunk.`,
       CLI_HELP_ROUTES.command,
     ),
   );
 }
 
-function parseArchiveObjectSelector(
-  action: CLIArchiveAction,
-  values: ArchiveArgumentValues,
-  helpRoute: string,
-): string {
-  const selectors = [
-    values.chapter === undefined
-      ? undefined
-      : {
-          flag: "--chapter",
-          id: formatArchiveSelectorId(
-            "chapter",
-            values.chapter,
-            "--chapter",
-            helpRoute,
-          ),
-        },
-    values.node === undefined
-      ? undefined
-      : {
-          flag: "--node",
-          id: formatArchiveSelectorId("node", values.node, "--node", helpRoute),
-        },
-    values.fragment === undefined
-      ? undefined
-      : {
-          flag: "--fragment",
-          id: formatArchiveSelectorId(
-            "fragment",
-            values.fragment,
-            "--fragment",
-            helpRoute,
-          ),
-        },
-    values.meta === undefined
-      ? undefined
-      : {
-          flag: "--meta",
-          id: formatArchiveSelectorId("meta", values.meta, "--meta", helpRoute),
-        },
-    values.summary === undefined
-      ? undefined
-      : {
-          flag: "--summary",
-          id: formatArchiveSelectorId(
-            "summary",
-            values.summary,
-            "--summary",
-            helpRoute,
-          ),
-        },
-  ].filter((selector) => selector !== undefined);
-
-  if (selectors.length === 0) {
+function parseResultFormat(values: {
+  readonly json?: boolean;
+  readonly jsonl?: boolean;
+}): CLIResultFormat {
+  if (values.json === true && values.jsonl === true) {
     throw new Error(
       withHelpRoute(
-        `\`spinedigest ${action}\` requires one object selector.`,
-        helpRoute,
-      ),
-    );
-  }
-  if (selectors.length > 1) {
-    throw new Error(
-      withHelpRoute(
-        `\`spinedigest ${action}\` accepts only one object selector.`,
-        helpRoute,
+        "`--json` and `--jsonl` cannot be combined.",
+        CLI_HELP_ROUTES.command,
       ),
     );
   }
 
-  const selector = selectors[0];
-  if (selector === undefined) {
-    throw new Error("Internal error: missing archive object selector.");
+  if (values.json === true) {
+    return "json";
+  }
+  if (values.jsonl === true) {
+    return "jsonl";
   }
 
-  return selector.id;
-}
-
-function requireSelectorValue(
-  action: CLIArchiveAction,
-  value: string | undefined,
-  flag: string,
-  helpRoute: string,
-): string {
-  if (value === undefined) {
-    throw new Error(
-      withHelpRoute(`\`spinedigest ${action}\` requires ${flag}.`, helpRoute),
-    );
-  }
-
-  return value;
-}
-
-function formatArchiveSelectorId(
-  type: NonNullable<CLIArchiveArguments["searchTypes"]>[number],
-  value: string,
-  flag: string,
-  helpRoute: string,
-): string {
-  switch (type) {
-    case "chapter":
-      return `chapter:${parsePositiveIntegerFlag(value, flag, helpRoute)}`;
-    case "fragment": {
-      const [chapterId, fragmentId, extra] = value
-        .split(":")
-        .map((item) => item.trim());
-
-      if (
-        extra !== undefined ||
-        chapterId === undefined ||
-        fragmentId === undefined
-      ) {
-        throw new Error(
-          withHelpRoute(
-            `Invalid ${flag}: ${value}. Expected <chapter>:<fragment>.`,
-            helpRoute,
-          ),
-        );
-      }
-
-      return `fragment:${parsePositiveIntegerFlag(chapterId, flag, helpRoute)}:${parseNonNegativeIntegerFlag(fragmentId, flag, helpRoute)}`;
-    }
-    case "meta":
-      if (value.trim() !== "book") {
-        throw new Error(
-          withHelpRoute(`Invalid ${flag}: ${value}. Expected book.`, helpRoute),
-        );
-      }
-
-      return "meta:book";
-    case "node":
-      return `node:${parsePositiveIntegerFlag(value, flag, helpRoute)}`;
-    case "summary":
-      return `summary:${parsePositiveIntegerFlag(value, flag, helpRoute)}`;
-  }
-}
-
-function requireNodeSelector(
-  value: string | undefined,
-  flag: "--from" | "--to",
-  helpRoute: string,
-): number {
-  if (value === undefined) {
-    throw new Error(
-      withHelpRoute(`spinedigest path requires ${flag}.`, helpRoute),
-    );
-  }
-
-  const parsed = Number(value.trim());
-
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(
-      withHelpRoute(
-        `Invalid ${flag}: ${value}. Expected a node id.`,
-        helpRoute,
-      ),
-    );
-  }
-
-  return parsed;
+  return "text";
 }
 
 function parsePositiveIntegerFlag(

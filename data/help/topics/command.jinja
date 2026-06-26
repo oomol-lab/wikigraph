@@ -1,66 +1,24 @@
 Help Type: topic
 Topic: command
 
-Command Reference
+Command Overview
 
-Archive-first commands:
-  create      Create an archive from source material at source stage.
-  estimate    Estimate words, token scale, calls, time, cost, and risk before queueing graph or summary jobs.
-  status      Show archive readiness and object counts.
-  index       Show the archive home/index page.
-  list        List archive objects with filters, stable order, and cursor paging.
-  find        Find objects by whitespace-separated keyword discovery.
-  grep        Search objects for one exact continuous text phrase.
-  page        Open one detailed object page by id.
-  read        Print one object as continuous plain text.
-  links       Show outgoing node links.
-  backlinks   Show incoming node links.
-  related     Show graph-adjacent knowledge units.
-  path        Find a directed graph path between two nodes in one chapter.
-  pack        Pack deterministic context around a known object id.
-  export      Export a projection from the archive.
+Object commands:
+  spinedigest search <archive.sdpub> <query>
+  spinedigest get <archive.sdpub> <uri>
+  spinedigest related <archive.sdpub> <uri>
+  spinedigest evidence <archive.sdpub> <uri>
+  spinedigest pack <archive.sdpub> <uri>
 
-Queue commands:
-  queue add      Create a graph or summary job for one archive chapter.
-  queue list     Show active jobs by default; use --all for historical jobs.
-  queue status   Show one job snapshot.
-  queue watch    Stream job events; use --jsonl for agent-friendly output.
-  queue pause    Stop scheduling a job while preserving its workspace.
-  queue resume   Return a paused job to the queue.
-  queue cancel   Mark a job canceled and preserve its workspace for debugging.
-  queue boost    Move a queued job to the front without preempting running jobs.
-  queue target   Change graph/summary target within allowed boundaries.
-  queue clean    Remove old terminal job records and workspaces.
+Archive commands:
+  spinedigest create <archive.sdpub>
+  spinedigest export <archive.sdpub>
+  estimate    Estimate generation cost.
+  index       Show archive-level counts.
+  spinedigest transform [options]
 
-Command shapes:
-  spinedigest create <archive.sdpub> [source] [--input-format <format>]
-  spinedigest estimate <archive.sdpub> [--stage <source|graph|summary>] [--json]
-  spinedigest queue add <archive.sdpub> --chapter <id> [--to graph|summary] --accept-cost [--boost] [--llm <json>] [--prompt <text>]
-  spinedigest queue list [--all] [--active] [--input <archive.sdpub>]
-  spinedigest queue watch <job-id> [--jsonl] [--from beginning|now]
-  spinedigest status <archive.sdpub> [--json]
-  spinedigest index <archive.sdpub> [--json]
-  spinedigest list <archive.sdpub> --type <types> [--id <ids>] [--chapter <ids>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
-  spinedigest find <archive.sdpub> <query> --type <types> [--match <any|all>] [--chapter <ids>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
-  spinedigest grep <archive.sdpub> <query> --type <types> [--chapter <ids>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
-  spinedigest page <archive.sdpub> <selector> [--json]
-  spinedigest read <archive.sdpub> <selector>
-  spinedigest related <archive.sdpub> --node <id> [--json]
-  spinedigest pack <archive.sdpub> <selector> [--budget <chars>] [--json]
-  spinedigest export <archive.sdpub> --output-format <format> [--output <path>]
-
-Direct transform:
-  spinedigest transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <planned|source|graph|summary>] [--verbose]
+Generation:
+  queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary|knowledge-graph> --accept-cost
 
 Maintenance:
-  spinedigest meta <archive.sdpub> [metadata options] [--json]
-  spinedigest cover <archive.sdpub>
-  spinedigest chapter <action> <archive.sdpub> [options]
-  spinedigest config status [--llm <json>]
-  `chapter tree` without `apply` is read-only structure inspection; mutating chapter actions are maintenance.
-
-Where to go next:
-  - Need archive mental model: spinedigest help overview
-  - Need agent rules: spinedigest help ai
-  - Need queue details: spinedigest queue --help
-  - Need command-specific details: append --help to the command.
+  meta, cover, chapter, config status

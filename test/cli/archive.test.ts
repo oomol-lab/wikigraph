@@ -1,31 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const archiveMockState = vi.hoisted(() => ({
-  readCalls: [] as string[],
   findHits: [
     {
       chapter: 2,
       field: "content",
       id: "node:9",
-      matchCount: 1,
       matchedTerms: ["rag"],
-      missingTerms: [],
       position: { chapter: 2, fragment: 0 },
       score: 1,
-      snippet: "RAG appears in this node.",
+      snippet: "RAG appears in this chunk.",
       title: "Retrieval design",
       type: "node",
-    },
-  ],
-  grepHits: [
-    {
-      chapter: 2,
-      field: "source",
-      id: "fragment:2:0",
-      position: { chapter: 2, fragment: 0 },
-      snippet: "Exact phrase appears here.",
-      title: "Chapter 2",
-      type: "fragment",
     },
   ],
   index: {
@@ -55,57 +41,16 @@ const archiveMockState = vi.hoisted(() => ({
     nodeCount: 2,
     summaryCount: 0,
   },
-  links: [
-    {
-      direction: "outgoing",
-      edge: {
-        fromId: 9,
-        toId: 11,
-        weight: 0.5,
-      },
-      node: {
-        content: "Related node",
-        id: 11,
-        label: "Related",
-        sentenceIds: [[2, 0, 2]],
-        weight: 0.4,
-        wordsCount: 2,
-      },
-    },
-  ],
   listItems: [
     {
-      id: "node:9",
-      label: "Retrieval design",
-      summary: "RAG appears in this node.",
+      id: "node:11",
+      label: "Related",
+      summary: "Related chunk",
       type: "node",
     },
   ],
-  collection: {
-    chapters: [2],
-    ids: null,
-    items: [
-      {
-        chapter: 2,
-        field: "content",
-        id: "node:9",
-        matchCount: 1,
-        matchedTerms: ["rag"],
-        missingTerms: [],
-        position: { chapter: 2, fragment: 0 },
-        score: 1,
-        snippet: "RAG appears in this node.",
-        title: "Retrieval design",
-        type: "node",
-      },
-    ],
-    limit: 20,
-    nextCursor: null,
-    order: "doc-asc",
-    types: ["node"],
-  },
   page: {
-    generatedNodeSummary: "RAG appears in this node.",
+    generatedNodeSummary: "RAG appears in this chunk.",
     id: "node:9",
     incoming: [],
     neighbors: [],
@@ -121,40 +66,7 @@ const archiveMockState = vi.hoisted(() => ({
     title: "Retrieval design",
     type: "node",
   },
-  chapterPage: {
-    chapter: {
-      chapterId: 2,
-      childCount: 0,
-      depth: 0,
-      fragmentCount: 1,
-      stage: "summarized",
-      title: "Chapter 2",
-      tocPath: ["Chapter 2"],
-    },
-    id: "chapter:2",
-    nodeCount: 2,
-    nodeGroups: [
-      {
-        groupId: 0,
-        nodeCount: 2,
-        nodes: [
-          {
-            id: "node:9",
-            title: "Retrieval design",
-          },
-          {
-            id: "node:11",
-            title: "Related",
-          },
-        ],
-      },
-    ],
-    summary: `Long summary ${"summary ".repeat(120)}`,
-    summaryTruncated: true,
-    title: "Chapter 2",
-    type: "chapter",
-  },
-  readText: "Readable archive text.",
+  readCalls: [] as string[],
   textWrites: [] as string[],
 }));
 
@@ -189,67 +101,22 @@ vi.mock("../../src/facade/index.js", () => ({
       targetStage: "summarized",
     }),
   ),
-  findArchiveObjects: vi.fn(
-    (
-      _document: unknown,
-      query: string,
-      options: {
-        readonly match?: "all" | "any";
-        readonly types?: readonly ("fragment" | "node" | "summary")[];
-      },
-    ) =>
-      Promise.resolve({
-        chapters: null,
-        items: archiveMockState.findHits,
-        lens: options.types === undefined ? "broad" : "typed",
-        lensHint:
-          options.types === undefined
-            ? {
-                lenses: {
-                  fragment: "original source wording",
-                  node: "topology / LLM Wiki structure",
-                  summary: "quick overview",
-                },
-                message:
-                  "Choose --type node, --type summary, or --type fragment as a search lens.",
-              }
-            : null,
-        limit: 20,
-        match: options.match ?? "any",
-        nextCursor: null,
-        order: "doc-asc",
-        query,
-        terms: query
-          .trim()
-          .toLowerCase()
-          .split(/\s+/u)
-          .filter((term) => term !== ""),
-        types: null,
-      }),
-  ),
-  findGraphPath: vi.fn(() => Promise.resolve([])),
-  formatNodeId: (id: number) => `node:${id}`,
-  getArchiveIndex: vi.fn(() => Promise.resolve(archiveMockState.index)),
-  grepArchiveObjects: vi.fn(() =>
+  findArchiveObjects: vi.fn((_document: unknown, query: string) =>
     Promise.resolve({
       chapters: null,
-      items: archiveMockState.grepHits,
-      lens: "exact",
+      items: archiveMockState.findHits,
+      lens: "typed",
       lensHint: null,
       limit: 20,
       match: "any",
       nextCursor: null,
       order: "doc-asc",
-      query: "exact phrase",
-      terms: ["exact", "phrase"],
+      query,
+      terms: [query.toLowerCase()],
       types: null,
     }),
   ),
-  listArchiveCollection: vi.fn(() =>
-    Promise.resolve(archiveMockState.collection),
-  ),
-  listArchiveLinks: vi.fn(() => Promise.resolve(archiveMockState.links)),
-  listArchiveObjects: vi.fn(() => Promise.resolve(archiveMockState.listItems)),
+  getArchiveIndex: vi.fn(() => Promise.resolve(archiveMockState.index)),
   listRelatedArchiveObjects: vi.fn(() =>
     Promise.resolve(archiveMockState.listItems),
   ),
@@ -257,15 +124,10 @@ vi.mock("../../src/facade/index.js", () => ({
     Promise.resolve({
       anchor: archiveMockState.page,
       budget: 1000,
-      links: archiveMockState.links,
+      links: [],
     }),
   ),
-  readArchivePage: vi.fn((_document: unknown, id: string) =>
-    Promise.resolve(
-      id === "chapter:2" ? archiveMockState.chapterPage : archiveMockState.page,
-    ),
-  ),
-  readArchiveText: vi.fn(() => Promise.resolve(archiveMockState.readText)),
+  readArchivePage: vi.fn(() => Promise.resolve(archiveMockState.page)),
 }));
 
 vi.mock("../../src/cli/io.js", () => ({
@@ -282,9 +144,8 @@ vi.mock("../../src/cli/convert.js", () => ({
 import { runArchiveCommand } from "../../src/cli/archive.js";
 import {
   findArchiveObjects,
-  grepArchiveObjects,
-  listArchiveCollection,
-  readArchiveText,
+  listRelatedArchiveObjects,
+  readArchivePage,
 } from "../../src/facade/index.js";
 
 describe("cli/archive", () => {
@@ -292,22 +153,6 @@ describe("cli/archive", () => {
     vi.clearAllMocks();
     archiveMockState.readCalls.length = 0;
     archiveMockState.textWrites.length = 0;
-    archiveMockState.links.splice(0, archiveMockState.links.length, {
-      direction: "outgoing",
-      edge: {
-        fromId: 9,
-        toId: 11,
-        weight: 0.5,
-      },
-      node: {
-        content: "Related node",
-        id: 11,
-        label: "Related",
-        sentenceIds: [[2, 0, 2]],
-        weight: 0.4,
-        wordsCount: 2,
-      },
-    });
   });
 
   it("prints an archive index", async () => {
@@ -321,185 +166,57 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain("chapter:2");
   });
 
-  it("prints search hits with next commands", async () => {
+  it("prints search hits as Wiki Graph URI objects", async () => {
     await runArchiveCommand({
-      action: "find",
+      action: "search",
       archivePath: "/tmp/book.sdpub",
+      format: "text",
+      kinds: ["chunk"],
       query: "RAG",
-      searchTypes: ["node"],
     });
 
-    expect(archiveMockState.textWrites[0]).toContain("node:9  node/content");
+    expect(archiveMockState.textWrites[0]).toContain("wikigraph://chunk/9");
     expect(archiveMockState.textWrites[0]).toContain("Matched: rag");
-    expect(archiveMockState.textWrites[0]).toContain(
-      "Next: spinedigest page <archive.sdpub> --node 9",
-    );
     expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
-      chapters: undefined,
-      cursor: undefined,
-      limit: undefined,
-      match: undefined,
-      order: undefined,
-      types: ["node"],
-    });
-    expect(grepArchiveObjects).not.toHaveBeenCalled();
-  });
-
-  it("prints archive collection items", async () => {
-    await runArchiveCommand({
-      action: "list",
-      archivePath: "/tmp/book.sdpub",
-      chapters: [2],
-      searchTypes: ["node"],
-    });
-
-    expect(archiveMockState.textWrites[0]).toContain("node:9  node/content");
-    expect(listArchiveCollection).toHaveBeenCalledWith(
-      {},
-      expect.objectContaining({
-        chapters: [2],
-        types: ["node"],
-      }),
-    );
-  });
-
-  it("prints continuous read text", async () => {
-    await runArchiveCommand({
-      action: "read",
-      archivePath: "/tmp/book.sdpub",
-      objectId: "chapter:2",
-    });
-
-    expect(archiveMockState.textWrites[0]).toBe("Readable archive text.\n");
-    expect(readArchiveText).toHaveBeenCalledWith({}, "chapter:2");
-  });
-
-  it("routes grep through exact text search", async () => {
-    await runArchiveCommand({
-      action: "grep",
-      archivePath: "/tmp/book.sdpub",
-      query: "exact phrase",
-      searchTypes: ["fragment"],
-    });
-
-    expect(archiveMockState.textWrites[0]).toContain(
-      "fragment:2:0  fragment/source",
-    );
-    expect(grepArchiveObjects).toHaveBeenCalledWith({}, "exact phrase", {
-      chapters: undefined,
-      cursor: undefined,
-      limit: undefined,
-      match: undefined,
-      order: undefined,
-      types: ["fragment"],
-    });
-    expect(findArchiveObjects).not.toHaveBeenCalled();
-  });
-
-  it("explains empty all-keyword find results", async () => {
-    archiveMockState.findHits.splice(0, archiveMockState.findHits.length);
-
-    await runArchiveCommand({
-      action: "find",
-      archivePath: "/tmp/book.sdpub",
-      match: "all",
-      query: "one two",
-      searchTypes: ["node"],
-    });
-
-    expect(archiveMockState.textWrites[0]).toContain(
-      "All 2 terms were required",
-    );
-    expect(findArchiveObjects).toHaveBeenCalledWith({}, "one two", {
-      chapters: undefined,
-      cursor: undefined,
-      limit: undefined,
-      match: "all",
-      order: undefined,
       types: ["node"],
     });
   });
 
-  it("passes search controls to find", async () => {
+  it("gets an object by Wiki Graph URI", async () => {
     await runArchiveCommand({
-      action: "find",
+      action: "get",
       archivePath: "/tmp/book.sdpub",
-      chapters: [11, 12],
-      cursor: "cursor-token",
-      limit: 10,
-      query: "RAG",
-      searchOrder: "doc-desc",
-      searchTypes: ["summary", "node"],
+      format: "text",
+      objectId: "wikigraph://chunk/9",
     });
 
-    expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
-      chapters: [11, 12],
-      cursor: "cursor-token",
-      limit: 10,
-      match: undefined,
-      order: "doc-desc",
-      types: ["summary", "node"],
-    });
-    expect(archiveMockState.textWrites[0]).not.toContain("Lens hint:");
-  });
-
-  it("prints node page summary and source fragments", async () => {
-    await runArchiveCommand({
-      action: "page",
-      archivePath: "/tmp/book.sdpub",
-      objectId: "node:9",
-    });
-
+    expect(readArchivePage).toHaveBeenCalledWith({}, "node:9");
     expect(archiveMockState.textWrites[0]).toContain("node:9");
-    expect(archiveMockState.textWrites[0]).toContain("Generated Node Summary:");
-    expect(archiveMockState.textWrites[0]).toContain("RAG appears");
     expect(archiveMockState.textWrites[0]).toContain("Source Fragments:");
-    expect(archiveMockState.textWrites[0]).toContain("fragment:2:0");
-    expect(archiveMockState.textWrites[0]).not.toContain("sentence:");
   });
 
-  it("prints chapter node groups before truncated summary", async () => {
-    await runArchiveCommand({
-      action: "page",
-      archivePath: "/tmp/book.sdpub",
-      objectId: "chapter:2",
-    });
-
-    const output = archiveMockState.textWrites[0] ?? "";
-
-    expect(output.indexOf("Node Groups:")).toBeLessThan(
-      output.indexOf("Summary:"),
-    );
-    expect(output).toContain("node:9  Retrieval design");
-    expect(output).not.toContain("Source Preview:");
-    expect(output).toContain("[summary truncated]");
-    expect(output.length).toBeLessThan(1800);
-  });
-
-  it("prints related nodes", async () => {
+  it("prints related objects", async () => {
     await runArchiveCommand({
       action: "related",
       archivePath: "/tmp/book.sdpub",
-      objectId: "node:9",
+      format: "text",
+      objectId: "wikigraph://chunk/9",
     });
 
-    expect(archiveMockState.textWrites[0]).toContain("node:9");
-    expect(archiveMockState.textWrites[0]).toContain("Retrieval design");
+    expect(listRelatedArchiveObjects).toHaveBeenCalledWith({}, "node:9");
+    expect(archiveMockState.textWrites[0]).toContain("node:11");
+    expect(archiveMockState.textWrites[0]).toContain("Related");
   });
 
-  it("points links users to backlinks when outgoing links are empty", async () => {
-    archiveMockState.links.length = 0;
-
+  it("prints an empty evidence result set", async () => {
     await runArchiveCommand({
-      action: "links",
+      action: "evidence",
       archivePath: "/tmp/book.sdpub",
-      objectId: "node:9",
+      format: "text",
+      objectId: "wikigraph://chunk/9",
     });
 
-    expect(archiveMockState.textWrites[0]).toContain("No outgoing links");
-    expect(archiveMockState.textWrites[0]).toContain(
-      "spinedigest backlinks <archive.sdpub> --node <id>",
-    );
+    expect(archiveMockState.textWrites[0]).toBe("No objects.\n");
   });
 
   it("prints a context pack", async () => {
@@ -507,7 +224,8 @@ describe("cli/archive", () => {
       action: "pack",
       archivePath: "/tmp/book.sdpub",
       budget: 1000,
-      objectId: "node:9",
+      format: "text",
+      objectId: "wikigraph://chunk/9",
     });
 
     expect(archiveMockState.textWrites[0]).toContain("Pack Budget: 1000");

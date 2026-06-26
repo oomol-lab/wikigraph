@@ -1,85 +1,21 @@
 Help Type: topic
 Topic: ai
 
-AI Agent Guide
+AI Agent Contract
 
 Primary contract:
-  - Treat `.sdpub` as an LLM Wiki archive managed by SpineDigest.
-  - Use archive commands such as `chapter tree`, `list`, `find`, `grep`, `page`, `read`, `links`, `backlinks`, and `export` before unpacking or inspecting ZIP internals.
-  - Choose one exploration mode first: search mode (`find`/`grep`), structure mode (`chapter tree`/`list`/`page`), or reading mode (`read`).
-  - Prefer `--json` for retrieval commands when composing with tools.
-  - Prefer `queue watch --jsonl` when observing generation jobs.
-  - Do not inspect `database.db` for routine retrieval.
-  - Do not queue large LLM-backed work without estimating first.
+  Use Wiki Graph URIs as stable object handles.
 
-Safe first moves:
-  - Broad understanding, synthesis, timeline, relationship, or process tasks:
-    spinedigest chapter tree <archive.sdpub> --json
-    spinedigest list <archive.sdpub> --type node --chapter <ids>
-    spinedigest page <archive.sdpub> --chapter <id>
-    # inspect nodeGroups, then:
-    spinedigest page <archive.sdpub> --node <id>
-  - Archive readiness, metadata, or queue state:
-    spinedigest status <archive.sdpub>
-    spinedigest index <archive.sdpub>
-    spinedigest queue list --input <archive.sdpub>
-  - Locate candidate chapters or verify missing concepts:
-    spinedigest find <archive.sdpub> <query> --type node
-    spinedigest find <archive.sdpub> <query> --type summary
-    spinedigest find <archive.sdpub> <query> --type fragment
-    spinedigest page <archive.sdpub> --fragment <chapter>:<fragment>
-    spinedigest grep <archive.sdpub> <exact phrase>
-    spinedigest list <archive.sdpub> --type node --chapter <id>
-  - Continuous reading after topology selection:
-    spinedigest read <archive.sdpub> --chapter <id>
-    spinedigest read <archive.sdpub> --fragment <chapter>:<fragment>
-  - Need graph context:
-    spinedigest links <archive.sdpub> --node <id>
-    spinedigest backlinks <archive.sdpub> --node <id>
-    spinedigest related <archive.sdpub> --node <id>
-  - Need a reusable context projection:
-    spinedigest pack <archive.sdpub> <selector> --budget 5000
-    spinedigest export <archive.sdpub> --output-format markdown
+Treat every search result as a Wiki Graph URI.
 
-Queue safety:
-  - Graph and summary jobs consume LLM tokens, may incur provider charges, and can run for minutes to hours on large archives.
-  - `queue add` requires `--accept-cost` to make this explicit.
-  - Before large graph or summary generation, run:
-    spinedigest estimate <archive.sdpub> --stage summary
-  - Queue one chapter at a time:
-    spinedigest queue add <archive.sdpub> --chapter <id> --to summary --accept-cost
-  - Watch as JSONL:
-    spinedigest queue watch <job-id> --jsonl
-  - Use `queue list` to distinguish running, queued, paused, and terminal jobs.
-  - Use `queue boost <job-id>` or `queue add ... --boost` only when the user asks to prioritize work.
-  - Use `queue cancel <job-id>` only when the user explicitly wants to abandon the job.
+Default exploration loop:
+  1. `spinedigest search <archive.sdpub> <query>`
+  2. `spinedigest get <archive.sdpub> <uri>`
+  3. `spinedigest related <archive.sdpub> <uri>`
+  4. `spinedigest evidence <archive.sdpub> <uri>`
+  5. `spinedigest pack <archive.sdpub> <uri> --budget <chars>`
 
-Queue event contract:
-  - JSONL watch prints one structured event per line.
-  - `progress_snapshot` events carry graph words, summary words, and approximate output tokens.
-  - State events include created, started, requeued, paused, resumed, target_changed, failed, canceled, and succeeded.
-  - Reconnecting with `--from beginning` replays durable event history.
+Use `--type` to filter object kinds:
+  entity, triple, source, summary, chunk
 
-Object selectors:
-  - `--chapter <id>` for chapter-like archive pages
-  - `--node <id>` for graph knowledge nodes
-  - `--fragment <chapter>:<fragment>` for source reading fragments
-  - `--summary <id>` for chapter summaries
-  - `--meta book` for metadata
-
-Stable terms:
-  - archive: `.sdpub`, the primary managed knowledge object
-  - source: normalized source material stored in the archive
-  - chapter: current top-level readable unit inside the archive
-  - queue job: device-local graph or summary generation task for one archive chapter
-  - node: graph knowledge unit surfaced as an agent-readable page
-  - source fragment: original text excerpt backing a node page
-  - projection: exported Markdown, txt, EPUB, JSON, or graph output
-
-Maintenance commands:
-  - `chapter tree` without `apply` is read-only structure inspection for table-of-contents hierarchy and chapter ordering.
-  - `meta`, `cover`, `chapter tree apply`, and other mutating `chapter` actions are maintenance commands.
-  - Active queue jobs protect their chapters from destructive maintenance edits.
-
-Discovery rule:
-  If the user question asks for synthesis, a timeline, a process, a relationship map, character development, or conceptual structure, start with `chapter tree --json`, then select likely chapter ids and use scoped `list --chapter <ids>` or `page --chapter <id>`. Do not flatten the archive into raw text first.
+Use `--json` or `--jsonl` when a stable machine-readable result is needed.
