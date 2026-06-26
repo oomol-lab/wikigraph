@@ -207,7 +207,11 @@ export async function writeSdpubArchiveWithOverlays(
     }
   }
   for (const overlay of overlayByPath.values()) {
-    entryPaths.add(normalizeArchivePath(overlay.entryPath));
+    const archivePath = normalizeArchivePath(overlay.entryPath);
+
+    if (archivePath !== "" && isSdpubArchivePath(archivePath)) {
+      entryPaths.add(archivePath);
+    }
   }
   entryPaths.add(SDPUB_MANIFEST_PATH);
 

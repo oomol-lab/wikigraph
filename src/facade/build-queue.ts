@@ -13,6 +13,7 @@ import { homedir } from "os";
 import { join, resolve } from "path";
 
 import { Database } from "../document/index.js";
+import { isNodeError } from "../utils/node-error.js";
 
 export const BUILD_JOB_STATES = [
   "queued",
@@ -1095,8 +1096,15 @@ async function copyLegacyStateDatabaseIfNeeded(
     }
 
     await copyFile(legacyDatabasePath, databasePath, fsConstants.COPYFILE_EXCL);
-  } catch {
-    return;
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return;
+    }
+    if (isNodeError(error) && error.code === "EEXIST") {
+      return;
+    }
+
+    throw error;
   }
 }
 

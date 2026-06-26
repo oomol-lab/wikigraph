@@ -31,6 +31,7 @@ import {
   SerialGeneration,
   type BuildSerialTopologyOptions,
 } from "../serial.js";
+import { ChunkImportance, ChunkRetention } from "../document/types.js";
 
 import {
   getChapterDetails,
@@ -60,15 +61,79 @@ export interface BuildChapterSummaryArtifactOptions extends GenerateChapterSumma
   readonly workspacePath: string;
 }
 
+const sentenceIdSchema = z.tuple([
+  z.number(),
+  z.number(),
+  z.number(),
+]) satisfies z.ZodType<SentenceId>;
+const sentenceRecordSchema = z.object({
+  text: z.string(),
+  wordsCount: z.number(),
+});
+const fragmentRecordSchema = z.object({
+  serialId: z.number(),
+  fragmentId: z.number(),
+  summary: z.string(),
+  sentences: z.array(sentenceRecordSchema),
+}) satisfies z.ZodType<FragmentRecord>;
+const serialRecordSchema = z.object({
+  id: z.number(),
+  topologyReady: z.boolean(),
+}) satisfies z.ZodType<SerialRecord>;
+const chunkRecordSchema = z.object({
+  id: z.number(),
+  generation: z.number(),
+  sentenceId: sentenceIdSchema,
+  label: z.string(),
+  content: z.string(),
+  sentenceIds: z.array(sentenceIdSchema),
+  retention: z.enum(ChunkRetention).optional(),
+  importance: z.enum(ChunkImportance).optional(),
+  wordsCount: z.number(),
+  weight: z.number(),
+});
+const knowledgeEdgeRecordSchema = z.object({
+  fromId: z.number(),
+  toId: z.number(),
+  strength: z.string().optional(),
+  weight: z.number(),
+});
+const snakeRecordSchema = z.object({
+  id: z.number(),
+  serialId: z.number(),
+  groupId: z.number(),
+  localSnakeId: z.number(),
+  size: z.number(),
+  firstLabel: z.string(),
+  lastLabel: z.string(),
+  wordsCount: z.number(),
+  weight: z.number(),
+}) satisfies z.ZodType<SnakeRecord>;
+const snakeChunkRecordSchema = z.object({
+  snakeId: z.number(),
+  chunkId: z.number(),
+  position: z.number(),
+}) satisfies z.ZodType<SnakeChunkRecord>;
+const snakeEdgeRecordSchema = z.object({
+  fromSnakeId: z.number(),
+  toSnakeId: z.number(),
+  weight: z.number(),
+}) satisfies z.ZodType<SnakeEdgeRecord>;
+const fragmentGroupRecordSchema = z.object({
+  serialId: z.number(),
+  groupId: z.number(),
+  fragmentId: z.number(),
+}) satisfies z.ZodType<FragmentGroupRecord>;
+
 const summaryInputSnapshotSchema = z.object({
-  chunks: z.array(z.custom<ChunkRecord>()),
-  fragmentGroups: z.array(z.custom<FragmentGroupRecord>()),
-  fragments: z.array(z.custom<FragmentRecord>()),
-  knowledgeEdges: z.array(z.custom<KnowledgeEdgeRecord>()),
-  serial: z.custom<SerialRecord>(),
-  snakeChunks: z.array(z.custom<SnakeChunkRecord>()),
-  snakeEdges: z.array(z.custom<SnakeEdgeRecord>()),
-  snakes: z.array(z.custom<SnakeRecord>()),
+  chunks: z.array(chunkRecordSchema),
+  fragmentGroups: z.array(fragmentGroupRecordSchema),
+  fragments: z.array(fragmentRecordSchema),
+  knowledgeEdges: z.array(knowledgeEdgeRecordSchema),
+  serial: serialRecordSchema,
+  snakeChunks: z.array(snakeChunkRecordSchema),
+  snakeEdges: z.array(snakeEdgeRecordSchema),
+  snakes: z.array(snakeRecordSchema),
 });
 
 interface SummaryInputSnapshotData {
@@ -470,9 +535,43 @@ async function readSerialFragments(
 async function readSummaryInputSnapshot(
   filePath: string,
 ): Promise<SummaryInputSnapshotData> {
-  return summaryInputSnapshotSchema.parse(
+  const snapshot = summaryInputSnapshotSchema.parse(
     JSON.parse(await readFile(filePath, "utf8")),
   );
+
+  return {
+    ...snapshot,
+    chunks: snapshot.chunks.map(toChunkRecord),
+    knowledgeEdges: snapshot.knowledgeEdges.map(toKnowledgeEdgeRecord),
+  };
+}
+
+function toChunkRecord(record: z.infer<typeof chunkRecordSchema>): ChunkRecord {
+  return {
+    id: record.id,
+    generation: record.generation,
+    sentenceId: record.sentenceId,
+    label: record.label,
+    content: record.content,
+    sentenceIds: record.sentenceIds,
+    ...(record.retention === undefined ? {} : { retention: record.retention }),
+    ...(record.importance === undefined
+      ? {}
+      : { importance: record.importance }),
+    wordsCount: record.wordsCount,
+    weight: record.weight,
+  };
+}
+
+function toKnowledgeEdgeRecord(
+  record: z.infer<typeof knowledgeEdgeRecordSchema>,
+): KnowledgeEdgeRecord {
+  return {
+    fromId: record.fromId,
+    toId: record.toId,
+    ...(record.strength === undefined ? {} : { strength: record.strength }),
+    weight: record.weight,
+  };
 }
 
 async function writeSummaryInputSnapshot(

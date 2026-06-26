@@ -399,6 +399,7 @@ async function flushArchiveOverlays(archiveKey: string): Promise<void> {
   const entryPaths = overlays
     .map((overlay) => overlay.entryPath)
     .sort((left, right) => left.localeCompare(right));
+  const lockedEntryPaths = new Set(entryPaths);
   const releaseLocks: Array<() => Promise<void>> = [];
 
   try {
@@ -413,7 +414,9 @@ async function flushArchiveOverlays(archiveKey: string): Promise<void> {
       await waitForSqliteLeasesToDrain(archiveKey, DATABASE_ENTRY_PATH);
     }
 
-    const currentOverlays = await listOverlays(archiveKey);
+    const currentOverlays = (await listOverlays(archiveKey)).filter((overlay) =>
+      lockedEntryPaths.has(overlay.entryPath),
+    );
 
     if (currentOverlays.length === 0) {
       return;
@@ -809,31 +812,73 @@ async function resolveArchivePathFromKey(
 
 async function cleanupStaleState(state: Database): Promise<void> {
   const now = Date.now();
+  const staleOwnerPids = new Set<number>();
+
+  for (const tableName of [
+    "entry_locks",
+    "entry_sqlite_leases",
+    "archive_commit_locks",
+  ]) {
+    const rows = await state.queryAll(
+      `
+SELECT DISTINCT owner_pid
+FROM ${tableName}
+WHERE owner_pid IS NOT NULL
+  AND heartbeat_at <= ?
+`,
+      [now - LOCK_STALE_TIMEOUT_MS],
+      (row) => getNumber(row, "owner_pid"),
+    );
+
+    for (const ownerPid of rows) {
+      if (!isProcessAlive(ownerPid)) {
+        staleOwnerPids.add(ownerPid);
+      }
+    }
+  }
+
+  if (staleOwnerPids.size === 0) {
+    return;
+  }
 
   await state.run(
     `
 DELETE FROM entry_locks
-WHERE owner_pid IS NOT NULL
-  AND heartbeat_at <= ?
+WHERE owner_pid IN (${createPlaceholders(staleOwnerPids.size)})
 `,
-    [now - LOCK_STALE_TIMEOUT_MS],
+    [...staleOwnerPids],
   );
   await state.run(
     `
 DELETE FROM entry_sqlite_leases
-WHERE owner_pid IS NOT NULL
-  AND heartbeat_at <= ?
+WHERE owner_pid IN (${createPlaceholders(staleOwnerPids.size)})
 `,
-    [now - LOCK_STALE_TIMEOUT_MS],
+    [...staleOwnerPids],
   );
   await state.run(
     `
 DELETE FROM archive_commit_locks
-WHERE owner_pid IS NOT NULL
-  AND heartbeat_at <= ?
+WHERE owner_pid IN (${createPlaceholders(staleOwnerPids.size)})
 `,
-    [now - LOCK_STALE_TIMEOUT_MS],
+    [...staleOwnerPids],
   );
+}
+
+function createPlaceholders(count: number): string {
+  return Array.from({ length: count }, () => "?").join(", ");
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ESRCH") {
+      return false;
+    }
+
+    return true;
+  }
 }
 
 async function withStateDatabase<T>(

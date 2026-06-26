@@ -193,41 +193,47 @@ export class DirectoryDocument implements Document {
   ): Promise<DirectoryDocument> {
     const resolvedDocumentPath = resolve(documentPath);
     const fileStore = options.fileStore ?? LOCAL_DOCUMENT_FILE_STORE;
-    const databasePath =
-      await fileStore.resolveDatabasePath(resolvedDocumentPath);
-    const writer = {
-      write: async (path: string, content: string): Promise<void> => {
-        await fileStore.writeFile(path, content, { overwrite: false });
-      },
-    };
-    const fragments = new Fragments(resolvedDocumentPath, writer, {
-      ensureDirectory: async (path) => {
-        await fileStore.ensureDirectory(path);
-      },
-      listFiles: async (path) => await fileStore.listFiles(path),
-      readFile: async (path) => await fileStore.readFile(path),
-    });
+    try {
+      const databasePath =
+        await fileStore.resolveDatabasePath(resolvedDocumentPath);
+      const writer = {
+        write: async (path: string, content: string): Promise<void> => {
+          await fileStore.writeFile(path, content, { overwrite: false });
+        },
+      };
+      const fragments = new Fragments(resolvedDocumentPath, writer, {
+        ensureDirectory: async (path) => {
+          await fileStore.ensureDirectory(path);
+        },
+        listFiles: async (path) => await fileStore.listFiles(path),
+        readFile: async (path) => await fileStore.readFile(path),
+      });
 
-    await fileStore.ensureDirectory(resolvedDocumentPath);
-    await fragments.ensureCreated();
+      await fileStore.ensureDirectory(resolvedDocumentPath);
+      await fragments.ensureCreated();
 
-    const database = await Database.open(
-      databasePath,
-      fileStore.initializeDatabaseSchema() ? SCHEMA_SQL : "",
-      { readonly: fileStore.openDatabaseReadonly() },
-    );
-    const document = new DirectoryDocument(
-      database,
-      fragments,
-      resolvedDocumentPath,
-      fileStore,
-    );
+      const database = await Database.open(
+        databasePath,
+        fileStore.initializeDatabaseSchema() ? SCHEMA_SQL : "",
+        { readonly: fileStore.openDatabaseReadonly() },
+      );
 
-    writer.write = async (path: string, content: string): Promise<void> => {
-      await document.#writeNewFile(path, content);
-    };
+      const document = new DirectoryDocument(
+        database,
+        fragments,
+        resolvedDocumentPath,
+        fileStore,
+      );
 
-    return document;
+      writer.write = async (path: string, content: string): Promise<void> => {
+        await document.#writeNewFile(path, content);
+      };
+
+      return document;
+    } catch (error) {
+      await fileStore.close();
+      throw error;
+    }
   }
 
   public static async openSession<T>(
@@ -392,9 +398,12 @@ export class DirectoryDocument implements Document {
   }
 
   public async release(): Promise<void> {
-    await this.flush();
-    await this.#database.close();
-    await this.#fileStore.close();
+    try {
+      await this.flush();
+      await this.#database.close();
+    } finally {
+      await this.#fileStore.close();
+    }
   }
 
   public async close(): Promise<void> {
@@ -411,7 +420,7 @@ export class DirectoryDocument implements Document {
   ): Promise<void> {
     for (const path of [...createdFilePaths].reverse()) {
       try {
-        await unlink(path);
+        await this.#fileStore.deleteFile(path);
       } catch (error) {
         if (isNodeError(error) && error.code === "ENOENT") {
           continue;

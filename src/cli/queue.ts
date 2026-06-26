@@ -176,7 +176,6 @@ async function executeBuildJob(
   });
   const prompt = resolveExtractionPrompt(job.prompt ?? config.prompt);
 
-  await reporter.stepStarted("graph");
   const buildInput = await new SpineDigestFile(job.archivePath).readDocument(
     async (document) => await readChapterBuildInput(document, job.chapterId),
   );
@@ -199,6 +198,7 @@ async function executeBuildJob(
   if (details.stage === "sourced") {
     let graphWords = 0;
 
+    await reporter.stepStarted("graph");
     const artifact = await buildChapterGraphArtifact(job.chapterId, {
       extractionPrompt: prompt,
       llm,

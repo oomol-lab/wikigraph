@@ -430,8 +430,7 @@ describe("facade/build-queue", () => {
         idleTimeoutMs: 2_000,
       });
 
-      await withTimeout(
-        waitForRunningJob(),
+      await waitForRunningJob(
         "Timed out waiting for the first queue slot to become running.",
       );
 
@@ -447,12 +446,17 @@ describe("facade/build-queue", () => {
     });
   });
 
-  async function waitForRunningJob(): Promise<void> {
-    await waitForRunningJobCount(1);
+  async function waitForRunningJob(message: string): Promise<void> {
+    await waitForRunningJobCount(1, message);
   }
 
-  async function waitForRunningJobCount(count: number): Promise<void> {
-    while (true) {
+  async function waitForRunningJobCount(
+    count: number,
+    message: string,
+  ): Promise<void> {
+    const deadline = Date.now() + 2_000;
+
+    while (Date.now() < deadline) {
       if (
         (await listBuildJobs()).filter((job) => job.state === "running")
           .length >= count
@@ -461,6 +465,8 @@ describe("facade/build-queue", () => {
       }
       await delay(50);
     }
+
+    throw new Error(message);
   }
 
   it("lists multiple running jobs when worker concurrency allows it", async () => {

@@ -87,8 +87,8 @@ export class Database {
         this.#activeTransactionScope ?? Symbol("database transaction scope");
 
       if (isRootTransaction) {
-        this.#activeTransactionScope = transactionScope;
         await this.#executeSql("BEGIN IMMEDIATE");
+        this.#activeTransactionScope = transactionScope;
       }
 
       this.#transactionDepth += 1;
@@ -99,29 +99,22 @@ export class Database {
           operation,
         );
 
-        this.#transactionDepth -= 1;
-
         if (isRootTransaction) {
-          try {
-            await this.#executeSql("COMMIT");
-          } finally {
-            this.#activeTransactionScope = undefined;
-          }
+          await this.#executeSql("COMMIT");
         }
 
         return result;
       } catch (error) {
-        this.#transactionDepth -= 1;
-
         if (isRootTransaction) {
-          try {
-            await this.#executeSql("ROLLBACK");
-          } finally {
-            this.#activeTransactionScope = undefined;
-          }
+          await this.#executeSql("ROLLBACK");
         }
 
         throw error;
+      } finally {
+        this.#transactionDepth -= 1;
+        if (isRootTransaction) {
+          this.#activeTransactionScope = undefined;
+        }
       }
     });
   }

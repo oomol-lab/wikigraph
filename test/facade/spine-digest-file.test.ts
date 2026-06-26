@@ -404,7 +404,8 @@ async function readCoordinatorOverlays(path: string): Promise<
   const { Database } = await import("../../src/document/index.js");
   const database = await Database.open(
     `${path}/state/sdpub-coordinator.sqlite`,
-    "CREATE TABLE IF NOT EXISTS entry_overlays (archive_key TEXT, archive_path TEXT, entry_path TEXT, kind TEXT, workspace_path TEXT, updated_at INTEGER);",
+    "",
+    { readonly: true },
   );
 
   try {
