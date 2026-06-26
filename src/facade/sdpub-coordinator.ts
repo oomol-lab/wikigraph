@@ -1,18 +1,9 @@
 import { createHash, randomUUID } from "crypto";
-import { constants as fsConstants } from "fs";
-import {
-  copyFile,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from "fs/promises";
-import { homedir, tmpdir } from "os";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
 import { basename, dirname, join, posix, resolve } from "path";
 
+import { resolveWikiGraphStateDirectoryPath } from "../common/wiki-graph-dir.js";
 import { Database } from "../document/index.js";
 import type { DocumentFileStore } from "../document/document.js";
 import { AsyncSemaphore } from "../utils/async-semaphore.js";
@@ -900,54 +891,7 @@ async function openStateDatabase(): Promise<Database> {
   const databasePath = join(directoryPath, "sdpub-coordinator.sqlite");
 
   await mkdir(directoryPath, { recursive: true });
-  await copyLegacyStateDatabaseIfNeeded(directoryPath, databasePath);
   return await Database.open(databasePath, STATE_SCHEMA_SQL);
-}
-
-async function copyLegacyStateDatabaseIfNeeded(
-  directoryPath: string,
-  databasePath: string,
-): Promise<void> {
-  try {
-    if ((await stat(databasePath)).size > 0) {
-      return;
-    }
-
-    await rm(databasePath, { force: true });
-  } catch {
-    await rm(databasePath, { force: true });
-  }
-
-  try {
-    const legacyDatabasePath = join(directoryPath, "state.sqlite");
-
-    if (!(await legacyDatabaseHasTable(legacyDatabasePath, "entry_overlays"))) {
-      return;
-    }
-
-    await copyFile(legacyDatabasePath, databasePath, fsConstants.COPYFILE_EXCL);
-  } catch {
-    return;
-  }
-}
-
-async function legacyDatabaseHasTable(
-  databasePath: string,
-  tableName: string,
-): Promise<boolean> {
-  const database = await Database.open(databasePath, "");
-
-  try {
-    return (
-      (await database.queryOne(
-        "SELECT 1 AS matched FROM sqlite_master WHERE type = 'table' AND name = ?",
-        [tableName],
-        () => true,
-      )) ?? false
-    );
-  } finally {
-    await database.close();
-  }
 }
 
 async function createWorkspaceFilePath(
@@ -994,7 +938,7 @@ function getCoordinatorStateDirectoryPath(): string {
     return resolve(stateDirectoryPath);
   }
 
-  return join(homedir(), ".spinedigest", "state");
+  return resolveWikiGraphStateDirectoryPath();
 }
 
 function createArchiveKey(archivePath: string): string {

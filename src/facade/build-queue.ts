@@ -1,19 +1,9 @@
 import { createHash, randomUUID } from "crypto";
-import { constants as fsConstants } from "fs";
-import {
-  appendFile,
-  copyFile,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  stat,
-} from "fs/promises";
-import { homedir } from "os";
+import { appendFile, mkdir, mkdtemp, readFile, rm } from "fs/promises";
 import { join, resolve } from "path";
 
+import { resolveWikiGraphStateDirectoryPath } from "../common/wiki-graph-dir.js";
 import { Database } from "../document/index.js";
-import { isNodeError } from "../utils/node-error.js";
 
 export const BUILD_JOB_STATES = [
   "queued",
@@ -1040,7 +1030,6 @@ async function openBuildQueueDatabase(): Promise<Database> {
   const databasePath = join(directoryPath, "build-queue.sqlite");
 
   await mkdir(directoryPath, { recursive: true });
-  await copyLegacyStateDatabaseIfNeeded(directoryPath, databasePath);
   return await Database.open(databasePath, BUILD_QUEUE_SCHEMA_SQL);
 }
 
@@ -1072,59 +1061,7 @@ function getBuildQueueStateDirectoryPath(): string {
     return resolve(stateDirectoryPath);
   }
 
-  return join(homedir(), ".spinedigest", "state");
-}
-
-async function copyLegacyStateDatabaseIfNeeded(
-  directoryPath: string,
-  databasePath: string,
-): Promise<void> {
-  try {
-    if ((await stat(databasePath)).size > 0) {
-      return;
-    }
-    await rm(databasePath, { force: true });
-  } catch {
-    await rm(databasePath, { force: true });
-  }
-
-  try {
-    const legacyDatabasePath = join(directoryPath, "state.sqlite");
-
-    if (!(await legacyDatabaseHasTable(legacyDatabasePath, "build_jobs"))) {
-      return;
-    }
-
-    await copyFile(legacyDatabasePath, databasePath, fsConstants.COPYFILE_EXCL);
-  } catch (error) {
-    if (isNodeError(error) && error.code === "ENOENT") {
-      return;
-    }
-    if (isNodeError(error) && error.code === "EEXIST") {
-      return;
-    }
-
-    throw error;
-  }
-}
-
-async function legacyDatabaseHasTable(
-  databasePath: string,
-  tableName: string,
-): Promise<boolean> {
-  const database = await Database.open(databasePath, "");
-
-  try {
-    return (
-      (await database.queryOne(
-        "SELECT 1 AS matched FROM sqlite_master WHERE type = 'table' AND name = ?",
-        [tableName],
-        () => true,
-      )) ?? false
-    );
-  } finally {
-    await database.close();
-  }
+  return resolveWikiGraphStateDirectoryPath();
 }
 
 function mapBuildJob(row: Record<string, unknown>): BuildJob {

@@ -5,6 +5,8 @@ import { dirname, isAbsolute, join, resolve } from "path";
 
 import { z } from "zod";
 
+import { resolveWikiGraphConfigFilePath } from "../common/wiki-graph-dir.js";
+
 import { CLI_HELP_ROUTES, withHelpRoute } from "./errors.js";
 
 const CLI_PROVIDER_VALUES = [
@@ -380,7 +382,7 @@ function resolveInlineBaseURL(input: {
 
 function resolveConfigFilePath(path: string | undefined): string {
   if (path === undefined) {
-    return join(homedir(), ".spinedigest", "config.json");
+    return resolveWikiGraphConfigFilePath();
   }
 
   return resolvePath(path, process.cwd());
