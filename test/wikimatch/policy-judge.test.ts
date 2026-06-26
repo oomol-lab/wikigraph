@@ -119,6 +119,12 @@ describe("wikimatch/policy-judge", () => {
       request,
     });
 
+    expect(request.mock.calls[0]?.[0][0]?.content).toContain(
+      "Recall policy:\n只召回专有名词实体。",
+    );
+    expect(request.mock.calls[0]?.[0][1]?.content).not.toContain(
+      "只召回专有名词实体。",
+    );
     expect(request.mock.calls[0]?.[0][1]?.content).toContain(
       '<group id="g2">Mercury</group>',
     );

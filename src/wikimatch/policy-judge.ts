@@ -357,14 +357,7 @@ function buildPolicyMessages(input: WikimatchPolicyJudgeInput): LLMessage[] {
   return [
     {
       role: "system",
-      content: [
-        "You judge which precomputed Wikidata mention candidates should be recalled.",
-        "Return JSON only.",
-        "Do not invent candidates, ranges, surfaces, or QIDs.",
-        "A recalled mention must choose a QID from entityOptions or disambiguationOptions.meanings.",
-        "Never return DIS identifiers as qid values; DIS identifiers are only disambiguation references.",
-        "Overlapping recalled ranges are illegal; choose the most specific valid mention.",
-      ].join("\n"),
+      content: formatPolicySystemPrompt(input),
     },
     {
       role: "user",
@@ -373,11 +366,26 @@ function buildPolicyMessages(input: WikimatchPolicyJudgeInput): LLMessage[] {
   ];
 }
 
-function formatPolicyPrompt(input: WikimatchPolicyJudgeInput): string {
+function formatPolicySystemPrompt(input: WikimatchPolicyJudgeInput): string {
   return [
+    "You judge which precomputed Wikidata mention candidates should be recalled.",
+    "",
     "Recall policy:",
     input.policyPrompt,
     "",
+    "Rules:",
+    "- Return JSON only.",
+    "- Return exactly one group result for every input group.",
+    "- Use decisions: [] only when this group has no selected mention and no policy update.",
+    "- Do not invent candidates, ranges, surfaces, or QIDs.",
+    "- A recalled mention must choose a QID from entityOptions or disambiguationOptions.meanings.",
+    "- Never return DIS identifiers as qid values; DIS identifiers are only disambiguation references.",
+    "- Overlapping recalled ranges are illegal; choose the most specific valid mention.",
+  ].join("\n");
+}
+
+function formatPolicyPrompt(input: WikimatchPolicyJudgeInput): string {
+  return [
     "Tagged context:",
     formatTaggedContext(input),
     "",
