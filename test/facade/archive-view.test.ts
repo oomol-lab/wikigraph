@@ -5,6 +5,7 @@ import {
   findArchiveObjects,
   grepArchiveObjects,
   listArchiveCollection,
+  listArchiveEvidence,
   listArchiveObjects,
   readArchiveText,
   readArchivePage,
@@ -403,6 +404,84 @@ describe("facade/archive-view", () => {
         await expect(readArchiveText(document, "node:100")).resolves.toBe(
           "Pages and links make archive navigation explicit.",
         );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("returns source evidence for chunks, entities, and triples", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "m1",
+              qid: "Q1",
+              rangeEnd: 11,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "LLM Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "m2",
+              qid: "Q2",
+              rangeEnd: 48,
+              rangeStart: 42,
+              sentenceIndex: 0,
+              surface: "agents",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceEnd: 65,
+            evidenceStart: 0,
+            id: "l1",
+            predicate: "mentions",
+            sourceMentionId: "m1",
+            targetMentionId: "m2",
+          });
+        });
+
+        await expect(
+          listArchiveEvidence(document, "wikigraph://chunk/100"),
+        ).resolves.toMatchObject({
+          items: [
+            {
+              id: "wikigraph://source/chapter/1#0..0",
+              source:
+                "An LLM Wiki exposes pages, links, and source fragments to agents.",
+              type: "source",
+            },
+          ],
+        });
+        await expect(
+          listArchiveEvidence(document, "wikigraph://entity/Q1"),
+        ).resolves.toMatchObject({
+          items: [
+            {
+              id: "wikigraph://source/chapter/1#0..0",
+              type: "source",
+            },
+          ],
+        });
+        await expect(
+          listArchiveEvidence(document, "wikigraph://triple/Q1/mentions/Q2"),
+        ).resolves.toMatchObject({
+          items: [
+            {
+              id: "wikigraph://source/chapter/1#0..0",
+              type: "source",
+            },
+          ],
+        });
       } finally {
         await document.release();
       }

@@ -41,6 +41,20 @@ const archiveMockState = vi.hoisted(() => ({
     nodeCount: 2,
     summaryCount: 0,
   },
+  evidence: {
+    items: [
+      {
+        chapterId: 2,
+        endSentenceIndex: 1,
+        fragmentId: 0,
+        id: "wikigraph://source/chapter/2#0..1",
+        source: "RAG original source fragment.",
+        startSentenceIndex: 0,
+        title: "Chapter 2",
+        type: "source",
+      },
+    ],
+  },
   listItems: [
     {
       id: "node:11",
@@ -116,6 +130,7 @@ vi.mock("../../src/facade/index.js", () => ({
       types: null,
     }),
   ),
+  listArchiveEvidence: vi.fn(() => Promise.resolve(archiveMockState.evidence)),
   getArchiveIndex: vi.fn(() => Promise.resolve(archiveMockState.index)),
   listRelatedArchiveObjects: vi.fn(() =>
     Promise.resolve(archiveMockState.listItems),
@@ -144,6 +159,7 @@ vi.mock("../../src/cli/convert.js", () => ({
 import { runArchiveCommand } from "../../src/cli/archive.js";
 import {
   findArchiveObjects,
+  listArchiveEvidence,
   listRelatedArchiveObjects,
   readArchivePage,
 } from "../../src/facade/index.js";
@@ -208,15 +224,38 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain("Related");
   });
 
-  it("prints an empty evidence result set", async () => {
+  it("prints evidence source ranges", async () => {
     await runArchiveCommand({
       action: "evidence",
       archivePath: "/tmp/book.sdpub",
       format: "text",
-      objectId: "wikigraph://chunk/9",
+      objectId: "wikigraph://triple/Q1/mentions/Q2",
     });
 
-    expect(archiveMockState.textWrites[0]).toBe("No objects.\n");
+    expect(listArchiveEvidence).toHaveBeenCalledWith(
+      {},
+      "wikigraph://triple/Q1/mentions/Q2",
+    );
+    expect(archiveMockState.textWrites[0]).toContain(
+      "wikigraph://source/chapter/2#0..1",
+    );
+    expect(archiveMockState.textWrites[0]).toContain("@@ 0..1 @@");
+    expect(archiveMockState.textWrites[0]).toContain(
+      "RAG original source fragment.",
+    );
+  });
+
+  it("prints evidence as JSONL", async () => {
+    await runArchiveCommand({
+      action: "evidence",
+      archivePath: "/tmp/book.sdpub",
+      format: "jsonl",
+      objectId: "wikigraph://entity/Q1",
+    });
+
+    expect(archiveMockState.textWrites[0]).toContain(
+      '"id":"wikigraph://source/chapter/2#0..1"',
+    );
   });
 
   it("prints a context pack", async () => {

@@ -378,6 +378,24 @@ describe("cli/args", () => {
 
     expect(
       parseCLIArguments([
+        "evidence",
+        "book.sdpub",
+        "wikigraph://triple/Q1/mentions/Q2",
+        "--jsonl",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "evidence",
+        archivePath: "book.sdpub",
+        format: "jsonl",
+        objectId: "wikigraph://triple/Q1/mentions/Q2",
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments([
         "pack",
         "book.sdpub",
         "wikigraph://chunk/1",
@@ -405,6 +423,15 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments(["search", "book.sdpub", "RAG", "--order", "doc-desc"]),
     ).toThrow("The `search` command does not support --order.");
+    expect(() =>
+      parseCLIArguments([
+        "evidence",
+        "book.sdpub",
+        "wikigraph://entity/Q1",
+        "--fragment",
+        "1:0",
+      ]),
+    ).toThrow("The `evidence` command does not support --fragment.");
   });
 
   it("parses archive metadata and cover commands", () => {

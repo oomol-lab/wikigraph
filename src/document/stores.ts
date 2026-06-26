@@ -46,11 +46,17 @@ export interface ReadonlyKnowledgeEdgeStore {
 
 export interface ReadonlyMentionStore {
   getById(mentionId: string): Promise<MentionRecord | undefined>;
+  listByQid(qid: string): Promise<MentionRecord[]>;
   listByChapter(chapterId: number): Promise<MentionRecord[]>;
 }
 
 export interface ReadonlyMentionLinkStore {
   getById(linkId: string): Promise<MentionLinkRecord | undefined>;
+  listByTriple(input: {
+    readonly objectQid: string;
+    readonly predicate: string;
+    readonly subjectQid: string;
+  }): Promise<MentionLinkRecord[]>;
   listByChapter(chapterId: number): Promise<MentionLinkRecord[]>;
 }
 
@@ -796,6 +802,29 @@ export class MentionStore implements ReadonlyMentionStore {
     );
   }
 
+  public async listByQid(qid: string): Promise<MentionRecord[]> {
+    return await this.#database.queryAll(
+      `
+        SELECT
+          id,
+          chapter_id,
+          fragment_id,
+          sentence_index,
+          range_start,
+          range_end,
+          surface,
+          qid,
+          confidence,
+          note
+        FROM mentions
+        WHERE qid = ?
+        ORDER BY chapter_id, fragment_id, sentence_index, range_start, range_end, id
+      `,
+      [qid],
+      mapMentionRow,
+    );
+  }
+
   public async listByChapter(chapterId: number): Promise<MentionRecord[]> {
     return await this.#database.queryAll(
       `
@@ -889,6 +918,43 @@ export class MentionLinkStore implements ReadonlyMentionLinkStore {
         WHERE id = ?
       `,
       [linkId],
+      mapMentionLinkRow,
+    );
+  }
+
+  public async listByTriple(input: {
+    readonly objectQid: string;
+    readonly predicate: string;
+    readonly subjectQid: string;
+  }): Promise<MentionLinkRecord[]> {
+    return await this.#database.queryAll(
+      `
+        SELECT
+          mention_links.id AS id,
+          mention_links.source_mention_id AS source_mention_id,
+          mention_links.target_mention_id AS target_mention_id,
+          mention_links.predicate AS predicate,
+          mention_links.evidence_start AS evidence_start,
+          mention_links.evidence_end AS evidence_end,
+          mention_links.confidence AS confidence,
+          mention_links.note AS note
+        FROM mention_links
+        INNER JOIN mentions AS source_mentions
+          ON source_mentions.id = mention_links.source_mention_id
+        INNER JOIN mentions AS target_mentions
+          ON target_mentions.id = mention_links.target_mention_id
+        WHERE source_mentions.qid = ?
+          AND mention_links.predicate = ?
+          AND target_mentions.qid = ?
+        ORDER BY
+          source_mentions.chapter_id,
+          source_mentions.fragment_id,
+          source_mentions.sentence_index,
+          mention_links.evidence_start,
+          mention_links.evidence_end,
+          mention_links.id
+      `,
+      [input.subjectQid, input.predicate, input.objectQid],
       mapMentionLinkRow,
     );
   }

@@ -24,6 +24,7 @@ export {
   getArchiveIndex,
   grepArchiveObjects,
   listArchiveCollection,
+  listArchiveEvidence,
   listAllArchiveLinks,
   listArchiveLinks,
   listArchiveObjects,
@@ -109,6 +110,8 @@ export {
 } from "./graph.js";
 export type {
   ArchiveEstimate,
+  ArchiveEvidence,
+  ArchiveEvidenceItem,
   ArchiveCollectionOptions,
   ArchiveCollectionResult,
   ArchiveCollectionType,

@@ -684,6 +684,10 @@ class EmptySnapshotMentionStore implements ReadonlyMentionStore {
     return Promise.resolve(undefined);
   }
 
+  public listByQid(_qid: string): Promise<MentionRecord[]> {
+    return Promise.resolve([]);
+  }
+
   public listByChapter(_chapterId: number): Promise<MentionRecord[]> {
     return Promise.resolve([]);
   }
@@ -692,6 +696,14 @@ class EmptySnapshotMentionStore implements ReadonlyMentionStore {
 class EmptySnapshotMentionLinkStore implements ReadonlyMentionLinkStore {
   public getById(_linkId: string): Promise<undefined> {
     return Promise.resolve(undefined);
+  }
+
+  public listByTriple(_input: {
+    readonly objectQid: string;
+    readonly predicate: string;
+    readonly subjectQid: string;
+  }): Promise<MentionLinkRecord[]> {
+    return Promise.resolve([]);
   }
 
   public listByChapter(_chapterId: number): Promise<MentionLinkRecord[]> {

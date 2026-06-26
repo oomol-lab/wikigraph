@@ -4,12 +4,15 @@ import { tmpdir } from "os";
 
 import {
   getArchiveIndex,
+  listArchiveEvidence,
   listRelatedArchiveObjects,
   packArchiveContext,
   readArchivePage,
   estimateArchiveBuild,
   findArchiveObjects,
   type ArchiveEstimate,
+  type ArchiveEvidence,
+  type ArchiveEvidenceItem,
   type ArchiveFindOptions,
   type ArchiveFindResult,
   type ArchiveIndex,
@@ -102,7 +105,12 @@ export async function runArchiveCommand(
       });
       return;
     case "evidence":
-      await writeList([], args.format ?? "text");
+      await readArchiveDocument(args.archivePath, async (document) => {
+        await writeEvidence(
+          await listArchiveEvidence(document, args.objectId!),
+          args.format ?? "text",
+        );
+      });
       return;
     case "pack":
       await readArchiveDocument(args.archivePath, async (document) => {
@@ -358,6 +366,37 @@ async function writeFindHits(
       )
       .join("\n\n")}${formatNextCursor(result)}${formatFindLensHint(result)}\n`,
   );
+}
+
+async function writeEvidence(
+  evidence: ArchiveEvidence,
+  format: ResultFormat,
+): Promise<void> {
+  if (format === "json") {
+    await writeTextToStdout(`${JSON.stringify(evidence, null, 2)}\n`);
+    return;
+  }
+  if (format === "jsonl") {
+    await writeJSONL(evidence.items);
+    return;
+  }
+
+  if (evidence.items.length === 0) {
+    await writeTextToStdout("No evidence.\n");
+    return;
+  }
+
+  await writeTextToStdout(
+    `${evidence.items.map(formatEvidenceItem).join("\n\n")}\n`,
+  );
+}
+
+function formatEvidenceItem(item: ArchiveEvidenceItem): string {
+  return [
+    item.id,
+    `@@ ${item.startSentenceIndex}..${item.endSentenceIndex} @@`,
+    item.source,
+  ].join("\n");
 }
 
 async function writePage(
