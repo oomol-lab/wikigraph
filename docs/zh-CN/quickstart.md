@@ -91,9 +91,9 @@ spinedigest export ./book.sdpub --output-format epub --output ./digest.epub
 运行 LLM-backed build stage 前，创建配置：
 
 ```bash
-mkdir -p ~/.spinedigest
+mkdir -p ~/.wikigraph
 
-cat > ~/.spinedigest/config.json <<'JSON'
+cat > ~/.wikigraph/config.json <<'JSON'
 {
   "llm": {
     "provider": "openai-compatible",

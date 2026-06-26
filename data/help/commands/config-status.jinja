@@ -8,7 +8,7 @@ Usage:
   spinedigest config status [--llm <json>] [--help|-h]
 
 Behavior:
-  - Resolves the active config path using `SPINEDIGEST_CONFIG` when set, otherwise `~/.spinedigest/config.json`.
+  - Resolves the active config path using `SPINEDIGEST_CONFIG` when set, otherwise `~/.wikigraph/config.json`.
   - Merges environment variable overrides and optional `--llm <json>`.
   - If no config values are available, prints `{}` to stdout and exits 0.
   - If config values are valid, prints the merged JSON to stdout.

@@ -81,7 +81,7 @@ const HELP_TOPIC_METADATA: readonly {
   },
   {
     name: "config-file",
-    summary: "Detailed ~/.spinedigest/config.json reference.",
+    summary: "Detailed ~/.wikigraph/config.json reference.",
   },
   {
     name: "runtime",

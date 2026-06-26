@@ -14,7 +14,7 @@ export function buildLLMOptions(config: CLIConfig): SpineDigestLLMOptions {
   if (llm?.provider === undefined || llm.model === undefined) {
     throw new Error(
       withHelpRoute(
-        "Missing LLM configuration. Set --llm, `llm.provider` and `llm.model` in ~/.spinedigest/config.json, or the matching SPINEDIGEST_LLM_* environment variables.",
+        "Missing LLM configuration. Set --llm, `llm.provider` and `llm.model` in ~/.wikigraph/config.json, or the matching SPINEDIGEST_LLM_* environment variables.",
         CLI_HELP_ROUTES.config,
       ),
     );
