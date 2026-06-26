@@ -14,6 +14,7 @@ import type {
   WikimatchConflictGroup,
   WikimatchQidOption,
   WikimatchPolicyDecisionOutput,
+  WikimatchPolicyGroupOutput,
   WikimatchPolicyJudgeInput,
   WikimatchPolicyJudgeResult,
   WikimatchPolicyResponse,
@@ -26,13 +27,20 @@ const policyDecisionSchema = z
     confidence: z.number().min(0).max(1).optional(),
     decision: z.enum(["recall", "skip_this_time", "never_recall"]),
     qid: z.string().min(1).optional(),
-    reason: z.string().min(1).optional(),
+  })
+  .strict();
+
+const policyGroupSchema = z
+  .object({
+    decisions: z.array(policyDecisionSchema),
+    groupId: z.string().min(1),
+    note: z.string().max(24).optional(),
   })
   .strict();
 
 const policyResponseSchema = z
   .object({
-    decisions: z.array(policyDecisionSchema),
+    groups: z.array(policyGroupSchema),
   })
   .strict();
 
@@ -51,6 +59,7 @@ export async function judgeWikimatchPolicy(
         parsePolicyResponse(
           options.candidates,
           normalizePolicyResponse(response),
+          options.window.groups,
         ),
       request: options.request,
       responseIntentClassifierPrompt:
@@ -76,14 +85,17 @@ function normalizePolicyResponse(
   response: z.infer<typeof policyResponseSchema>,
 ): WikimatchPolicyResponse {
   return {
-    decisions: response.decisions.map((decision) => ({
-      candidateId: decision.candidateId,
-      ...(decision.confidence === undefined
-        ? {}
-        : { confidence: decision.confidence }),
-      decision: decision.decision,
-      ...(decision.qid === undefined ? {} : { qid: decision.qid }),
-      ...(decision.reason === undefined ? {} : { reason: decision.reason }),
+    groups: response.groups.map((group) => ({
+      decisions: group.decisions.map((decision) => ({
+        candidateId: decision.candidateId,
+        ...(decision.confidence === undefined
+          ? {}
+          : { confidence: decision.confidence }),
+        decision: decision.decision,
+        ...(decision.qid === undefined ? {} : { qid: decision.qid }),
+      })),
+      groupId: group.groupId,
+      ...(group.note === undefined ? {} : { note: group.note }),
     })),
   };
 }
@@ -91,8 +103,9 @@ function normalizePolicyResponse(
 export function parsePolicyResponse(
   candidates: readonly WikimatchCandidate[],
   response: WikimatchPolicyResponse,
+  groups: readonly WikimatchConflictGroup[] = inferGroups(candidates),
 ): WikimatchPolicyJudgeResult {
-  const issues = validatePolicyResponse(candidates, response);
+  const issues = validatePolicyResponse(candidates, response, groups);
 
   if (issues.length > 0) {
     throw new ParsedJsonError(issues);
@@ -102,30 +115,32 @@ export function parsePolicyResponse(
   const mentions: WikimatchAcceptedMention[] = [];
   const policyUpdates: WikimatchPolicyUpdate[] = [];
 
-  for (const decision of response.decisions) {
-    const candidate = candidatesById.get(decision.candidateId)!;
+  for (const group of response.groups) {
+    for (const decision of group.decisions) {
+      const candidate = candidatesById.get(decision.candidateId)!;
 
-    if (decision.decision === "recall") {
-      mentions.push({
+      if (decision.decision === "recall") {
+        mentions.push({
+          candidateId: candidate.id,
+          ...(decision.confidence === undefined
+            ? {}
+            : { confidence: decision.confidence }),
+          ...(group.note === undefined ? {} : { note: group.note }),
+          qid: decision.qid!,
+          range: candidate.range,
+          surface: candidate.surface,
+        });
+        continue;
+      }
+
+      policyUpdates.push({
         candidateId: candidate.id,
-        ...(decision.confidence === undefined
-          ? {}
-          : { confidence: decision.confidence }),
-        qid: decision.qid!,
-        range: candidate.range,
-        ...(decision.reason === undefined ? {} : { reason: decision.reason }),
+        decision: decision.decision,
+        ...(group.note === undefined ? {} : { note: group.note }),
+        ...(decision.qid === undefined ? {} : { qid: decision.qid }),
         surface: candidate.surface,
       });
-      continue;
     }
-
-    policyUpdates.push({
-      candidateId: candidate.id,
-      decision: decision.decision,
-      ...(decision.qid === undefined ? {} : { qid: decision.qid }),
-      ...(decision.reason === undefined ? {} : { reason: decision.reason }),
-      surface: candidate.surface,
-    });
   }
 
   return {
@@ -137,43 +152,83 @@ export function parsePolicyResponse(
 export function validatePolicyResponse(
   candidates: readonly WikimatchCandidate[],
   response: WikimatchPolicyResponse,
+  groups: readonly WikimatchConflictGroup[] = inferGroups(candidates),
 ): readonly string[] {
   const issues: string[] = [];
   const candidatesById = createCandidateMap(candidates);
+  const groupsById = createGroupMap(groups);
+  const seenGroupIds = new Set<string>();
   const seenCandidateIds = new Set<string>();
   const recalled: Array<{
     readonly candidate: WikimatchCandidate;
     readonly decision: WikimatchPolicyDecisionOutput;
   }> = [];
 
-  for (const decision of response.decisions) {
-    const candidate = candidatesById.get(decision.candidateId);
+  for (const group of response.groups) {
+    const expectedCandidateIds = groupsById.get(group.groupId);
 
-    if (candidate === undefined) {
+    if (expectedCandidateIds === undefined) {
       issues.push(
-        `Unknown candidateId "${decision.candidateId}". Use only one of: ${[
-          ...candidatesById.keys(),
+        `Unknown groupId "${group.groupId}". Use exactly these group IDs: ${[
+          ...groupsById.keys(),
         ].join(", ")}.`,
       );
       continue;
     }
-    if (seenCandidateIds.has(decision.candidateId)) {
+    if (seenGroupIds.has(group.groupId)) {
+      issues.push(`Duplicate group result for ${group.groupId}.`);
+      continue;
+    }
+    seenGroupIds.add(group.groupId);
+
+    for (const decision of group.decisions) {
+      const candidate = candidatesById.get(decision.candidateId);
+
+      if (candidate === undefined) {
+        issues.push(
+          `Unknown candidateId "${decision.candidateId}". Use only one of: ${[
+            ...candidatesById.keys(),
+          ].join(", ")}.`,
+        );
+        continue;
+      }
+      if (!expectedCandidateIds.has(decision.candidateId)) {
+        issues.push(
+          `Candidate ${decision.candidateId} does not belong to group ${group.groupId}. Use only candidates from that group: ${[
+            ...expectedCandidateIds,
+          ].join(", ")}.`,
+        );
+        continue;
+      }
+      if (seenCandidateIds.has(decision.candidateId)) {
+        issues.push(
+          `Duplicate decision for candidate ${decision.candidateId}. Return exactly one decision per candidate at most.`,
+        );
+        continue;
+      }
+
+      seenCandidateIds.add(decision.candidateId);
+
+      if (decision.decision === "recall") {
+        validateRecallDecision(issues, candidate, decision);
+        recalled.push({ candidate, decision });
+        continue;
+      }
+
+      if (
+        decision.qid !== undefined &&
+        !isAllowedQid(candidate, decision.qid)
+      ) {
+        issues.push(formatIllegalQidIssue(candidate, decision.qid));
+      }
+    }
+  }
+
+  for (const groupId of groupsById.keys()) {
+    if (!seenGroupIds.has(groupId)) {
       issues.push(
-        `Duplicate decision for candidate ${decision.candidateId}. Return exactly one decision per candidate at most.`,
+        `Missing group result for ${groupId}. Return exactly one result for every input group; use decisions: [] when nothing should be recalled.`,
       );
-      continue;
-    }
-
-    seenCandidateIds.add(decision.candidateId);
-
-    if (decision.decision === "recall") {
-      validateRecallDecision(issues, candidate, decision);
-      recalled.push({ candidate, decision });
-      continue;
-    }
-
-    if (decision.qid !== undefined && !isAllowedQid(candidate, decision.qid)) {
-      issues.push(formatIllegalQidIssue(candidate, decision.qid));
     }
   }
 
@@ -269,6 +324,35 @@ function createCandidateMap(
   return new Map(candidates.map((candidate) => [candidate.id, candidate]));
 }
 
+function createGroupMap(
+  groups: readonly WikimatchConflictGroup[],
+): ReadonlyMap<string, ReadonlySet<string>> {
+  return new Map(
+    groups.map((group) => [group.id, new Set(group.candidateIds)]),
+  );
+}
+
+function inferGroups(
+  candidates: readonly WikimatchCandidate[],
+): readonly WikimatchConflictGroup[] {
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      candidateIds: candidates.map((candidate) => candidate.id),
+      id: "g1",
+      range: {
+        end: Math.max(...candidates.map((candidate) => candidate.range.end)),
+        start: Math.min(
+          ...candidates.map((candidate) => candidate.range.start),
+        ),
+      },
+    },
+  ];
+}
+
 function buildPolicyMessages(input: WikimatchPolicyJudgeInput): LLMessage[] {
   return [
     {
@@ -303,13 +387,18 @@ function formatPolicyPrompt(input: WikimatchPolicyJudgeInput): string {
     "Return this JSON shape:",
     JSON.stringify(
       {
-        decisions: [
+        groups: [
           {
-            candidateId: "candidate id from the input",
-            confidence: 0.9,
-            decision: "recall | skip_this_time | never_recall",
-            qid: "required only for recall; optional for non-recall",
-            reason: "brief reason",
+            decisions: [
+              {
+                candidateId: "candidate id from this group",
+                confidence: 0.9,
+                decision: "recall | skip_this_time | never_recall",
+                qid: "required only for recall; optional for non-recall",
+              },
+            ],
+            groupId: "group id from the input",
+            note: "optional, <= 12 Chinese chars or 6 English words",
           },
         ],
       },
@@ -388,9 +477,7 @@ function formatCandidateForPrompt(
   };
 }
 
-function formatQidOptions(
-  options: readonly WikimatchQidOption[],
-): {
+function formatQidOptions(options: readonly WikimatchQidOption[]): {
   readonly disambiguationOptions: readonly object[];
   readonly entityOptions: readonly object[];
 } {

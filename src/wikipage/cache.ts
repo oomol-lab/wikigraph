@@ -266,7 +266,9 @@ function parseDisambiguationProfile(value: string): DisambiguationProfile {
   const parsed = JSON.parse(value);
 
   if (!isDisambiguationProfile(parsed)) {
-    throw new Error("Expected profile_json to contain a disambiguation profile.");
+    throw new Error(
+      "Expected profile_json to contain a disambiguation profile.",
+    );
   }
 
   return parsed;

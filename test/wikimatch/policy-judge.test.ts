@@ -18,33 +18,46 @@ describe("wikimatch/policy-judge", () => {
       .fn<GuaranteedRequest>()
       .mockResolvedValueOnce(
         JSON.stringify({
-          decisions: [
+          groups: [
             {
-              candidateId: "c1",
-              decision: "recall",
-              qid: "Q1",
-            },
-            {
-              candidateId: "c2",
-              decision: "recall",
-              qid: "Q2",
+              decisions: [
+                {
+                  candidateId: "c1",
+                  decision: "recall",
+                  qid: "Q1",
+                },
+                {
+                  candidateId: "c2",
+                  decision: "recall",
+                  qid: "Q2",
+                },
+              ],
+              groupId: "g1",
             },
           ],
         }),
       )
       .mockResolvedValueOnce(
         JSON.stringify({
-          decisions: [
+          groups: [
             {
-              candidateId: "c1",
-              decision: "recall",
-              qid: "Q1",
-              reason: "整体指代北京大学",
+              decisions: [
+                {
+                  candidateId: "c1",
+                  decision: "recall",
+                  qid: "Q1",
+                },
+                {
+                  candidateId: "c2",
+                  decision: "skip_this_time",
+                },
+              ],
+              groupId: "g1",
+              note: "整体实体",
             },
             {
-              candidateId: "c2",
-              decision: "skip_this_time",
-              reason: "北京只是北京大学名称的一部分",
+              decisions: [],
+              groupId: "g2",
             },
           ],
         }),
@@ -63,7 +76,7 @@ describe("wikimatch/policy-judge", () => {
           end: 9,
           start: 5,
         },
-        reason: "整体指代北京大学",
+        note: "整体实体",
         surface: "北京大学",
       },
     ]);
@@ -71,7 +84,7 @@ describe("wikimatch/policy-judge", () => {
       {
         candidateId: "c2",
         decision: "skip_this_time",
-        reason: "北京只是北京大学名称的一部分",
+        note: "整体实体",
         surface: "北京",
       },
     ]);
@@ -85,11 +98,16 @@ describe("wikimatch/policy-judge", () => {
     const input = createInput();
     const request = vi.fn<GuaranteedRequest>().mockResolvedValue(
       JSON.stringify({
-        decisions: [
+        groups: [
           {
-            candidateId: "c3",
-            decision: "recall",
-            qid: "Q48397",
+            decisions: [
+              {
+                candidateId: "c3",
+                decision: "recall",
+                qid: "Q48397",
+              },
+            ],
+            groupId: "g2",
           },
         ],
       }),
@@ -104,9 +122,7 @@ describe("wikimatch/policy-judge", () => {
     expect(request.mock.calls[0]?.[0][1]?.content).toContain(
       '<group id="g2">Mercury</group>',
     );
-    expect(request.mock.calls[0]?.[0][1]?.content).toContain(
-      '"id": "DIS1"',
-    );
+    expect(request.mock.calls[0]?.[0][1]?.content).toContain('"id": "DIS1"');
     expect(request.mock.calls[0]?.[0][1]?.content).toContain('"qid": "Q308"');
     expect(request.mock.calls[0]?.[0][1]?.content).not.toContain("sourceQid");
     expect(request.mock.calls[0]?.[0][1]?.content).not.toContain(
@@ -119,9 +135,7 @@ describe("wikimatch/policy-judge", () => {
       },
       mentions: [],
     });
-    expect(result.fallback?.issues[0]).toContain(
-      "Source disambiguation QIDs",
-    );
+    expect(result.fallback?.issues[0]).toContain("Source disambiguation QIDs");
   });
 
   it("can return empty fallback when guaranteed JSON keeps failing", async () => {
@@ -138,16 +152,31 @@ describe("wikimatch/policy-judge", () => {
   });
 
   it("rejects qids outside the candidate option set", () => {
+    const input = createInput();
+
     try {
-      parsePolicyResponse(createInput().candidates, {
-        decisions: [
-          {
-            candidateId: "c1",
-            decision: "recall",
-            qid: "Q404",
-          },
-        ],
-      });
+      parsePolicyResponse(
+        input.candidates,
+        {
+          groups: [
+            {
+              decisions: [
+                {
+                  candidateId: "c1",
+                  decision: "recall",
+                  qid: "Q404",
+                },
+              ],
+              groupId: "g1",
+            },
+            {
+              decisions: [],
+              groupId: "g2",
+            },
+          ],
+        },
+        input.window.groups,
+      );
       throw new Error("Expected parsePolicyResponse to fail");
     } catch (error) {
       expect(error).toBeInstanceOf(ParsedJsonError);

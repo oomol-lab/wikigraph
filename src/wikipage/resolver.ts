@@ -114,9 +114,7 @@ export class WikipageResolver {
         ...(disambiguation === undefined
           ? {}
           : { disambiguation: toDisambiguationExpansion(disambiguation) }),
-        ...(disambiguationPages.length === 0
-          ? {}
-          : { disambiguationPages }),
+        ...(disambiguationPages.length === 0 ? {} : { disambiguationPages }),
         isDisambiguation: disambiguationPages.length > 0,
         ...(record.label === undefined ? {} : { label: record.label }),
         qid,
@@ -202,7 +200,9 @@ export class WikipageResolver {
   ): Promise<CachedDisambiguationRecord> {
     const pages: DisambiguationPageText[] = [];
 
-    for (const page of record.sitelinks.filter((item) => item.isDisambiguation)) {
+    for (const page of record.sitelinks.filter(
+      (item) => item.isDisambiguation,
+    )) {
       const parsedPage = await this.#client.parseDisambiguationPage(
         page.title,
         page.wiki,

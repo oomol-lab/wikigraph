@@ -97,7 +97,9 @@ function parseDisambiguationProfile(
       continue;
     }
     if (seen.has(meaning.qid)) {
-      issues.push(`Duplicate meaning qid ${meaning.qid}. Return each QID once.`);
+      issues.push(
+        `Duplicate meaning qid ${meaning.qid}. Return each QID once.`,
+      );
       continue;
     }
 
@@ -159,8 +161,10 @@ function buildNormalizerMessages(
           {
             meanings: [
               {
-                category: "person | place | organization | work | concept | event | other",
-                information: "short information copied or summarized from the disambiguation page; empty string if no information is present",
+                category:
+                  "person | place | organization | work | concept | event | other",
+                information:
+                  "short information copied or summarized from the disambiguation page; empty string if no information is present",
                 name: "display name",
                 priority: "primary | secondary | other",
                 qid: "QID from pageQidLinks",

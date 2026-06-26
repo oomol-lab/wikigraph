@@ -235,9 +235,7 @@ export function replaceTitleUriWithQidUri(
       const title = decodeURIComponent(encodedTitle);
       const qid = titleToQid.get(title);
 
-      return qid === undefined
-        ? label
-        : `[[${label}|wikigraph://qid=${qid}]]`;
+      return qid === undefined ? label : `[[${label}|wikigraph://qid=${qid}]]`;
     },
   );
 }
@@ -396,16 +394,9 @@ function shouldSkipElement(node: HtmlElement): boolean {
 }
 
 function isBlockElement(name: string): boolean {
-  return [
-    "blockquote",
-    "br",
-    "dd",
-    "div",
-    "dl",
-    "dt",
-    "p",
-    "section",
-  ].includes(name);
+  return ["blockquote", "br", "dd", "div", "dl", "dt", "p", "section"].includes(
+    name,
+  );
 }
 
 function normalizeInlineText(value: string): string {

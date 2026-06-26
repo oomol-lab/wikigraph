@@ -62,15 +62,15 @@ export interface WikimatchAcceptedMention {
   readonly confidence?: number;
   readonly qid: string;
   readonly range: WikimatchTextRange;
-  readonly reason?: string;
+  readonly note?: string;
   readonly surface: string;
 }
 
 export interface WikimatchPolicyUpdate {
   readonly candidateId: string;
   readonly decision: Exclude<WikimatchPolicyDecision, "recall">;
+  readonly note?: string;
   readonly qid?: string;
-  readonly reason?: string;
   readonly surface: string;
 }
 
@@ -84,9 +84,14 @@ export interface WikimatchPolicyDecisionOutput {
   readonly confidence?: number;
   readonly decision: WikimatchPolicyDecision;
   readonly qid?: string;
-  readonly reason?: string;
+}
+
+export interface WikimatchPolicyGroupOutput {
+  readonly decisions: readonly WikimatchPolicyDecisionOutput[];
+  readonly groupId: string;
+  readonly note?: string;
 }
 
 export interface WikimatchPolicyResponse {
-  readonly decisions: readonly WikimatchPolicyDecisionOutput[];
+  readonly groups: readonly WikimatchPolicyGroupOutput[];
 }
