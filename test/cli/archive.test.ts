@@ -1,6 +1,35 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const archiveMockState = vi.hoisted(() => ({
+  entityFindHits: [
+    {
+      chapter: 2,
+      evidence: {
+        shown: 1,
+        sources: [
+          {
+            chapterId: 2,
+            endSentenceIndex: 1,
+            fragmentId: 0,
+            id: "wikigraph://source/chapter/2/fragment/0#0..1",
+            source: "RAG original source fragment.",
+            startSentenceIndex: 0,
+            title: "Chapter 2",
+            type: "source",
+          },
+        ],
+        total: 3,
+      },
+      field: "title",
+      id: "wikigraph://entity/Q1",
+      matchedTerms: ["rag"],
+      position: { chapter: 2, fragment: 0 },
+      score: 1,
+      snippet: "RAG original source fragment.",
+      title: "RAG",
+      type: "entity",
+    },
+  ],
   findHits: [
     {
       chapter: 2,
@@ -115,20 +144,28 @@ vi.mock("../../src/facade/index.js", () => ({
       targetStage: "summarized",
     }),
   ),
-  findArchiveObjects: vi.fn((_document: unknown, query: string) =>
-    Promise.resolve({
-      chapters: null,
-      items: archiveMockState.findHits,
-      lens: "typed",
-      lensHint: null,
-      limit: 20,
-      match: "any",
-      nextCursor: null,
-      order: "doc-asc",
-      query,
-      terms: [query.toLowerCase()],
-      types: null,
-    }),
+  findArchiveObjects: vi.fn(
+    (
+      _document: unknown,
+      query: string,
+      options: { readonly types?: readonly string[] },
+    ) =>
+      Promise.resolve({
+        chapters: null,
+        items:
+          options.types?.includes("entity") === true
+            ? archiveMockState.entityFindHits
+            : archiveMockState.findHits,
+        lens: "typed",
+        lensHint: null,
+        limit: 20,
+        match: "any",
+        nextCursor: null,
+        order: "doc-asc",
+        query,
+        terms: [query.toLowerCase()],
+        types: null,
+      }),
   ),
   listArchiveEvidence: vi.fn(() => Promise.resolve(archiveMockState.evidence)),
   getArchiveIndex: vi.fn(() => Promise.resolve(archiveMockState.index)),
@@ -192,7 +229,7 @@ describe("cli/archive", () => {
     });
 
     expect(archiveMockState.textWrites[0]).toContain("wikigraph://chunk/9");
-    expect(archiveMockState.textWrites[0]).toContain("Matched: rag");
+    expect(archiveMockState.textWrites[0]).toContain("Retrieval design");
     expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
       archiveKey: "/tmp/book.sdpub",
       types: ["node"],
@@ -211,6 +248,49 @@ describe("cli/archive", () => {
     expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
       archiveKey: "/tmp/book.sdpub",
       types: ["entity"],
+    });
+    expect(archiveMockState.textWrites[0]).toContain("1 wikigraph://entity/Q1");
+    expect(archiveMockState.textWrites[0]).toContain("-- evidence 1/1");
+    expect(archiveMockState.textWrites[0]).toContain(
+      "@@ wikigraph://source/chapter/2/fragment/0#0..1 @@",
+    );
+    expect(archiveMockState.textWrites[0]).toContain("2 evidence more...");
+  });
+
+  it("prints search objects as JSON", async () => {
+    await runArchiveCommand({
+      action: "search",
+      archivePath: "/tmp/book.sdpub",
+      format: "json",
+      kinds: ["entity"],
+      query: "RAG",
+    });
+
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      nextCursor: null,
+      objects: [
+        {
+          evidence: {
+            shown: 1,
+            sources: [
+              {
+                chapter: 2,
+                fragment: 0,
+                range: { end: 1, start: 0 },
+                text: "RAG original source fragment.",
+                type: "source",
+                uri: "wikigraph://source/chapter/2/fragment/0#0..1",
+              },
+            ],
+            total: 3,
+          },
+          label: "RAG",
+          score: 1,
+          summary: "RAG original source fragment.",
+          type: "entity",
+          uri: "wikigraph://entity/Q1",
+        },
+      ],
     });
   });
 
@@ -255,7 +335,9 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain(
       "wikigraph://source/chapter/2/fragment/0#0..1",
     );
-    expect(archiveMockState.textWrites[0]).toContain("@@ 0..1 @@");
+    expect(archiveMockState.textWrites[0]).toContain(
+      "@@ wikigraph://source/chapter/2/fragment/0#0..1 @@",
+    );
     expect(archiveMockState.textWrites[0]).toContain(
       "RAG original source fragment.",
     );

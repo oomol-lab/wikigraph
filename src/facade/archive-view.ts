@@ -69,6 +69,7 @@ export interface ArchiveIndex {
 
 export interface ArchiveFindHit {
   readonly chapter?: number;
+  readonly evidence?: ArchiveFindEvidencePreview;
   readonly field: ArchiveFindField;
   readonly id: string;
   readonly matchCount?: number;
@@ -79,6 +80,12 @@ export interface ArchiveFindHit {
   readonly snippet: string;
   readonly title: string;
   readonly type: ArchiveFindObjectType;
+}
+
+export interface ArchiveFindEvidencePreview {
+  readonly shown: number;
+  readonly sources: readonly ArchiveEvidenceItem[];
+  readonly total: number;
 }
 
 export type ArchiveFindField =
@@ -965,33 +972,76 @@ async function findEntities(
   document: ReadonlyDocument,
   search: LexicalQuery,
 ): Promise<readonly ArchiveFindHit[]> {
-  const hitsByQid = new Map<string, ArchiveFindHit>();
+  const candidatesByQid = new Map<
+    string,
+    Array<{
+      readonly hit: ArchiveFindHit;
+      readonly mention: MentionRecord;
+    }>
+  >();
 
   for (const { match, mention } of createMentionLexicalHits(
     await listAllMentions(document),
     search,
   )) {
-    const current = hitsByQid.get(mention.qid);
-    const next = {
-      chapter: mention.chapterId,
-      field: "title" as const,
-      id: `wikigraph://entity/${mention.qid}`,
-      ...createFindMatchFields(match),
-      position: {
-        chapter: mention.chapterId,
-        fragment: mention.fragmentId,
-      },
-      snippet: mention.note ?? mention.surface,
-      title: mention.surface,
-      type: "entity" as const,
-    };
+    const candidates = candidatesByQid.get(mention.qid) ?? [];
 
-    if (current === undefined || (current.score ?? 0) < (next.score ?? 0)) {
-      hitsByQid.set(mention.qid, next);
-    }
+    candidates.push({
+      hit: {
+        chapter: mention.chapterId,
+        field: "title" as const,
+        id: `wikigraph://entity/${mention.qid}`,
+        ...createFindMatchFields(match),
+        position: {
+          chapter: mention.chapterId,
+          fragment: mention.fragmentId,
+        },
+        snippet: mention.note ?? mention.surface,
+        title: mention.surface,
+        type: "entity" as const,
+      },
+      mention,
+    });
+    candidatesByQid.set(mention.qid, candidates);
   }
 
-  return [...hitsByQid.values()];
+  return await Promise.all(
+    [...candidatesByQid.values()].map(async (candidates) => {
+      const rankedCandidates = [...candidates].sort((left, right) => {
+        const scoreComparison = (right.hit.score ?? 0) - (left.hit.score ?? 0);
+
+        if (scoreComparison !== 0) {
+          return scoreComparison;
+        }
+        if (left.hit.position === undefined) {
+          return right.hit.position === undefined ? 0 : 1;
+        }
+        if (right.hit.position === undefined) {
+          return -1;
+        }
+        return compareArchivePositions(left.hit.position, right.hit.position);
+      });
+      const [best] = rankedCandidates;
+
+      if (best === undefined) {
+        throw new Error("Internal error: entity search candidate is empty.");
+      }
+
+      const sources = await createMentionEvidenceItems(
+        document,
+        rankedCandidates.map((candidate) => candidate.mention),
+      );
+
+      return {
+        ...best.hit,
+        evidence: {
+          shown: Math.min(3, sources.length),
+          sources: sources.slice(0, 3),
+          total: sources.length,
+        },
+      };
+    }),
+  );
 }
 
 async function findTriples(

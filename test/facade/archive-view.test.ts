@@ -103,6 +103,17 @@ describe("facade/archive-view", () => {
 
         expect(result.items).toStrictEqual([
           expect.objectContaining({
+            evidence: {
+              shown: 1,
+              sources: [
+                expect.objectContaining({
+                  id: "wikigraph://source/chapter/1/fragment/0#0..0",
+                  source:
+                    "An LLM Wiki exposes pages, links, and source fragments to agents.",
+                }),
+              ],
+              total: 1,
+            },
             id: "wikigraph://entity/Q8018",
             title: "Augustine",
             type: "entity",

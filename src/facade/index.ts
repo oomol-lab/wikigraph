@@ -113,6 +113,7 @@ export type {
   ArchiveEstimate,
   ArchiveEvidence,
   ArchiveEvidenceItem,
+  ArchiveFindEvidencePreview,
   ArchiveCollectionOptions,
   ArchiveCollectionResult,
   ArchiveCollectionType,

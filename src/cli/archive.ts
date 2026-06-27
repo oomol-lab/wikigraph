@@ -13,8 +13,10 @@ import {
   type ArchiveEstimate,
   type ArchiveEvidence,
   type ArchiveEvidenceItem,
+  type ArchiveFindEvidencePreview,
   type ArchiveFindOptions,
   type ArchiveFindResult,
+  type ArchiveFindHit,
   type ArchiveIndex,
   type ArchiveListItem,
   type ArchivePack,
@@ -29,6 +31,33 @@ import { runConvertCommand } from "./convert.js";
 import { readTextStreamFromStdin, writeTextToStdout } from "./io.js";
 
 type ResultFormat = "json" | "jsonl" | "text";
+
+interface ArchiveOutputObject {
+  readonly evidence?: ArchiveOutputEvidencePreview;
+  readonly label?: string;
+  readonly score?: number;
+  readonly summary?: string;
+  readonly type: string;
+  readonly uri: string;
+}
+
+interface ArchiveOutputEvidencePreview {
+  readonly shown: number;
+  readonly sources: readonly ArchiveOutputSource[];
+  readonly total: number;
+}
+
+interface ArchiveOutputSource {
+  readonly chapter: number;
+  readonly fragment: number;
+  readonly range: {
+    readonly end: number;
+    readonly start: number;
+  };
+  readonly text: string;
+  readonly type: "source";
+  readonly uri: string;
+}
 
 export async function runArchiveCommand(
   args: CLIArchiveArguments,
@@ -328,30 +357,30 @@ async function writeList(
   items: readonly ArchiveListItem[],
   format: ResultFormat,
 ): Promise<void> {
-  const outputItems = items.map((item) => ({
-    ...item,
-    id: toWikiGraphUri(item.id),
+  const objects = items.map((item) => ({
+    label: item.label,
+    summary: item.summary,
+    type: item.type,
+    uri: toWikiGraphUri(item.id),
   }));
 
   if (format === "json") {
-    await writeTextToStdout(
-      `${JSON.stringify({ items: outputItems }, null, 2)}\n`,
-    );
+    await writeTextToStdout(`${JSON.stringify({ objects }, null, 2)}\n`);
     return;
   }
   if (format === "jsonl") {
-    await writeJSONL(outputItems);
+    await writeJSONL(objects);
     return;
   }
 
-  if (outputItems.length === 0) {
+  if (objects.length === 0) {
     await writeTextToStdout("No objects.\n");
     return;
   }
 
   await writeTextToStdout(
-    `${outputItems
-      .map((item) => `${item.id}  ${item.label}  ${item.summary}`)
+    `${objects
+      .map((item) => `${item.uri}\n${item.label}\n${item.summary}`)
       .join("\n")}\n`,
   );
 }
@@ -360,26 +389,34 @@ async function writeFindHits(
   result: ArchiveFindResult,
   format: ResultFormat,
 ): Promise<void> {
+  const objects = result.items.map(createFindObject);
+
   if (format === "json") {
-    await writeTextToStdout(`${JSON.stringify(result, null, 2)}\n`);
+    await writeTextToStdout(
+      `${JSON.stringify(
+        {
+          objects,
+          nextCursor: result.nextCursor,
+        },
+        null,
+        2,
+      )}\n`,
+    );
     return;
   }
   if (format === "jsonl") {
-    await writeJSONL(result.items);
+    await writeJSONL(objects);
     return;
   }
 
-  if (result.items.length === 0) {
+  if (objects.length === 0) {
     await writeTextToStdout(formatNoMatches(result));
     return;
   }
 
   await writeTextToStdout(
-    `${result.items
-      .map(
-        (hit) =>
-          `${toWikiGraphUri(hit.id)}\n${hit.title}\n${formatFindMatchLine(hit)}${hit.snippet}`,
-      )
+    `${objects
+      .map((object) => formatFindObject(object))
       .join("\n\n")}${formatNextCursor(result)}${formatFindLensHint(result)}\n`,
   );
 }
@@ -408,11 +445,7 @@ async function writeEvidence(
 }
 
 function formatEvidenceItem(item: ArchiveEvidenceItem): string {
-  return [
-    item.id,
-    `@@ ${item.startSentenceIndex}..${item.endSentenceIndex} @@`,
-    item.source,
-  ].join("\n");
+  return [`@@ ${item.id} @@`, item.source].join("\n");
 }
 
 async function writePage(
@@ -549,6 +582,77 @@ function formatNoMatches(result: ArchiveFindResult): string {
   return `${lines.join("\n")}\n`;
 }
 
+function createFindObject(hit: ArchiveFindHit): ArchiveOutputObject {
+  return {
+    ...(hit.evidence === undefined
+      ? {}
+      : { evidence: createEvidencePreviewObject(hit.evidence) }),
+    label: hit.title,
+    ...(hit.score === undefined ? {} : { score: hit.score }),
+    summary: hit.snippet,
+    type: hit.type === "node" ? "chunk" : hit.type,
+    uri: toWikiGraphUri(hit.id),
+  };
+}
+
+function createEvidencePreviewObject(
+  evidence: ArchiveFindEvidencePreview,
+): ArchiveOutputEvidencePreview {
+  return {
+    shown: evidence.shown,
+    sources: evidence.sources.map(createSourceObject),
+    total: evidence.total,
+  };
+}
+
+function createSourceObject(item: ArchiveEvidenceItem): ArchiveOutputSource {
+  return {
+    chapter: item.chapterId,
+    fragment: item.fragmentId,
+    range: {
+      end: item.endSentenceIndex,
+      start: item.startSentenceIndex,
+    },
+    text: item.source,
+    type: item.type,
+    uri: item.id,
+  };
+}
+
+function formatFindObject(object: ArchiveOutputObject): string {
+  const lines = [
+    `${formatScorePrefix(object.score)}${object.uri}`,
+    object.label,
+    object.evidence === undefined ? object.summary : undefined,
+  ].filter((line): line is string => line !== undefined && line !== "");
+
+  if (object.evidence !== undefined && object.evidence.sources.length > 0) {
+    lines.push(
+      "",
+      ...object.evidence.sources.flatMap((source, index) => [
+        `-- evidence ${index + 1}/${object.evidence?.shown ?? object.evidence?.sources.length}`,
+        formatSourceObject(source),
+      ]),
+    );
+
+    const hiddenEvidenceCount = object.evidence.total - object.evidence.shown;
+
+    if (hiddenEvidenceCount > 0) {
+      lines.push("", `${hiddenEvidenceCount} evidence more...`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function formatScorePrefix(score: number | undefined): string {
+  return score === undefined ? "" : `${Math.round(score * 100) / 100} `;
+}
+
+function formatSourceObject(source: ArchiveOutputSource): string {
+  return [`@@ ${source.uri} @@`, source.text].join("\n");
+}
+
 function formatFindLensHint(result: ArchiveFindResult): string {
   if (result.lensHint === null) {
     return "";
@@ -565,16 +669,6 @@ function formatFindTypes(result: ArchiveFindResult): string {
           type === "node" ? "chunk" : type === "fragment" ? "source" : type,
         )
         .join(",");
-}
-
-function formatFindMatchLine(hit: {
-  readonly matchedTerms?: readonly string[];
-}): string {
-  if (hit.matchedTerms === undefined || hit.matchedTerms.length === 0) {
-    return "";
-  }
-
-  return `Matched: ${hit.matchedTerms.join(", ")}\n`;
 }
 
 function formatNeighborLines(
