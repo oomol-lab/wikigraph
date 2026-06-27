@@ -16,6 +16,7 @@ export {
   countWikimatchQidOption,
   filterCandidateQidOptions,
   listCandidateSelectableQids,
+  sliceCandidateByOptionBudget,
   splitCandidateByOptionBudget,
 } from "./options.js";
 export {
@@ -48,6 +49,7 @@ export type {
   WikimatchConflictGroup,
   NarrowWikimatchCandidateOptionsInput,
   WikimatchPolicyDecision,
+  WikimatchPolicyContinuation,
   WikimatchPolicyDecisionOutput,
   WikimatchPolicyFallback,
   WikimatchPolicyJudgeInput,

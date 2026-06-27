@@ -191,6 +191,71 @@ describe("wikimatch/policy-judge", () => {
       );
     }
   });
+
+  it("allows continue only when the candidate page is incomplete", () => {
+    const input = createInput();
+
+    const result = parsePolicyResponse(
+      [
+        {
+          ...input.candidates[0]!,
+          hasMoreOptions: true,
+        },
+      ],
+      {
+        groups: [
+          {
+            decisions: [
+              {
+                candidateId: "c1",
+                decision: "continue",
+              },
+            ],
+            groupId: "g1",
+          },
+        ],
+      },
+      [
+        {
+          candidateIds: ["c1"],
+          id: "g1",
+          range: input.candidates[0]!.range,
+        },
+      ],
+    );
+
+    expect(result.continuations).toStrictEqual([
+      {
+        candidateIds: ["c1"],
+        groupId: "g1",
+      },
+    ]);
+    expect(() =>
+      parsePolicyResponse(
+        [input.candidates[0]!],
+        {
+          groups: [
+            {
+              decisions: [
+                {
+                  candidateId: "c1",
+                  decision: "continue",
+                },
+              ],
+              groupId: "g1",
+            },
+          ],
+        },
+        [
+          {
+            candidateIds: ["c1"],
+            id: "g1",
+            range: input.candidates[0]!.range,
+          },
+        ],
+      ),
+    ).toThrow(ParsedJsonError);
+  });
 });
 
 function createInput(): {

@@ -16,12 +16,11 @@ import type { WikipageResolveProgress } from "../wikipage/index.js";
 import {
   buildWikimatchSurfaceProtectionInput,
   buildWikimatchWindows,
-  countWikimatchCandidateOptions,
   enrichWikimatchCandidates,
   judgeWikimatchPolicy,
   judgeWikimatchSurfaceProtection,
   matchWikispineSentenceCandidates,
-  narrowWikimatchCandidateOptions,
+  sliceCandidateByOptionBudget,
   type WikimatchAcceptedMention,
   type WikimatchCandidate,
   type WikimatchSentence,
@@ -311,61 +310,226 @@ async function judgeCandidates(input: {
   readonly text: string;
 }): Promise<readonly MentionRecord[]> {
   const mentions: MentionRecord[] = [];
-  let mentionIndex = 1;
-  const candidates = await narrowOversizedCandidates(input);
-  const windows = buildWikimatchWindows({
-    candidates,
-    contextWords: 220,
-    optionBudget: WIKIMATCH_GROUNDING_OPTION_BUDGET,
+  const sentenceLocations = buildSentenceLocations(input.fragments);
+  const acceptedMentions = await groundWikimatchCandidates({
+    candidates: input.candidates,
+    policyPrompt: input.policyPrompt,
+    ...(input.progressTracker === undefined
+      ? {}
+      : { progressTracker: input.progressTracker }),
+    request: input.request,
     text: input.text,
   });
+  let mentionIndex = 1;
+
+  for (const mention of acceptedMentions) {
+    const location = locateMention(sentenceLocations, mention.range.start);
+
+    mentions.push(
+      toMentionRecord(input.chapterId, mention, location, mentionIndex),
+    );
+    mentionIndex += 1;
+  }
+
+  return mentions;
+}
+
+export async function groundWikimatchCandidates(input: {
+  readonly candidates: readonly WikimatchCandidate[];
+  readonly policyPrompt: string;
+  readonly progressTracker?: Pick<
+    BuildJobProgressReporter,
+    "throwIfStopped" | "updatePhase"
+  >;
+  readonly request: GuaranteedRequest;
+  readonly text: string;
+}): Promise<readonly WikimatchAcceptedMention[]> {
+  const mentions: WikimatchAcceptedMention[] = [];
+  const candidatePages = createGroundingCandidatePages(input.candidates);
   let completedWindows = 0;
+  let totalWindows = 0;
 
   await input.progressTracker?.updatePhase({
     done: 0,
     phase: "grounding",
-    total: windows.length,
+    total: 0,
     unit: "window",
   });
   const limiter = new AsyncSemaphore(WIKIMATCH_GROUNDING_CONCURRENCY);
-  const results = await Promise.all(
-    windows.map(async (window) => {
-      return await limiter.use(async () => {
-        try {
-          await input.progressTracker?.throwIfStopped();
-          return await judgeWikimatchPolicy({
-            candidates: window.candidates,
-            policyPrompt: input.policyPrompt,
-            request: input.request,
-            window,
-          });
-        } finally {
-          completedWindows += 1;
-          await input.progressTracker?.updatePhase({
-            done: completedWindows,
-            phase: "grounding",
-            total: windows.length,
-            unit: "window",
-          });
+  let activeCandidates = candidatePages.nextPage();
+
+  while (activeCandidates.length > 0) {
+    const windows = buildWikimatchWindows({
+      candidates: activeCandidates,
+      contextWords: 220,
+      optionBudget: WIKIMATCH_GROUNDING_OPTION_BUDGET,
+      text: input.text,
+    });
+
+    totalWindows += windows.length;
+
+    const results = await Promise.all(
+      windows.map(async (window) => {
+        return await limiter.use(async () => {
+          try {
+            await input.progressTracker?.throwIfStopped();
+            return await judgeWikimatchPolicy({
+              candidates: window.candidates,
+              policyPrompt: input.policyPrompt,
+              request: input.request,
+              window,
+            });
+          } finally {
+            completedWindows += 1;
+            await input.progressTracker?.updatePhase({
+              done: completedWindows,
+              phase: "grounding",
+              total: totalWindows,
+              unit: "window",
+            });
+          }
+        });
+      }),
+    );
+
+    const continuedCandidateIds = new Set<string>();
+
+    for (const result of results) {
+      for (const mention of result.mentions) {
+        mentions.push(mention);
+        candidatePages.accept(mention);
+      }
+      for (const update of result.policyUpdates) {
+        candidatePages.close(update.candidateId);
+      }
+      for (const continuation of result.continuations) {
+        for (const candidateId of continuation.candidateIds) {
+          continuedCandidateIds.add(candidateId);
         }
-      });
-    }),
-  );
-
-  const sentenceLocations = buildSentenceLocations(input.fragments);
-
-  for (const result of results) {
-    for (const mention of result.mentions) {
-      const location = locateMention(sentenceLocations, mention.range.start);
-
-      mentions.push(
-        toMentionRecord(input.chapterId, mention, location, mentionIndex),
-      );
-      mentionIndex += 1;
+      }
     }
+
+    activeCandidates = candidatePages.nextPage(continuedCandidateIds);
   }
 
   return mentions;
+}
+
+function createGroundingCandidatePages(
+  candidates: readonly WikimatchCandidate[],
+): {
+  readonly accept: (mention: WikimatchAcceptedMention) => void;
+  readonly close: (candidateId: string) => void;
+  readonly nextPage: (
+    continuedCandidateIds?: ReadonlySet<string>,
+  ) => readonly WikimatchCandidate[];
+} {
+  const candidatesById = new Map(
+    candidates.map((candidate) => [candidate.id, candidate]),
+  );
+  const cursors = new Map(candidates.map((candidate) => [candidate.id, 0]));
+  const closedCandidateIds = new Set<string>();
+  const recallCounts = new Map<string, number>();
+
+  return {
+    accept(mention) {
+      closedCandidateIds.add(mention.candidateId);
+      recallCounts.set(
+        createSurfaceQidKey(mention.surface, mention.qid),
+        (recallCounts.get(createSurfaceQidKey(mention.surface, mention.qid)) ??
+          0) + 1,
+      );
+    },
+    close(candidateId) {
+      closedCandidateIds.add(candidateId);
+    },
+    nextPage(continuedCandidateIds) {
+      const pageCandidates: WikimatchCandidate[] = [];
+      const candidateIds =
+        continuedCandidateIds === undefined
+          ? candidates.map((candidate) => candidate.id)
+          : [...continuedCandidateIds];
+
+      for (const candidateId of candidateIds) {
+        if (closedCandidateIds.has(candidateId)) {
+          continue;
+        }
+
+        const candidate = candidatesById.get(candidateId);
+        const cursor = cursors.get(candidateId);
+
+        if (candidate === undefined || cursor === undefined) {
+          continue;
+        }
+
+        const sortedCandidate = sortCandidateOptionsByRecall(
+          candidate,
+          recallCounts,
+        );
+        const page = sliceCandidateByOptionBudget(
+          sortedCandidate,
+          WIKIMATCH_GROUNDING_OPTION_BUDGET,
+          cursor,
+        );
+
+        if (page.candidate.qidOptions.length === 0) {
+          closedCandidateIds.add(candidateId);
+          continue;
+        }
+
+        if (page.nextOffset === undefined) {
+          closedCandidateIds.add(candidateId);
+        } else {
+          cursors.set(candidateId, page.nextOffset);
+        }
+        pageCandidates.push(page.candidate);
+      }
+
+      return pageCandidates;
+    },
+  };
+}
+
+function sortCandidateOptionsByRecall(
+  candidate: WikimatchCandidate,
+  recallCounts: ReadonlyMap<string, number>,
+): WikimatchCandidate {
+  return {
+    ...candidate,
+    qidOptions: [...candidate.qidOptions].sort((left, right) => {
+      return (
+        getOptionRecallScore(candidate.surface, right, recallCounts) -
+        getOptionRecallScore(candidate.surface, left, recallCounts)
+      );
+    }),
+  };
+}
+
+function getOptionRecallScore(
+  surface: string,
+  option: WikimatchCandidate["qidOptions"][number],
+  recallCounts: ReadonlyMap<string, number>,
+): number {
+  const directScore =
+    recallCounts.get(createSurfaceQidKey(surface, option.qid)) ?? 0;
+  const disambiguationScore =
+    option.disambiguation?.linkedQids.reduce(
+      (total, item) =>
+        total + (recallCounts.get(createSurfaceQidKey(surface, item.qid)) ?? 0),
+      0,
+    ) ?? 0;
+  const profileScore =
+    option.disambiguation?.profile?.meanings.reduce(
+      (total, item) =>
+        total + (recallCounts.get(createSurfaceQidKey(surface, item.qid)) ?? 0),
+      0,
+    ) ?? 0;
+
+  return directScore + disambiguationScore + profileScore;
+}
+
+function createSurfaceQidKey(surface: string, qid: string): string {
+  return `${surface}\0${qid}`;
 }
 
 export function createEnrichmentProgressReporter(
@@ -532,73 +696,6 @@ function buildFragmentSentenceOffsets(
 
 function joinSentences(sentences: readonly WikilinkSentence[]): string {
   return sentences.map((sentence) => sentence.text).join(" ");
-}
-
-async function narrowOversizedCandidates(input: {
-  readonly candidates: readonly WikimatchCandidate[];
-  readonly policyPrompt: string;
-  readonly progressTracker?: Pick<
-    BuildJobProgressReporter,
-    "throwIfStopped" | "updatePhase"
-  >;
-  readonly request: GuaranteedRequest;
-  readonly text: string;
-}): Promise<readonly WikimatchCandidate[]> {
-  const oversizedCandidates = input.candidates.filter(
-    (candidate) =>
-      countWikimatchCandidateOptions(candidate) >
-      WIKIMATCH_GROUNDING_OPTION_BUDGET,
-  );
-  let completedCandidates = 0;
-
-  if (oversizedCandidates.length > 0) {
-    await input.progressTracker?.updatePhase({
-      done: 0,
-      phase: "narrowing",
-      total: oversizedCandidates.length,
-      unit: "candidate",
-    });
-  }
-
-  return (
-    await Promise.all(
-      input.candidates.map(async (candidate) => {
-        if (
-          countWikimatchCandidateOptions(candidate) <=
-          WIKIMATCH_GROUNDING_OPTION_BUDGET
-        ) {
-          return candidate;
-        }
-
-        let result: Awaited<ReturnType<typeof narrowWikimatchCandidateOptions>>;
-
-        try {
-          await input.progressTracker?.throwIfStopped();
-          result = await narrowWikimatchCandidateOptions({
-            candidate,
-            optionBudget: WIKIMATCH_GROUNDING_OPTION_BUDGET,
-            policyPrompt: input.policyPrompt,
-            request: input.request,
-            text: input.text,
-          });
-        } finally {
-          completedCandidates += 1;
-          await input.progressTracker?.updatePhase({
-            done: completedCandidates,
-            phase: "narrowing",
-            total: oversizedCandidates.length,
-            unit: "candidate",
-          });
-        }
-
-        return result.candidate.qidOptions.length > 0
-          ? result.candidate
-          : undefined;
-      }),
-    )
-  ).filter(
-    (candidate): candidate is WikimatchCandidate => candidate !== undefined,
-  );
 }
 
 function countUniqueQids(candidates: readonly WikimatchCandidate[]): number {

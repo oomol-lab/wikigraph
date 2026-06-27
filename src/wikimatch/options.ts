@@ -85,6 +85,40 @@ export function splitCandidateByOptionBudget(
   return chunks;
 }
 
+export function sliceCandidateByOptionBudget(
+  candidate: WikimatchCandidate,
+  optionBudget: number,
+  offset: number,
+): {
+  readonly candidate: WikimatchCandidate;
+  readonly nextOffset?: number;
+} {
+  if (!Number.isFinite(optionBudget) || optionBudget <= 0) {
+    throw new Error("Wikimatch option budget must be positive.");
+  }
+  if (!Number.isInteger(offset) || offset < 0) {
+    throw new Error("Wikimatch option offset must be a non-negative integer.");
+  }
+
+  const selectedQids = listCandidateSelectableQids(candidate).slice(
+    offset,
+    offset + optionBudget,
+  );
+  const filtered = filterCandidateQidOptions(candidate, new Set(selectedQids));
+  const nextOffset =
+    offset + selectedQids.length < listCandidateSelectableQids(candidate).length
+      ? offset + selectedQids.length
+      : undefined;
+
+  return {
+    candidate: {
+      ...filtered,
+      ...(nextOffset === undefined ? {} : { hasMoreOptions: true }),
+    },
+    ...(nextOffset === undefined ? {} : { nextOffset }),
+  };
+}
+
 function splitQidOptionByBudget(
   option: WikimatchQidOption,
   optionBudget: number,

@@ -73,6 +73,7 @@ export {
   commitChapterKnowledgeGraphArtifact,
   createEnrichmentProgressReporter,
   generateChapterKnowledgeGraphArtifact,
+  groundWikimatchCandidates,
 } from "./knowledge-graph-build.js";
 export type {
   BuildChapterGraphArtifactOptions,

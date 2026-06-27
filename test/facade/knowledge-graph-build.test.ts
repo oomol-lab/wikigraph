@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { DirectoryDocument } from "../../src/document/index.js";
 import {
@@ -6,7 +6,9 @@ import {
   clearChapterKnowledgeGraph,
   commitChapterKnowledgeGraphArtifact,
   createEnrichmentProgressReporter,
+  groundWikimatchCandidates,
 } from "../../src/facade/index.js";
+import type { GuaranteedRequest } from "../../src/guaranteed/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("facade/knowledge-graph-build", () => {
@@ -37,6 +39,95 @@ describe("facade/knowledge-graph-build", () => {
         unit: "qid",
       },
     ]);
+  });
+
+  it("grounds oversized candidate pages without narrowing", async () => {
+    const updates: unknown[] = [];
+    const request = vi
+      .fn<GuaranteedRequest>()
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          groups: [
+            {
+              decisions: [
+                {
+                  candidateId: "c1",
+                  decision: "continue",
+                },
+              ],
+              groupId: "g1",
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          groups: [
+            {
+              decisions: [
+                {
+                  candidateId: "c1",
+                  decision: "recall",
+                  qid: "Q40",
+                },
+              ],
+              groupId: "g1",
+            },
+          ],
+        }),
+      );
+
+    const mentions = await groundWikimatchCandidates({
+      candidates: [
+        {
+          id: "c1",
+          qidOptions: [
+            {
+              disambiguation: {
+                checkedAt: "2026-06-27T00:00:00.000Z",
+                disambiguationQid: "Q1",
+                linkedQids: Array.from({ length: 40 }, (_value, index) => ({
+                  qid: `Q${index + 1}`,
+                  title: `Option ${index + 1}`,
+                })),
+                pages: [],
+              },
+              isDisambiguation: true,
+              label: "舰队",
+              qid: "Q1",
+            },
+          ],
+          range: { end: 2, start: 0 },
+          surface: "舰队",
+        },
+      ],
+      policyPrompt: "召回历史叙事中的实体。",
+      progressTracker: {
+        throwIfStopped: () => Promise.resolve(),
+        updatePhase: (input) => {
+          updates.push(input);
+          return Promise.resolve();
+        },
+      },
+      request,
+      text: "舰队发动攻击。",
+    });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[0]?.[0][1]?.content).toContain(
+      '"hasMoreOptions": true',
+    );
+    expect(mentions).toStrictEqual([
+      {
+        candidateId: "c1",
+        qid: "Q40",
+        range: { end: 2, start: 0 },
+        surface: "舰队",
+      },
+    ]);
+    expect(updates).not.toContainEqual(
+      expect.objectContaining({ phase: "narrowing" }),
+    );
   });
 
   it("commits chapter mention evidence from JSONL artifacts", async () => {

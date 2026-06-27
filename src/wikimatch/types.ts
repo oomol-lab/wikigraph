@@ -1,6 +1,7 @@
 import type { DisambiguationExpansion } from "../wikipage/index.js";
 
 export interface WikimatchCandidate {
+  readonly hasMoreOptions?: boolean;
   readonly id: string;
   readonly qidOptions: readonly WikimatchQidOption[];
   readonly range: WikimatchTextRange;
@@ -120,6 +121,7 @@ export interface WikimatchSurfaceProtectionResponse {
 }
 
 export type WikimatchPolicyDecision =
+  | "continue"
   | "never_recall"
   | "recall"
   | "skip_this_time";
@@ -131,6 +133,7 @@ export interface WikimatchPolicyJudgeInput {
 }
 
 export interface WikimatchPolicyJudgeResult {
+  readonly continuations: readonly WikimatchPolicyContinuation[];
   readonly fallback?: WikimatchPolicyFallback;
   readonly mentions: readonly WikimatchAcceptedMention[];
   readonly policyUpdates: readonly WikimatchPolicyUpdate[];
@@ -147,10 +150,15 @@ export interface WikimatchAcceptedMention {
 
 export interface WikimatchPolicyUpdate {
   readonly candidateId: string;
-  readonly decision: Exclude<WikimatchPolicyDecision, "recall">;
+  readonly decision: Exclude<WikimatchPolicyDecision, "recall" | "continue">;
   readonly note?: string;
   readonly qid?: string;
   readonly surface: string;
+}
+
+export interface WikimatchPolicyContinuation {
+  readonly candidateIds: readonly string[];
+  readonly groupId: string;
 }
 
 export interface WikimatchPolicyFallback {
