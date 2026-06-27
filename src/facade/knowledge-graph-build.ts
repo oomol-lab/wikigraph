@@ -12,6 +12,7 @@ import type {
   MentionRecord,
   ReadonlyDocument,
 } from "../document/index.js";
+import type { WikipageResolveProgress } from "../wikipage/index.js";
 import {
   buildWikimatchSurfaceProtectionInput,
   buildWikimatchWindows,
@@ -25,6 +26,7 @@ import {
   type WikimatchCandidate,
   type WikimatchSentence,
 } from "../wikimatch/index.js";
+import type { WikipageResolverOptions } from "../wikipage/index.js";
 import {
   buildWikilinkEvidenceWindows,
   discoverWikilinkRelations,
@@ -55,8 +57,12 @@ export interface BuildChapterKnowledgeGraphArtifactOptions {
 
 export interface GenerateChapterKnowledgeGraphArtifactOptions {
   readonly policyPrompt: string;
-  readonly progressTracker?: Pick<BuildJobProgressReporter, "updatePhase">;
+  readonly progressTracker?: Pick<
+    BuildJobProgressReporter,
+    "throwIfStopped" | "updatePhase"
+  >;
   readonly request: GuaranteedRequest;
+  readonly resolverOptions?: Omit<WikipageResolverOptions, "progress">;
   readonly workspacePath: string;
 }
 
@@ -116,6 +122,7 @@ export async function generateChapterKnowledgeGraphArtifact(
     includeDisambiguation: true,
     sentences,
   });
+  await options.progressTracker?.throwIfStopped();
   await options.progressTracker?.updatePhase({
     done: sentences.length,
     phase: "matching",
@@ -131,6 +138,7 @@ export async function generateChapterKnowledgeGraphArtifact(
     request: options.request,
     text,
   });
+  await options.progressTracker?.throwIfStopped();
   const qidCount = countUniqueQids(screenedCandidates);
   await options.progressTracker?.updatePhase({
     done: 0,
@@ -144,21 +152,14 @@ export async function generateChapterKnowledgeGraphArtifact(
       ...(options.progressTracker === undefined
         ? {}
         : {
-            progress: async (event) => {
-              await options.progressTracker?.updatePhase({
-                done: event.done,
-                phase: "enrichment",
-                phaseDetail: event.detail,
-                total: event.total,
-                unit:
-                  event.detail === "entity" || event.detail === "qid"
-                    ? "qid"
-                    : "page",
-              });
-            },
+            progress: createEnrichmentProgressReporter(options.progressTracker),
           }),
+      ...(options.resolverOptions === undefined
+        ? {}
+        : { resolverOptions: options.resolverOptions }),
     },
   );
+  await options.progressTracker?.throwIfStopped();
   await options.progressTracker?.updatePhase({
     done: qidCount,
     phase: "enrichment",
@@ -176,6 +177,7 @@ export async function generateChapterKnowledgeGraphArtifact(
     request: options.request,
     text,
   });
+  await options.progressTracker?.throwIfStopped();
   await options.progressTracker?.updatePhase({
     done: 0,
     phase: "writing",
@@ -191,6 +193,7 @@ export async function generateChapterKnowledgeGraphArtifact(
       : { progressTracker: options.progressTracker }),
     request: options.request,
   });
+  await options.progressTracker?.throwIfStopped();
   const artifact = await buildChapterKnowledgeGraphArtifact(chapterId, {
     mentionLinks,
     mentions,
@@ -238,7 +241,10 @@ export async function buildChapterKnowledgeGraphArtifact(
 async function screenCandidates(input: {
   readonly candidates: readonly WikimatchCandidate[];
   readonly policyPrompt: string;
-  readonly progressTracker?: Pick<BuildJobProgressReporter, "updatePhase">;
+  readonly progressTracker?: Pick<
+    BuildJobProgressReporter,
+    "throwIfStopped" | "updatePhase"
+  >;
   readonly request: GuaranteedRequest;
   readonly text: string;
 }): Promise<readonly WikimatchCandidate[]> {
@@ -259,11 +265,13 @@ async function screenCandidates(input: {
     total: 1,
     unit: "window",
   });
+  await input.progressTracker?.throwIfStopped();
   const protection = await judgeWikimatchSurfaceProtection({
     policyPrompt: input.policyPrompt,
     request: input.request,
     suspiciousSurfaces: protectionInput.suspiciousSurfaces,
   });
+  await input.progressTracker?.throwIfStopped();
   const protectedSurfaces = new Set(
     protection.protectedSurfaces.map((surface) => surface.text),
   );
@@ -295,7 +303,10 @@ async function judgeCandidates(input: {
   readonly chapterId: number;
   readonly fragments: readonly FragmentRecord[];
   readonly policyPrompt: string;
-  readonly progressTracker?: Pick<BuildJobProgressReporter, "updatePhase">;
+  readonly progressTracker?: Pick<
+    BuildJobProgressReporter,
+    "throwIfStopped" | "updatePhase"
+  >;
   readonly request: GuaranteedRequest;
   readonly text: string;
 }): Promise<readonly MentionRecord[]> {
@@ -321,6 +332,7 @@ async function judgeCandidates(input: {
     windows.map(async (window) => {
       return await limiter.use(async () => {
         try {
+          await input.progressTracker?.throwIfStopped();
           return await judgeWikimatchPolicy({
             candidates: window.candidates,
             policyPrompt: input.policyPrompt,
@@ -356,10 +368,34 @@ async function judgeCandidates(input: {
   return mentions;
 }
 
+export function createEnrichmentProgressReporter(
+  progressTracker: Pick<
+    BuildJobProgressReporter,
+    "throwIfStopped" | "updatePhase"
+  >,
+): (event: WikipageResolveProgress) => Promise<void> {
+  return async (event) => {
+    await progressTracker.throwIfStopped();
+    if (event.detail !== "qid") {
+      return;
+    }
+
+    await progressTracker.updatePhase({
+      done: event.done,
+      phase: "enrichment",
+      total: event.total,
+      unit: "qid",
+    });
+  };
+}
+
 async function discoverMentionLinks(input: {
   readonly fragments: readonly FragmentRecord[];
   readonly mentions: readonly MentionRecord[];
-  readonly progressTracker?: Pick<BuildJobProgressReporter, "updatePhase">;
+  readonly progressTracker?: Pick<
+    BuildJobProgressReporter,
+    "throwIfStopped" | "updatePhase"
+  >;
   readonly request: GuaranteedRequest;
 }): Promise<readonly MentionLinkRecord[]> {
   const fragmentWindows = buildMentionLinkWindows(
@@ -378,6 +414,7 @@ async function discoverMentionLinks(input: {
 
   for (const item of fragmentWindows) {
     try {
+      await input.progressTracker?.throwIfStopped();
       discoveredLinks.push(
         ...(await discoverWikilinkRelations({
           chapterId: item.fragment.serialId,
@@ -500,7 +537,10 @@ function joinSentences(sentences: readonly WikilinkSentence[]): string {
 async function narrowOversizedCandidates(input: {
   readonly candidates: readonly WikimatchCandidate[];
   readonly policyPrompt: string;
-  readonly progressTracker?: Pick<BuildJobProgressReporter, "updatePhase">;
+  readonly progressTracker?: Pick<
+    BuildJobProgressReporter,
+    "throwIfStopped" | "updatePhase"
+  >;
   readonly request: GuaranteedRequest;
   readonly text: string;
 }): Promise<readonly WikimatchCandidate[]> {
@@ -533,6 +573,7 @@ async function narrowOversizedCandidates(input: {
         let result: Awaited<ReturnType<typeof narrowWikimatchCandidateOptions>>;
 
         try {
+          await input.progressTracker?.throwIfStopped();
           result = await narrowWikimatchCandidateOptions({
             candidate,
             optionBudget: WIKIMATCH_GROUNDING_OPTION_BUDGET,

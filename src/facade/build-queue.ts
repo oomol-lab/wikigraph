@@ -8,6 +8,7 @@ import { Database } from "../document/index.js";
 export const BUILD_JOB_STATES = [
   "queued",
   "running",
+  "canceling",
   "paused",
   "succeeded",
   "failed",
@@ -62,7 +63,7 @@ export type BuildJobEvent =
       readonly jobId: string;
       readonly seq: number;
       readonly state: BuildJobState;
-      readonly type: "created" | "paused" | "resumed" | "boosted";
+      readonly type: "created" | "paused" | "resumed" | "boosted" | "canceling";
     }
   | {
       readonly at: number;
@@ -165,6 +166,7 @@ export interface BuildJobProgressReporter {
     readonly total: number;
     readonly unit: BuildJobProgressUnit;
   }): Promise<void>;
+  throwIfStopped(): Promise<void>;
 }
 
 const BUILD_QUEUE_SCHEMA_SQL = `
@@ -192,7 +194,7 @@ CREATE TABLE IF NOT EXISTS build_jobs (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_build_jobs_active_chapter
 ON build_jobs(archive_key, chapter_id)
-WHERE state IN ('queued', 'running', 'paused');
+WHERE state IN ('queued', 'running', 'canceling', 'paused');
 
 CREATE INDEX IF NOT EXISTS idx_build_jobs_queue
 ON build_jobs(state, queue_rank, updated_at);
@@ -211,6 +213,7 @@ VALUES (1);
 const ACTIVE_JOB_STATES = new Set<BuildJobState>([
   "queued",
   "running",
+  "canceling",
   "paused",
 ]);
 const WORKER_HEARTBEAT_INTERVAL_MS = 5_000;
@@ -288,7 +291,7 @@ export async function listBuildJobs(
       filters.push("archive_key = ?");
     }
     if (options.activeOnly === true || options.all !== true) {
-      filters.push("state IN ('queued', 'running', 'paused')");
+      filters.push("state IN ('queued', 'running', 'canceling', 'paused')");
     }
 
     return await state.queryAll(
@@ -299,9 +302,10 @@ ${filters.length === 0 ? "" : `WHERE ${filters.join(" AND ")}`}
 ORDER BY
   CASE state
     WHEN 'running' THEN 0
-    WHEN 'queued' THEN 1
-    WHEN 'paused' THEN 2
-    ELSE 3
+    WHEN 'canceling' THEN 1
+    WHEN 'queued' THEN 2
+    WHEN 'paused' THEN 3
+    ELSE 4
   END,
   queue_rank ASC,
   updated_at DESC
@@ -350,10 +354,25 @@ export async function resumeBuildJob(jobId: string): Promise<BuildJob> {
 }
 
 export async function cancelBuildJob(jobId: string): Promise<BuildJob> {
-  return await updateBuildJobState(jobId, "canceled", "canceled", {
-    allowedStates: ["queued", "running", "paused"],
-    finished: true,
-  });
+  const state = await openBuildQueueDatabase();
+
+  try {
+    await recoverStaleBuildJobs(state);
+    return await state.transaction(async () => {
+      const job = await requireBuildJobById(state, jobId);
+
+      if (job.state === "running") {
+        return await markBuildJobCanceling(state, job);
+      }
+      if (job.state === "queued" || job.state === "paused") {
+        return await markBuildJobCanceled(state, job);
+      }
+
+      throw new Error(`Cannot cancel ${job.state} job ${jobId}.`);
+    });
+  } finally {
+    await state.close();
+  }
 }
 
 export async function boostBuildJob(jobId: string): Promise<BuildJob> {
@@ -479,7 +498,7 @@ SELECT *
 FROM build_jobs
 WHERE archive_key = ?
   AND chapter_id IN (${placeholders})
-  AND state IN ('queued', 'running', 'paused')
+  AND state IN ('queued', 'running', 'canceling', 'paused')
   ${targetFilter}
 ORDER BY updated_at DESC
 LIMIT 1
@@ -583,7 +602,7 @@ async function executeClaimedBuildJob(
   ownerId: string,
   options: BuildJobWorkerOptions,
 ): Promise<void> {
-  const reporter = new BuildJobProgressAccumulator(job);
+  const reporter = new BuildJobProgressAccumulator(job, ownerId);
 
   try {
     await appendBuildJobEvent(job, {
@@ -596,6 +615,11 @@ async function executeClaimedBuildJob(
     await options.executeJob(job, reporter);
     await markBuildJobSucceeded(job.jobId, ownerId);
   } catch (error) {
+    if (error instanceof BuildJobStoppedError) {
+      await markBuildJobStopped(job.jobId, ownerId);
+      return;
+    }
+
     await markBuildJobFailed(job.jobId, ownerId, error);
   }
 }
@@ -655,7 +679,7 @@ WHERE state IN (${placeholders})
 async function updateBuildJobState(
   jobId: string,
   stateName: BuildJobState,
-  eventType: Extract<BuildJobEvent["type"], "paused" | "resumed" | "canceled">,
+  eventType: Extract<BuildJobEvent["type"], "paused" | "resumed">,
   options: {
     readonly allowedStates: readonly BuildJobState[];
     readonly clearOwner?: boolean;
@@ -697,7 +721,7 @@ WHERE job_id = ?
         at: now,
         jobId,
         seq: 0,
-        state: stateName as "queued" | "paused" | "canceled",
+        state: stateName as "queued" | "paused",
         type: eventType,
       } as BuildJobEvent);
       return updated;
@@ -705,6 +729,59 @@ WHERE job_id = ?
   } finally {
     await state.close();
   }
+}
+
+async function markBuildJobCanceling(
+  state: Database,
+  job: BuildJob,
+): Promise<BuildJob> {
+  const now = Date.now();
+
+  await state.run(
+    `
+UPDATE build_jobs
+SET state = 'canceling', updated_at = ?
+WHERE job_id = ? AND state = 'running'
+`,
+    [now, job.jobId],
+  );
+
+  const updated = await requireBuildJobById(state, job.jobId);
+  await appendBuildJobEvent(updated, {
+    at: now,
+    jobId: job.jobId,
+    seq: 0,
+    state: "canceling",
+    type: "canceling",
+  });
+  return updated;
+}
+
+async function markBuildJobCanceled(
+  state: Database,
+  job: BuildJob,
+): Promise<BuildJob> {
+  const now = Date.now();
+
+  await state.run(
+    `
+UPDATE build_jobs
+SET state = 'canceled', owner_id = NULL, owner_pid = NULL,
+    current_step = NULL, finished_at = ?, updated_at = ?
+WHERE job_id = ?
+`,
+    [now, now, job.jobId],
+  );
+
+  const updated = await requireBuildJobById(state, job.jobId);
+  await appendBuildJobEvent(updated, {
+    at: now,
+    jobId: job.jobId,
+    seq: 0,
+    state: "canceled",
+    type: "canceled",
+  });
+  return updated;
 }
 
 async function markBuildJobSucceeded(
@@ -786,6 +863,27 @@ WHERE job_id = ?
   }
 }
 
+async function markBuildJobStopped(
+  jobId: string,
+  ownerId: string,
+): Promise<void> {
+  const state = await openBuildQueueDatabase();
+
+  try {
+    await state.transaction(async () => {
+      const job = await requireBuildJobById(state, jobId);
+
+      if (job.ownerId !== ownerId || job.state !== "canceling") {
+        return;
+      }
+
+      await markBuildJobCanceled(state, job);
+    });
+  } finally {
+    await state.close();
+  }
+}
+
 async function claimQueuedBuildJob(
   state: Database,
   ownerId: string,
@@ -827,7 +925,7 @@ async function recoverStaleBuildJobs(state: Database): Promise<void> {
       `
 SELECT *
 FROM build_jobs
-WHERE state = 'running'
+WHERE state IN ('running', 'canceling')
   AND owner_pid IS NOT NULL
 `,
       undefined,
@@ -840,6 +938,11 @@ WHERE state = 'running'
       }
 
       const now = Date.now();
+      if (job.state === "canceling") {
+        await markBuildJobCanceled(state, job);
+        continue;
+      }
+
       await state.run(
         `
 UPDATE build_jobs
@@ -1233,6 +1336,7 @@ async function delay(ms: number): Promise<void> {
 
 class BuildJobProgressAccumulator implements BuildJobProgressReporter {
   readonly #job: BuildJob;
+  readonly #ownerId: string;
   readonly #outputCharactersPerToken = 4;
   readonly #refreshIntervalMs = 5_000;
   #graphWords = 0;
@@ -1253,12 +1357,14 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
   #totalReadingSummaryWords = 0;
   #writeQueue: Promise<void> = Promise.resolve();
 
-  public constructor(job: BuildJob) {
+  public constructor(job: BuildJob, ownerId: string) {
     this.#job = job;
+    this.#ownerId = ownerId;
   }
 
   public async addOutputCharacters(characters: number): Promise<void> {
     await this.#enqueue(async () => {
+      await this.throwIfStopped();
       this.#outputCharacters += characters;
       await this.#snapshot();
     });
@@ -1269,6 +1375,7 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
     readonly totalReadingSummaryWords?: number;
   }): Promise<void> {
     await this.#enqueue(async () => {
+      await this.throwIfStopped();
       this.#totalGraphWords = input.totalGraphWords ?? this.#totalGraphWords;
       this.#totalReadingSummaryWords =
         input.totalReadingSummaryWords ?? this.#totalReadingSummaryWords;
@@ -1278,6 +1385,7 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
 
   public async stepStarted(step: BuildJobTarget): Promise<void> {
     await this.#enqueue(async () => {
+      await this.throwIfStopped();
       this.#step = step;
       this.#phase = undefined;
       await markBuildJobStep(this.#job.jobId, step);
@@ -1294,6 +1402,7 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
 
   public async stepCompleted(step: BuildJobTarget): Promise<void> {
     await this.#enqueue(async () => {
+      await this.throwIfStopped();
       this.#step = step;
       await appendBuildJobEvent(this.#job, {
         at: Date.now(),
@@ -1311,6 +1420,7 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
     readonly readingSummaryWords?: number;
   }): Promise<void> {
     await this.#enqueue(async () => {
+      await this.throwIfStopped();
       this.#graphWords =
         input.graphWords === undefined
           ? this.#graphWords
@@ -1334,6 +1444,7 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
     readonly unit: BuildJobProgressUnit;
   }): Promise<void> {
     await this.#enqueue(async () => {
+      await this.throwIfStopped();
       this.#phase = {
         done: clampProgressWords(input.done, input.total),
         phase: input.phase,
@@ -1345,6 +1456,18 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
       };
       await this.#snapshot(true);
     });
+  }
+
+  public async throwIfStopped(): Promise<void> {
+    const job = await getBuildJob(this.#job.jobId);
+
+    if (job.state === "running" && job.ownerId === this.#ownerId) {
+      return;
+    }
+
+    throw new BuildJobStoppedError(
+      `Job ${this.#job.jobId} is ${job.state}. Stop current worker execution.`,
+    );
   }
 
   async #enqueue(operation: () => Promise<void>): Promise<void> {
@@ -1413,6 +1536,13 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
       case undefined:
         return 0;
     }
+  }
+}
+
+class BuildJobStoppedError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "BuildJobStoppedError";
   }
 }
 

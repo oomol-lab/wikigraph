@@ -114,6 +114,7 @@ describe("facade/build-queue", () => {
           await reporter.stepStarted("reading-summary");
           summaryStarted();
           await workerRelease;
+          await reporter.throwIfStopped();
         },
         idleTimeoutMs: 0,
       });
@@ -232,6 +233,73 @@ describe("facade/build-queue", () => {
         phaseUnit: "window",
         step: "knowledge-graph",
       });
+    });
+  });
+
+  it("marks running jobs canceling before the worker confirms cancellation", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+      const first = await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "knowledge-graph",
+      });
+      const second = await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 2,
+        target: "knowledge-graph",
+      });
+      let firstStarted!: () => void;
+      let secondStarted!: () => void;
+      let releaseCanceledJob!: () => void;
+      const firstStartedSignal = new Promise<void>((resolveStarted) => {
+        firstStarted = resolveStarted;
+      });
+      const secondStartedSignal = new Promise<void>((resolveStarted) => {
+        secondStarted = resolveStarted;
+      });
+      const releaseCanceledJobSignal = new Promise<void>((resolveRelease) => {
+        releaseCanceledJob = resolveRelease;
+      });
+
+      const worker = runBuildJobWorker({
+        concurrency: 1,
+        executeJob: async (job, reporter) => {
+          if (job.jobId === first.jobId) {
+            firstStarted();
+            await releaseCanceledJobSignal;
+            await reporter.updatePhase({
+              done: 1,
+              phase: "writing",
+              total: 1,
+              unit: "window",
+            });
+            return;
+          }
+
+          secondStarted();
+        },
+        idleTimeoutMs: 0,
+      });
+
+      await firstStartedSignal;
+      expect((await cancelBuildJob(first.jobId)).state).toBe("canceling");
+      expect((await getBuildJob(first.jobId)).state).toBe("canceling");
+      releaseCanceledJob();
+      await withTimeout(
+        secondStartedSignal,
+        "Timed out waiting for worker to continue after canceled job.",
+      );
+      await worker;
+
+      expect((await getBuildJob(first.jobId)).state).toBe("canceled");
+      expect((await getBuildJob(second.jobId)).state).toBe("succeeded");
+      expect(
+        (await readBuildJobEvents(first)).map((event) => event.type),
+      ).toStrictEqual(expect.arrayContaining(["canceling", "canceled"]));
+      expect(
+        (await readBuildJobEvents(first)).map((event) => event.type),
+      ).not.toContain("failed");
     });
   });
 

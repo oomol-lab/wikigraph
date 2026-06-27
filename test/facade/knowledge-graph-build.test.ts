@@ -5,10 +5,40 @@ import {
   buildChapterKnowledgeGraphArtifact,
   clearChapterKnowledgeGraph,
   commitChapterKnowledgeGraphArtifact,
+  createEnrichmentProgressReporter,
 } from "../../src/facade/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("facade/knowledge-graph-build", () => {
+  it("reports enrichment progress as one qid counter", async () => {
+    const phases: unknown[] = [];
+    let stopChecks = 0;
+    const reporter = createEnrichmentProgressReporter({
+      throwIfStopped: () => {
+        stopChecks += 1;
+        return Promise.resolve();
+      },
+      updatePhase: (input) => {
+        phases.push(input);
+        return Promise.resolve();
+      },
+    });
+
+    await reporter({ detail: "entity", done: 50, total: 100 });
+    await reporter({ detail: "page", done: 10, total: 20 });
+    await reporter({ detail: "qid", done: 75, total: 100 });
+
+    expect(stopChecks).toBe(3);
+    expect(phases).toStrictEqual([
+      {
+        done: 75,
+        phase: "enrichment",
+        total: 100,
+        unit: "qid",
+      },
+    ]);
+  });
+
   it("commits chapter mention evidence from JSONL artifacts", async () => {
     await withTempDir("spinedigest-knowledge-graph-build-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);

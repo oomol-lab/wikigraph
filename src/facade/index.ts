@@ -71,6 +71,7 @@ export {
   buildChapterKnowledgeGraphArtifact,
   clearChapterKnowledgeGraph,
   commitChapterKnowledgeGraphArtifact,
+  createEnrichmentProgressReporter,
   generateChapterKnowledgeGraphArtifact,
 } from "./knowledge-graph-build.js";
 export type {
