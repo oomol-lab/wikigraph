@@ -595,6 +595,36 @@ describe("facade/archive-view", () => {
           ],
         });
         await expect(
+          readArchivePage(document, "wikigraph://entity/Q1"),
+        ).resolves.toMatchObject({
+          evidence: [
+            {
+              id: "wikigraph://source/chapter/1/fragment/0#0..0",
+              type: "source",
+            },
+          ],
+          id: "wikigraph://entity/Q1",
+          label: "LLM Wiki",
+          mentionCount: 1,
+          qid: "Q1",
+          type: "entity",
+        });
+        await expect(
+          readArchivePage(document, "wikigraph://triple/Q1/mentions/Q2"),
+        ).resolves.toMatchObject({
+          evidence: [
+            {
+              id: "wikigraph://source/chapter/1/fragment/0#0..0",
+              type: "source",
+            },
+          ],
+          id: "wikigraph://triple/Q1/mentions/Q2",
+          objectQid: "Q2",
+          predicate: "mentions",
+          subjectQid: "Q1",
+          type: "triple",
+        });
+        await expect(
           listArchiveEvidence(document, "wikigraph://entity/Q3"),
         ).resolves.toMatchObject({
           items: [

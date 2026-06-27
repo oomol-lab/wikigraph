@@ -117,7 +117,7 @@ export async function runArchiveCommand(
     case "get":
       await readArchiveDocument(args.archivePath, async (document) => {
         await writePage(
-          await readArchivePage(document, toArchiveObjectId(args.objectId!)),
+          await readArchivePage(document, args.objectId!),
           args.format ?? "text",
         );
       });
@@ -526,6 +526,29 @@ async function writePage(
     case "summary":
       await writeTextToStdout(`${page.id}  ${page.title}\n\n${page.content}\n`);
       return;
+    case "entity":
+      await writeTextToStdout(
+        [
+          `${page.id}`,
+          page.label,
+          `Mentions: ${page.mentionCount}`,
+          "",
+          "Evidence:",
+          ...formatEvidenceBlocks(page.evidence),
+        ].join("\n") + "\n",
+      );
+      return;
+    case "triple":
+      await writeTextToStdout(
+        [
+          `${page.id}`,
+          page.label,
+          "",
+          "Evidence:",
+          ...formatEvidenceBlocks(page.evidence),
+        ].join("\n") + "\n",
+      );
+      return;
   }
 }
 
@@ -734,6 +757,19 @@ function formatSourceFragmentLines(
   ]);
 }
 
+function formatEvidenceBlocks(
+  evidence: readonly ArchiveEvidenceItem[],
+): string[] {
+  if (evidence.length === 0) {
+    return ["[none]"];
+  }
+
+  return evidence.flatMap((item, index) => [
+    `-- evidence ${index + 1}/${evidence.length}`,
+    formatEvidenceItem(item),
+  ]);
+}
+
 function formatPosition(
   position:
     | {
@@ -790,6 +826,23 @@ function formatPackAnchor(anchor: ArchivePage): string {
       ].join("\n");
     case "summary":
       return `${anchor.id} ${anchor.title}\n${anchor.content}`;
+    case "entity":
+      return [
+        `${anchor.id}`,
+        anchor.label,
+        `Mentions: ${anchor.mentionCount}`,
+        "",
+        "Evidence:",
+        ...formatEvidenceBlocks(anchor.evidence),
+      ].join("\n");
+    case "triple":
+      return [
+        `${anchor.id}`,
+        anchor.label,
+        "",
+        "Evidence:",
+        ...formatEvidenceBlocks(anchor.evidence),
+      ].join("\n");
   }
 }
 

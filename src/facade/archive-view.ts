@@ -211,6 +211,23 @@ export type ArchivePage =
       readonly type: "summary";
     }
   | {
+      readonly evidence: readonly ArchiveEvidenceItem[];
+      readonly id: string;
+      readonly label: string;
+      readonly mentionCount: number;
+      readonly qid: string;
+      readonly type: "entity";
+    }
+  | {
+      readonly evidence: readonly ArchiveEvidenceItem[];
+      readonly id: string;
+      readonly label: string;
+      readonly objectQid: string;
+      readonly predicate: string;
+      readonly subjectQid: string;
+      readonly type: "triple";
+    }
+  | {
       readonly id: string;
       readonly meta: BookMeta | undefined;
       readonly title: string;
@@ -667,6 +684,10 @@ export async function readArchivePage(
   document: ReadonlyDocument,
   id: string,
 ): Promise<ArchivePage> {
+  if (id.startsWith("wikigraph://")) {
+    return await readWikiGraphPage(document, id);
+  }
+
   const reference = parseArchiveReference(id);
 
   switch (reference.type) {
@@ -768,6 +789,70 @@ export async function readArchivePage(
         type: "summary",
       };
     }
+  }
+}
+
+async function readWikiGraphPage(
+  document: ReadonlyDocument,
+  uri: string,
+): Promise<ArchivePage> {
+  const reference = parseWikiGraphReference(uri);
+
+  switch (reference.type) {
+    case "entity": {
+      const mentions = await document.mentions.listByQid(reference.qid);
+
+      if (mentions.length === 0) {
+        throw new Error(`Entity ${uri} was not found in this archive.`);
+      }
+
+      return {
+        evidence: await createMentionEvidenceItems(document, mentions),
+        id: uri,
+        label: selectEntityLabel(mentions),
+        mentionCount: mentions.length,
+        qid: reference.qid,
+        type: "entity",
+      };
+    }
+    case "triple": {
+      const links = await document.mentionLinks.listByTriple({
+        objectQid: reference.objectQid,
+        predicate: reference.predicate,
+        subjectQid: reference.subjectQid,
+      });
+
+      if (links.length === 0) {
+        throw new Error(`Triple ${uri} was not found in this archive.`);
+      }
+
+      return {
+        evidence: await createMentionLinkEvidenceItems(document, links),
+        id: uri,
+        label: `${reference.subjectQid} ${reference.predicate} ${reference.objectQid}`,
+        objectQid: reference.objectQid,
+        predicate: reference.predicate,
+        subjectQid: reference.subjectQid,
+        type: "triple",
+      };
+    }
+    case "chunk":
+      return await readArchivePage(document, formatNodeId(reference.id));
+    case "source":
+      return {
+        fragment: await createSourceRangeFragment(document, reference),
+        id: uri,
+        nextFragmentId: undefined,
+        nodes: [],
+        previousFragmentId: undefined,
+        title: uri,
+        type: "fragment",
+      };
+    case "summary":
+      return await readArchivePage(
+        document,
+        formatSummaryId(reference.chapterId),
+      );
   }
 }
 
@@ -1418,6 +1503,52 @@ async function readSourceFragment(
   };
 }
 
+async function createSourceRangeFragment(
+  document: ReadonlyDocument,
+  reference: Extract<WikiGraphReference, { readonly type: "source" }>,
+): Promise<ArchiveSourceFragment> {
+  const evidence = await createSourceEvidenceItem(
+    document,
+    reference.chapterId,
+    reference.startSentenceIndex,
+    reference.endSentenceIndex,
+    reference.fragmentId,
+  );
+
+  return {
+    fragmentId: evidence.fragmentId,
+    id: evidence.id,
+    preview: createSnippet(evidence.source),
+    sentenceCount: evidence.endSentenceIndex - evidence.startSentenceIndex + 1,
+    text: evidence.source,
+    wordsCount: countWords(evidence.source),
+  };
+}
+
+function selectEntityLabel(mentions: readonly MentionRecord[]): string {
+  const counts = new Map<string, number>();
+
+  for (const mention of mentions) {
+    counts.set(mention.surface, (counts.get(mention.surface) ?? 0) + 1);
+  }
+
+  const [label] = [...counts.entries()].sort((left, right) => {
+    const countComparison = right[1] - left[1];
+
+    return countComparison === 0
+      ? left[0].localeCompare(right[0])
+      : countComparison;
+  })[0] ?? [mentions[0]?.qid ?? "[entity]", 0];
+
+  return label;
+}
+
+function countWords(text: string): number {
+  const trimmed = text.trim();
+
+  return trimmed === "" ? 0 : trimmed.split(/\s+/u).length;
+}
+
 async function listChapterNodeGroups(
   document: ReadonlyDocument,
   chapterId: number,
@@ -2031,7 +2162,13 @@ type WikiGraphReference =
       readonly endSentenceIndex: number;
       readonly fragmentId?: number;
       readonly startSentenceIndex: number;
-      readonly type: "source" | "summary";
+      readonly type: "source";
+    }
+  | {
+      readonly chapterId: number;
+      readonly endSentenceIndex: number;
+      readonly startSentenceIndex: number;
+      readonly type: "summary";
     }
   | {
       readonly qid: string;

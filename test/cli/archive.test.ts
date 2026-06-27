@@ -109,6 +109,25 @@ const archiveMockState = vi.hoisted(() => ({
     title: "Retrieval design",
     type: "node",
   },
+  entityPage: {
+    evidence: [
+      {
+        chapterId: 2,
+        endSentenceIndex: 1,
+        fragmentId: 0,
+        id: "wikigraph://source/chapter/2/fragment/0#0..1",
+        source: "RAG original source fragment.",
+        startSentenceIndex: 0,
+        title: "Chapter 2",
+        type: "source",
+      },
+    ],
+    id: "wikigraph://entity/Q1",
+    label: "RAG",
+    mentionCount: 1,
+    qid: "Q1",
+    type: "entity",
+  },
   readCalls: [] as string[],
   textWrites: [] as string[],
 }));
@@ -179,7 +198,13 @@ vi.mock("../../src/facade/index.js", () => ({
       links: [],
     }),
   ),
-  readArchivePage: vi.fn(() => Promise.resolve(archiveMockState.page)),
+  readArchivePage: vi.fn((_document: unknown, id: string) =>
+    Promise.resolve(
+      id === "wikigraph://entity/Q1"
+        ? archiveMockState.entityPage
+        : archiveMockState.page,
+    ),
+  ),
 }));
 
 vi.mock("../../src/cli/io.js", () => ({
@@ -302,9 +327,23 @@ describe("cli/archive", () => {
       objectId: "wikigraph://chunk/9",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith({}, "node:9");
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://chunk/9");
     expect(archiveMockState.textWrites[0]).toContain("node:9");
     expect(archiveMockState.textWrites[0]).toContain("Source Fragments:");
+  });
+
+  it("gets an entity by Wiki Graph URI", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "/tmp/book.sdpub",
+      format: "json",
+      objectId: "wikigraph://entity/Q1",
+    });
+
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://entity/Q1");
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual(
+      archiveMockState.entityPage,
+    );
   });
 
   it("prints related objects", async () => {

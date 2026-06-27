@@ -391,6 +391,55 @@ describe("cli/main", () => {
     expect(process.exitCode).toBe(1);
   });
 
+  it("writes archive command failures as JSON when --json is requested", async () => {
+    process.argv = [
+      "node",
+      "wikigraph",
+      "get",
+      "/tmp/book.sdpub",
+      "wikigraph://entity/Q1",
+      "--json",
+    ];
+    mainMockState.argsResult = {
+      args: {
+        action: "get",
+        archivePath: "/tmp/book.sdpub",
+        format: "json",
+        objectId: "wikigraph://entity/Q1",
+      },
+      help: false,
+      kind: "archive",
+    };
+    mainMockState.archiveRunError = new Error("entity not found");
+
+    await main();
+
+    expect(stderrChunks).toStrictEqual([]);
+    expect(JSON.parse(stdoutChunks.join(""))).toStrictEqual({
+      error: {
+        message: "entity not found",
+        type: "error",
+      },
+    });
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("writes parse errors as JSON when --json is requested", async () => {
+    process.argv = ["node", "wikigraph", "search", "--json"];
+    mainMockState.parseError = new Error("bad args");
+
+    await main();
+
+    expect(stderrChunks).toStrictEqual([]);
+    expect(JSON.parse(stdoutChunks.join(""))).toStrictEqual({
+      error: {
+        message: "bad args",
+        type: "error",
+      },
+    });
+    expect(process.exitCode).toBe(1);
+  });
+
   it("writes transform command failures to stderr and sets a non-zero exit code", async () => {
     mainMockState.argsResult = {
       args: {
