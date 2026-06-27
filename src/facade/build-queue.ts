@@ -28,6 +28,7 @@ export type BuildJobProgressPhase =
   | "writing";
 export type BuildJobProgressUnit =
   | "candidate"
+  | "page"
   | "qid"
   | "sentence"
   | "window"
@@ -98,6 +99,7 @@ export type BuildJobEvent =
       readonly jobId: string;
       readonly outputTokens: number;
       readonly phase?: BuildJobProgressPhase;
+      readonly phaseDetail?: string;
       readonly phaseDone?: number;
       readonly phaseTotal?: number;
       readonly phaseUnit?: BuildJobProgressUnit;
@@ -159,6 +161,7 @@ export interface BuildJobProgressReporter {
   updatePhase(input: {
     readonly done: number;
     readonly phase: BuildJobProgressPhase;
+    readonly phaseDetail?: string;
     readonly total: number;
     readonly unit: BuildJobProgressUnit;
   }): Promise<void>;
@@ -1239,6 +1242,7 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
     | {
         readonly done: number;
         readonly phase: BuildJobProgressPhase;
+        readonly phaseDetail?: string;
         readonly total: number;
         readonly unit: BuildJobProgressUnit;
       }
@@ -1247,83 +1251,107 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
   #readingSummaryWords = 0;
   #totalGraphWords = 0;
   #totalReadingSummaryWords = 0;
+  #writeQueue: Promise<void> = Promise.resolve();
 
   public constructor(job: BuildJob) {
     this.#job = job;
   }
 
   public async addOutputCharacters(characters: number): Promise<void> {
-    this.#outputCharacters += characters;
-    await this.#snapshot();
+    await this.#enqueue(async () => {
+      this.#outputCharacters += characters;
+      await this.#snapshot();
+    });
   }
 
   public async setTotals(input: {
     readonly totalGraphWords?: number;
     readonly totalReadingSummaryWords?: number;
   }): Promise<void> {
-    this.#totalGraphWords = input.totalGraphWords ?? this.#totalGraphWords;
-    this.#totalReadingSummaryWords =
-      input.totalReadingSummaryWords ?? this.#totalReadingSummaryWords;
-    await this.#snapshot(true);
+    await this.#enqueue(async () => {
+      this.#totalGraphWords = input.totalGraphWords ?? this.#totalGraphWords;
+      this.#totalReadingSummaryWords =
+        input.totalReadingSummaryWords ?? this.#totalReadingSummaryWords;
+      await this.#snapshot(true);
+    });
   }
 
   public async stepStarted(step: BuildJobTarget): Promise<void> {
-    this.#step = step;
-    this.#phase = undefined;
-    await markBuildJobStep(this.#job.jobId, step);
-    await appendBuildJobEvent(this.#job, {
-      at: Date.now(),
-      jobId: this.#job.jobId,
-      seq: 0,
-      step,
-      type: "step_started",
+    await this.#enqueue(async () => {
+      this.#step = step;
+      this.#phase = undefined;
+      await markBuildJobStep(this.#job.jobId, step);
+      await appendBuildJobEvent(this.#job, {
+        at: Date.now(),
+        jobId: this.#job.jobId,
+        seq: 0,
+        step,
+        type: "step_started",
+      });
+      await this.#snapshot(true);
     });
-    await this.#snapshot(true);
   }
 
   public async stepCompleted(step: BuildJobTarget): Promise<void> {
-    this.#step = step;
-    await appendBuildJobEvent(this.#job, {
-      at: Date.now(),
-      jobId: this.#job.jobId,
-      seq: 0,
-      step,
-      type: "step_completed",
+    await this.#enqueue(async () => {
+      this.#step = step;
+      await appendBuildJobEvent(this.#job, {
+        at: Date.now(),
+        jobId: this.#job.jobId,
+        seq: 0,
+        step,
+        type: "step_completed",
+      });
+      await this.#snapshot(true);
     });
-    await this.#snapshot(true);
   }
 
   public async updateWords(input: {
     readonly graphWords?: number;
     readonly readingSummaryWords?: number;
   }): Promise<void> {
-    this.#graphWords =
-      input.graphWords === undefined
-        ? this.#graphWords
-        : clampProgressWords(input.graphWords, this.#totalGraphWords);
-    this.#readingSummaryWords =
-      input.readingSummaryWords === undefined
-        ? this.#readingSummaryWords
-        : clampProgressWords(
-            input.readingSummaryWords,
-            this.#totalReadingSummaryWords,
-          );
-    await this.#snapshot();
+    await this.#enqueue(async () => {
+      this.#graphWords =
+        input.graphWords === undefined
+          ? this.#graphWords
+          : clampProgressWords(input.graphWords, this.#totalGraphWords);
+      this.#readingSummaryWords =
+        input.readingSummaryWords === undefined
+          ? this.#readingSummaryWords
+          : clampProgressWords(
+              input.readingSummaryWords,
+              this.#totalReadingSummaryWords,
+            );
+      await this.#snapshot();
+    });
   }
 
   public async updatePhase(input: {
     readonly done: number;
     readonly phase: BuildJobProgressPhase;
+    readonly phaseDetail?: string;
     readonly total: number;
     readonly unit: BuildJobProgressUnit;
   }): Promise<void> {
-    this.#phase = {
-      done: clampProgressWords(input.done, input.total),
-      phase: input.phase,
-      total: Math.max(0, input.total),
-      unit: input.unit,
-    };
-    await this.#snapshot(true);
+    await this.#enqueue(async () => {
+      this.#phase = {
+        done: clampProgressWords(input.done, input.total),
+        phase: input.phase,
+        ...(input.phaseDetail === undefined
+          ? {}
+          : { phaseDetail: input.phaseDetail }),
+        total: Math.max(0, input.total),
+        unit: input.unit,
+      };
+      await this.#snapshot(true);
+    });
+  }
+
+  async #enqueue(operation: () => Promise<void>): Promise<void> {
+    const queued = this.#writeQueue.then(operation, operation);
+
+    this.#writeQueue = queued.catch(() => undefined);
+    await queued;
   }
 
   async #snapshot(force = false): Promise<void> {
@@ -1345,6 +1373,9 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
         ? {}
         : {
             phase: this.#phase.phase,
+            ...(this.#phase.phaseDetail === undefined
+              ? {}
+              : { phaseDetail: this.#phase.phaseDetail }),
             phaseDone: this.#phase.done,
             phaseTotal: this.#phase.total,
             phaseUnit: this.#phase.unit,

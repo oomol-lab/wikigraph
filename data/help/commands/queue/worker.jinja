@@ -10,4 +10,5 @@ Usage:
 Notes:
   - Users normally do not run this directly.
   - Queue mutating commands start the worker when needed.
-  - Worker concurrency follows `request.concurrent` from configuration.
+  - Worker job concurrency follows `queue.concurrent` from configuration.
+  - LLM request concurrency inside jobs follows `request.concurrent`.

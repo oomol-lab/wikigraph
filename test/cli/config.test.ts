@@ -62,6 +62,9 @@ describe("cli/config", () => {
               debugLogDir: "./debug",
             },
             prompt: "File prompt",
+            queue: {
+              concurrent: 1,
+            },
             request: {
               concurrent: 2,
               retryIntervalSeconds: 1.5,
@@ -85,6 +88,7 @@ describe("cli/config", () => {
       process.env.WIKIGRAPH_CACHE_DIR = "./env-cache";
       process.env.WIKIGRAPH_DEBUG_LOG_DIR = "./env-debug";
       process.env.WIKIGRAPH_REQUEST_CONCURRENT = "5";
+      process.env.WIKIGRAPH_QUEUE_CONCURRENT = "3";
       process.env.WIKIGRAPH_REQUEST_RETRY_INTERVAL_SECONDS = "2.5";
       process.env.WIKIGRAPH_REQUEST_RETRY_TIMES = "4";
       process.env.WIKIGRAPH_REQUEST_STREAM = "true";
@@ -105,6 +109,9 @@ describe("cli/config", () => {
           debugLogDir: `${process.cwd()}/env-debug`,
         },
         prompt: "Env prompt",
+        queue: {
+          concurrent: 3,
+        },
         request: {
           concurrent: 5,
           retryIntervalSeconds: 2.5,
@@ -249,6 +256,13 @@ describe("cli/config", () => {
     );
 
     delete process.env.WIKIGRAPH_REQUEST_CONCURRENT;
+    process.env.WIKIGRAPH_QUEUE_CONCURRENT = "0";
+
+    await expect(loadCLIConfig()).rejects.toThrow(
+      "WIKIGRAPH_QUEUE_CONCURRENT must be a positive number.\nSee: wikigraph help env",
+    );
+
+    delete process.env.WIKIGRAPH_QUEUE_CONCURRENT;
     process.env.WIKIGRAPH_REQUEST_TEMPERATURE = '[1,"bad"]';
 
     await expect(loadCLIConfig()).rejects.toThrow(

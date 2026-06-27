@@ -1,16 +1,24 @@
 import { WikipageResolver } from "../wikipage/index.js";
 
-import type { QidResolution } from "../wikipage/index.js";
+import type {
+  QidResolution,
+  WikipageResolveProgressReporter,
+} from "../wikipage/index.js";
 import type { WikimatchCandidate, WikimatchQidOption } from "./types.js";
 
 export async function enrichWikimatchCandidates(
   candidates: readonly WikimatchCandidate[],
+  options: {
+    readonly progress?: WikipageResolveProgressReporter;
+  } = {},
 ): Promise<readonly WikimatchCandidate[]> {
   if (candidates.length === 0) {
     return [];
   }
 
-  const resolver = await WikipageResolver.open();
+  const resolver = await WikipageResolver.open({
+    ...(options.progress === undefined ? {} : { progress: options.progress }),
+  });
 
   try {
     return applyQidResolutions(

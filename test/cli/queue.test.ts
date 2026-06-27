@@ -215,6 +215,9 @@ vi.mock("../../src/cli/io.js", () => ({
 vi.mock("../../src/cli/config.js", () => ({
   loadCLIConfig: vi.fn(() =>
     Promise.resolve({
+      queue: {
+        concurrent: 3,
+      },
       request: {
         concurrent: 2,
       },
@@ -516,6 +519,14 @@ describe("cli/queue", () => {
     );
   });
 
+  it("uses queue concurrency for worker slots", async () => {
+    await runQueueCommand({
+      action: "worker",
+    });
+
+    expect(queueMockState.runWorkerOptions?.concurrency).toBe(3);
+  });
+
   it("runs knowledge graph work without reading graph or summary builds", async () => {
     queueMockState.job = {
       ...queueMockState.job,
@@ -749,6 +760,41 @@ describe("cli/queue", () => {
     ]);
   });
 
+  it("prints knowledge graph phase detail when available", async () => {
+    queueMockState.events = [
+      {
+        at: 1,
+        graphWords: 0,
+        jobId: "job-1",
+        outputTokens: 6500,
+        phase: "enrichment",
+        phaseDetail: "linked-page",
+        phaseDone: 25,
+        phaseTotal: 80,
+        phaseUnit: "page",
+        readingSummaryWords: 0,
+        seq: 1,
+        step: "knowledge-graph",
+        totalGraphWords: 0,
+        totalReadingSummaryWords: 4520,
+        totalWords: 0,
+        type: "progress_snapshot",
+        words: 0,
+      },
+    ];
+
+    await runQueueCommand({
+      action: "watch",
+      from: "beginning",
+      jobId: "job-1",
+      jsonl: false,
+    });
+
+    expect(queueMockState.textWrites).toStrictEqual([
+      "progress knowledge-graph enrichment linked-page 25/80 pages output ~6500 tokens\n",
+    ]);
+  });
+
   it("includes knowledge graph phase progress in jsonl watch output", async () => {
     queueMockState.events = [
       {
@@ -757,6 +803,7 @@ describe("cli/queue", () => {
         jobId: "job-1",
         outputTokens: 6500,
         phase: "grounding",
+        phaseDetail: "window",
         phaseDone: 5,
         phaseTotal: 19,
         phaseUnit: "window",
@@ -791,6 +838,7 @@ describe("cli/queue", () => {
         jobId: "job-1",
         outputTokens: 6500,
         phase: "grounding",
+        phaseDetail: "window",
         phaseDone: 5,
         phaseTotal: 19,
         phaseUnit: "window",

@@ -55,6 +55,11 @@ const cliConfigSchema = z.object({
     })
     .optional(),
   prompt: z.string().min(1).optional(),
+  queue: z
+    .object({
+      concurrent: z.number().int().positive().optional(),
+    })
+    .optional(),
   request: z
     .object({
       concurrent: z.number().int().positive().optional(),
@@ -84,6 +89,9 @@ export interface CLIConfig {
     readonly debugLogDir?: string;
   };
   readonly prompt?: string;
+  readonly queue?: {
+    readonly concurrent?: number;
+  };
   readonly request?: {
     readonly concurrent?: number;
     readonly retryIntervalSeconds?: number;
@@ -212,12 +220,22 @@ export async function loadCLIConfig(options?: {
       fileConfig.request?.topP,
     ),
   });
+  const queue = createQueueConfig({
+    concurrent: firstDefined(
+      parseOptionalPositiveInteger(
+        process.env.WIKIGRAPH_QUEUE_CONCURRENT,
+        "WIKIGRAPH_QUEUE_CONCURRENT",
+      ),
+      fileConfig.queue?.concurrent,
+    ),
+  });
 
   return {
     ...(existsSync(configFilePath) ? { configFilePath } : {}),
     ...(prompt === undefined ? {} : { prompt }),
     ...(llm === undefined ? {} : { llm }),
     ...(paths === undefined ? {} : { paths }),
+    ...(queue === undefined ? {} : { queue }),
     ...(request === undefined ? {} : { request }),
   };
 }
@@ -651,6 +669,18 @@ function createRequestConfig(input: {
       : { temperature: input.temperature }),
     ...(input.timeout === undefined ? {} : { timeout: input.timeout }),
     ...(input.topP === undefined ? {} : { topP: input.topP }),
+  };
+}
+
+function createQueueConfig(input: {
+  readonly concurrent: number | undefined;
+}): CLIConfig["queue"] {
+  if (input.concurrent === undefined) {
+    return undefined;
+  }
+
+  return {
+    concurrent: input.concurrent,
   };
 }
 

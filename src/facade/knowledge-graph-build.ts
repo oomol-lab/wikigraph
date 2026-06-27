@@ -130,8 +130,27 @@ export async function generateChapterKnowledgeGraphArtifact(
       total: qidCount,
       unit: "qid",
     });
-    const enrichedCandidates =
-      await enrichWikimatchCandidates(screenedCandidates);
+    const enrichedCandidates = await enrichWikimatchCandidates(
+      screenedCandidates,
+      {
+        ...(options.progressTracker === undefined
+          ? {}
+          : {
+              progress: async (event) => {
+                await options.progressTracker?.updatePhase({
+                  done: event.done,
+                  phase: "enrichment",
+                  phaseDetail: event.detail,
+                  total: event.total,
+                  unit:
+                    event.detail === "entity" || event.detail === "qid"
+                      ? "qid"
+                      : "page",
+                });
+              },
+            }),
+      },
+    );
     await options.progressTracker?.updatePhase({
       done: qidCount,
       phase: "enrichment",

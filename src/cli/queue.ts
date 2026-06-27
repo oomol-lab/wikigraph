@@ -158,7 +158,7 @@ async function runQueueWorker(): Promise<void> {
   const config = await loadCLIConfig();
 
   await runBuildJobWorker({
-    concurrency: config.request?.concurrent ?? 1,
+    concurrency: config.queue?.concurrent ?? 1,
     executeJob: async (job, reporter) => {
       await executeBuildJob(job, reporter);
     },
@@ -392,6 +392,9 @@ function formatWatchEventJSONL(event: BuildJobEvent): unknown {
       ? {}
       : {
           phase: event.phase,
+          ...(event.phaseDetail === undefined
+            ? {}
+            : { phaseDetail: event.phaseDetail }),
           phaseDone: event.phaseDone ?? 0,
           phaseTotal: event.phaseTotal ?? 0,
           phaseUnit: event.phaseUnit,
@@ -431,13 +434,15 @@ function formatPhaseProgress(
     return "";
   }
 
-  return ` ${event.phase} ${event.phaseDone ?? 0}/${event.phaseTotal ?? 0} ${formatProgressUnit(event.phaseUnit)}`;
+  return ` ${event.phase}${event.phaseDetail === undefined ? "" : ` ${event.phaseDetail}`} ${event.phaseDone ?? 0}/${event.phaseTotal ?? 0} ${formatProgressUnit(event.phaseUnit)}`;
 }
 
 function formatProgressUnit(unit: string | undefined): string {
   switch (unit) {
     case "candidate":
       return "candidates";
+    case "page":
+      return "pages";
     case "qid":
       return "qids";
     case "record":

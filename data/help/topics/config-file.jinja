@@ -34,6 +34,9 @@ Top-level structure:
       "cacheDir": "...",
       "debugLogDir": "..."
     },
+    "queue": {
+      "concurrent": 1
+    },
     "request": {
       "concurrent": 4,
       "timeout": 120,
@@ -81,6 +84,13 @@ Fields:
   `paths.debugLogDir`
     Debug log directory.
     Type: path string.
+
+  `queue.concurrent`
+    Simultaneous queue job limit.
+    Type: positive integer.
+    Notes:
+      This controls how many build jobs the worker may run at once.
+      It is separate from `request.concurrent`, which controls concurrent LLM requests inside those jobs.
 
   `request.concurrent`
     Concurrent LLM request limit.
