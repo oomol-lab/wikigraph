@@ -26,6 +26,7 @@ import {
   type WikimatchCandidate,
   type WikimatchSentence,
 } from "../wikimatch/index.js";
+import { AsyncSemaphore } from "../utils/async-semaphore.js";
 
 import { getChapterDetails } from "./chapter.js";
 import type { BuildJobProgressReporter } from "./build-queue.js";
@@ -77,6 +78,7 @@ const mentionLinkRecordSchema = z.object({
 });
 
 const WIKIMATCH_GROUNDING_OPTION_BUDGET = 35;
+const WIKIMATCH_GROUNDING_CONCURRENCY = 4;
 
 export async function generateChapterKnowledgeGraphArtifact(
   document: ReadonlyDocument,
@@ -323,24 +325,27 @@ async function judgeCandidates(input: {
     total: windows.length,
     unit: "window",
   });
+  const limiter = new AsyncSemaphore(WIKIMATCH_GROUNDING_CONCURRENCY);
   const results = await Promise.all(
     windows.map(async (window) => {
-      try {
-        return await judgeWikimatchPolicy({
-          candidates: window.candidates,
-          policyPrompt: input.policyPrompt,
-          request: input.request,
-          window,
-        });
-      } finally {
-        completedWindows += 1;
-        await input.progressTracker?.updatePhase({
-          done: completedWindows,
-          phase: "grounding",
-          total: windows.length,
-          unit: "window",
-        });
-      }
+      return await limiter.use(async () => {
+        try {
+          return await judgeWikimatchPolicy({
+            candidates: window.candidates,
+            policyPrompt: input.policyPrompt,
+            request: input.request,
+            window,
+          });
+        } finally {
+          completedWindows += 1;
+          await input.progressTracker?.updatePhase({
+            done: completedWindows,
+            phase: "grounding",
+            total: windows.length,
+            unit: "window",
+          });
+        }
+      });
     }),
   );
 
