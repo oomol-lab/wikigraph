@@ -175,19 +175,23 @@ async function screenCandidates(input: {
   }
 
   const allowedSurfaces = new Set<string>();
+  const results = await Promise.all(
+    buildWikimatchSurfaceWindows({
+      candidates,
+      contextWords: 180,
+      surfaceBudget: 60,
+      text: input.text,
+    }).map(
+      async (window) =>
+        await judgeWikimatchSurfaceScreening({
+          policyPrompt: input.policyPrompt,
+          request: input.request,
+          window,
+        }),
+    ),
+  );
 
-  for (const window of buildWikimatchSurfaceWindows({
-    candidates,
-    contextWords: 180,
-    surfaceBudget: 60,
-    text: input.text,
-  })) {
-    const result = await judgeWikimatchSurfaceScreening({
-      policyPrompt: input.policyPrompt,
-      request: input.request,
-      window,
-    });
-
+  for (const result of results) {
     for (const surface of result.surfaces) {
       if (surface.decision === "allow") {
         allowedSurfaces.add(surface.text);
@@ -219,20 +223,25 @@ async function judgeCandidates(input: {
   const mentions: MentionRecord[] = [];
   let mentionIndex = 1;
   const candidates = await narrowOversizedCandidates(input);
-
-  for (const window of buildWikimatchWindows({
+  const windows = buildWikimatchWindows({
     candidates,
     contextWords: 220,
     optionBudget: WIKIMATCH_GROUNDING_OPTION_BUDGET,
     text: input.text,
-  })) {
-    const result = await judgeWikimatchPolicy({
-      candidates: window.candidates,
-      policyPrompt: input.policyPrompt,
-      request: input.request,
-      window,
-    });
+  });
+  const results = await Promise.all(
+    windows.map(
+      async (window) =>
+        await judgeWikimatchPolicy({
+          candidates: window.candidates,
+          policyPrompt: input.policyPrompt,
+          request: input.request,
+          window,
+        }),
+    ),
+  );
 
+  for (const result of results) {
     for (const mention of result.mentions) {
       const location = locateMention(input.fragments, mention.range.start);
 
@@ -252,31 +261,32 @@ async function narrowOversizedCandidates(input: {
   readonly request: GuaranteedRequest;
   readonly text: string;
 }): Promise<readonly WikimatchCandidate[]> {
-  const candidates: WikimatchCandidate[] = [];
+  return (
+    await Promise.all(
+      input.candidates.map(async (candidate) => {
+        if (
+          countWikimatchCandidateOptions(candidate) <=
+          WIKIMATCH_GROUNDING_OPTION_BUDGET
+        ) {
+          return candidate;
+        }
 
-  for (const candidate of input.candidates) {
-    if (
-      countWikimatchCandidateOptions(candidate) <=
-      WIKIMATCH_GROUNDING_OPTION_BUDGET
-    ) {
-      candidates.push(candidate);
-      continue;
-    }
+        const result = await narrowWikimatchCandidateOptions({
+          candidate,
+          optionBudget: WIKIMATCH_GROUNDING_OPTION_BUDGET,
+          policyPrompt: input.policyPrompt,
+          request: input.request,
+          text: input.text,
+        });
 
-    const result = await narrowWikimatchCandidateOptions({
-      candidate,
-      optionBudget: WIKIMATCH_GROUNDING_OPTION_BUDGET,
-      policyPrompt: input.policyPrompt,
-      request: input.request,
-      text: input.text,
-    });
-
-    if (result.candidate.qidOptions.length > 0) {
-      candidates.push(result.candidate);
-    }
-  }
-
-  return candidates;
+        return result.candidate.qidOptions.length > 0
+          ? result.candidate
+          : undefined;
+      }),
+    )
+  ).filter(
+    (candidate): candidate is WikimatchCandidate => candidate !== undefined,
+  );
 }
 
 function toMentionRecord(
