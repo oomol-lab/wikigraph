@@ -192,6 +192,44 @@ describe("wikimatch/policy-judge", () => {
     }
   });
 
+  it("ignores empty qid values on non-recall decisions", async () => {
+    const input = createInput();
+    const request = vi.fn<GuaranteedRequest>().mockResolvedValue(
+      JSON.stringify({
+        groups: [
+          {
+            decisions: [
+              {
+                candidateId: "c1",
+                decision: "never_recall",
+                qid: "",
+              },
+            ],
+            groupId: "g1",
+          },
+          {
+            decisions: [],
+            groupId: "g2",
+          },
+        ],
+      }),
+    );
+
+    const result = await judgeWikimatchPolicy({
+      ...input,
+      request,
+    });
+
+    expect(result.policyUpdates).toStrictEqual([
+      {
+        candidateId: "c1",
+        decision: "never_recall",
+        surface: "北京大学",
+      },
+    ]);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it("allows continue only when the candidate page is incomplete", () => {
     const input = createInput();
 

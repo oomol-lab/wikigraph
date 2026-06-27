@@ -27,7 +27,7 @@ const policyDecisionSchema = z
     candidateId: z.string().min(1),
     confidence: z.number().min(0).max(1).optional(),
     decision: z.enum(["continue", "recall", "skip_this_time", "never_recall"]),
-    qid: z.string().min(1).optional(),
+    qid: z.string().optional(),
   })
   .strict();
 
@@ -94,12 +94,22 @@ function normalizePolicyResponse(
           ? {}
           : { confidence: decision.confidence }),
         decision: decision.decision,
-        ...(decision.qid === undefined ? {} : { qid: decision.qid }),
+        ...normalizeDecisionQid(decision.qid),
       })),
       groupId: group.groupId,
       ...(group.note === undefined ? {} : { note: group.note }),
     })),
   };
+}
+
+function normalizeDecisionQid(
+  qid: string | undefined,
+): { readonly qid?: string } {
+  const normalized = qid?.trim();
+
+  return normalized === undefined || normalized === ""
+    ? {}
+    : { qid: normalized };
 }
 
 export function parsePolicyResponse(
@@ -408,6 +418,7 @@ function formatPolicySystemPrompt(input: WikimatchPolicyJudgeInput): string {
     '- If a surface should be recalled but the current incomplete page lacks a suitable QID, use "continue" instead of skip_this_time.',
     "- Do not invent candidates, ranges, surfaces, or QIDs.",
     "- A recalled mention must choose a QID from entityOptions or disambiguationOptions.meanings.",
+    '- Include qid only when decision is "recall"; do not include qid for continue, skip_this_time, or never_recall.',
     "- Never return DIS identifiers as qid values; DIS identifiers are only disambiguation references.",
     "- Overlapping recalled ranges are illegal; choose the most specific valid mention.",
   ].join("\n");
@@ -431,7 +442,7 @@ function formatPolicyPrompt(input: WikimatchPolicyJudgeInput): string {
                 candidateId: "candidate id from this group",
                 confidence: 0.9,
                 decision: "recall | continue | skip_this_time | never_recall",
-                qid: "required only for recall; optional for non-recall",
+                qid: "required only when decision is recall",
               },
             ],
             groupId: "group id from the input",
