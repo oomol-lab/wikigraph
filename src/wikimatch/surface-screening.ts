@@ -9,46 +9,50 @@ import {
 import type { LLMessage } from "../llm/index.js";
 
 import type {
+  WikimatchProtectedSurface,
   WikimatchSurface,
-  WikimatchSurfaceScreeningInput,
-  WikimatchSurfaceScreeningResponse,
-  WikimatchSurfaceScreeningResult,
+  WikimatchSurfaceProtectionInput,
+  WikimatchSurfaceProtectionResponse,
+  WikimatchSurfaceProtectionResult,
 } from "./types.js";
 
-const surfaceScreeningItemSchema = z
+const protectedSurfaceSchema = z
   .object({
-    decision: z.enum(["allow", "skip_this_time", "global_blocklist_candidate"]),
     note: z.string().max(24).optional(),
     surfaceId: z.string().min(1),
   })
   .strict();
 
-const surfaceScreeningResponseSchema = z
+const protectionResponseSchema = z
   .object({
-    surfaces: z.array(surfaceScreeningItemSchema),
+    protectedSurfaces: z.array(protectedSurfaceSchema),
   })
   .strict();
 
-export interface JudgeWikimatchSurfaceScreeningOptions extends WikimatchSurfaceScreeningInput {
+export interface JudgeWikimatchSurfaceProtectionOptions extends WikimatchSurfaceProtectionInput {
   readonly maxRetries?: number;
   readonly request: GuaranteedRequest;
 }
 
-export async function judgeWikimatchSurfaceScreening(
-  options: JudgeWikimatchSurfaceScreeningOptions,
-): Promise<WikimatchSurfaceScreeningResult> {
+export async function judgeWikimatchSurfaceProtection(
+  options: JudgeWikimatchSurfaceProtectionOptions,
+): Promise<WikimatchSurfaceProtectionResult> {
+  if (options.suspiciousSurfaces.length === 0) {
+    return { protectedSurfaces: [] };
+  }
+
   try {
     return await requestGuaranteedJson({
-      messages: buildSurfaceScreeningMessages(options),
+      messages: buildProtectionMessages(options),
       parse: (response) =>
-        parseSurfaceScreeningResponse(
-          options.window.surfaces,
-          normalizeSurfaceScreeningResponse(response),
+        parseSurfaceProtectionResponse(
+          options.suspiciousSurfaces,
+          normalizeProtectionResponse(response),
         ),
       request: options.request,
       responseIntentClassifierPrompt:
         RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
-      schema: surfaceScreeningResponseSchema,
+      schema: protectionResponseSchema,
       ...(options.maxRetries === undefined
         ? {}
         : { maxRetries: options.maxRetries }),
@@ -59,134 +63,123 @@ export async function judgeWikimatchSurfaceScreening(
         issues: [formatFallbackIssue(error)],
         reason: "guaranteed_json_failed",
       },
-      surfaces: [],
+      protectedSurfaces: [],
     };
   }
 }
 
-function normalizeSurfaceScreeningResponse(
-  response: z.infer<typeof surfaceScreeningResponseSchema>,
-): WikimatchSurfaceScreeningResponse {
+function normalizeProtectionResponse(
+  response: z.infer<typeof protectionResponseSchema>,
+): WikimatchSurfaceProtectionResponse {
   return {
-    surfaces: response.surfaces.map((surface) => ({
-      decision: surface.decision,
+    protectedSurfaces: response.protectedSurfaces.map((surface) => ({
       ...(surface.note === undefined ? {} : { note: surface.note }),
       surfaceId: surface.surfaceId,
     })),
   };
 }
 
-export function parseSurfaceScreeningResponse(
+export function parseSurfaceProtectionResponse(
   surfaces: readonly WikimatchSurface[],
-  response: WikimatchSurfaceScreeningResponse,
-): WikimatchSurfaceScreeningResult {
-  const issues = validateSurfaceScreeningResponse(surfaces, response);
+  response: WikimatchSurfaceProtectionResponse,
+): WikimatchSurfaceProtectionResult {
+  const issues = validateSurfaceProtectionResponse(surfaces, response);
 
   if (issues.length > 0) {
     throw new ParsedJsonError(issues);
   }
 
   const surfacesById = createSurfaceMap(surfaces);
+  const protectedSurfaces: WikimatchProtectedSurface[] = [];
 
-  return {
-    surfaces: response.surfaces.map((surface) => {
-      const source = surfacesById.get(surface.surfaceId)!;
+  for (const surface of response.protectedSurfaces) {
+    const source = surfacesById.get(surface.surfaceId)!;
 
-      return {
-        decision: surface.decision,
-        ...(surface.note === undefined ? {} : { note: surface.note }),
-        surfaceId: surface.surfaceId,
-        text: source.text,
-      };
-    }),
-  };
+    protectedSurfaces.push({
+      ...(surface.note === undefined ? {} : { note: surface.note }),
+      surfaceId: surface.surfaceId,
+      text: source.text,
+    });
+  }
+
+  return { protectedSurfaces };
 }
 
-export function validateSurfaceScreeningResponse(
+export function validateSurfaceProtectionResponse(
   surfaces: readonly WikimatchSurface[],
-  response: WikimatchSurfaceScreeningResponse,
+  response: WikimatchSurfaceProtectionResponse,
 ): readonly string[] {
   const issues: string[] = [];
   const surfacesById = createSurfaceMap(surfaces);
   const seenIds = new Set<string>();
 
-  for (const surface of response.surfaces) {
+  for (const surface of response.protectedSurfaces) {
     if (!surfacesById.has(surface.surfaceId)) {
       issues.push(
-        `Unknown surfaceId "${surface.surfaceId}". Use exactly these surface IDs: ${[
+        `Unknown surfaceId "${surface.surfaceId}". Use only these surface IDs: ${[
           ...surfacesById.keys(),
         ].join(", ")}.`,
       );
       continue;
     }
     if (seenIds.has(surface.surfaceId)) {
-      issues.push(`Duplicate result for surface ${surface.surfaceId}.`);
+      issues.push(`Duplicate protected surface ${surface.surfaceId}.`);
       continue;
     }
 
     seenIds.add(surface.surfaceId);
   }
 
-  for (const surface of surfaces) {
-    if (!seenIds.has(surface.id)) {
-      issues.push(
-        `Missing result for ${surface.id}. Return exactly one result for every input surface.`,
-      );
-    }
-  }
-
   return issues;
 }
 
-function buildSurfaceScreeningMessages(
-  input: WikimatchSurfaceScreeningInput,
+function buildProtectionMessages(
+  input: WikimatchSurfaceProtectionInput,
 ): LLMessage[] {
   return [
     {
       role: "system",
-      content: formatSurfaceScreeningSystemPrompt(input),
+      content: formatProtectionSystemPrompt(input),
     },
     {
       role: "user",
-      content: formatSurfaceScreeningPrompt(input),
+      content: formatProtectionPrompt(input),
     },
   ];
 }
 
-function formatSurfaceScreeningSystemPrompt(
-  input: WikimatchSurfaceScreeningInput,
+function formatProtectionSystemPrompt(
+  input: WikimatchSurfaceProtectionInput,
 ): string {
   return [
-    "You screen raw surface strings before Wikidata grounding.",
+    "You protect useful high-frequency surface strings before Wikidata grounding.",
+    "",
+    "The input surfaces are suspicious only because they are frequent after range suppression.",
+    "Most high-frequency function words, fragments, punctuation, generic words, and discourse words should NOT be protected.",
+    "A surface that is not protected will be removed before grounding.",
     "",
     "User recall policy:",
     input.policyPrompt,
     "",
-    "Decision meanings:",
-    "- allow: this surface is worth sending to the grounding stage under the user recall policy and current context.",
-    "- skip_this_time: this surface should not be grounded in this context, but it may be useful in another context.",
-    "- global_blocklist_candidate: this exact string is useless as an entity mention in any context, such as punctuation, pure numbers, isolated letters, or function words.",
+    "Protect a surface only when it is likely to be a meaningful entity, named concept, named event, place, person, organization, work, or domain term under the policy.",
     "",
     "Rules:",
     "- Return JSON only.",
-    "- Return exactly one result for every input surface.",
-    "- The user recall policy decides allow vs skip_this_time only.",
-    "- Use global_blocklist_candidate only for strings that are context-independent noise.",
-    "- Do not use global_blocklist_candidate for meaningful words that are merely irrelevant to this context.",
+    "- Return only protected surface IDs.",
+    "- Do not return a result for every input surface.",
+    "- Do not protect generic grammar words merely because they appear often.",
     "- Do not infer or choose Wikidata QIDs in this stage.",
   ].join("\n");
 }
 
-function formatSurfaceScreeningPrompt(
-  input: WikimatchSurfaceScreeningInput,
+function formatProtectionPrompt(
+  input: WikimatchSurfaceProtectionInput,
 ): string {
   return [
-    "Context:",
-    input.window.text,
-    "",
-    "Surfaces:",
+    "Suspicious high-frequency surfaces:",
     JSON.stringify(
-      input.window.surfaces.map((surface) => ({
+      input.suspiciousSurfaces.map((surface) => ({
+        count: surface.count,
         surfaceId: surface.id,
         text: surface.text,
       })),
@@ -197,9 +190,8 @@ function formatSurfaceScreeningPrompt(
     "Return this JSON shape:",
     JSON.stringify(
       {
-        surfaces: [
+        protectedSurfaces: [
           {
-            decision: "allow | skip_this_time | global_blocklist_candidate",
             note: "optional, <= 12 Chinese chars or 6 English words",
             surfaceId: "surface id from the input",
           },

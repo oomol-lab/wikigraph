@@ -33,15 +33,9 @@ export interface WikimatchWindow {
   readonly text: string;
 }
 
-export interface WikimatchSurfaceWindow {
-  readonly baseOffset: number;
-  readonly surfaces: readonly WikimatchSurface[];
-  readonly text: string;
-}
-
 export interface WikimatchSurface {
   readonly id: string;
-  readonly ranges: readonly WikimatchTextRange[];
+  readonly count: number;
   readonly text: string;
 }
 
@@ -83,48 +77,46 @@ export interface WikimatchCandidateOptionNarrowingItemOutput {
   readonly qid: string;
 }
 
-export interface BuildWikimatchSurfaceWindowsOptions {
+export interface BuildWikimatchSurfaceProtectionInputOptions {
   readonly candidates: readonly WikimatchCandidate[];
-  readonly contextWords: number;
-  readonly surfaceBudget: number;
+  readonly percentile: number;
   readonly text: string;
 }
 
-export type WikimatchSurfaceScreeningDecision =
-  | "allow"
-  | "global_blocklist_candidate"
-  | "skip_this_time";
-
-export interface WikimatchSurfaceScreeningInput {
+export interface WikimatchSurfaceProtectionInput {
   readonly policyPrompt: string;
-  readonly window: WikimatchSurfaceWindow;
+  readonly suspiciousSurfaces: readonly WikimatchSurface[];
 }
 
-export interface WikimatchSurfaceScreeningResult {
-  readonly fallback?: WikimatchSurfaceScreeningFallback;
-  readonly surfaces: readonly WikimatchSurfaceScreeningItem[];
+export interface WikimatchSurfaceProtectionBuildResult {
+  readonly candidates: readonly WikimatchCandidate[];
+  readonly suppressedCandidates: readonly WikimatchCandidate[];
+  readonly suspiciousSurfaces: readonly WikimatchSurface[];
 }
 
-export interface WikimatchSurfaceScreeningItem {
-  readonly decision: WikimatchSurfaceScreeningDecision;
+export interface WikimatchSurfaceProtectionResult {
+  readonly fallback?: WikimatchSurfaceProtectionFallback;
+  readonly protectedSurfaces: readonly WikimatchProtectedSurface[];
+}
+
+export interface WikimatchProtectedSurface {
   readonly note?: string;
   readonly surfaceId: string;
   readonly text: string;
 }
 
-export interface WikimatchSurfaceScreeningFallback {
+export interface WikimatchSurfaceProtectionFallback {
   readonly issues: readonly string[];
   readonly reason: "guaranteed_json_failed";
 }
 
-export interface WikimatchSurfaceScreeningItemOutput {
-  readonly decision: WikimatchSurfaceScreeningDecision;
+export interface WikimatchProtectedSurfaceOutput {
   readonly note?: string;
   readonly surfaceId: string;
 }
 
-export interface WikimatchSurfaceScreeningResponse {
-  readonly surfaces: readonly WikimatchSurfaceScreeningItemOutput[];
+export interface WikimatchSurfaceProtectionResponse {
+  readonly protectedSurfaces: readonly WikimatchProtectedSurfaceOutput[];
 }
 
 export type WikimatchPolicyDecision =

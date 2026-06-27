@@ -13,15 +13,14 @@ import type {
   ReadonlyDocument,
 } from "../document/index.js";
 import {
-  buildWikimatchSurfaceWindows,
+  buildWikimatchSurfaceProtectionInput,
   buildWikimatchWindows,
   countWikimatchCandidateOptions,
   enrichWikimatchCandidates,
   judgeWikimatchPolicy,
-  judgeWikimatchSurfaceScreening,
+  judgeWikimatchSurfaceProtection,
   matchWikispineSentenceCandidates,
   narrowWikimatchCandidateOptions,
-  WikimatchSurfaceBlocklist,
   type WikimatchAcceptedMention,
   type WikimatchCandidate,
   type WikimatchSentence,
@@ -87,6 +86,7 @@ const mentionLinkRecordSchema = z.object({
 
 const WIKIMATCH_GROUNDING_OPTION_BUDGET = 35;
 const WIKIMATCH_GROUNDING_CONCURRENCY = 4;
+const WIKIMATCH_SURFACE_PROTECTION_PERCENTILE = 0.1;
 const WIKILINK_EVIDENCE_DISTANCE = 700;
 const WIKILINK_WINDOW_LENGTH = 1800;
 
@@ -122,95 +122,88 @@ export async function generateChapterKnowledgeGraphArtifact(
     total: sentences.length,
     unit: "sentence",
   });
-  const blocklist = await WikimatchSurfaceBlocklist.open();
-
-  try {
-    const screenedCandidates = await screenCandidates({
-      blocklist,
-      candidates: rawCandidates,
-      policyPrompt: options.policyPrompt,
+  const screenedCandidates = await screenCandidates({
+    candidates: rawCandidates,
+    policyPrompt: options.policyPrompt,
+    ...(options.progressTracker === undefined
+      ? {}
+      : { progressTracker: options.progressTracker }),
+    request: options.request,
+    text,
+  });
+  const qidCount = countUniqueQids(screenedCandidates);
+  await options.progressTracker?.updatePhase({
+    done: 0,
+    phase: "enrichment",
+    total: qidCount,
+    unit: "qid",
+  });
+  const enrichedCandidates = await enrichWikimatchCandidates(
+    screenedCandidates,
+    {
       ...(options.progressTracker === undefined
         ? {}
-        : { progressTracker: options.progressTracker }),
-      request: options.request,
-      text,
-    });
-    const qidCount = countUniqueQids(screenedCandidates);
-    await options.progressTracker?.updatePhase({
-      done: 0,
-      phase: "enrichment",
-      total: qidCount,
-      unit: "qid",
-    });
-    const enrichedCandidates = await enrichWikimatchCandidates(
-      screenedCandidates,
-      {
-        ...(options.progressTracker === undefined
-          ? {}
-          : {
-              progress: async (event) => {
-                await options.progressTracker?.updatePhase({
-                  done: event.done,
-                  phase: "enrichment",
-                  phaseDetail: event.detail,
-                  total: event.total,
-                  unit:
-                    event.detail === "entity" || event.detail === "qid"
-                      ? "qid"
-                      : "page",
-                });
-              },
-            }),
-      },
-    );
-    await options.progressTracker?.updatePhase({
-      done: qidCount,
-      phase: "enrichment",
-      total: qidCount,
-      unit: "qid",
-    });
-    const mentions = await judgeCandidates({
-      candidates: enrichedCandidates,
-      chapterId,
-      fragments,
-      policyPrompt: options.policyPrompt,
-      ...(options.progressTracker === undefined
-        ? {}
-        : { progressTracker: options.progressTracker }),
-      request: options.request,
-      text,
-    });
-    await options.progressTracker?.updatePhase({
-      done: 0,
-      phase: "writing",
-      total: mentions.length,
-      unit: "record",
-    });
+        : {
+            progress: async (event) => {
+              await options.progressTracker?.updatePhase({
+                done: event.done,
+                phase: "enrichment",
+                phaseDetail: event.detail,
+                total: event.total,
+                unit:
+                  event.detail === "entity" || event.detail === "qid"
+                    ? "qid"
+                    : "page",
+              });
+            },
+          }),
+    },
+  );
+  await options.progressTracker?.updatePhase({
+    done: qidCount,
+    phase: "enrichment",
+    total: qidCount,
+    unit: "qid",
+  });
+  const mentions = await judgeCandidates({
+    candidates: enrichedCandidates,
+    chapterId,
+    fragments,
+    policyPrompt: options.policyPrompt,
+    ...(options.progressTracker === undefined
+      ? {}
+      : { progressTracker: options.progressTracker }),
+    request: options.request,
+    text,
+  });
+  await options.progressTracker?.updatePhase({
+    done: 0,
+    phase: "writing",
+    total: mentions.length,
+    unit: "record",
+  });
 
-    const mentionLinks = await discoverMentionLinks({
-      fragments,
-      mentions,
-      ...(options.progressTracker === undefined
-        ? {}
-        : { progressTracker: options.progressTracker }),
-      request: options.request,
-    });
-    const artifact = await buildChapterKnowledgeGraphArtifact(chapterId, {
-      mentionLinks,
-      mentions,
-      workspacePath: options.workspacePath,
-    });
-    await options.progressTracker?.updatePhase({
-      done: mentions.length,
-      phase: "writing",
-      total: mentions.length,
-      unit: "record",
-    });
+  const mentionLinks = await discoverMentionLinks({
+    fragments,
+    mentions,
+    ...(options.progressTracker === undefined
+      ? {}
+      : { progressTracker: options.progressTracker }),
+    request: options.request,
+  });
+  const artifact = await buildChapterKnowledgeGraphArtifact(chapterId, {
+    mentionLinks,
+    mentions,
+    workspacePath: options.workspacePath,
+  });
+  await options.progressTracker?.updatePhase({
+    done: mentions.length,
+    phase: "writing",
+    total: mentions.length,
+    unit: "record",
+  });
 
-    return artifact;
-  } finally {
-    await blocklist.close();
-  }
+  return artifact;
 }
 
 export async function buildChapterKnowledgeGraphArtifact(
@@ -243,78 +236,58 @@ export async function buildChapterKnowledgeGraphArtifact(
 }
 
 async function screenCandidates(input: {
-  readonly blocklist: WikimatchSurfaceBlocklist;
   readonly candidates: readonly WikimatchCandidate[];
   readonly policyPrompt: string;
   readonly progressTracker?: Pick<BuildJobProgressReporter, "updatePhase">;
   readonly request: GuaranteedRequest;
   readonly text: string;
 }): Promise<readonly WikimatchCandidate[]> {
-  const blockedSurfaces = await input.blocklist.getBlockedSurfaces(
-    input.candidates.map((candidate) => candidate.surface),
-  );
-  const candidates = input.candidates.filter(
-    (candidate) => !blockedSurfaces.has(candidate.surface),
-  );
-
-  if (candidates.length === 0) {
+  if (input.candidates.length === 0) {
     return [];
   }
 
-  const allowedSurfaces = new Set<string>();
-  const windows = buildWikimatchSurfaceWindows({
-    candidates,
-    contextWords: 180,
-    surfaceBudget: 60,
+  const protectionInput = buildWikimatchSurfaceProtectionInput({
+    candidates: input.candidates,
+    percentile: WIKIMATCH_SURFACE_PROTECTION_PERCENTILE,
     text: input.text,
   });
-  let completedWindows = 0;
 
   await input.progressTracker?.updatePhase({
     done: 0,
     phase: "screening",
-    total: windows.length,
+    phaseDetail: `${protectionInput.suspiciousSurfaces.length} high-frequency surfaces`,
+    total: 1,
     unit: "window",
   });
-  const results = await Promise.all(
-    windows.map(async (window) => {
-      try {
-        return await judgeWikimatchSurfaceScreening({
-          policyPrompt: input.policyPrompt,
-          request: input.request,
-          window,
-        });
-      } finally {
-        completedWindows += 1;
-        await input.progressTracker?.updatePhase({
-          done: completedWindows,
-          phase: "screening",
-          total: windows.length,
-          unit: "window",
-        });
-      }
-    }),
+  const protection = await judgeWikimatchSurfaceProtection({
+    policyPrompt: input.policyPrompt,
+    request: input.request,
+    suspiciousSurfaces: protectionInput.suspiciousSurfaces,
+  });
+  const protectedSurfaces = new Set(
+    protection.protectedSurfaces.map((surface) => surface.text),
+  );
+  const allowedCandidateKeys = new Set(
+    protectionInput.candidates.map(createCandidateRangeKey),
   );
 
-  for (const result of results) {
-    for (const surface of result.surfaces) {
-      if (surface.decision === "allow") {
-        allowedSurfaces.add(surface.text);
-      }
-    }
-    await input.blocklist.put(
-      result.surfaces
-        .filter((surface) => surface.decision === "global_blocklist_candidate")
-        .map((surface) => ({
-          ...(surface.note === undefined ? {} : { note: surface.note }),
-          surface: surface.text,
-        })),
-    );
-  }
+  await input.progressTracker?.updatePhase({
+    done: 1,
+    phase: "screening",
+    phaseDetail: `${protectedSurfaces.size} protected surfaces`,
+    total: 1,
+    unit: "window",
+  });
 
-  return candidates.filter((candidate) =>
-    allowedSurfaces.has(candidate.surface),
+  return protectionInput.suppressedCandidates.filter(
+    (candidate) =>
+      allowedCandidateKeys.has(createCandidateRangeKey(candidate)) ||
+      protectedSurfaces.has(candidate.surface),
   );
+}
+
+function createCandidateRangeKey(candidate: WikimatchCandidate): string {
+  return `${candidate.range.start}\0${candidate.range.end}\0${candidate.surface}`;
 }
 
 async function judgeCandidates(input: {

@@ -23,16 +23,13 @@ export {
   enrichWikimatchCandidates,
 } from "./enrichment.js";
 export {
-  judgeWikimatchSurfaceScreening,
-  parseSurfaceScreeningResponse,
-  validateSurfaceScreeningResponse,
-  type JudgeWikimatchSurfaceScreeningOptions,
+  judgeWikimatchSurfaceProtection,
+  parseSurfaceProtectionResponse,
+  validateSurfaceProtectionResponse,
+  type JudgeWikimatchSurfaceProtectionOptions,
 } from "./surface-screening.js";
-export {
-  WikimatchSurfaceBlocklist,
-  type WikimatchSurfaceBlocklistRecord,
-} from "./surface-blocklist.js";
-export { buildWikimatchSurfaceWindows } from "./surface-window.js";
+export { buildWikimatchSurfaceProtectionInput } from "./surface-window.js";
+export { suppressContainedRanges } from "./range-suppression.js";
 export {
   matchWikispineSentenceCandidates,
   type MatchWikispineSentenceCandidatesOptions,
@@ -41,7 +38,7 @@ export { buildWikimatchWindows } from "./window.js";
 export { expandRangeByWords, listWordBoundaries } from "./words.js";
 export type {
   BuildWikimatchWindowsOptions,
-  BuildWikimatchSurfaceWindowsOptions,
+  BuildWikimatchSurfaceProtectionInputOptions,
   WikimatchAcceptedMention,
   WikimatchCandidate,
   WikimatchCandidateOptionNarrowingFallback,
@@ -59,15 +56,13 @@ export type {
   WikimatchPolicyUpdate,
   WikimatchQidOption,
   WikimatchSentence,
+  WikimatchProtectedSurface,
   WikimatchSurface,
-  WikimatchSurfaceScreeningDecision,
-  WikimatchSurfaceScreeningFallback,
-  WikimatchSurfaceScreeningInput,
-  WikimatchSurfaceScreeningItem,
-  WikimatchSurfaceScreeningItemOutput,
-  WikimatchSurfaceScreeningResponse,
-  WikimatchSurfaceScreeningResult,
-  WikimatchSurfaceWindow,
+  WikimatchSurfaceProtectionBuildResult,
+  WikimatchSurfaceProtectionFallback,
+  WikimatchSurfaceProtectionInput,
+  WikimatchSurfaceProtectionResponse,
+  WikimatchSurfaceProtectionResult,
   WikimatchTextRange,
   WikimatchWindow,
 } from "./types.js";
