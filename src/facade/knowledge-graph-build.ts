@@ -15,9 +15,12 @@ import type {
 import {
   buildWikimatchSurfaceWindows,
   buildWikimatchWindows,
+  countWikimatchCandidateOptions,
+  enrichWikimatchCandidates,
   judgeWikimatchPolicy,
   judgeWikimatchSurfaceScreening,
   matchWikispineSentenceCandidates,
+  narrowWikimatchCandidateOptions,
   WikimatchSurfaceBlocklist,
   type WikimatchAcceptedMention,
   type WikimatchCandidate,
@@ -71,6 +74,8 @@ const mentionLinkRecordSchema = z.object({
   note: z.string().optional(),
 });
 
+const WIKIMATCH_GROUNDING_OPTION_BUDGET = 35;
+
 export async function generateChapterKnowledgeGraphArtifact(
   document: ReadonlyDocument,
   chapterId: number,
@@ -89,15 +94,15 @@ export async function generateChapterKnowledgeGraphArtifact(
   const sentences = createWikimatchSentences(fragments);
   const rawCandidates = await matchWikispineSentenceCandidates({
     includeDisambiguation: true,
-    maxCandidatesPerSurface: 3,
     sentences,
   });
+  const enrichedCandidates = await enrichWikimatchCandidates(rawCandidates);
   const blocklist = await WikimatchSurfaceBlocklist.open();
 
   try {
     const screenedCandidates = await screenCandidates({
       blocklist,
-      candidates: rawCandidates,
+      candidates: enrichedCandidates,
       policyPrompt: options.policyPrompt,
       request: options.request,
       text,
@@ -212,11 +217,12 @@ async function judgeCandidates(input: {
 }): Promise<readonly MentionRecord[]> {
   const mentions: MentionRecord[] = [];
   let mentionIndex = 1;
+  const candidates = await narrowOversizedCandidates(input);
 
   for (const window of buildWikimatchWindows({
-    candidateBudget: 35,
-    candidates: input.candidates,
+    candidates,
     contextWords: 220,
+    optionBudget: WIKIMATCH_GROUNDING_OPTION_BUDGET,
     text: input.text,
   })) {
     const result = await judgeWikimatchPolicy({
@@ -237,6 +243,39 @@ async function judgeCandidates(input: {
   }
 
   return mentions;
+}
+
+async function narrowOversizedCandidates(input: {
+  readonly candidates: readonly WikimatchCandidate[];
+  readonly policyPrompt: string;
+  readonly request: GuaranteedRequest;
+  readonly text: string;
+}): Promise<readonly WikimatchCandidate[]> {
+  const candidates: WikimatchCandidate[] = [];
+
+  for (const candidate of input.candidates) {
+    if (
+      countWikimatchCandidateOptions(candidate) <=
+      WIKIMATCH_GROUNDING_OPTION_BUDGET
+    ) {
+      candidates.push(candidate);
+      continue;
+    }
+
+    const result = await narrowWikimatchCandidateOptions({
+      candidate,
+      optionBudget: WIKIMATCH_GROUNDING_OPTION_BUDGET,
+      policyPrompt: input.policyPrompt,
+      request: input.request,
+      text: input.text,
+    });
+
+    if (result.candidate.qidOptions.length > 0) {
+      candidates.push(result.candidate);
+    }
+  }
+
+  return candidates;
 }
 
 function toMentionRecord(
