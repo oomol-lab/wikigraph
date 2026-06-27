@@ -233,6 +233,9 @@ vi.mock("../../src/cli/stage-runtime.js", () => ({
     }),
   ),
   resolveExtractionPrompt: vi.fn((prompt: string | undefined) => prompt ?? ""),
+  resolveKnowledgeGraphRecallPrompt: vi.fn(
+    (prompt: string | undefined) => prompt ?? "Default KG recall",
+  ),
 }));
 
 import { runQueueCommand } from "../../src/cli/queue.js";

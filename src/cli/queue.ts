@@ -37,6 +37,7 @@ import {
   createStageLLM,
   loadRequiredStageConfig,
   resolveExtractionPrompt,
+  resolveKnowledgeGraphRecallPrompt,
 } from "./stage-runtime.js";
 
 const TERMINAL_STATES = new Set<BuildJobState>([
@@ -177,7 +178,10 @@ async function executeBuildJob(
       await reporter.addOutputCharacters(event.outputCharacters);
     },
   });
-  const prompt = resolveExtractionPrompt(job.prompt ?? config.prompt);
+  const promptSource = job.prompt ?? config.prompt;
+  const extractionPrompt = resolveExtractionPrompt(promptSource);
+  const knowledgeGraphRecallPrompt =
+    resolveKnowledgeGraphRecallPrompt(promptSource);
   const request = async (
     messages: Parameters<typeof llm.request>[0],
     index: number,
@@ -213,7 +217,7 @@ async function executeBuildJob(
     const artifact = await new SpineDigestFile(job.archivePath).readDocument(
       async (document) =>
         await generateChapterKnowledgeGraphArtifact(document, job.chapterId, {
-          policyPrompt: prompt,
+          policyPrompt: knowledgeGraphRecallPrompt,
           progressTracker: reporter,
           request,
           workspacePath: job.workspacePath,
@@ -233,7 +237,7 @@ async function executeBuildJob(
 
     await reporter.stepStarted("reading-graph");
     const artifact = await buildChapterGraphArtifact(job.chapterId, {
-      extractionPrompt: prompt,
+      extractionPrompt,
       llm,
       sourceText,
       workspacePath: job.workspacePath,
