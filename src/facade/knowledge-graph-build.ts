@@ -26,7 +26,14 @@ import {
   type WikimatchCandidate,
   type WikimatchSentence,
 } from "../wikimatch/index.js";
-import { buildWikilinkEvidenceWindows } from "../wikilink/index.js";
+import {
+  buildWikilinkEvidenceWindows,
+  discoverWikilinkRelations,
+  type WikilinkDiscoveredRelation,
+  type WikilinkEvidenceWindow,
+  type WikilinkMention,
+  type WikilinkSentence,
+} from "../wikilink/index.js";
 import { AsyncSemaphore } from "../utils/async-semaphore.js";
 
 import { getChapterDetails } from "./chapter.js";
@@ -180,10 +187,13 @@ export async function generateChapterKnowledgeGraphArtifact(
       unit: "record",
     });
 
-    const mentionLinks = buildMentionLinks({
+    const mentionLinks = await discoverMentionLinks({
       fragments,
       mentions,
-      text,
+      ...(options.progressTracker === undefined
+        ? {}
+        : { progressTracker: options.progressTracker }),
+      request: options.request,
     });
     const artifact = await buildChapterKnowledgeGraphArtifact(chapterId, {
       mentionLinks,
@@ -373,96 +383,145 @@ async function judgeCandidates(input: {
   return mentions;
 }
 
-export function buildMentionLinks(input: {
+async function discoverMentionLinks(input: {
   readonly fragments: readonly FragmentRecord[];
   readonly mentions: readonly MentionRecord[];
-  readonly text: string;
-}): readonly MentionLinkRecord[] {
-  const mentionsById = new Map(
-    input.mentions.map((mention) => [mention.id, mention]),
+  readonly progressTracker?: Pick<BuildJobProgressReporter, "updatePhase">;
+  readonly request: GuaranteedRequest;
+}): Promise<readonly MentionLinkRecord[]> {
+  const fragmentWindows = buildMentionLinkWindows(
+    input.fragments,
+    input.mentions,
   );
-  const sentenceLocations = buildSentenceLocations(input.fragments);
-  const sentenceLocationByKey = new Map(
-    sentenceLocations.map((location) => [
-      `${location.fragmentId}:${location.sentenceIndex}`,
-      location,
-    ]),
-  );
-  const linkKeys = new Set<string>();
-  const links: MentionLinkRecord[] = [];
+  const discoveredLinks: WikilinkDiscoveredRelation[] = [];
+  let completedWindows = 0;
 
-  for (const window of buildWikilinkEvidenceWindows({
-    maxEvidenceDistance: WIKILINK_EVIDENCE_DISTANCE,
-    mentions: input.mentions
-      .map((mention) => {
-        if (mention.sentenceIndex === undefined) {
-          return undefined;
-        }
+  await input.progressTracker?.updatePhase({
+    done: 0,
+    phase: "writing",
+    total: fragmentWindows.length,
+    unit: "window",
+  });
 
-        const location = sentenceLocationByKey.get(
-          `${mention.fragmentId}:${mention.sentenceIndex}`,
-        );
-
-        if (location === undefined) {
-          return undefined;
-        }
-
-        const start = location.absoluteStart + mention.rangeStart;
-
-        return {
-          id: mention.id,
-          range: {
-            end: start + mention.surface.length,
-            start,
-          },
-        };
-      })
-      .filter(isDefined),
-    text: input.text,
-    windowLength: WIKILINK_WINDOW_LENGTH,
-  })) {
-    for (
-      let leftIndex = 0;
-      leftIndex < window.mentions.length;
-      leftIndex += 1
-    ) {
-      for (
-        let rightIndex = leftIndex + 1;
-        rightIndex < window.mentions.length;
-        rightIndex += 1
-      ) {
-        const source = mentionsById.get(window.mentions[leftIndex]!.id);
-        const target = mentionsById.get(window.mentions[rightIndex]!.id);
-
-        if (source === undefined || target === undefined) {
-          continue;
-        }
-        if (source.qid === target.qid) {
-          continue;
-        }
-
-        const key = `${source.id}\0${target.id}`;
-
-        if (linkKeys.has(key)) {
-          continue;
-        }
-
-        linkKeys.add(key);
-        links.push({
-          id: `l${source.chapterId}-${links.length + 1}`,
-          predicate: "mentions",
-          sourceMentionId: source.id,
-          targetMentionId: target.id,
-        });
-      }
+  for (const item of fragmentWindows) {
+    try {
+      discoveredLinks.push(
+        ...(await discoverWikilinkRelations({
+          chapterId: item.fragment.serialId,
+          fragmentId: item.fragment.fragmentId,
+          request: input.request,
+          sentences: item.fragment.sentences,
+          window: item.window,
+        })),
+      );
+    } finally {
+      completedWindows += 1;
+      await input.progressTracker?.updatePhase({
+        done: completedWindows,
+        phase: "writing",
+        total: fragmentWindows.length,
+        unit: "window",
+      });
     }
   }
 
-  return links;
+  return discoveredLinks.map((link, index) => ({
+    ...(link.confidence === undefined ? {} : { confidence: link.confidence }),
+    evidenceEnd: link.evidenceEnd,
+    evidenceStart: link.evidenceStart,
+    id: `l${input.fragments[0]?.serialId ?? 0}-${index + 1}`,
+    ...(link.note === undefined ? {} : { note: link.note }),
+    predicate: link.predicate,
+    sourceMentionId: link.sourceMentionId,
+    targetMentionId: link.targetMentionId,
+  }));
 }
 
-function isDefined<T>(value: T | undefined): value is T {
-  return value !== undefined;
+function buildMentionLinkWindows(
+  fragments: readonly FragmentRecord[],
+  mentions: readonly MentionRecord[],
+): ReadonlyArray<{
+  readonly fragment: FragmentRecord;
+  readonly window: WikilinkEvidenceWindow;
+}> {
+  const mentionsByFragment = new Map<number, MentionRecord[]>();
+
+  for (const mention of mentions) {
+    const list = mentionsByFragment.get(mention.fragmentId) ?? [];
+
+    list.push(mention);
+    mentionsByFragment.set(mention.fragmentId, list);
+  }
+
+  return fragments.flatMap((fragment) => {
+    const fragmentMentions = toWikilinkMentions(
+      fragment.sentences,
+      mentionsByFragment.get(fragment.fragmentId) ?? [],
+    );
+    const windows = buildWikilinkEvidenceWindows({
+      maxEvidenceDistance: WIKILINK_EVIDENCE_DISTANCE,
+      mentions: fragmentMentions,
+      text: joinSentences(fragment.sentences),
+      windowLength: WIKILINK_WINDOW_LENGTH,
+    });
+
+    return windows.map((window) => ({
+      fragment,
+      window,
+    }));
+  });
+}
+
+function toWikilinkMentions(
+  sentences: readonly WikilinkSentence[],
+  mentions: readonly MentionRecord[],
+): readonly WikilinkMention[] {
+  const sentenceOffsets = buildFragmentSentenceOffsets(sentences);
+
+  return mentions.flatMap((mention) => {
+    if (mention.sentenceIndex === undefined) {
+      return [];
+    }
+
+    const sentenceOffset = sentenceOffsets[mention.sentenceIndex];
+
+    if (sentenceOffset === undefined) {
+      return [];
+    }
+
+    return [
+      {
+        id: mention.id,
+        qid: mention.qid,
+        range: {
+          end: sentenceOffset.start + mention.rangeEnd,
+          start: sentenceOffset.start + mention.rangeStart,
+        },
+        surface: mention.surface,
+      },
+    ];
+  });
+}
+
+function buildFragmentSentenceOffsets(
+  sentences: readonly WikilinkSentence[],
+): ReadonlyArray<{ readonly end: number; readonly start: number }> {
+  const offsets: Array<{ readonly end: number; readonly start: number }> = [];
+  let cursor = 0;
+
+  for (const sentence of sentences) {
+    const start = cursor;
+    const end = start + sentence.text.length;
+
+    offsets.push({ end, start });
+    cursor = end + 1;
+  }
+
+  return offsets;
+}
+
+function joinSentences(sentences: readonly WikilinkSentence[]): string {
+  return sentences.map((sentence) => sentence.text).join(" ");
 }
 
 async function narrowOversizedCandidates(input: {

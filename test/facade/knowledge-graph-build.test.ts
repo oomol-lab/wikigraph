@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { DirectoryDocument } from "../../src/document/index.js";
 import {
-  buildMentionLinks,
   buildChapterKnowledgeGraphArtifact,
   clearChapterKnowledgeGraph,
   commitChapterKnowledgeGraphArtifact,
@@ -10,98 +9,6 @@ import {
 import { withTempDir } from "../helpers/temp.js";
 
 describe("facade/knowledge-graph-build", () => {
-  it("builds mention links from grounded mention evidence windows", () => {
-    const links = buildMentionLinks({
-      fragments: [
-        {
-          fragmentId: 0,
-          sentences: [
-            { text: "Alpha meets Beta.", wordsCount: 3 },
-            { text: "Alpha later sees Gamma.", wordsCount: 4 },
-          ],
-          serialId: 1,
-          summary: "",
-        },
-      ],
-      mentions: [
-        {
-          chapterId: 1,
-          fragmentId: 0,
-          id: "m1",
-          qid: "Q1",
-          rangeEnd: 5,
-          rangeStart: 0,
-          sentenceIndex: 0,
-          surface: "Alpha",
-        },
-        {
-          chapterId: 1,
-          fragmentId: 0,
-          id: "m2",
-          qid: "Q2",
-          rangeEnd: 16,
-          rangeStart: 12,
-          sentenceIndex: 0,
-          surface: "Beta",
-        },
-        {
-          chapterId: 1,
-          fragmentId: 0,
-          id: "m3",
-          qid: "Q1",
-          rangeEnd: 5,
-          rangeStart: 0,
-          sentenceIndex: 1,
-          surface: "Alpha",
-        },
-        {
-          chapterId: 1,
-          fragmentId: 0,
-          id: "m4",
-          qid: "Q3",
-          rangeEnd: 22,
-          rangeStart: 17,
-          sentenceIndex: 1,
-          surface: "Gamma",
-        },
-      ],
-      text: "Alpha meets Beta. Alpha later sees Gamma.",
-    });
-
-    expect(links).toStrictEqual([
-      {
-        id: "l1-1",
-        predicate: "mentions",
-        sourceMentionId: "m1",
-        targetMentionId: "m2",
-      },
-      {
-        id: "l1-2",
-        predicate: "mentions",
-        sourceMentionId: "m1",
-        targetMentionId: "m4",
-      },
-      {
-        id: "l1-3",
-        predicate: "mentions",
-        sourceMentionId: "m2",
-        targetMentionId: "m3",
-      },
-      {
-        id: "l1-4",
-        predicate: "mentions",
-        sourceMentionId: "m2",
-        targetMentionId: "m4",
-      },
-      {
-        id: "l1-5",
-        predicate: "mentions",
-        sourceMentionId: "m3",
-        targetMentionId: "m4",
-      },
-    ]);
-  });
-
   it("commits chapter mention evidence from JSONL artifacts", async () => {
     await withTempDir("spinedigest-knowledge-graph-build-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
