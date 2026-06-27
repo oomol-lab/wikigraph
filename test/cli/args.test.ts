@@ -953,8 +953,8 @@ describe("cli/args", () => {
     expect(renderHelpTopicText("config")).toContain("wikigraph help env");
     expect(renderHelpTopicText("config")).toContain("Inline LLM JSON");
     expect(renderHelpTopicText("config")).toContain("baseUrl");
-    expect(renderHelpTopicText("env")).toContain("SPINEDIGEST_LLM_MODEL");
-    expect(renderHelpTopicText("env")).toContain("SPINEDIGEST_REQUEST_STREAM");
+    expect(renderHelpTopicText("env")).toContain("WIKIGRAPH_LLM_MODEL");
+    expect(renderHelpTopicText("env")).toContain("WIKIGRAPH_REQUEST_STREAM");
     expect(renderHelpTopicText("env")).toContain(
       "positive number or JSON number array such as `0.2` or `[0.2, 0.4]`",
     );

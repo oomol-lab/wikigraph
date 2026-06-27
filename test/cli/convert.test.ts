@@ -409,7 +409,7 @@ describe("cli/convert", () => {
         verbose: false,
       }),
     ).rejects.toThrow(
-      "Missing LLM configuration. Set --llm, `llm.provider` and `llm.model` in ~/.wikigraph/config.json, or the matching SPINEDIGEST_LLM_* environment variables.\nSee: wikigraph help config",
+      "Missing LLM configuration. Set --llm, `llm.provider` and `llm.model` in ~/.wikigraph/config.json, or the matching WIKIGRAPH_LLM_* environment variables.\nSee: wikigraph help config",
     );
 
     expect(cliMockState.appConstructorOptions).toHaveLength(0);

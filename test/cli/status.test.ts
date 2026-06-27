@@ -56,7 +56,7 @@ describe("cli/status", () => {
 
   it("prints {} when the config file does not exist", async () => {
     await withTempDir("wikigraph-status-", async (path) => {
-      process.env.SPINEDIGEST_CONFIG = `${path}/missing.json`;
+      process.env.WIKIGRAPH_CONFIG = `${path}/missing.json`;
       await runStatusCommand({});
 
       expect(statusMockState.stdoutTexts).toStrictEqual(["{}\n"]);
@@ -85,7 +85,7 @@ describe("cli/status", () => {
           2,
         ),
       );
-      process.env.SPINEDIGEST_CONFIG = configPath;
+      process.env.WIKIGRAPH_CONFIG = configPath;
 
       await runStatusCommand({});
 
@@ -123,7 +123,7 @@ describe("cli/status", () => {
           2,
         ),
       );
-      process.env.SPINEDIGEST_CONFIG = configPath;
+      process.env.WIKIGRAPH_CONFIG = configPath;
 
       await runStatusCommand({});
 
@@ -145,7 +145,7 @@ describe("cli/status", () => {
       const configPath = `${path}/broken.json`;
 
       await writeFile(configPath, "{not json", "utf8");
-      process.env.SPINEDIGEST_CONFIG = configPath;
+      process.env.WIKIGRAPH_CONFIG = configPath;
 
       await expect(runStatusCommand({})).rejects.toThrow(
         `Invalid CLI config JSON at ${configPath}:`,
@@ -155,7 +155,7 @@ describe("cli/status", () => {
 
   it("prints masked merged config when inline llm json is provided", async () => {
     await withTempDir("wikigraph-status-", async (path) => {
-      process.env.SPINEDIGEST_CONFIG = `${path}/missing.json`;
+      process.env.WIKIGRAPH_CONFIG = `${path}/missing.json`;
 
       await runStatusCommand({
         llmJSON: JSON.stringify({

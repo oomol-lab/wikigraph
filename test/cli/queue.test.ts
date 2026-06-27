@@ -236,7 +236,7 @@ import { runQueueCommand } from "../../src/cli/queue.js";
 
 describe("cli/queue", () => {
   const originalDisableAutostart =
-    process.env.SPINEDIGEST_QUEUE_DISABLE_AUTOSTART;
+    process.env.WIKIGRAPH_QUEUE_DISABLE_AUTOSTART;
 
   beforeEach(() => {
     queueMockState.activeError = undefined;
@@ -274,16 +274,16 @@ describe("cli/queue", () => {
     queueMockState.stepLog.length = 0;
     queueMockState.textWrites.length = 0;
     queueMockState.writeCalls.length = 0;
-    process.env.SPINEDIGEST_QUEUE_DISABLE_AUTOSTART = "1";
+    process.env.WIKIGRAPH_QUEUE_DISABLE_AUTOSTART = "1";
   });
 
   afterEach(() => {
     if (originalDisableAutostart === undefined) {
-      delete process.env.SPINEDIGEST_QUEUE_DISABLE_AUTOSTART;
+      delete process.env.WIKIGRAPH_QUEUE_DISABLE_AUTOSTART;
       return;
     }
 
-    process.env.SPINEDIGEST_QUEUE_DISABLE_AUTOSTART = originalDisableAutostart;
+    process.env.WIKIGRAPH_QUEUE_DISABLE_AUTOSTART = originalDisableAutostart;
   });
 
   it("checks archive and active job preconditions before the cost gate", async () => {

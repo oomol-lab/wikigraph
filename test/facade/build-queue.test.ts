@@ -16,11 +16,11 @@ import {
 } from "../../src/facade/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
-const originalStateDir = process.env.SPINEDIGEST_STATE_DIR;
+const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
 
 describe("facade/build-queue", () => {
   afterEach(() => {
-    restoreEnv("SPINEDIGEST_STATE_DIR", originalStateDir);
+    restoreEnv("WIKIGRAPH_STATE_DIR", originalStateDir);
   });
 
   it("allows only one active job for an archive chapter", async () => {
@@ -588,7 +588,7 @@ function requirePromise<T>(promise: Promise<T> | undefined): Promise<T> {
 }
 
 function useStateDir(path: string): void {
-  process.env.SPINEDIGEST_STATE_DIR = path;
+  process.env.WIKIGRAPH_STATE_DIR = path;
 }
 
 function restoreEnv(key: string, value: string | undefined): void {

@@ -12,11 +12,11 @@ import {
 } from "../../src/facade/archive-view.js";
 import { withTempDir } from "../helpers/temp.js";
 
-const originalStateDir = process.env.SPINEDIGEST_STATE_DIR;
+const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
 
 describe("facade/archive-view", () => {
   afterEach(() => {
-    restoreEnv("SPINEDIGEST_STATE_DIR", originalStateDir);
+    restoreEnv("WIKIGRAPH_STATE_DIR", originalStateDir);
   });
 
   it("searches sourced fragments before graph or summary build", async () => {
@@ -79,7 +79,7 @@ describe("facade/archive-view", () => {
 
   it("prioritizes entity matches before source fallback", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
-      process.env.SPINEDIGEST_STATE_DIR = `${path}/state`;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
       const document = await DirectoryDocument.open(`${path}/document`);
 
       try {
@@ -116,7 +116,7 @@ describe("facade/archive-view", () => {
 
   it("falls back to lexical source scan with session cursors", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
-      process.env.SPINEDIGEST_STATE_DIR = `${path}/state`;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
       const document = await DirectoryDocument.open(`${path}/document`);
 
       try {

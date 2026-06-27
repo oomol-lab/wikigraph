@@ -566,7 +566,7 @@ async function writeJobSummary(job: BuildJob): Promise<void> {
 }
 
 function tryStartQueueWorker(): void {
-  if (process.env.SPINEDIGEST_QUEUE_DISABLE_AUTOSTART === "1") {
+  if (process.env.WIKIGRAPH_QUEUE_DISABLE_AUTOSTART === "1") {
     return;
   }
 

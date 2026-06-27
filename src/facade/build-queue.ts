@@ -1058,7 +1058,7 @@ async function createJobEventsPath(jobId: string): Promise<string> {
 }
 
 function getBuildQueueStateDirectoryPath(): string {
-  const stateDirectoryPath = process.env.SPINEDIGEST_STATE_DIR;
+  const stateDirectoryPath = process.env.WIKIGRAPH_STATE_DIR;
 
   if (stateDirectoryPath !== undefined && stateDirectoryPath.trim() !== "") {
     return resolve(stateDirectoryPath);
