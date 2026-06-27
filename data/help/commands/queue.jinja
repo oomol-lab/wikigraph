@@ -17,9 +17,14 @@ Usage:
   wikigraph queue clean
 
 Tasks:
-  - reading-graph builds the reading-oriented chunk graph.
-  - reading-summary builds the Reading Graph summary path.
-  - knowledge-graph builds entity mentions from sourced text.
+  - reading-graph builds the reading-oriented chunk graph from sourced text.
+  - reading-summary builds summaries from the Reading Graph. It builds reading-graph first when needed.
+  - knowledge-graph builds entity mentions from sourced text. Use this before searching `--type entity`.
+
+Task shape:
+  - reading-graph -> reading-summary is the Reading Graph line.
+  - knowledge-graph is separate and does not build summaries.
+  - Queue one task per chapter. Add both reading-summary and knowledge-graph when you need both outputs.
 
 Cost:
   Queue tasks may call an LLM, consume tokens, and incur provider charges.
@@ -28,4 +33,5 @@ Cost:
 Examples:
   wikigraph queue add book.sdpub --chapter 3 --task reading-graph --accept-cost
   wikigraph queue add book.sdpub --chapter 3 --task reading-summary --accept-cost
+  wikigraph queue add book.sdpub --chapter 3 --task knowledge-graph --accept-cost
   wikigraph queue watch <job-id> --jsonl

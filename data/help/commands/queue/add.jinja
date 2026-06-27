@@ -15,6 +15,12 @@ Options:
   --llm <json>         Override LLM configuration for this job.
   --prompt <text>      Override extraction prompt for this job.
 
+Task choices:
+  reading-graph        Build the reading-oriented chunk graph from sourced text.
+  reading-summary      Build summaries from the Reading Graph. Builds reading-graph first when needed.
+  knowledge-graph      Build entity mentions from sourced text. Required before entity search can return results.
+
 Examples:
   wikigraph queue add book.sdpub --chapter 3 --task reading-graph --accept-cost
   wikigraph queue add book.sdpub --chapter 3 --task reading-summary --accept-cost --boost
+  wikigraph queue add book.sdpub --chapter 3 --task knowledge-graph --accept-cost
