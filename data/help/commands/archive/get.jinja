@@ -4,10 +4,25 @@ Command: wikigraph get
 get
 
 Purpose:
-  Read one Wiki Graph object by URI.
+  Read one readable Wiki Graph object by URI.
+
+Use when:
+  - You already have a `wikigraph://...` URI and need to inspect its object payload.
 
 Usage:
   wikigraph get <archive.sdpub> <uri> [--json|--jsonl] [--help|-h]
+
+Returns:
+  - The selected object in human-readable text, JSON, or JSONL.
+
+Notes:
+  - `get` is for readable archive objects such as chunks, source chapters or ranges, and summaries.
+  - Use `evidence` for entity or triple URIs when source-backed support is needed.
+
+Next steps:
+  - Use `related` to expand from this object.
+  - Use `evidence` to trace source-backed support.
+  - Use `pack` to assemble bounded context around the object.
 
 Examples:
   wikigraph get book.sdpub wikigraph://chunk/123

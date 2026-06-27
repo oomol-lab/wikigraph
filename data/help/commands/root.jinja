@@ -11,6 +11,13 @@ Object model:
   Search and navigation return URI-addressable objects. Common object kinds are:
     entity, triple, source, summary, chunk
 
+Object workflow:
+  - `search` returns candidate Wiki Graph URIs from query text.
+  - `get` opens one readable URI.
+  - `related` expands from one URI to nearby URIs.
+  - `evidence` traces a URI to source-backed evidence.
+  - `pack` builds bounded Agent-readable context around one readable URI.
+
 Object commands:
   wikigraph search <archive.sdpub> <query> [--type <entity|triple|source|summary|chunk[,kind...]>] [--chapter <ids>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
   wikigraph get <archive.sdpub> <uri> [--json|--jsonl]
