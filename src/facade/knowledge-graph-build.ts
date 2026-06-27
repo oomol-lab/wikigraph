@@ -349,12 +349,6 @@ export async function groundWikimatchCandidates(input: {
   let completedWindows = 0;
   let totalWindows = 0;
 
-  await input.progressTracker?.updatePhase({
-    done: 0,
-    phase: "grounding",
-    total: 0,
-    unit: "window",
-  });
   const limiter = new AsyncSemaphore(WIKIMATCH_GROUNDING_CONCURRENCY);
   let activeCandidates = candidatePages.nextPage();
 
@@ -367,6 +361,15 @@ export async function groundWikimatchCandidates(input: {
     });
 
     totalWindows += windows.length;
+    if (windows.length === 0) {
+      break;
+    }
+    await input.progressTracker?.updatePhase({
+      done: completedWindows,
+      phase: "grounding",
+      total: totalWindows,
+      unit: "window",
+    });
 
     const results = await Promise.all(
       windows.map(async (window) => {

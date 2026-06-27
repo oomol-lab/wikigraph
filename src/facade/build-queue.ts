@@ -1353,6 +1353,7 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
     | undefined;
   #step: BuildJobTarget | undefined;
   #readingSummaryWords = 0;
+  #stopCheckQueue: Promise<void> = Promise.resolve();
   #totalGraphWords = 0;
   #totalReadingSummaryWords = 0;
   #writeQueue: Promise<void> = Promise.resolve();
@@ -1459,15 +1460,20 @@ class BuildJobProgressAccumulator implements BuildJobProgressReporter {
   }
 
   public async throwIfStopped(): Promise<void> {
-    const job = await getBuildJob(this.#job.jobId);
+    const queued = this.#stopCheckQueue.then(async () => {
+      const job = await getBuildJob(this.#job.jobId);
 
-    if (job.state === "running" && job.ownerId === this.#ownerId) {
-      return;
-    }
+      if (job.state === "running" && job.ownerId === this.#ownerId) {
+        return;
+      }
 
-    throw new BuildJobStoppedError(
-      `Job ${this.#job.jobId} is ${job.state}. Stop current worker execution.`,
-    );
+      throw new BuildJobStoppedError(
+        `Job ${this.#job.jobId} is ${job.state}. Stop current worker execution.`,
+      );
+    });
+
+    this.#stopCheckQueue = queued.catch(() => undefined);
+    await queued;
   }
 
   async #enqueue(operation: () => Promise<void>): Promise<void> {
