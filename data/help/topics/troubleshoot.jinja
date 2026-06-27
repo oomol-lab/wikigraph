@@ -3,65 +3,13 @@ Topic: troubleshoot
 
 Troubleshooting
 
-Search returns no matches:
-  Check:
-    Run `spinedigest status <archive.sdpub>` and `spinedigest list <archive.sdpub> --type fragment`.
-    Source-only archives should be searchable through fragment text. If there are no fragments, archive creation did not store source text.
+No search results:
+  Try fewer keywords, remove restrictive `--type` filters, or inspect the archive with `spinedigest index <archive.sdpub>`.
 
-Page shows missing summary:
-  Check:
-    `page --chapter <id>` remains a topology entry page; use `read --chapter <id>` for source text or `find --type fragment` to locate source fragments.
-    Queue a summary job only when a summary projection is needed.
+Missing generated objects:
+  Queue the relevant generation task for the chapter:
+    spinedigest queue add <archive.sdpub> --chapter <id> --task reading-graph --accept-cost
+    spinedigest queue add <archive.sdpub> --chapter <id> --task summary --accept-cost
 
-Queued job does not start:
-  Check:
-    Run `spinedigest queue list`.
-    Confirm the job is `queued`, not `paused`.
-    Confirm `request.concurrent` in `~/.wikigraph/config.json` is positive.
-    Run `spinedigest queue resume <job-id>` for paused jobs.
-
-Need machine-readable progress:
-  Check:
-    Use `spinedigest queue watch <job-id> --jsonl`.
-    Use `--from beginning` to replay durable event history.
-    Look for `progress_snapshot`, `failed`, `canceled`, or `succeeded` events.
-
-Missing LLM configuration:
-  Symptom:
-    A graph or summary queue job fails before generation starts.
-  Check:
-    `--llm`, `llm.provider` and `llm.model` in config, or the matching env vars.
-
-Chapter edit blocked by an active job:
-  Symptom:
-    A chapter maintenance command reports an active graph or summary job.
-  Check:
-    Run `spinedigest queue list --input <archive.sdpub>`.
-    Wait for the job, pause it, or cancel it before destructive chapter edits.
-
-Unexpected format errors:
-  Symptom:
-    The CLI rejects a create or export format.
-  Check:
-    The file extension, or pass `--input-format` / `--output-format` explicitly.
-    stdin create supports only markdown and txt.
-
-stdin or stdout misuse:
-  Symptom:
-    The CLI rejects interactive stdin or cannot infer a stream format.
-  Check:
-    Pipe text into stdin and pass `--input-format`, or pass a source path.
-
-Archive maintenance command failure:
-  Symptom:
-    archive maintenance commands reject flags or input.
-  Check:
-    Use archive-first commands for routine retrieval. Use `spinedigest meta --help`, `spinedigest cover --help`, or `spinedigest chapter --help` for maintenance commands.
-
-Where to go next:
-  - Need command shape:
-    spinedigest help command
-  - Need runtime stream rules:
-    spinedigest help runtime
-  - Need archive model:
-    spinedigest help overview
+Need machine-readable output:
+  Use `--json` or `--jsonl` on object commands.

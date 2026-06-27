@@ -1,45 +1,14 @@
 Help Type: topic
 Topic: format
 
-Format Reference
+Format Rules
 
-Supported formats:
-  {{ formats | join(", ") }}
+`.sdpub` is the managed Wiki Graph archive format.
 
-Archive-first rules:
-  - `.sdpub` is the primary managed knowledge archive.
-  - `epub`, `markdown`, `txt`, URL text, and stdin text are archive creation sources.
-  - `markdown`, `txt`, `epub`, and `.sdpub` are export projections.
-  - List, search, page, read, links, path, and pack operate on `.sdpub` and do not require output formats.
+Source formats for archive creation:
+  sdpub, epub, txt, markdown
 
-Create rules:
-  - `spinedigest create <archive.sdpub> <source>` infers source format from the source path when possible.
-  - `spinedigest create <archive.sdpub> --input-format markdown` reads source text from stdin.
-  - stdin create supports only `markdown` and `txt`.
-  - `.sdpub` itself must be a real archive file path.
+Object commands operate on `.sdpub` archives. `search` and `related` return URI-addressable objects, `get` opens one object, `evidence` returns source evidence items, and `pack` returns packed context.
 
-Export rules:
-  - `spinedigest export <archive.sdpub> --output-format markdown|txt|epub|sdpub` exports a projection.
-  - If `--output` is omitted, text projections can go to stdout.
-  - Binary or archive projections should be written to a file.
-
-Readiness by archive stage:
-  - planned: chapter exists, but no source is available.
-  - source: source fragments are searchable and readable; graph and summary may be missing.
-  - graph: graph nodes, links, and source fragment pointers are available; summary may be missing.
-  - summary: summaries and export projections are ready.
-
-LLM usage:
-  - Create/source does not call an LLM.
-  - Queue graph and summary jobs may call an LLM.
-  - List, search, page, read, navigation, pack, and export do not call an LLM.
-
-Maintenance commands:
-  Use `spinedigest chapter tree` to inspect table-of-contents hierarchy. Use `spinedigest meta`, `spinedigest cover`, `spinedigest chapter tree apply`, and other mutating `chapter` actions for metadata, cover extraction, and chapter tree maintenance.
-Where to go next:
-  - Need command forms:
-    spinedigest help command
-  - Need agent contract:
-    spinedigest help ai
-  - Need runtime stream rules:
-    spinedigest help runtime
+Use `export` when a projection file is needed:
+  spinedigest export book.sdpub --output-format markdown --output out.md

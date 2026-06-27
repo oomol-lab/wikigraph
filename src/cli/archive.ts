@@ -3,30 +3,22 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 import {
-  findGraphPath,
   getArchiveIndex,
-  listArchiveCollection,
-  listArchiveLinks,
-  listArchiveObjects,
+  listArchiveEvidence,
   listRelatedArchiveObjects,
   packArchiveContext,
   readArchivePage,
-  readArchiveText,
   estimateArchiveBuild,
-  type ArchiveCollectionOptions,
-  type ArchiveCollectionResult,
   findArchiveObjects,
-  formatNodeId,
   type ArchiveEstimate,
+  type ArchiveEvidence,
+  type ArchiveEvidenceItem,
   type ArchiveFindOptions,
   type ArchiveFindResult,
   type ArchiveIndex,
   type ArchiveListItem,
   type ArchivePack,
   type ArchivePage,
-  grepArchiveObjects,
-  type GraphNeighbor,
-  type GraphPathStep,
   type ChapterStage,
 } from "../facade/index.js";
 import { SpineDigestFile } from "../facade/spine-digest-file.js";
@@ -35,6 +27,8 @@ import type { ReadonlyDocument } from "../document/index.js";
 import type { CLIArchiveArguments } from "./args.js";
 import { runConvertCommand } from "./convert.js";
 import { readTextStreamFromStdin, writeTextToStdout } from "./io.js";
+
+type ResultFormat = "json" | "jsonl" | "text";
 
 export async function runArchiveCommand(
   args: CLIArchiveArguments,
@@ -69,28 +63,17 @@ export async function runArchiveCommand(
         );
       });
       return;
-    case "status":
     case "index": {
-      const indexAction = args.action;
-
       await readArchiveDocument(args.archivePath, async (document) => {
         await writeIndex(
           await getArchiveIndex(document),
-          indexAction,
+          "index",
           args.json ?? false,
         );
       });
       return;
     }
-    case "list":
-      await readArchiveDocument(args.archivePath, async (document) => {
-        await writeCollection(
-          await listArchiveCollection(document, createCollectionOptions(args)),
-          args.json ?? false,
-        );
-      });
-      return;
-    case "find":
+    case "search":
       await readArchiveDocument(args.archivePath, async (document) => {
         await writeFindHits(
           await findArchiveObjects(
@@ -98,55 +81,34 @@ export async function runArchiveCommand(
             args.query!,
             createFindOptions(args),
           ),
-          args.json ?? false,
+          args.format ?? "text",
         );
       });
       return;
-    case "grep":
-      await readArchiveDocument(args.archivePath, async (document) => {
-        await writeFindHits(
-          await grepArchiveObjects(
-            document,
-            args.query!,
-            createFindOptions(args),
-          ),
-          args.json ?? false,
-        );
-      });
-      return;
-    case "page":
+    case "get":
       await readArchiveDocument(args.archivePath, async (document) => {
         await writePage(
-          await readArchivePage(document, args.objectId!),
-          args.json ?? false,
+          await readArchivePage(document, toArchiveObjectId(args.objectId!)),
+          args.format ?? "text",
         );
       });
       return;
-    case "read":
-      await readArchiveDocument(args.archivePath, async (document) => {
-        await writeTextToStdout(
-          `${await readArchiveText(document, args.objectId!)}\n`,
-        );
-      });
-      return;
-    case "links":
-    case "backlinks": {
-      const linkDirection = args.action;
-
-      await readArchiveDocument(args.archivePath, async (document) => {
-        await writeLinks(
-          await listArchiveLinks(document, args.objectId!, linkDirection),
-          linkDirection,
-          args.json ?? false,
-        );
-      });
-      return;
-    }
     case "related":
       await readArchiveDocument(args.archivePath, async (document) => {
         await writeList(
-          await listRelatedArchiveObjects(document, args.objectId!),
-          args.json ?? false,
+          await listRelatedArchiveObjects(
+            document,
+            toArchiveObjectId(args.objectId!),
+          ),
+          args.format ?? "text",
+        );
+      });
+      return;
+    case "evidence":
+      await readArchiveDocument(args.archivePath, async (document) => {
+        await writeEvidence(
+          await listArchiveEvidence(document, args.objectId!),
+          args.format ?? "text",
         );
       });
       return;
@@ -155,32 +117,10 @@ export async function runArchiveCommand(
         await writePack(
           await packArchiveContext(
             document,
-            args.objectId!,
+            toArchiveObjectId(args.objectId!),
             args.budget ?? 5000,
           ),
-          args.json ?? false,
-        );
-      });
-      return;
-    case "map":
-      await readArchiveDocument(args.archivePath, async (document) => {
-        await writeMap(
-          await listArchiveObjects(document, "edges"),
-          args.json ?? false,
-        );
-      });
-      return;
-    case "path":
-      await readArchiveDocument(args.archivePath, async (document) => {
-        await writeTextToStdout(
-          formatPath(
-            await findGraphPath(
-              document,
-              args.chapterId!,
-              args.fromNodeId!,
-              args.toNodeId!,
-            ),
-          ),
+          args.format ?? "text",
         );
       });
       return;
@@ -279,29 +219,21 @@ async function createArchiveFromStdin(
 }
 
 function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
-  return {
-    ...(args.chapters === undefined ? {} : { chapters: args.chapters }),
-    ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
-    ...(args.ids === undefined ? {} : { ids: args.ids }),
-    ...(args.limit === undefined ? {} : { limit: args.limit }),
-    ...(args.match === undefined ? {} : { match: args.match }),
-    ...(args.searchOrder === undefined ? {} : { order: args.searchOrder }),
-    ...(args.searchTypes === undefined
-      ? {}
-      : { types: args.searchTypes.filter(isSearchFilterType) }),
-  };
-}
+  const types = args.kinds?.map((kind) => {
+    const type = toArchiveFindType(kind);
 
-function createCollectionOptions(
-  args: CLIArchiveArguments,
-): ArchiveCollectionOptions {
+    if (type === undefined) {
+      throw new Error(`Unsupported archive search type: ${kind}`);
+    }
+
+    return type;
+  });
+
   return {
     ...(args.chapters === undefined ? {} : { chapters: args.chapters }),
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
-    ...(args.ids === undefined ? {} : { ids: args.ids }),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
-    ...(args.searchOrder === undefined ? {} : { order: args.searchOrder }),
-    ...(args.searchTypes === undefined ? {} : { types: args.searchTypes }),
+    ...(types === undefined ? {} : { types }),
   };
 }
 
@@ -314,7 +246,7 @@ async function readArchiveDocument<T>(
 
 async function writeIndex(
   index: ArchiveIndex,
-  action: "index" | "status",
+  action: "index",
   json: boolean,
 ): Promise<void> {
   if (json) {
@@ -335,16 +267,16 @@ async function writeIndex(
   if (index.nodeCount === 0) {
     lines.push(
       "",
-      "Graph note:",
-      "  No graph nodes are currently available. If a graph queue job already ran, the source may be too short, too sparse, or no stable knowledge units were extracted.",
-      "  Next: inspect a chapter with `spinedigest page <archive.sdpub> --chapter <id>` or queue a graph/summary job if you need generated knowledge.",
+      "Reading Graph:",
+      "  No reading chunks are currently available. If a reading-graph queue task already ran, the source may be too short or sparse.",
+      "  Next: inspect source with `spinedigest get <archive.sdpub> wikigraph://source/chapter/<id>` or queue `--task reading-graph`.",
     );
   } else if (index.edgeCount === 0) {
     lines.push(
       "",
-      "Graph note:",
-      "  Graph nodes exist, but no edges are currently available. This can be valid when extracted nodes have no stable relationships.",
-      "  Next: inspect nodes with `spinedigest list <archive.sdpub> --type node`.",
+      "Reading Graph:",
+      "  Reading chunks exist, but no chunk edges are currently available. This can be valid when extracted chunks have no stable relationships.",
+      "  Next: inspect chunks with `spinedigest search <archive.sdpub> <query> --type chunk`.",
     );
   }
 
@@ -358,9 +290,9 @@ async function writeIndex(
     lines.push(
       "",
       "Next:",
-      "  spinedigest find <archive.sdpub> <term> --type node",
-      "  spinedigest page <archive.sdpub> --chapter <id>",
-      "  spinedigest list <archive.sdpub> --type node",
+      "  spinedigest search <archive.sdpub> <term>",
+      "  spinedigest get <archive.sdpub> wikigraph://source/chapter/<id>",
+      "  spinedigest related <archive.sdpub> <uri>",
     );
   }
 
@@ -393,55 +325,46 @@ async function writeEstimate(
 
 async function writeList(
   items: readonly ArchiveListItem[],
-  json: boolean,
+  format: ResultFormat,
 ): Promise<void> {
-  if (json) {
-    await writeTextToStdout(`${JSON.stringify({ items }, null, 2)}\n`);
+  const outputItems = items.map((item) => ({
+    ...item,
+    id: toWikiGraphUri(item.id),
+  }));
+
+  if (format === "json") {
+    await writeTextToStdout(
+      `${JSON.stringify({ items: outputItems }, null, 2)}\n`,
+    );
+    return;
+  }
+  if (format === "jsonl") {
+    await writeJSONL(outputItems);
     return;
   }
 
-  if (items.length === 0) {
+  if (outputItems.length === 0) {
     await writeTextToStdout("No objects.\n");
     return;
   }
 
   await writeTextToStdout(
-    `${items
+    `${outputItems
       .map((item) => `${item.id}  ${item.label}  ${item.summary}`)
       .join("\n")}\n`,
   );
 }
 
-async function writeCollection(
-  result: ArchiveCollectionResult,
-  json: boolean,
-): Promise<void> {
-  if (json) {
-    await writeTextToStdout(`${JSON.stringify(result, null, 2)}\n`);
-    return;
-  }
-
-  if (result.items.length === 0) {
-    await writeTextToStdout("No objects.\n");
-    return;
-  }
-
-  await writeTextToStdout(
-    `${result.items
-      .map(
-        (item) =>
-          `${item.id}  ${item.type}/${item.field}  ${item.title}\n${item.snippet}\nNext: spinedigest page <archive.sdpub> ${formatObjectSelector(item)}`,
-      )
-      .join("\n\n")}${formatCollectionCursor(result)}\n`,
-  );
-}
-
 async function writeFindHits(
   result: ArchiveFindResult,
-  json: boolean,
+  format: ResultFormat,
 ): Promise<void> {
-  if (json) {
+  if (format === "json") {
     await writeTextToStdout(`${JSON.stringify(result, null, 2)}\n`);
+    return;
+  }
+  if (format === "jsonl") {
+    await writeJSONL(result.items);
     return;
   }
 
@@ -454,15 +377,53 @@ async function writeFindHits(
     `${result.items
       .map(
         (hit) =>
-          `${hit.id}  ${hit.type}/${hit.field}  ${hit.title}\n${formatFindMatchLine(hit)}${hit.snippet}\nNext: spinedigest page <archive.sdpub> ${formatObjectSelector(hit)}`,
+          `${toWikiGraphUri(hit.id)}\n${hit.title}\n${formatFindMatchLine(hit)}${hit.snippet}`,
       )
       .join("\n\n")}${formatNextCursor(result)}${formatFindLensHint(result)}\n`,
   );
 }
 
-async function writePage(page: ArchivePage, json: boolean): Promise<void> {
-  if (json) {
+async function writeEvidence(
+  evidence: ArchiveEvidence,
+  format: ResultFormat,
+): Promise<void> {
+  if (format === "json") {
+    await writeTextToStdout(`${JSON.stringify(evidence, null, 2)}\n`);
+    return;
+  }
+  if (format === "jsonl") {
+    await writeJSONL(evidence.items);
+    return;
+  }
+
+  if (evidence.items.length === 0) {
+    await writeTextToStdout("No evidence.\n");
+    return;
+  }
+
+  await writeTextToStdout(
+    `${evidence.items.map(formatEvidenceItem).join("\n\n")}\n`,
+  );
+}
+
+function formatEvidenceItem(item: ArchiveEvidenceItem): string {
+  return [
+    item.id,
+    `@@ ${item.startSentenceIndex}..${item.endSentenceIndex} @@`,
+    item.source,
+  ].join("\n");
+}
+
+async function writePage(
+  page: ArchivePage,
+  format: ResultFormat,
+): Promise<void> {
+  if (format === "json") {
     await writeTextToStdout(`${JSON.stringify(page, null, 2)}\n`);
+    return;
+  }
+  if (format === "jsonl") {
+    await writeJSONL([page]);
     return;
   }
 
@@ -534,57 +495,16 @@ async function writePage(page: ArchivePage, json: boolean): Promise<void> {
   }
 }
 
-async function writeLinks(
-  links: readonly GraphNeighbor[],
-  direction: "backlinks" | "links",
-  json: boolean,
+async function writePack(
+  pack: ArchivePack,
+  format: ResultFormat,
 ): Promise<void> {
-  if (json) {
-    await writeTextToStdout(`${JSON.stringify({ links }, null, 2)}\n`);
-    return;
-  }
-
-  if (links.length === 0) {
-    const next =
-      direction === "links"
-        ? "No outgoing links. Try: spinedigest backlinks <archive.sdpub> --node <id>\n"
-        : "No incoming links.\n";
-    await writeTextToStdout(next);
-    return;
-  }
-
-  await writeTextToStdout(`${formatNeighborLines(links).join("\n")}\n`);
-}
-
-async function writeMap(
-  edges: readonly ArchiveListItem[],
-  json: boolean,
-): Promise<void> {
-  if (json) {
-    await writeTextToStdout(`${JSON.stringify({ edges }, null, 2)}\n`);
-    return;
-  }
-
-  if (edges.length === 0) {
-    await writeTextToStdout(
-      [
-        "No graph edges.",
-        "This can be valid after a graph job when the source is too short, too sparse, or the model found no stable relationships.",
-        "Next:",
-        "  spinedigest status <archive.sdpub>",
-        "  spinedigest list <archive.sdpub> --type node",
-        "  spinedigest page <archive.sdpub> --chapter <id>",
-      ].join("\n") + "\n",
-    );
-    return;
-  }
-
-  await writeTextToStdout(`${edges.map((edge) => edge.label).join("\n")}\n`);
-}
-
-async function writePack(pack: ArchivePack, json: boolean): Promise<void> {
-  if (json) {
+  if (format === "json") {
     await writeTextToStdout(`${JSON.stringify(pack, null, 2)}\n`);
+    return;
+  }
+  if (format === "jsonl") {
+    await writeJSONL([pack]);
     return;
   }
 
@@ -603,14 +523,6 @@ async function writePack(pack: ArchivePack, json: boolean): Promise<void> {
   );
 }
 
-function formatPath(steps: readonly GraphPathStep[]): string {
-  if (steps.length === 0) {
-    return "No path.\n";
-  }
-
-  return `${steps.map((step) => `${formatNodeId(step.node.id)}  ${step.node.label}`).join("\n  ->\n")}\n`;
-}
-
 function formatNextCursor(result: ArchiveFindResult): string {
   if (result.nextCursor === null) {
     return "";
@@ -621,12 +533,12 @@ function formatNextCursor(result: ArchiveFindResult): string {
 
 function formatNoMatches(result: ArchiveFindResult): string {
   if (result.match === "all" && result.terms.length > 1) {
-    return `No matches. All ${result.terms.length} terms were required. Try: spinedigest find <archive.sdpub> "${result.query}" --type ${formatFindTypes(result)} --match any${formatFindLensHint(result)}\n`;
+    return `No matches. Try: spinedigest search <archive.sdpub> "${result.query}" --type ${formatFindTypes(result)}${formatFindLensHint(result)}\n`;
   }
 
   const lines = [
     "No matches.",
-    "Try fewer or broader keywords, `grep` for an exact continuous phrase, or `list --type fragment` to inspect source fragments.",
+    "Try fewer or broader keywords, or filter with `--type source|summary|chunk`.",
   ];
 
   if (result.lensHint !== null) {
@@ -646,8 +558,12 @@ function formatFindLensHint(result: ArchiveFindResult): string {
 
 function formatFindTypes(result: ArchiveFindResult): string {
   return result.types === null || result.types.length === 0
-    ? "node"
-    : result.types.join(",");
+    ? "chunk"
+    : result.types
+        .map((type) =>
+          type === "node" ? "chunk" : type === "fragment" ? "source" : type,
+        )
+        .join(",");
 }
 
 function formatFindMatchLine(hit: {
@@ -660,56 +576,9 @@ function formatFindMatchLine(hit: {
   return `Matched: ${hit.matchedTerms.join(", ")}\n`;
 }
 
-function formatCollectionCursor(result: ArchiveCollectionResult): string {
-  if (result.nextCursor === null) {
-    return "";
-  }
-
-  return `\n\nNext page: add --cursor ${result.nextCursor}`;
-}
-
-function isSearchFilterType(
-  type: NonNullable<CLIArchiveArguments["searchTypes"]>[number],
-): type is NonNullable<ArchiveFindOptions["types"]>[number] {
-  return type === "fragment" || type === "node" || type === "summary";
-}
-
-function formatObjectSelector(item: { readonly id: string }): string {
-  const [type, first, second] = item.id.split(":");
-
-  switch (type) {
-    case "chapter":
-      return `--chapter ${first}`;
-    case "fragment":
-      if (first === undefined || second === undefined) {
-        return item.id;
-      }
-
-      return `--fragment ${first}:${second}`;
-    case "meta":
-      if (first === undefined) {
-        return item.id;
-      }
-
-      return `--meta ${first}`;
-    case "node":
-      if (first === undefined) {
-        return item.id;
-      }
-
-      return `--node ${first}`;
-    case "summary":
-      if (first === undefined) {
-        return item.id;
-      }
-
-      return `--summary ${first}`;
-    default:
-      return item.id;
-  }
-}
-
-function formatNeighborLines(neighbors: readonly GraphNeighbor[]): string[] {
+function formatNeighborLines(
+  neighbors: Extract<ArchivePage, { readonly type: "node" }>["neighbors"],
+): string[] {
   if (neighbors.length === 0) {
     return ["  [none]"];
   }
@@ -717,7 +586,7 @@ function formatNeighborLines(neighbors: readonly GraphNeighbor[]): string[] {
   return neighbors.map((neighbor) => {
     const arrow = neighbor.direction === "incoming" ? "<-" : "->";
 
-    return `  ${arrow} ${formatNodeId(neighbor.node.id)}  ${neighbor.node.label}`;
+    return `  ${arrow} ${toWikiGraphUri(`node:${neighbor.node.id}`)}  ${neighbor.node.label}`;
   });
 }
 
@@ -834,9 +703,8 @@ function formatChapterNextSteps(
 ): string {
   return [
     "Next:",
-    `  spinedigest list <archive.sdpub> --type node --chapter ${page.chapter.chapterId}`,
-    `  spinedigest find <archive.sdpub> <keyword> --type node --chapter ${page.chapter.chapterId}`,
-    `  spinedigest read <archive.sdpub> --chapter ${page.chapter.chapterId}`,
+    `  spinedigest search <archive.sdpub> <keyword> --type chunk --chapter ${page.chapter.chapterId}`,
+    `  spinedigest get <archive.sdpub> wikigraph://source/chapter/${page.chapter.chapterId}`,
   ].join("\n");
 }
 
@@ -846,6 +714,75 @@ function truncateToBudget(text: string, budget: number): string {
   }
 
   return `${text.slice(0, Math.max(0, budget - 20))}\n[truncated]`;
+}
+
+async function writeJSONL(items: readonly unknown[]): Promise<void> {
+  await writeTextToStdout(
+    items.map((item) => JSON.stringify(item)).join("\n") +
+      (items.length === 0 ? "" : "\n"),
+  );
+}
+
+function toArchiveObjectId(uri: string): string {
+  if (!uri.startsWith("wikigraph://")) {
+    return uri;
+  }
+
+  const parsed = new URL(uri);
+  const pathParts = parsed.pathname.split("/").filter((part) => part !== "");
+
+  switch (parsed.hostname) {
+    case "chunk":
+      return `node:${pathParts[0] ?? ""}`;
+    case "source":
+      if (pathParts[0] === "chapter" && pathParts[1] !== undefined) {
+        return `chapter:${pathParts[1]}`;
+      }
+      break;
+    case "summary":
+      if (pathParts[0] === "chapter" && pathParts[1] !== undefined) {
+        return `summary:${pathParts[1]}`;
+      }
+      break;
+    case "entity":
+    case "triple":
+      throw new Error(`${uri} is not readable by the current archive adapter.`);
+  }
+
+  throw new Error(`Invalid Wiki Graph URI: ${uri}`);
+}
+
+function toWikiGraphUri(id: string): string {
+  const [type, first, second] = id.split(":");
+
+  switch (type) {
+    case "chapter":
+      return `wikigraph://source/chapter/${first ?? ""}`;
+    case "fragment":
+      return `wikigraph://source/chapter/${first ?? ""}#${second ?? "0"}..${second ?? "0"}`;
+    case "node":
+      return `wikigraph://chunk/${first ?? ""}`;
+    case "summary":
+      return `wikigraph://summary/chapter/${first ?? ""}`;
+    default:
+      return id;
+  }
+}
+
+function toArchiveFindType(
+  kind: NonNullable<CLIArchiveArguments["kinds"]>[number],
+): NonNullable<ArchiveFindOptions["types"]>[number] | undefined {
+  switch (kind) {
+    case "chunk":
+      return "node";
+    case "source":
+      return "fragment";
+    case "summary":
+      return "summary";
+    case "entity":
+    case "triple":
+      return undefined;
+  }
 }
 
 function isUrl(value: string): boolean {

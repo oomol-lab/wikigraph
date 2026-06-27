@@ -188,6 +188,32 @@ describe("document/directory-document", () => {
         await context.run(async () => {
           await document.serials.createWithId(1);
           await document.serials.setTopologyReady(1);
+          await document.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "m1",
+              qid: "Q1",
+              rangeEnd: 1,
+              rangeStart: 0,
+              surface: "A",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "m2",
+              qid: "Q2",
+              rangeEnd: 3,
+              rangeStart: 2,
+              surface: "B",
+            },
+          ]);
+          await document.mentionLinks.save({
+            id: "l1",
+            predicate: "mentions",
+            sourceMentionId: "m1",
+            targetMentionId: "m2",
+          });
           await document.writeSummary(1, "Transient summary");
         });
       } finally {
@@ -196,6 +222,12 @@ describe("document/directory-document", () => {
 
       try {
         await expect(document.serials.listIds()).resolves.toStrictEqual([]);
+        await expect(document.mentions.listByChapter(1)).resolves.toStrictEqual(
+          [],
+        );
+        await expect(
+          document.mentionLinks.listByChapter(1),
+        ).resolves.toStrictEqual([]);
         await expect(document.readSummary(1)).resolves.toBeUndefined();
       } finally {
         await document.release();

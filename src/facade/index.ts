@@ -24,6 +24,7 @@ export {
   getArchiveIndex,
   grepArchiveObjects,
   listArchiveCollection,
+  listArchiveEvidence,
   listAllArchiveLinks,
   listArchiveLinks,
   listArchiveObjects,
@@ -66,11 +67,20 @@ export {
   readChapterBuildInput,
   snapshotChapterSummaryInput,
 } from "./chapter-build.js";
+export {
+  buildChapterKnowledgeGraphArtifact,
+  clearChapterKnowledgeGraph,
+  commitChapterKnowledgeGraphArtifact,
+} from "./knowledge-graph-build.js";
 export type {
   BuildChapterGraphArtifactOptions,
   BuildChapterSummaryArtifactOptions,
   ChapterGraphBuildArtifact,
 } from "./chapter-build.js";
+export type {
+  BuildChapterKnowledgeGraphArtifactOptions,
+  ChapterKnowledgeGraphBuildArtifact,
+} from "./knowledge-graph-build.js";
 export {
   addChapter,
   advanceChapterStages,
@@ -100,6 +110,8 @@ export {
 } from "./graph.js";
 export type {
   ArchiveEstimate,
+  ArchiveEvidence,
+  ArchiveEvidenceItem,
   ArchiveCollectionOptions,
   ArchiveCollectionResult,
   ArchiveCollectionType,

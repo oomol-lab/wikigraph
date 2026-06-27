@@ -87,7 +87,7 @@ describe("cli/args", () => {
         "book.sdpub",
         "--chapter",
         "12",
-        "--to",
+        "--task",
         "summary",
         "--boost",
         "--accept-cost",
@@ -115,7 +115,7 @@ describe("cli/args", () => {
         "book.sdpub",
         "--chapter",
         "12",
-        "--to",
+        "--task",
         "summary",
       ]),
     ).toStrictEqual({
@@ -131,6 +131,28 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments(["status", "book.sdpub", "--accept-cost"]),
     ).toThrow("only valid for `spinedigest queue add`");
+    expect(() =>
+      parseCLIArguments([
+        "queue",
+        "add",
+        "book.sdpub",
+        "--chapter",
+        "12",
+        "--stage",
+        "graph",
+      ]),
+    ).toThrow("`spinedigest queue add` does not support --stage.");
+    expect(() =>
+      parseCLIArguments([
+        "queue",
+        "add",
+        "book.sdpub",
+        "--chapter",
+        "12",
+        "--task",
+        "knowledge-graph",
+      ]),
+    ).toThrow("Invalid queue task: knowledge-graph.");
 
     expect(
       parseCLIArguments([
@@ -288,20 +310,20 @@ describe("cli/args", () => {
 
     expect(
       parseCLIArguments([
-        "find",
+        "search",
         "book.sdpub",
         "RAG",
         "--type",
-        "node",
+        "chunk",
         "--json",
       ]),
     ).toStrictEqual({
       args: {
-        action: "find",
+        action: "search",
         archivePath: "book.sdpub",
-        json: true,
+        format: "json",
+        kinds: ["chunk"],
         query: "RAG",
-        searchTypes: ["node"],
       },
       help: false,
       kind: "archive",
@@ -309,122 +331,83 @@ describe("cli/args", () => {
 
     expect(
       parseCLIArguments([
-        "find",
-        "book.sdpub",
-        "朱元璋 洪都",
-        "--type",
-        "summary",
-        "--match",
-        "all",
-      ]),
-    ).toStrictEqual({
-      args: {
-        action: "find",
-        archivePath: "book.sdpub",
-        match: "all",
-        query: "朱元璋 洪都",
-        searchTypes: ["summary"],
-      },
-      help: false,
-      kind: "archive",
-    });
-    expect(() =>
-      parseCLIArguments(["find", "book.sdpub", "RAG", "--match", "strict"]),
-    ).toThrow("--type is required.");
-
-    expect(
-      parseCLIArguments([
-        "grep",
+        "search",
         "book.sdpub",
         "exact phrase",
         "--chapter",
         "11,12",
         "--type",
-        "summary,node",
+        "summary,source",
         "--limit",
         "10",
-        "--order",
-        "doc-desc",
         "--cursor",
         "cursor-token",
-        "--json",
+        "--jsonl",
       ]),
     ).toStrictEqual({
       args: {
-        action: "grep",
+        action: "search",
         archivePath: "book.sdpub",
         chapters: [11, 12],
         cursor: "cursor-token",
-        json: true,
+        format: "jsonl",
+        kinds: ["summary", "source"],
         limit: 10,
         query: "exact phrase",
-        searchOrder: "doc-desc",
-        searchTypes: ["summary", "node"],
-      },
-      help: false,
-      kind: "archive",
-    });
-    expect(() =>
-      parseCLIArguments([
-        "grep",
-        "book.sdpub",
-        "exact phrase",
-        "--type",
-        "node",
-        "--match",
-        "all",
-      ]),
-    ).toThrow("The `grep` command does not support --match.");
-
-    expect(
-      parseCLIArguments([
-        "list",
-        "book.sdpub",
-        "--type",
-        "node",
-        "--chapter",
-        "12,13",
-        "--id",
-        "320,321",
-        "--limit",
-        "20",
-        "--json",
-      ]),
-    ).toStrictEqual({
-      args: {
-        action: "list",
-        archivePath: "book.sdpub",
-        chapters: [12, 13],
-        ids: ["node:320", "node:321"],
-        json: true,
-        limit: 20,
-        searchTypes: ["node"],
       },
       help: false,
       kind: "archive",
     });
 
     expect(
-      parseCLIArguments(["read", "book.sdpub", "--chapter", "12"]),
+      parseCLIArguments(["get", "book.sdpub", "wikigraph://chunk/1"]),
     ).toStrictEqual({
       args: {
-        action: "read",
+        action: "get",
         archivePath: "book.sdpub",
-        objectId: "chapter:12",
+        format: "text",
+        objectId: "wikigraph://chunk/1",
       },
       help: false,
       kind: "archive",
     });
-    expect(() =>
-      parseCLIArguments(["read", "book.sdpub", "--chapter", "12", "--json"]),
-    ).toThrow("The `read` command does not support --json.");
+
+    expect(
+      parseCLIArguments(["related", "book.sdpub", "wikigraph://chunk/1"]),
+    ).toStrictEqual({
+      args: {
+        action: "related",
+        archivePath: "book.sdpub",
+        format: "text",
+        objectId: "wikigraph://chunk/1",
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments([
+        "evidence",
+        "book.sdpub",
+        "wikigraph://triple/Q1/mentions/Q2",
+        "--jsonl",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "evidence",
+        archivePath: "book.sdpub",
+        format: "jsonl",
+        objectId: "wikigraph://triple/Q1/mentions/Q2",
+      },
+      help: false,
+      kind: "archive",
+    });
 
     expect(
       parseCLIArguments([
         "pack",
         "book.sdpub",
-        "--node",
-        "1",
+        "wikigraph://chunk/1",
         "--budget",
         "2000",
       ]),
@@ -433,60 +416,40 @@ describe("cli/args", () => {
         action: "pack",
         archivePath: "book.sdpub",
         budget: 2000,
-        objectId: "node:1",
+        format: "text",
+        objectId: "wikigraph://chunk/1",
       },
       help: false,
       kind: "archive",
     });
 
-    expect(
-      parseCLIArguments([
-        "path",
-        "book.sdpub",
-        "--from",
-        "1",
-        "--to",
-        "2",
-        "--chapter",
-        "3",
-      ]),
-    ).toStrictEqual({
-      args: {
-        action: "path",
-        archivePath: "book.sdpub",
-        chapterId: 3,
-        fromNodeId: 1,
-        toNodeId: 2,
-      },
-      help: false,
-      kind: "archive",
-    });
-
-    expect(() => parseCLIArguments(["list", "book.sdpub"])).toThrow(
-      "--type is required.",
+    expect(() => parseCLIArguments(["find", "book.sdpub", "RAG"])).toThrow(
+      "Unknown command: find.",
+    );
+    expect(() => parseCLIArguments(["search", "book.sdpub"])).toThrow(
+      "`spinedigest search` requires a search query.",
     );
     expect(() =>
+      parseCLIArguments(["search", "book.sdpub", "RAG", "--order", "doc-desc"]),
+    ).toThrow("The `search` command does not support --order.");
+    expect(() =>
       parseCLIArguments([
-        "list",
+        "related",
         "book.sdpub",
+        "wikigraph://chunk/1",
         "--type",
-        "node,chapter",
-        "--id",
-        "1",
+        "source",
       ]),
-    ).toThrow("requires exactly one --type");
-    expect(() => parseCLIArguments(["page", "book.sdpub", "node:1"])).toThrow(
-      "Unexpected positional arguments for `page`: node:1.",
-    );
+    ).toThrow("The `related` command does not support --type.");
     expect(() =>
-      parseCLIArguments(["page", "book.sdpub", "--node", "1", "--from", "2"]),
-    ).toThrow("The `page` command does not support --from.");
-    expect(() =>
-      parseCLIArguments(["links", "book.sdpub", "--chapter", "1"]),
-    ).toThrow("The `links` command does not support --chapter.");
-    expect(() =>
-      parseCLIArguments(["path", "book.sdpub", "--chapter", "3"]),
-    ).toThrow("spinedigest path requires --from.");
+      parseCLIArguments([
+        "evidence",
+        "book.sdpub",
+        "wikigraph://entity/Q1",
+        "--fragment",
+        "1:0",
+      ]),
+    ).toThrow("The `evidence` command does not support --fragment.");
   });
 
   it("parses archive metadata and cover commands", () => {
@@ -798,9 +761,9 @@ describe("cli/args", () => {
       kind: "config-status",
     });
 
-    expect(parseCLIArguments(["status", "--help"])).toStrictEqual({
+    expect(parseCLIArguments(["search", "--help"])).toStrictEqual({
       help: true,
-      helpText: renderArchiveCommandHelpText("status"),
+      helpText: renderArchiveCommandHelpText("search"),
       kind: "help",
     });
   });
@@ -928,26 +891,15 @@ describe("cli/args", () => {
     );
   });
 
-  it("rejects invalid status usage", () => {
-    expect(() => parseCLIArguments(["status", "--input", "book.epub"])).toThrow(
-      "Missing archive path. Use `spinedigest status <archive.sdpub>`.\nSee: spinedigest status --help",
-    );
-    expect(() => parseCLIArguments(["status", "--verbose"])).toThrow(
-      "Missing archive path. Use `spinedigest status <archive.sdpub>`.\nSee: spinedigest status --help",
-    );
+  it("rejects invalid config status usage", () => {
     expect(() =>
       parseCLIArguments(["config", "status", "--input", "book.epub"]),
     ).toThrow(
       "The `config status` command does not support --input.\nSee: spinedigest config status --help",
     );
-    expect(parseCLIArguments(["status", "book.sdpub"])).toStrictEqual({
-      args: {
-        action: "status",
-        archivePath: "book.sdpub",
-      },
-      help: false,
-      kind: "archive",
-    });
+    expect(() => parseCLIArguments(["status", "book.sdpub"])).toThrow(
+      "Unknown command: status.",
+    );
   });
 
   it("documents the layered help contract", () => {
@@ -955,7 +907,7 @@ describe("cli/args", () => {
     const commandHelpText = renderHelpTopicText("command");
 
     expect(rootHelpText).toContain("spinedigest help [topic]");
-    expect(rootHelpText).toContain("spinedigest status <archive.sdpub>");
+    expect(rootHelpText).toContain("spinedigest search <archive.sdpub>");
     expect(rootHelpText).toContain("spinedigest help overview");
     expect(rootHelpText).toContain("spinedigest help env");
     expect(rootHelpText).toContain("spinedigest help config-file");
@@ -973,18 +925,18 @@ describe("cli/args", () => {
     expect(rootHelpText).toContain(
       "Read `spinedigest help overview` for the archive-first mental model.",
     );
-    expect(rootHelpText).toContain("Queue graph and summary jobs call an LLM");
+    expect(rootHelpText).toContain("Queue generation tasks call an LLM");
     expect(renderHelpTopicText("runtime")).toContain("Runtime Behavior");
     expect(renderHelpTopicText("config")).toContain("Configuration Overview");
-    expect(renderHelpTopicText("command")).toContain("spinedigest status");
+    expect(renderHelpTopicText("command")).toContain("spinedigest search");
     expect(renderHelpTopicText("ai")).toContain("Primary contract:");
     expect(renderHelpTopicText("ai")).toContain(
-      "Treat `.sdpub` as an LLM Wiki archive",
+      "Use Wiki Graph URIs as stable object handles",
     );
     expect(renderHelpTopicText("ai")).toContain(
-      "spinedigest estimate <archive.sdpub> --stage summary",
+      "spinedigest search <archive.sdpub> <query>",
     );
-    expect(commandHelpText).toContain("Archive-first commands:");
+    expect(commandHelpText).toContain("Object commands:");
     expect(commandHelpText).toContain("spinedigest create <archive.sdpub>");
     expect(commandHelpText).toContain("spinedigest export <archive.sdpub>");
     expect(commandHelpText).toContain("spinedigest transform");

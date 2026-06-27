@@ -28,20 +28,13 @@ export type HelpTopic = (typeof HELP_TOPICS)[number];
 
 export const ARCHIVE_COMMANDS = [
   "create",
-  "estimate",
-  "status",
-  "index",
-  "list",
-  "find",
-  "grep",
-  "page",
-  "read",
-  "links",
-  "backlinks",
+  "search",
+  "get",
   "related",
-  "path",
-  "map",
+  "evidence",
   "pack",
+  "estimate",
+  "index",
   "export",
 ] as const satisfies readonly CLIArchiveAction[];
 

@@ -1,19 +1,14 @@
 Help Type: command
 Command: spinedigest pack
 
+pack
+
 Purpose:
-  Pack deterministic context around a known object selector.
+  Pack a bounded Agent-readable context around one Wiki Graph object.
 
 Usage:
-  spinedigest pack <archive.sdpub> <selector> [--budget <chars>] [--json]
-
-Contract:
-  - Mutates: no.
-  - LLM: no.
-  - JSON: yes.
-  - Input must be a known selector from index, list, find, page, or links.
-  - Node packs include source fragment excerpts and both incoming and outgoing graph neighbors.
+  spinedigest pack <archive.sdpub> <uri> [--budget <chars>] [--json|--jsonl] [--help|-h]
 
 Examples:
-  spinedigest pack book.sdpub --node 84 --budget 5000
-  spinedigest pack book.sdpub --chapter 1 --json
+  spinedigest pack book.sdpub wikigraph://entity/Q162593 --budget 5000
+  spinedigest pack book.sdpub wikigraph://chunk/123

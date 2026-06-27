@@ -1,5 +1,7 @@
 import type {
   ChunkRecord,
+  MentionLinkRecord,
+  MentionRecord,
   ReadonlyDocument,
   KnowledgeEdgeRecord,
   SentenceId,
@@ -213,6 +215,21 @@ export interface ArchivePack {
   readonly anchor: ArchivePage;
   readonly budget: number;
   readonly links: readonly GraphNeighbor[];
+}
+
+export interface ArchiveEvidence {
+  readonly items: readonly ArchiveEvidenceItem[];
+}
+
+export interface ArchiveEvidenceItem {
+  readonly chapterId: number;
+  readonly endSentenceIndex: number;
+  readonly fragmentId: number;
+  readonly id: string;
+  readonly source: string;
+  readonly startSentenceIndex: number;
+  readonly title: string;
+  readonly type: "source";
 }
 
 export interface ArchiveNodeGroup {
@@ -694,6 +711,64 @@ export async function listRelatedArchiveObjects(
       type: "node",
     }),
   );
+}
+
+export async function listArchiveEvidence(
+  document: ReadonlyDocument,
+  uri: string,
+): Promise<ArchiveEvidence> {
+  const reference = parseWikiGraphReference(uri);
+
+  switch (reference.type) {
+    case "chunk": {
+      const { node } = await requireNode(document, reference.id);
+
+      return {
+        items: await createNodeEvidenceItems(document, node),
+      };
+    }
+    case "entity":
+      return {
+        items: await createMentionEvidenceItems(
+          document,
+          await document.mentions.listByQid(reference.qid),
+        ),
+      };
+    case "source":
+      return {
+        items: [
+          await createSourceEvidenceItem(
+            document,
+            reference.chapterId,
+            reference.startSentenceIndex,
+            reference.endSentenceIndex,
+            reference.fragmentId,
+          ),
+        ],
+      };
+    case "summary":
+      return {
+        items: [
+          await createSourceEvidenceItem(
+            document,
+            reference.chapterId,
+            0,
+            Number.POSITIVE_INFINITY,
+          ),
+        ],
+      };
+    case "triple":
+      return {
+        items: await createMentionLinkEvidenceItems(
+          document,
+          await document.mentionLinks.listByTriple({
+            objectQid: reference.objectQid,
+            predicate: reference.predicate,
+            subjectQid: reference.subjectQid,
+          }),
+        ),
+      };
+  }
 }
 
 export async function packArchiveContext(
@@ -1218,6 +1293,436 @@ function collectNodeSourceFragmentIds(
 
 function truncateSourceExcerpt(text: string): string {
   return text.length <= 1200 ? text : `${text.slice(0, 1200)}...`;
+}
+
+async function createNodeEvidenceItems(
+  document: ReadonlyDocument,
+  node: Pick<GraphNode, "sentenceIds">,
+): Promise<readonly ArchiveEvidenceItem[]> {
+  const ranges = new Map<string, [number, number]>();
+
+  for (const [chapterId, fragmentId, sentenceIndex] of node.sentenceIds) {
+    const key = `${chapterId}:${fragmentId}`;
+    const current = ranges.get(key);
+
+    if (current === undefined) {
+      ranges.set(key, [sentenceIndex, sentenceIndex]);
+    } else {
+      ranges.set(key, [
+        Math.min(current[0], sentenceIndex),
+        Math.max(current[1], sentenceIndex),
+      ]);
+    }
+  }
+
+  return await Promise.all(
+    [...ranges.entries()].map(async ([key, [start, end]]) => {
+      const { chapterId, fragmentId } = parseEvidenceRangeKey(key);
+      return await createSourceEvidenceItem(
+        document,
+        chapterId,
+        start,
+        end,
+        fragmentId,
+      );
+    }),
+  );
+}
+
+async function createMentionEvidenceItems(
+  document: ReadonlyDocument,
+  mentions: readonly MentionRecord[],
+): Promise<readonly ArchiveEvidenceItem[]> {
+  return await createSourceEvidenceItems(
+    document,
+    await Promise.all(
+      mentions.map(async (mention) => {
+        const startSentenceIndex =
+          mention.sentenceIndex ??
+          (await findSentenceIndexAtOffset(
+            document,
+            mention.chapterId,
+            mention.fragmentId,
+            mention.rangeStart,
+          ));
+        const endSentenceIndex =
+          mention.sentenceIndex ??
+          (await findSentenceIndexAtOffset(
+            document,
+            mention.chapterId,
+            mention.fragmentId,
+            Math.max(0, mention.rangeEnd - 1),
+          ));
+
+        return {
+          chapterId: mention.chapterId,
+          endSentenceIndex,
+          fragmentId: mention.fragmentId,
+          startSentenceIndex,
+        };
+      }),
+    ),
+  );
+}
+
+async function createMentionLinkEvidenceItems(
+  document: ReadonlyDocument,
+  links: readonly MentionLinkRecord[],
+): Promise<readonly ArchiveEvidenceItem[]> {
+  const ranges = await Promise.all(
+    links.map(async (link) => {
+      const [source, target] = await Promise.all([
+        document.mentions.getById(link.sourceMentionId),
+        document.mentions.getById(link.targetMentionId),
+      ]);
+
+      if (source === undefined || target === undefined) {
+        return undefined;
+      }
+
+      const chapterId = source.chapterId;
+      const fragmentId = source.fragmentId;
+      const sourceSentenceIndex =
+        source.sentenceIndex ??
+        (await findSentenceIndexAtOffset(
+          document,
+          chapterId,
+          fragmentId,
+          source.rangeStart,
+        ));
+      const targetSentenceIndex =
+        target.chapterId === chapterId && target.fragmentId === fragmentId
+          ? (target.sentenceIndex ??
+            (await findSentenceIndexAtOffset(
+              document,
+              chapterId,
+              fragmentId,
+              target.rangeStart,
+            )))
+          : sourceSentenceIndex;
+      const evidenceStart = link.evidenceStart;
+      const evidenceEnd = link.evidenceEnd;
+      const startSentenceIndex =
+        evidenceStart === undefined
+          ? Math.min(sourceSentenceIndex, targetSentenceIndex)
+          : await findSentenceIndexAtOffset(
+              document,
+              chapterId,
+              fragmentId,
+              evidenceStart,
+            );
+      const endSentenceIndex =
+        evidenceEnd === undefined
+          ? Math.max(sourceSentenceIndex, targetSentenceIndex)
+          : await findSentenceIndexAtOffset(
+              document,
+              chapterId,
+              fragmentId,
+              Math.max(0, evidenceEnd - 1),
+            );
+
+      return {
+        chapterId,
+        endSentenceIndex,
+        fragmentId,
+        startSentenceIndex,
+      };
+    }),
+  );
+
+  return await createSourceEvidenceItems(document, ranges.filter(isDefined));
+}
+
+async function createSourceEvidenceItems(
+  document: ReadonlyDocument,
+  ranges: readonly {
+    readonly chapterId: number;
+    readonly endSentenceIndex: number;
+    readonly fragmentId: number;
+    readonly startSentenceIndex: number;
+  }[],
+): Promise<readonly ArchiveEvidenceItem[]> {
+  const rangesBySource = new Map<string, Array<[number, number]>>();
+
+  for (const range of ranges) {
+    const key = `${range.chapterId}:${range.fragmentId}`;
+    const sourceRanges = rangesBySource.get(key) ?? [];
+
+    sourceRanges.push([range.startSentenceIndex, range.endSentenceIndex]);
+    rangesBySource.set(key, sourceRanges);
+  }
+
+  return await Promise.all(
+    [...rangesBySource.entries()].flatMap(([key, ranges]) => {
+      const { chapterId, fragmentId } = parseEvidenceRangeKey(key);
+
+      return mergeEvidenceRanges(ranges).map(
+        async ([start, end]) =>
+          await createSourceEvidenceItem(
+            document,
+            chapterId,
+            start,
+            end,
+            fragmentId,
+          ),
+      );
+    }),
+  );
+}
+
+async function createSourceEvidenceItem(
+  document: ReadonlyDocument,
+  chapterId: number,
+  startSentenceIndex: number,
+  endSentenceIndex: number,
+  fragmentId?: number,
+): Promise<ArchiveEvidenceItem> {
+  const chapter = await requireChapter(document, chapterId);
+  const resolvedFragmentId =
+    fragmentId ??
+    (await document.getSerialFragments(chapterId).listFragmentIds())[0];
+
+  if (resolvedFragmentId === undefined) {
+    throw new Error(`Chapter ${formatChapterId(chapterId)} has no source.`);
+  }
+
+  const fragment = await document
+    .getSerialFragments(chapterId)
+    .getFragment(resolvedFragmentId);
+  const lastSentenceIndex = Math.max(0, fragment.sentences.length - 1);
+  const start = clampInteger(startSentenceIndex, 0, lastSentenceIndex);
+  const end = clampInteger(endSentenceIndex, start, lastSentenceIndex);
+  const source = fragment.sentences
+    .slice(start, end + 1)
+    .map((sentence) => sentence.text)
+    .join("\n");
+
+  return {
+    chapterId,
+    endSentenceIndex: end,
+    fragmentId: resolvedFragmentId,
+    id: formatSourceRangeUri(chapterId, resolvedFragmentId, start, end),
+    source,
+    startSentenceIndex: start,
+    title: chapter.title ?? `[chapter ${chapterId}]`,
+    type: "source",
+  };
+}
+
+async function findSentenceIndexAtOffset(
+  document: ReadonlyDocument,
+  chapterId: number,
+  fragmentId: number,
+  offset: number,
+): Promise<number> {
+  const fragment = await document
+    .getSerialFragments(chapterId)
+    .getFragment(fragmentId);
+  let cursor = 0;
+
+  for (let index = 0; index < fragment.sentences.length; index += 1) {
+    const sentence = fragment.sentences[index];
+
+    if (sentence === undefined) {
+      continue;
+    }
+
+    const nextCursor = cursor + sentence.text.length;
+
+    if (offset <= nextCursor) {
+      return index;
+    }
+
+    cursor = nextCursor + 1;
+  }
+
+  return Math.max(0, fragment.sentences.length - 1);
+}
+
+function formatSourceRangeUri(
+  chapterId: number,
+  fragmentId: number,
+  startSentenceIndex: number,
+  endSentenceIndex: number,
+): string {
+  return `wikigraph://source/chapter/${chapterId}/fragment/${fragmentId}#${startSentenceIndex}..${endSentenceIndex}`;
+}
+
+function mergeEvidenceRanges(
+  ranges: readonly (readonly [number, number])[],
+): readonly (readonly [number, number])[] {
+  const sortedRanges = [...ranges]
+    .map(
+      ([start, end]) => [Math.min(start, end), Math.max(start, end)] as const,
+    )
+    .sort(([leftStart, leftEnd], [rightStart, rightEnd]) =>
+      leftStart === rightStart ? leftEnd - rightEnd : leftStart - rightStart,
+    );
+  const mergedRanges: Array<[number, number]> = [];
+
+  for (const [start, end] of sortedRanges) {
+    const last = mergedRanges.at(-1);
+
+    if (last === undefined || start > last[1] + 1) {
+      mergedRanges.push([start, end]);
+    } else {
+      last[1] = Math.max(last[1], end);
+    }
+  }
+
+  return mergedRanges;
+}
+
+function parseEvidenceRangeKey(key: string): {
+  readonly chapterId: number;
+  readonly fragmentId: number;
+} {
+  const [chapterId, fragmentId] = key.split(":").map(Number);
+
+  if (chapterId === undefined || fragmentId === undefined) {
+    throw new Error("Internal error: invalid source evidence range.");
+  }
+
+  return { chapterId, fragmentId };
+}
+
+function clampInteger(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, Math.floor(value)));
+}
+
+type WikiGraphReference =
+  | {
+      readonly id: number;
+      readonly type: "chunk";
+    }
+  | {
+      readonly chapterId: number;
+      readonly endSentenceIndex: number;
+      readonly fragmentId?: number;
+      readonly startSentenceIndex: number;
+      readonly type: "source" | "summary";
+    }
+  | {
+      readonly qid: string;
+      readonly type: "entity";
+    }
+  | {
+      readonly objectQid: string;
+      readonly predicate: string;
+      readonly subjectQid: string;
+      readonly type: "triple";
+    };
+
+function parseWikiGraphReference(uri: string): WikiGraphReference {
+  if (!uri.startsWith("wikigraph://")) {
+    const archiveReference = parseArchiveReference(uri);
+
+    switch (archiveReference.type) {
+      case "node":
+        return { id: archiveReference.id, type: "chunk" };
+      case "chapter":
+        return {
+          chapterId: archiveReference.id,
+          endSentenceIndex: Number.POSITIVE_INFINITY,
+          startSentenceIndex: 0,
+          type: "source",
+        };
+      case "summary":
+        return {
+          chapterId: archiveReference.id,
+          endSentenceIndex: Number.POSITIVE_INFINITY,
+          startSentenceIndex: 0,
+          type: "summary",
+        };
+      case "fragment":
+      case "meta":
+        throw new Error(`Evidence is not available for ${uri}.`);
+    }
+  }
+
+  const parsed = new URL(uri);
+  const pathParts = parsed.pathname.split("/").filter((part) => part !== "");
+
+  switch (parsed.hostname) {
+    case "chunk":
+      return {
+        id: parsePositiveInteger(pathParts[0], uri),
+        type: "chunk",
+      };
+    case "entity":
+      return {
+        qid: parseQid(pathParts[0], uri),
+        type: "entity",
+      };
+    case "source":
+      if (pathParts[0] === "chapter" && pathParts[1] !== undefined) {
+        const [start, end] = parseSentenceRange(parsed.hash);
+        const fragmentId =
+          pathParts[2] === "fragment" && pathParts[3] !== undefined
+            ? parseNonNegativeInteger(pathParts[3], uri)
+            : undefined;
+
+        return {
+          chapterId: parsePositiveInteger(pathParts[1], uri),
+          endSentenceIndex: end,
+          ...(fragmentId === undefined ? {} : { fragmentId }),
+          startSentenceIndex: start,
+          type: "source",
+        };
+      }
+      break;
+    case "summary":
+      if (pathParts[0] === "chapter" && pathParts[1] !== undefined) {
+        return {
+          chapterId: parsePositiveInteger(pathParts[1], uri),
+          endSentenceIndex: Number.POSITIVE_INFINITY,
+          startSentenceIndex: 0,
+          type: "summary",
+        };
+      }
+      break;
+    case "triple":
+      if (pathParts.length === 3) {
+        return {
+          objectQid: parseQid(pathParts[2], uri),
+          predicate: decodeURIComponent(pathParts[1] ?? ""),
+          subjectQid: parseQid(pathParts[0], uri),
+          type: "triple",
+        };
+      }
+      break;
+  }
+
+  throw new Error(`Invalid Wiki Graph URI: ${uri}`);
+}
+
+function parseQid(value: string | undefined, uri: string): string {
+  if (value !== undefined && /^Q[1-9][0-9]*$/u.test(value)) {
+    return value;
+  }
+
+  throw new Error(`Invalid Wiki Graph URI: ${uri}`);
+}
+
+function parseSentenceRange(hash: string): readonly [number, number] {
+  if (hash === "") {
+    return [0, Number.POSITIVE_INFINITY];
+  }
+
+  const [start, end] = hash.slice(1).split("..", 2);
+  const parsedStart = Number(start);
+  const parsedEnd = Number(end);
+
+  if (
+    Number.isInteger(parsedStart) &&
+    parsedStart >= 0 &&
+    Number.isInteger(parsedEnd) &&
+    parsedEnd >= parsedStart
+  ) {
+    return [parsedStart, parsedEnd];
+  }
+
+  throw new Error(`Invalid source sentence range: ${hash}`);
 }
 
 function parseArchiveReference(id: string):
