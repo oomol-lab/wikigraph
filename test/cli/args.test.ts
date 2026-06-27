@@ -131,6 +131,28 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments(["status", "book.sdpub", "--accept-cost"]),
     ).toThrow("only valid for `spinedigest queue add`");
+    expect(() =>
+      parseCLIArguments([
+        "queue",
+        "add",
+        "book.sdpub",
+        "--chapter",
+        "12",
+        "--stage",
+        "graph",
+      ]),
+    ).toThrow("`spinedigest queue add` does not support --stage.");
+    expect(() =>
+      parseCLIArguments([
+        "queue",
+        "add",
+        "book.sdpub",
+        "--chapter",
+        "12",
+        "--task",
+        "knowledge-graph",
+      ]),
+    ).toThrow("Invalid queue task: knowledge-graph.");
 
     expect(
       parseCLIArguments([
@@ -351,26 +373,13 @@ describe("cli/args", () => {
     });
 
     expect(
-      parseCLIArguments([
-        "related",
-        "book.sdpub",
-        "wikigraph://entity/Q1",
-        "--type",
-        "triple,source",
-        "--predicate",
-        "discusses",
-        "--limit",
-        "20",
-      ]),
+      parseCLIArguments(["related", "book.sdpub", "wikigraph://chunk/1"]),
     ).toStrictEqual({
       args: {
         action: "related",
         archivePath: "book.sdpub",
         format: "text",
-        kinds: ["triple", "source"],
-        limit: 20,
-        objectId: "wikigraph://entity/Q1",
-        predicate: "discusses",
+        objectId: "wikigraph://chunk/1",
       },
       help: false,
       kind: "archive",
@@ -423,6 +432,15 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments(["search", "book.sdpub", "RAG", "--order", "doc-desc"]),
     ).toThrow("The `search` command does not support --order.");
+    expect(() =>
+      parseCLIArguments([
+        "related",
+        "book.sdpub",
+        "wikigraph://chunk/1",
+        "--type",
+        "source",
+      ]),
+    ).toThrow("The `related` command does not support --type.");
     expect(() =>
       parseCLIArguments([
         "evidence",

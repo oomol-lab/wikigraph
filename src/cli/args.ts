@@ -704,6 +704,7 @@ function parseQueueArguments(
     case "add": {
       rejectQueueJSONFlag(action, values.json, helpRoute);
       rejectQueueJSONLFlag(action, values.jsonl, helpRoute);
+      rejectQueueFlag(action, "--stage", values.stage, helpRoute);
       rejectQueueFlag(action, "--to", values.to, helpRoute);
       const archivePath = positionals[1];
 
@@ -840,6 +841,7 @@ function parseQueueArguments(
     case "target": {
       rejectQueueJSONFlag(action, values.json, helpRoute);
       rejectQueueJSONLFlag(action, values.jsonl, helpRoute);
+      rejectQueueFlag(action, "--stage", values.stage, helpRoute);
       rejectQueueFlag(action, "--to", values.to, helpRoute);
       const jobId = positionals[1];
 
@@ -1333,36 +1335,22 @@ function parseArchiveArguments(
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--id", values.id, helpRoute);
+      rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
+      rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+      rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--order", values.order, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveFlag(action, "--predicate", values.predicate, helpRoute);
+      rejectArchiveFlag(action, "--type", values.type, helpRoute);
       rejectArchiveSelectorFlags(action, values, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
           action,
           archivePath,
-          ...(values.chapter === undefined
-            ? {}
-            : { chapters: parseArchiveSearchChapters(values.chapter) }),
-          ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
           format: parseResultFormat(values),
-          ...(values.limit === undefined
-            ? {}
-            : {
-                limit: parsePositiveIntegerFlag(
-                  values.limit,
-                  "--limit",
-                  helpRoute,
-                ),
-              }),
           objectId: uri,
-          ...(values.predicate === undefined
-            ? {}
-            : { predicate: values.predicate }),
-          ...(values.type === undefined
-            ? {}
-            : { kinds: parseObjectKinds(values.type) }),
         },
         help: false,
         kind: "archive",
@@ -2713,17 +2701,10 @@ function parseBuildJobTarget(value: string | undefined): BuildJobTarget {
       return "summary";
     case "reading-graph":
       return "graph";
-    case "knowledge-graph":
-      throw new Error(
-        withHelpRoute(
-          "Knowledge graph queue tasks are not implemented yet.",
-          "spinedigest queue --help",
-        ),
-      );
     default:
       throw new Error(
         withHelpRoute(
-          `Invalid queue task: ${value}. Expected reading-graph, summary, or knowledge-graph.`,
+          `Invalid queue task: ${value}. Expected reading-graph or summary.`,
           "spinedigest queue --help",
         ),
       );

@@ -5,11 +5,11 @@ Purpose:
   Create one generation task for one `.sdpub` chapter.
 
 Usage:
-  spinedigest queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary|knowledge-graph> --accept-cost [--boost] [--llm <json>] [--prompt <text>]
+  spinedigest queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary> --accept-cost [--boost] [--llm <json>] [--prompt <text>]
 
 Options:
   --chapter <id>       Required chapter id.
-  --task <task>        Required task: reading-graph, summary, or knowledge-graph.
+  --task <task>        Required task: reading-graph or summary.
   --accept-cost        Explicitly acknowledge LLM cost and wait time.
   --boost              Insert the new job at the front of the queued jobs.
   --llm <json>         Override LLM configuration for this job.

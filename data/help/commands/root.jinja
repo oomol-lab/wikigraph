@@ -12,10 +12,10 @@ Object model:
     entity, triple, source, summary, chunk
 
 Object commands:
-  spinedigest search <archive.sdpub> <query> [--type <entity|triple|source|summary|chunk>] [--chapter <ids>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+  spinedigest search <archive.sdpub> <query> [--type <chunk|source|summary[,kind...]>] [--chapter <ids>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
   spinedigest get <archive.sdpub> <uri> [--json|--jsonl]
-  spinedigest related <archive.sdpub> <uri> [--type <entity|triple|source|summary|chunk>] [--chapter <ids>] [--predicate <text>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
-  spinedigest evidence <archive.sdpub> <uri> [--type <entity|triple|source|summary|chunk>] [--chapter <ids>] [--predicate <text>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+  spinedigest related <archive.sdpub> <uri> [--json|--jsonl]
+  spinedigest evidence <archive.sdpub> <uri> [--json|--jsonl]
   spinedigest pack <archive.sdpub> <uri> [--budget <chars>] [--json|--jsonl]
 
 Archive commands:
@@ -26,7 +26,7 @@ Archive commands:
   spinedigest transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose|-v]
 
 Generation queue:
-  spinedigest queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary|knowledge-graph> --accept-cost [--boost] [--llm <json>] [--prompt <text>]
+  spinedigest queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary> --accept-cost [--boost] [--llm <json>] [--prompt <text>]
   spinedigest queue list [--all] [--active]
   spinedigest queue watch <job-id> [--jsonl] [--from beginning|now]
   Queue generation tasks call an LLM, consume tokens, and may incur provider charges.

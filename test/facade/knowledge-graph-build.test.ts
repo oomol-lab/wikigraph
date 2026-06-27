@@ -155,4 +155,27 @@ describe("facade/knowledge-graph-build", () => {
       }
     });
   });
+
+  it("rejects negative mention sentence indexes", async () => {
+    await withTempDir("spinedigest-knowledge-graph-build-", async (path) => {
+      await expect(
+        buildChapterKnowledgeGraphArtifact(1, {
+          mentionLinks: [],
+          mentions: [
+            {
+              chapterId: 1,
+              fragmentId: 10,
+              id: "m1",
+              qid: "Q1",
+              rangeEnd: 1,
+              rangeStart: 0,
+              sentenceIndex: -1,
+              surface: "A",
+            },
+          ],
+          workspacePath: `${path}/workspace`,
+        }),
+      ).rejects.toThrow("sentenceIndex");
+    });
+  });
 });

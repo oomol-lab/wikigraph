@@ -29,7 +29,7 @@ const mentionRecordSchema = z.object({
   id: z.string().min(1),
   chapterId: z.number().int(),
   fragmentId: z.number().int(),
-  sentenceIndex: z.number().int().optional(),
+  sentenceIndex: z.number().int().nonnegative().optional(),
   rangeStart: z.number().int().nonnegative(),
   rangeEnd: z.number().int().nonnegative(),
   surface: z.string().min(1),

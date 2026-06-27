@@ -47,7 +47,7 @@ const archiveMockState = vi.hoisted(() => ({
         chapterId: 2,
         endSentenceIndex: 1,
         fragmentId: 0,
-        id: "wikigraph://source/chapter/2#0..1",
+        id: "wikigraph://source/chapter/2/fragment/0#0..1",
         source: "RAG original source fragment.",
         startSentenceIndex: 0,
         title: "Chapter 2",
@@ -198,6 +198,18 @@ describe("cli/archive", () => {
     });
   });
 
+  it("rejects search kinds that are not implemented yet", async () => {
+    await expect(
+      runArchiveCommand({
+        action: "search",
+        archivePath: "/tmp/book.sdpub",
+        format: "text",
+        kinds: ["entity"],
+        query: "RAG",
+      }),
+    ).rejects.toThrow("Unsupported archive search type: entity");
+  });
+
   it("gets an object by Wiki Graph URI", async () => {
     await runArchiveCommand({
       action: "get",
@@ -220,7 +232,7 @@ describe("cli/archive", () => {
     });
 
     expect(listRelatedArchiveObjects).toHaveBeenCalledWith({}, "node:9");
-    expect(archiveMockState.textWrites[0]).toContain("node:11");
+    expect(archiveMockState.textWrites[0]).toContain("wikigraph://chunk/11");
     expect(archiveMockState.textWrites[0]).toContain("Related");
   });
 
@@ -237,7 +249,7 @@ describe("cli/archive", () => {
       "wikigraph://triple/Q1/mentions/Q2",
     );
     expect(archiveMockState.textWrites[0]).toContain(
-      "wikigraph://source/chapter/2#0..1",
+      "wikigraph://source/chapter/2/fragment/0#0..1",
     );
     expect(archiveMockState.textWrites[0]).toContain("@@ 0..1 @@");
     expect(archiveMockState.textWrites[0]).toContain(
@@ -254,7 +266,7 @@ describe("cli/archive", () => {
     });
 
     expect(archiveMockState.textWrites[0]).toContain(
-      '"id":"wikigraph://source/chapter/2#0..1"',
+      '"id":"wikigraph://source/chapter/2/fragment/0#0..1"',
     );
   });
 

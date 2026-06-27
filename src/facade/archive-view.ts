@@ -742,6 +742,7 @@ export async function listArchiveEvidence(
             reference.chapterId,
             reference.startSentenceIndex,
             reference.endSentenceIndex,
+            reference.fragmentId,
           ),
         ],
       };
@@ -1316,12 +1317,7 @@ async function createNodeEvidenceItems(
 
   return await Promise.all(
     [...ranges.entries()].map(async ([key, [start, end]]) => {
-      const [chapterId, fragmentId] = key.split(":").map(Number);
-
-      if (chapterId === undefined || fragmentId === undefined) {
-        throw new Error("Internal error: invalid node evidence range.");
-      }
-
+      const { chapterId, fragmentId } = parseEvidenceRangeKey(key);
       return await createSourceEvidenceItem(
         document,
         chapterId,
@@ -1339,12 +1335,33 @@ async function createMentionEvidenceItems(
 ): Promise<readonly ArchiveEvidenceItem[]> {
   return await createSourceEvidenceItems(
     document,
-    mentions.map((mention) => ({
-      chapterId: mention.chapterId,
-      endSentenceIndex: mention.sentenceIndex ?? 0,
-      fragmentId: mention.fragmentId,
-      startSentenceIndex: mention.sentenceIndex ?? 0,
-    })),
+    await Promise.all(
+      mentions.map(async (mention) => {
+        const startSentenceIndex =
+          mention.sentenceIndex ??
+          (await findSentenceIndexAtOffset(
+            document,
+            mention.chapterId,
+            mention.fragmentId,
+            mention.rangeStart,
+          ));
+        const endSentenceIndex =
+          mention.sentenceIndex ??
+          (await findSentenceIndexAtOffset(
+            document,
+            mention.chapterId,
+            mention.fragmentId,
+            Math.max(0, mention.rangeEnd - 1),
+          ));
+
+        return {
+          chapterId: mention.chapterId,
+          endSentenceIndex,
+          fragmentId: mention.fragmentId,
+          startSentenceIndex,
+        };
+      }),
+    ),
   );
 }
 
@@ -1365,10 +1382,23 @@ async function createMentionLinkEvidenceItems(
 
       const chapterId = source.chapterId;
       const fragmentId = source.fragmentId;
-      const sourceSentenceIndex = source.sentenceIndex ?? 0;
+      const sourceSentenceIndex =
+        source.sentenceIndex ??
+        (await findSentenceIndexAtOffset(
+          document,
+          chapterId,
+          fragmentId,
+          source.rangeStart,
+        ));
       const targetSentenceIndex =
         target.chapterId === chapterId && target.fragmentId === fragmentId
-          ? (target.sentenceIndex ?? sourceSentenceIndex)
+          ? (target.sentenceIndex ??
+            (await findSentenceIndexAtOffset(
+              document,
+              chapterId,
+              fragmentId,
+              target.rangeStart,
+            )))
           : sourceSentenceIndex;
       const evidenceStart = link.evidenceStart;
       const evidenceEnd = link.evidenceEnd;
@@ -1412,36 +1442,29 @@ async function createSourceEvidenceItems(
     readonly startSentenceIndex: number;
   }[],
 ): Promise<readonly ArchiveEvidenceItem[]> {
-  const mergedRanges = new Map<string, [number, number]>();
+  const rangesBySource = new Map<string, Array<[number, number]>>();
 
   for (const range of ranges) {
     const key = `${range.chapterId}:${range.fragmentId}`;
-    const current = mergedRanges.get(key);
+    const sourceRanges = rangesBySource.get(key) ?? [];
 
-    if (current === undefined) {
-      mergedRanges.set(key, [range.startSentenceIndex, range.endSentenceIndex]);
-    } else {
-      mergedRanges.set(key, [
-        Math.min(current[0], range.startSentenceIndex),
-        Math.max(current[1], range.endSentenceIndex),
-      ]);
-    }
+    sourceRanges.push([range.startSentenceIndex, range.endSentenceIndex]);
+    rangesBySource.set(key, sourceRanges);
   }
 
   return await Promise.all(
-    [...mergedRanges.entries()].map(async ([key, [start, end]]) => {
-      const [chapterId, fragmentId] = key.split(":").map(Number);
+    [...rangesBySource.entries()].flatMap(([key, ranges]) => {
+      const { chapterId, fragmentId } = parseEvidenceRangeKey(key);
 
-      if (chapterId === undefined || fragmentId === undefined) {
-        throw new Error("Internal error: invalid source evidence range.");
-      }
-
-      return await createSourceEvidenceItem(
-        document,
-        chapterId,
-        start,
-        end,
-        fragmentId,
+      return mergeEvidenceRanges(ranges).map(
+        async ([start, end]) =>
+          await createSourceEvidenceItem(
+            document,
+            chapterId,
+            start,
+            end,
+            fragmentId,
+          ),
       );
     }),
   );
@@ -1478,7 +1501,7 @@ async function createSourceEvidenceItem(
     chapterId,
     endSentenceIndex: end,
     fragmentId: resolvedFragmentId,
-    id: formatSourceRangeUri(chapterId, start, end),
+    id: formatSourceRangeUri(chapterId, resolvedFragmentId, start, end),
     source,
     startSentenceIndex: start,
     title: chapter.title ?? `[chapter ${chapterId}]`,
@@ -1518,10 +1541,49 @@ async function findSentenceIndexAtOffset(
 
 function formatSourceRangeUri(
   chapterId: number,
+  fragmentId: number,
   startSentenceIndex: number,
   endSentenceIndex: number,
 ): string {
-  return `wikigraph://source/chapter/${chapterId}#${startSentenceIndex}..${endSentenceIndex}`;
+  return `wikigraph://source/chapter/${chapterId}/fragment/${fragmentId}#${startSentenceIndex}..${endSentenceIndex}`;
+}
+
+function mergeEvidenceRanges(
+  ranges: readonly (readonly [number, number])[],
+): readonly (readonly [number, number])[] {
+  const sortedRanges = [...ranges]
+    .map(
+      ([start, end]) => [Math.min(start, end), Math.max(start, end)] as const,
+    )
+    .sort(([leftStart, leftEnd], [rightStart, rightEnd]) =>
+      leftStart === rightStart ? leftEnd - rightEnd : leftStart - rightStart,
+    );
+  const mergedRanges: Array<[number, number]> = [];
+
+  for (const [start, end] of sortedRanges) {
+    const last = mergedRanges.at(-1);
+
+    if (last === undefined || start > last[1] + 1) {
+      mergedRanges.push([start, end]);
+    } else {
+      last[1] = Math.max(last[1], end);
+    }
+  }
+
+  return mergedRanges;
+}
+
+function parseEvidenceRangeKey(key: string): {
+  readonly chapterId: number;
+  readonly fragmentId: number;
+} {
+  const [chapterId, fragmentId] = key.split(":").map(Number);
+
+  if (chapterId === undefined || fragmentId === undefined) {
+    throw new Error("Internal error: invalid source evidence range.");
+  }
+
+  return { chapterId, fragmentId };
 }
 
 function clampInteger(value: number, min: number, max: number): number {
@@ -1536,6 +1598,7 @@ type WikiGraphReference =
   | {
       readonly chapterId: number;
       readonly endSentenceIndex: number;
+      readonly fragmentId?: number;
       readonly startSentenceIndex: number;
       readonly type: "source" | "summary";
     }
@@ -1594,10 +1657,15 @@ function parseWikiGraphReference(uri: string): WikiGraphReference {
     case "source":
       if (pathParts[0] === "chapter" && pathParts[1] !== undefined) {
         const [start, end] = parseSentenceRange(parsed.hash);
+        const fragmentId =
+          pathParts[2] === "fragment" && pathParts[3] !== undefined
+            ? parseNonNegativeInteger(pathParts[3], uri)
+            : undefined;
 
         return {
           chapterId: parsePositiveInteger(pathParts[1], uri),
           endSentenceIndex: end,
+          ...(fragmentId === undefined ? {} : { fragmentId }),
           startSentenceIndex: start,
           type: "source",
         };

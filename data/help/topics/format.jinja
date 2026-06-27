@@ -8,7 +8,7 @@ Format Rules
 Source formats for archive creation:
   sdpub, epub, txt, markdown
 
-Object commands operate on `.sdpub` archives and return Wiki Graph URIs.
+Object commands operate on `.sdpub` archives. `search` and `related` return URI-addressable objects, `get` opens one object, `evidence` returns source evidence items, and `pack` returns packed context.
 
 Use `export` when a projection file is needed:
   spinedigest export book.sdpub --output-format markdown --output out.md

@@ -13,12 +13,15 @@ Object commands:
 Archive commands:
   spinedigest create <archive.sdpub>
   spinedigest export <archive.sdpub>
-  estimate    Estimate generation cost.
-  index       Show archive-level counts.
+  spinedigest estimate <archive.sdpub>
+  spinedigest index <archive.sdpub>
   spinedigest transform [options]
 
 Generation:
-  queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary|knowledge-graph> --accept-cost
+  spinedigest queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary> --accept-cost
 
 Maintenance:
-  meta, cover, chapter, config status
+  spinedigest meta <archive.sdpub>
+  spinedigest cover <archive.sdpub>
+  spinedigest chapter <action> <archive.sdpub>
+  spinedigest config status

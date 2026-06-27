@@ -418,6 +418,14 @@ describe("facade/archive-view", () => {
         await seedSourcedDocument(document);
 
         await document.openSession(async (openedDocument) => {
+          const secondDraft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          secondDraft.addSentence("First unrelated fragment sentence.", 4);
+          secondDraft.addSentence("Second fragment mentions Augustine.", 4);
+          secondDraft.addSentence("Third unrelated fragment sentence.", 4);
+          await secondDraft.commit();
           await openedDocument.mentions.saveMany([
             {
               chapterId: 1,
@@ -439,6 +447,25 @@ describe("facade/archive-view", () => {
               sentenceIndex: 0,
               surface: "agents",
             },
+            {
+              chapterId: 1,
+              fragmentId: 1,
+              id: "m3",
+              qid: "Q3",
+              rangeEnd: 60,
+              rangeStart: 35,
+              surface: "Augustine",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "m4",
+              qid: "Q4",
+              rangeEnd: 130,
+              rangeStart: 112,
+              sentenceIndex: 2,
+              surface: "searchable",
+            },
           ]);
           await openedDocument.mentionLinks.save({
             evidenceEnd: 65,
@@ -455,7 +482,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wikigraph://source/chapter/1#0..0",
+              id: "wikigraph://source/chapter/1/fragment/0#0..0",
               source:
                 "An LLM Wiki exposes pages, links, and source fragments to agents.",
               type: "source",
@@ -467,7 +494,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wikigraph://source/chapter/1#0..0",
+              id: "wikigraph://source/chapter/1/fragment/0#0..0",
               type: "source",
             },
           ],
@@ -477,7 +504,42 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wikigraph://source/chapter/1#0..0",
+              id: "wikigraph://source/chapter/1/fragment/0#0..0",
+              type: "source",
+            },
+          ],
+        });
+        await expect(
+          listArchiveEvidence(document, "wikigraph://entity/Q3"),
+        ).resolves.toMatchObject({
+          items: [
+            {
+              id: "wikigraph://source/chapter/1/fragment/1#1..1",
+              source: "Second fragment mentions Augustine.",
+              type: "source",
+            },
+          ],
+        });
+        await expect(
+          listArchiveEvidence(
+            document,
+            "wikigraph://source/chapter/1/fragment/1#1..1",
+          ),
+        ).resolves.toMatchObject({
+          items: [
+            {
+              id: "wikigraph://source/chapter/1/fragment/1#1..1",
+              source: "Second fragment mentions Augustine.",
+              type: "source",
+            },
+          ],
+        });
+        await expect(
+          listArchiveEvidence(document, "wikigraph://entity/Q4"),
+        ).resolves.toMatchObject({
+          items: [
+            {
+              id: "wikigraph://source/chapter/1/fragment/0#2..2",
               type: "source",
             },
           ],

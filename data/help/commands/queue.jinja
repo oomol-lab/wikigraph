@@ -5,7 +5,7 @@ Purpose:
   Manage device-local generation tasks for `.sdpub` chapters.
 
 Usage:
-  spinedigest queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary|knowledge-graph> --accept-cost [--boost] [--llm <json>] [--prompt <text>]
+  spinedigest queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary> --accept-cost [--boost] [--llm <json>] [--prompt <text>]
   spinedigest queue list [--all] [--active] [--input <archive.sdpub>]
   spinedigest queue status <job-id>
   spinedigest queue watch <job-id> [--jsonl] [--from beginning|now]
@@ -13,13 +13,12 @@ Usage:
   spinedigest queue resume <job-id>
   spinedigest queue cancel <job-id>
   spinedigest queue boost <job-id>
-  spinedigest queue target <job-id> --task <reading-graph|summary|knowledge-graph>
+  spinedigest queue target <job-id> --task <reading-graph|summary>
   spinedigest queue clean
 
 Tasks:
   - reading-graph builds the reading-oriented chunk graph.
   - summary builds the summary path.
-  - knowledge-graph builds entity/triple evidence.
 
 Cost:
   Queue tasks may call an LLM, consume tokens, and incur provider charges.

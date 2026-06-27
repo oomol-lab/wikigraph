@@ -219,13 +219,21 @@ async function createArchiveFromStdin(
 }
 
 function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
+  const types = args.kinds?.map((kind) => {
+    const type = toArchiveFindType(kind);
+
+    if (type === undefined) {
+      throw new Error(`Unsupported archive search type: ${kind}`);
+    }
+
+    return type;
+  });
+
   return {
     ...(args.chapters === undefined ? {} : { chapters: args.chapters }),
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
-    ...(args.kinds === undefined
-      ? {}
-      : { types: args.kinds.map(toArchiveFindType).filter(isDefined) }),
+    ...(types === undefined ? {} : { types }),
   };
 }
 
@@ -319,22 +327,29 @@ async function writeList(
   items: readonly ArchiveListItem[],
   format: ResultFormat,
 ): Promise<void> {
+  const outputItems = items.map((item) => ({
+    ...item,
+    id: toWikiGraphUri(item.id),
+  }));
+
   if (format === "json") {
-    await writeTextToStdout(`${JSON.stringify({ items }, null, 2)}\n`);
+    await writeTextToStdout(
+      `${JSON.stringify({ items: outputItems }, null, 2)}\n`,
+    );
     return;
   }
   if (format === "jsonl") {
-    await writeJSONL(items);
+    await writeJSONL(outputItems);
     return;
   }
 
-  if (items.length === 0) {
+  if (outputItems.length === 0) {
     await writeTextToStdout("No objects.\n");
     return;
   }
 
   await writeTextToStdout(
-    `${items
+    `${outputItems
       .map((item) => `${item.id}  ${item.label}  ${item.summary}`)
       .join("\n")}\n`,
   );
@@ -768,10 +783,6 @@ function toArchiveFindType(
     case "triple":
       return undefined;
   }
-}
-
-function isDefined<T>(value: T | undefined): value is T {
-  return value !== undefined;
 }
 
 function isUrl(value: string): boolean {
