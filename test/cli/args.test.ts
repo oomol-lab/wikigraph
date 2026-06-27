@@ -88,7 +88,7 @@ describe("cli/args", () => {
         "--chapter",
         "12",
         "--task",
-        "summary",
+        "reading-summary",
         "--boost",
         "--accept-cost",
         "--llm",
@@ -102,7 +102,7 @@ describe("cli/args", () => {
         boost: true,
         chapterId: 12,
         llmJSON: '{"model":"cli-model"}',
-        target: "summary",
+        target: "reading-summary",
       },
       help: false,
       kind: "queue",
@@ -116,14 +116,14 @@ describe("cli/args", () => {
         "--chapter",
         "12",
         "--task",
-        "summary",
+        "reading-summary",
       ]),
     ).toStrictEqual({
       args: {
         action: "add",
         archivePath: "book.sdpub",
         chapterId: 12,
-        target: "summary",
+        target: "reading-summary",
       },
       help: false,
       kind: "queue",
@@ -142,7 +142,7 @@ describe("cli/args", () => {
         "graph",
       ]),
     ).toThrow("`wikigraph queue add` does not support --stage.");
-    expect(() =>
+    expect(
       parseCLIArguments([
         "queue",
         "add",
@@ -152,7 +152,16 @@ describe("cli/args", () => {
         "--task",
         "knowledge-graph",
       ]),
-    ).toThrow("Invalid queue task: knowledge-graph.");
+    ).toStrictEqual({
+      args: {
+        action: "add",
+        archivePath: "book.sdpub",
+        chapterId: 12,
+        target: "knowledge-graph",
+      },
+      help: false,
+      kind: "queue",
+    });
 
     expect(
       parseCLIArguments([
@@ -871,7 +880,7 @@ describe("cli/args", () => {
         "summarized",
       ]),
     ).toThrow(
-      "Invalid --to: summarized. Expected planned, source, or graph.\nSee: wikigraph chapter --help",
+      "Invalid --to: summarized. Expected planned, source, or reading-graph.\nSee: wikigraph chapter --help",
     );
   });
 
@@ -967,7 +976,7 @@ describe("cli/args", () => {
     );
     expect(
       renderArchiveMaintenanceChapterActionHelpText("set-summary"),
-    ).toContain("The chapter must be `graph`");
+    ).toContain("The chapter must be `reading-graph`");
     expect(renderArchiveMaintenanceCommandHelpText("cover")).toContain(
       "refuses to write binary data to an interactive terminal",
     );

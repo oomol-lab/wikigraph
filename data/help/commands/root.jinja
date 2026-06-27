@@ -28,12 +28,12 @@ Object commands:
 Archive commands:
   wikigraph create <archive.sdpub> [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
   wikigraph export <archive.sdpub> --output-format <format> [--output <path>]
-  wikigraph estimate <archive.sdpub> [--stage <source|graph|summary>] [--json]
+  wikigraph estimate <archive.sdpub> [--stage <source|reading-graph|reading-summary>] [--json]
   wikigraph index <archive.sdpub> [--json]
   wikigraph transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose|-v]
 
 Generation queue:
-  wikigraph queue add <archive.sdpub> --chapter <id> --task <reading-graph|summary> --accept-cost [--boost] [--llm <json>] [--prompt <text>]
+  wikigraph queue add <archive.sdpub> --chapter <id> --task <reading-graph|reading-summary|knowledge-graph> --accept-cost [--boost] [--llm <json>] [--prompt <text>]
   wikigraph queue list [--all] [--active]
   wikigraph queue watch <job-id> [--jsonl] [--from beginning|now]
   Queue generation tasks call an LLM, consume tokens, and may incur provider charges.

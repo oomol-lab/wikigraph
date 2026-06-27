@@ -71,6 +71,7 @@ export {
   buildChapterKnowledgeGraphArtifact,
   clearChapterKnowledgeGraph,
   commitChapterKnowledgeGraphArtifact,
+  generateChapterKnowledgeGraphArtifact,
 } from "./knowledge-graph-build.js";
 export type {
   BuildChapterGraphArtifactOptions,

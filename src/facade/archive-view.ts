@@ -3,7 +3,7 @@ import type {
   MentionLinkRecord,
   MentionRecord,
   ReadonlyDocument,
-  KnowledgeEdgeRecord,
+  ReadingEdgeRecord,
   SentenceId,
   SnakeRecord,
 } from "../document/index.js";
@@ -289,7 +289,7 @@ export async function getArchiveIndex(
     listChapters(document),
     document.readBookMeta(),
     document.chunks.listAll(),
-    document.knowledgeEdges.listAll(),
+    document.readingEdges.listAll(),
   ]);
 
   return {
@@ -315,7 +315,7 @@ export async function listArchiveObjects(
         type: "chapter",
       }));
     case "edges":
-      return (await document.knowledgeEdges.listAll()).map((edge) => ({
+      return (await document.readingEdges.listAll()).map((edge) => ({
         id: formatEdgeId(edge),
         label: `${formatNodeId(edge.fromId)} -> ${formatNodeId(edge.toId)}`,
         summary: `weight ${formatWeight(edge.weight)}`,
@@ -945,7 +945,7 @@ export function formatChapterId(chapterId: number): string {
   return `chapter:${chapterId}`;
 }
 
-export function formatEdgeId(edge: KnowledgeEdgeRecord): string {
+export function formatEdgeId(edge: ReadingEdgeRecord): string {
   return `edge:${edge.fromId}->${edge.toId}`;
 }
 

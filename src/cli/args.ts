@@ -1730,7 +1730,7 @@ function normalizeArchiveChapterArguments(
       if (resetStage === undefined) {
         throw new Error(
           withHelpRoute(
-            "Missing --to. `chapter reset` requires planned, source, or graph.",
+            "Missing --to. `chapter reset` requires planned, source, or reading-graph.",
             helpRoute,
           ),
         );
@@ -2214,7 +2214,7 @@ function parseChapterStage(
 
   throw new Error(
     withHelpRoute(
-      `Invalid ${flag}: ${value}. Expected planned, source, graph, or summary.`,
+      `Invalid ${flag}: ${value}. Expected planned, source, reading-graph, or reading-summary.`,
       helpRoute,
     ),
   );
@@ -2268,7 +2268,7 @@ function parseResetStage(
   if (stage !== undefined) {
     throw new Error(
       withHelpRoute(
-        "`chapter reset` does not support --to summary.",
+        "`chapter reset` does not support --to reading-summary.",
         helpRoute,
       ),
     );
@@ -2276,7 +2276,7 @@ function parseResetStage(
 
   throw new Error(
     withHelpRoute(
-      `Invalid --to: ${value}. Expected planned, source, or graph.`,
+      `Invalid --to: ${value}. Expected planned, source, or reading-graph.`,
       helpRoute,
     ),
   );
@@ -2288,9 +2288,9 @@ function parseExternalChapterStage(value: string): ChapterStage | undefined {
       return "planned";
     case "source":
       return "sourced";
-    case "graph":
+    case "reading-graph":
       return "graphed";
-    case "summary":
+    case "reading-summary":
       return "summarized";
     default:
       return undefined;
@@ -2697,14 +2697,16 @@ function isQueueAction(value: string | undefined): value is CLIQueueAction {
 function parseBuildJobTarget(value: string | undefined): BuildJobTarget {
   switch (value) {
     case undefined:
-    case "summary":
-      return "summary";
+    case "reading-summary":
+      return "reading-summary";
     case "reading-graph":
-      return "graph";
+      return "reading-graph";
+    case "knowledge-graph":
+      return "knowledge-graph";
     default:
       throw new Error(
         withHelpRoute(
-          `Invalid queue task: ${value}. Expected reading-graph or summary.`,
+          `Invalid queue task: ${value}. Expected reading-graph, reading-summary, or knowledge-graph.`,
           "wikigraph queue --help",
         ),
       );

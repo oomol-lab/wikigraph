@@ -30,14 +30,14 @@ describe("facade/build-queue", () => {
       await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "summary",
+        target: "reading-summary",
       });
 
       await expect(
         addBuildJob({
           archivePath: `${path}/book.sdpub`,
           chapterId: 1,
-          target: "graph",
+          target: "reading-graph",
         }),
       ).rejects.toThrow();
     });
@@ -49,12 +49,12 @@ describe("facade/build-queue", () => {
       const first = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "summary",
+        target: "reading-summary",
       });
       const second = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 2,
-        target: "summary",
+        target: "reading-summary",
       });
 
       await boostBuildJob(second.jobId);
@@ -73,13 +73,13 @@ describe("facade/build-queue", () => {
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
         jobId: "aaaaaaaa-1111-4111-8111-111111111111",
-        target: "summary",
+        target: "reading-summary",
       });
       const second = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 2,
         jobId: "aaaaaaaa-2222-4222-8222-222222222222",
-        target: "summary",
+        target: "reading-summary",
       });
 
       await expect(resolveBuildJobId("aaaaaaaa-1")).resolves.toBe(first.jobId);
@@ -98,7 +98,7 @@ describe("facade/build-queue", () => {
       const job = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "summary",
+        target: "reading-summary",
       });
       let releaseWorker!: () => void;
       const workerRelease = new Promise<void>((resolveRelease) => {
@@ -111,7 +111,7 @@ describe("facade/build-queue", () => {
       const worker = runBuildJobWorker({
         concurrency: 1,
         executeJob: async (_job, reporter) => {
-          await reporter.stepStarted("summary");
+          await reporter.stepStarted("reading-summary");
           summaryStarted();
           await workerRelease;
         },
@@ -119,9 +119,9 @@ describe("facade/build-queue", () => {
       });
 
       await summaryStartedSignal;
-      await expect(updateBuildJobTarget(job.jobId, "graph")).rejects.toThrow(
-        "Cannot downgrade",
-      );
+      await expect(
+        updateBuildJobTarget(job.jobId, "reading-graph"),
+      ).rejects.toThrow("Cannot downgrade");
       await cancelBuildJob(job.jobId);
       releaseWorker();
       await worker;
@@ -134,17 +134,17 @@ describe("facade/build-queue", () => {
       const job = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "graph",
+        target: "reading-graph",
       });
 
       await runBuildJobWorker({
         concurrency: 1,
         executeJob: async (_job, reporter) => {
           await reporter.setTotals({ totalGraphWords: 100 });
-          await reporter.stepStarted("graph");
+          await reporter.stepStarted("reading-graph");
           await reporter.updateWords({ graphWords: 50 });
           await reporter.addOutputCharacters(400);
-          await reporter.stepCompleted("graph");
+          await reporter.stepCompleted("reading-graph");
         },
         idleTimeoutMs: 0,
       });
@@ -164,7 +164,7 @@ describe("facade/build-queue", () => {
       const job = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "summary",
+        target: "reading-summary",
       });
 
       await runBuildJobWorker({
@@ -172,13 +172,13 @@ describe("facade/build-queue", () => {
         executeJob: async (_job, reporter) => {
           await reporter.setTotals({
             totalGraphWords: 100,
-            totalSummaryWords: 50,
+            totalReadingSummaryWords: 50,
           });
           await reporter.updateWords({
             graphWords: 150,
-            summaryWords: 75,
+            readingSummaryWords: 75,
           });
-          await reporter.stepStarted("summary");
+          await reporter.stepStarted("reading-summary");
         },
         idleTimeoutMs: 0,
       });
@@ -190,7 +190,7 @@ describe("facade/build-queue", () => {
 
       expect(latest).toMatchObject({
         graphWords: 100,
-        summaryWords: 50,
+        readingSummaryWords: 50,
         totalWords: 50,
         words: 50,
       });
@@ -203,12 +203,12 @@ describe("facade/build-queue", () => {
       const failedJob = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "summary",
+        target: "reading-summary",
       });
       const succeededJob = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 2,
-        target: "summary",
+        target: "reading-summary",
       });
 
       await runBuildJobWorker({
@@ -238,7 +238,7 @@ describe("facade/build-queue", () => {
       const job = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "summary",
+        target: "reading-summary",
       });
       let releaseLockPromise: Promise<void> | undefined;
 
@@ -267,7 +267,7 @@ describe("facade/build-queue", () => {
       const job = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "graph",
+        target: "reading-graph",
       });
 
       await forceRunningPid(
@@ -294,7 +294,7 @@ describe("facade/build-queue", () => {
       await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "graph",
+        target: "reading-graph",
       });
 
       let firstStarted!: () => void;
@@ -333,7 +333,7 @@ describe("facade/build-queue", () => {
       await addBuildJob({
         archivePath: `${path}/other-book.sdpub`,
         chapterId: 2,
-        target: "graph",
+        target: "reading-graph",
       });
       await withTimeout(
         secondStartedSignal,
@@ -352,12 +352,12 @@ describe("facade/build-queue", () => {
       await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "graph",
+        target: "reading-graph",
       });
       await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 2,
-        target: "graph",
+        target: "reading-graph",
       });
 
       let firstStarted!: () => void;
@@ -414,7 +414,7 @@ describe("facade/build-queue", () => {
       await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "graph",
+        target: "reading-graph",
       });
 
       let releaseJob!: () => void;
@@ -475,12 +475,12 @@ describe("facade/build-queue", () => {
       await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
-        target: "graph",
+        target: "reading-graph",
       });
       await addBuildJob({
         archivePath: `${path}/other-book.sdpub`,
         chapterId: 2,
-        target: "graph",
+        target: "reading-graph",
       });
 
       let firstStarted!: () => void;

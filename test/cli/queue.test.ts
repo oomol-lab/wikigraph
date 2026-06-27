@@ -5,9 +5,11 @@ const queueMockState = vi.hoisted(() => ({
   activeJobChecks: [] as unknown[],
   addCalls: [] as unknown[],
   buildGraphCalls: [] as unknown[],
+  buildKnowledgeGraphCalls: [] as unknown[],
   buildSummaryCalls: [] as unknown[],
   chapterStage: "sourced" as "planned" | "sourced" | "graphed" | "summarized",
   commitGraphCalls: [] as unknown[],
+  commitKnowledgeGraphCalls: [] as unknown[],
   commitSummaryCalls: [] as unknown[],
   events: [] as unknown[],
   getJobIds: [] as string[],
@@ -23,7 +25,7 @@ const queueMockState = vi.hoisted(() => ({
     eventsPath: "events.ndjson",
     jobId: "job-1",
     state: "succeeded",
-    target: "summary",
+    target: "reading-summary",
     workspacePath: "/tmp/job-workspace",
   } as Record<string, unknown>,
   readDocumentCalls: [] as string[],
@@ -98,7 +100,7 @@ vi.mock("../../src/facade/index.js", () => ({
       chapterId: 12,
       jobId: "job-1",
       state: "queued",
-      target: "summary",
+      target: "reading-summary",
     });
   }),
   assertNoActiveBuildJobs: vi.fn((input: unknown) => {
@@ -136,6 +138,17 @@ vi.mock("../../src/facade/index.js", () => ({
       words: 4,
     });
   }),
+  commitChapterKnowledgeGraphArtifact: vi.fn(
+    (_document: unknown, artifact: unknown) => {
+      queueMockState.stepLog.push("commit-knowledge-graph");
+      queueMockState.commitKnowledgeGraphCalls.push(artifact);
+      return Promise.resolve({
+        chapterId: 12,
+        mentionLinks: 0,
+        mentions: 2,
+      });
+    },
+  ),
   commitChapterSummaryArtifact: vi.fn(() => {
     queueMockState.stepLog.push("commit-summary");
     queueMockState.commitSummaryCalls.push({});
@@ -149,6 +162,16 @@ vi.mock("../../src/facade/index.js", () => ({
     queueMockState.getJobIds.push(jobId);
     return Promise.resolve(queueMockState.job);
   }),
+  generateChapterKnowledgeGraphArtifact: vi.fn(
+    (_document: unknown, _chapterId: number, options: unknown) => {
+      queueMockState.stepLog.push("build-knowledge-graph");
+      queueMockState.buildKnowledgeGraphCalls.push(options);
+      return Promise.resolve({
+        chapterId: 12,
+        manifestPath: "/tmp/job-workspace/knowledge-graph/manifest.json",
+      });
+    },
+  ),
   listBuildJobs: vi.fn(() => Promise.resolve(queueMockState.jobs)),
   pauseBuildJob: vi.fn(),
   readBuildJobEvents: vi.fn(() => Promise.resolve(queueMockState.events)),
@@ -220,10 +243,12 @@ describe("cli/queue", () => {
     queueMockState.activeJobChecks.length = 0;
     queueMockState.addCalls.length = 0;
     queueMockState.buildGraphCalls.length = 0;
+    queueMockState.buildKnowledgeGraphCalls.length = 0;
     queueMockState.buildSummaryCalls.length = 0;
     queueMockState.buildInputStage = "sourced";
     queueMockState.chapterStage = "sourced";
     queueMockState.commitGraphCalls.length = 0;
+    queueMockState.commitKnowledgeGraphCalls.length = 0;
     queueMockState.commitSummaryCalls.length = 0;
     queueMockState.events = [];
     queueMockState.getJobIds.length = 0;
@@ -237,7 +262,7 @@ describe("cli/queue", () => {
       jobId: "job-1",
       queueRank: 10,
       state: "succeeded",
-      target: "summary",
+      target: "reading-summary",
       updatedAt: 2,
       workspacePath: "/tmp/job-workspace",
     };
@@ -267,7 +292,7 @@ describe("cli/queue", () => {
         action: "add",
         archivePath: "book.sdpub",
         chapterId: 12,
-        target: "summary",
+        target: "reading-summary",
       }),
     ).rejects.toThrow("consume tokens");
 
@@ -292,7 +317,7 @@ describe("cli/queue", () => {
         action: "add",
         archivePath: "book.sdpub",
         chapterId: 12,
-        target: "summary",
+        target: "reading-summary",
       }),
     ).rejects.toThrow("Chapter 12 does not exist");
 
@@ -308,7 +333,7 @@ describe("cli/queue", () => {
         action: "add",
         archivePath: "book.sdpub",
         chapterId: 12,
-        target: "summary",
+        target: "reading-summary",
       }),
     ).rejects.toThrow("Set source before queueing");
 
@@ -324,7 +349,7 @@ describe("cli/queue", () => {
         action: "add",
         archivePath: "book.sdpub",
         chapterId: 12,
-        target: "summary",
+        target: "reading-summary",
       }),
     ).rejects.toThrow("active job conflict");
 
@@ -338,7 +363,7 @@ describe("cli/queue", () => {
       archivePath: "book.sdpub",
       boost: true,
       chapterId: 12,
-      target: "graph",
+      target: "reading-graph",
     });
 
     expect(queueMockState.addCalls).toStrictEqual([
@@ -346,7 +371,7 @@ describe("cli/queue", () => {
         archivePath: "book.sdpub",
         boost: true,
         chapterId: 12,
-        target: "graph",
+        target: "reading-graph",
       },
     ]);
     expect(queueMockState.textWrites.join("")).toContain("Job job-1 queued");
@@ -359,12 +384,12 @@ describe("cli/queue", () => {
         archivePath: "/books/book.sdpub",
         chapterId: 12,
         createdAt: 1,
-        currentStep: "summary",
+        currentStep: "reading-summary",
         eventsPath: "events.ndjson",
         jobId: "job-1-full",
         queueRank: 1,
         state: "running",
-        target: "summary",
+        target: "reading-summary",
         updatedAt: 2,
         workspacePath: "/tmp/job-workspace",
       },
@@ -375,7 +400,7 @@ describe("cli/queue", () => {
     });
 
     expect(queueMockState.textWrites).toStrictEqual([
-      "JOB      STATE     STEP    TARGET  CHAPTER ARCHIVE\njob-1-fu running   summary summary      12 book.sdpub\n",
+      "JOB      STATE     STEP    TARGET  CHAPTER ARCHIVE\njob-1-fu running   reading-summary reading-summary      12 book.sdpub\n",
     ]);
   });
 
@@ -390,7 +415,7 @@ describe("cli/queue", () => {
         jobId: "job-1-full",
         queueRank: 1,
         state: "queued",
-        target: "graph",
+        target: "reading-graph",
         updatedAt: 2,
         workspacePath: "/tmp/job-workspace",
       },
@@ -412,7 +437,7 @@ describe("cli/queue", () => {
           jobId: "job-1-full",
           queueRank: 1,
           state: "queued",
-          target: "graph",
+          target: "reading-graph",
           updatedAt: 2,
           workspacePath: "/tmp/job-workspace",
         },
@@ -490,6 +515,57 @@ describe("cli/queue", () => {
     );
   });
 
+  it("runs knowledge graph work without reading graph or summary builds", async () => {
+    queueMockState.job = {
+      ...queueMockState.job,
+      state: "running",
+      target: "knowledge-graph",
+    };
+
+    await runQueueCommand({
+      action: "worker",
+    });
+
+    const reporter = {
+      addOutputCharacters: vi.fn(() => Promise.resolve()),
+      setTotals: vi.fn(() => Promise.resolve()),
+      stepCompleted: vi.fn(() => Promise.resolve()),
+      stepStarted: vi.fn(() => Promise.resolve()),
+      updateWords: vi.fn(() => Promise.resolve()),
+    };
+
+    await queueMockState.runWorkerOptions!.executeJob(
+      queueMockState.job,
+      reporter,
+    );
+
+    expect(queueMockState.stepLog).toStrictEqual([
+      "read:start",
+      "read:end",
+      "read:start",
+      "build-knowledge-graph",
+      "read:end",
+      "write:start",
+      "commit-knowledge-graph",
+      "write:end",
+    ]);
+    expect(queueMockState.buildKnowledgeGraphCalls).toHaveLength(1);
+    expect(queueMockState.buildKnowledgeGraphCalls[0]).toMatchObject({
+      policyPrompt: "Keep key beats",
+      workspacePath: "/tmp/job-workspace",
+    });
+    expect(queueMockState.commitKnowledgeGraphCalls).toStrictEqual([
+      {
+        chapterId: 12,
+        manifestPath: "/tmp/job-workspace/knowledge-graph/manifest.json",
+      },
+    ]);
+    expect(queueMockState.buildGraphCalls).toStrictEqual([]);
+    expect(queueMockState.buildSummaryCalls).toStrictEqual([]);
+    expect(queueMockState.commitGraphCalls).toStrictEqual([]);
+    expect(queueMockState.commitSummaryCalls).toStrictEqual([]);
+  });
+
   it("writes every watch jsonl event without closing stdout", async () => {
     queueMockState.events = [
       {
@@ -551,10 +627,10 @@ describe("cli/queue", () => {
         jobId: "job-1",
         outputTokens: 200,
         seq: 1,
-        step: "summary",
-        summaryWords: 9040,
+        step: "reading-summary",
+        readingSummaryWords: 9040,
         totalGraphWords: 4520,
-        totalSummaryWords: 4520,
+        totalReadingSummaryWords: 4520,
         type: "progress_snapshot",
       },
       {
@@ -579,14 +655,14 @@ describe("cli/queue", () => {
         jobId: "job-1",
         outputTokens: 200,
         seq: 1,
-        step: "summary",
+        step: "reading-summary",
         totalWords: 4520,
         type: "progress_snapshot",
         words: 4520,
       })}\n`,
     );
     expect(queueMockState.textWrites[0]).not.toContain("graphWords");
-    expect(queueMockState.textWrites[0]).not.toContain("summaryWords");
+    expect(queueMockState.textWrites[0]).not.toContain("readingSummaryWords");
     expect(queueMockState.textWrites[1]).toBe(
       `${JSON.stringify(queueMockState.events[1])}\n`,
     );
@@ -600,10 +676,10 @@ describe("cli/queue", () => {
         jobId: "job-1",
         outputTokens: 200,
         seq: 1,
-        step: "summary",
-        summaryWords: 9040,
+        step: "reading-summary",
+        readingSummaryWords: 9040,
         totalGraphWords: 4520,
-        totalSummaryWords: 4520,
+        totalReadingSummaryWords: 4520,
         type: "progress_snapshot",
       },
       {
@@ -623,7 +699,7 @@ describe("cli/queue", () => {
     });
 
     expect(queueMockState.textWrites).toStrictEqual([
-      "progress summary 4520/4520 output ~200 tokens\n",
+      "progress reading-summary 4520/4520 output ~200 tokens\n",
       "succeeded\n",
     ]);
   });

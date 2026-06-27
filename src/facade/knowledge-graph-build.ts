@@ -4,11 +4,27 @@ import { createInterface } from "readline";
 import { join } from "path";
 import { z } from "zod";
 
+import type { GuaranteedRequest } from "../guaranteed/index.js";
 import type {
   Document,
+  FragmentRecord,
   MentionLinkRecord,
   MentionRecord,
+  ReadonlyDocument,
 } from "../document/index.js";
+import {
+  buildWikimatchSurfaceWindows,
+  buildWikimatchWindows,
+  judgeWikimatchPolicy,
+  judgeWikimatchSurfaceScreening,
+  matchWikispineSentenceCandidates,
+  WikimatchSurfaceBlocklist,
+  type WikimatchAcceptedMention,
+  type WikimatchCandidate,
+  type WikimatchSentence,
+} from "../wikimatch/index.js";
+
+import { getChapterDetails } from "./chapter.js";
 
 export interface ChapterKnowledgeGraphBuildArtifact {
   readonly chapterId: number;
@@ -22,6 +38,12 @@ export interface BuildChapterKnowledgeGraphArtifactOptions {
     | AsyncIterable<MentionLinkRecord>
     | Iterable<MentionLinkRecord>;
   readonly mentions: AsyncIterable<MentionRecord> | Iterable<MentionRecord>;
+  readonly workspacePath: string;
+}
+
+export interface GenerateChapterKnowledgeGraphArtifactOptions {
+  readonly policyPrompt: string;
+  readonly request: GuaranteedRequest;
   readonly workspacePath: string;
 }
 
@@ -48,6 +70,56 @@ const mentionLinkRecordSchema = z.object({
   confidence: z.number().min(0).max(1).optional(),
   note: z.string().optional(),
 });
+
+export async function generateChapterKnowledgeGraphArtifact(
+  document: ReadonlyDocument,
+  chapterId: number,
+  options: GenerateChapterKnowledgeGraphArtifactOptions,
+): Promise<ChapterKnowledgeGraphBuildArtifact> {
+  const details = await getChapterDetails(document, chapterId);
+
+  if (details.stage === "planned") {
+    throw new Error(
+      `Chapter ${chapterId} is planned. Set source before generating Knowledge Graph.`,
+    );
+  }
+
+  const fragments = await readChapterFragments(document, chapterId);
+  const text = joinFragmentText(fragments);
+  const sentences = createWikimatchSentences(fragments);
+  const rawCandidates = await matchWikispineSentenceCandidates({
+    includeDisambiguation: true,
+    maxCandidatesPerSurface: 3,
+    sentences,
+  });
+  const blocklist = await WikimatchSurfaceBlocklist.open();
+
+  try {
+    const screenedCandidates = await screenCandidates({
+      blocklist,
+      candidates: rawCandidates,
+      policyPrompt: options.policyPrompt,
+      request: options.request,
+      text,
+    });
+    const mentions = await judgeCandidates({
+      candidates: screenedCandidates,
+      chapterId,
+      fragments,
+      policyPrompt: options.policyPrompt,
+      request: options.request,
+      text,
+    });
+
+    return await buildChapterKnowledgeGraphArtifact(chapterId, {
+      mentionLinks: [],
+      mentions,
+      workspacePath: options.workspacePath,
+    });
+  } finally {
+    await blocklist.close();
+  }
+}
 
 export async function buildChapterKnowledgeGraphArtifact(
   chapterId: number,
@@ -76,6 +148,220 @@ export async function buildChapterKnowledgeGraphArtifact(
     mentionsPath,
     workspacePath,
   };
+}
+
+async function screenCandidates(input: {
+  readonly blocklist: WikimatchSurfaceBlocklist;
+  readonly candidates: readonly WikimatchCandidate[];
+  readonly policyPrompt: string;
+  readonly request: GuaranteedRequest;
+  readonly text: string;
+}): Promise<readonly WikimatchCandidate[]> {
+  const blockedSurfaces = await input.blocklist.getBlockedSurfaces(
+    input.candidates.map((candidate) => candidate.surface),
+  );
+  const candidates = input.candidates.filter(
+    (candidate) => !blockedSurfaces.has(candidate.surface),
+  );
+
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  const allowedSurfaces = new Set<string>();
+
+  for (const window of buildWikimatchSurfaceWindows({
+    candidates,
+    contextWords: 180,
+    surfaceBudget: 60,
+    text: input.text,
+  })) {
+    const result = await judgeWikimatchSurfaceScreening({
+      policyPrompt: input.policyPrompt,
+      request: input.request,
+      window,
+    });
+
+    for (const surface of result.surfaces) {
+      if (surface.decision === "allow") {
+        allowedSurfaces.add(surface.text);
+      }
+    }
+    await input.blocklist.put(
+      result.surfaces
+        .filter((surface) => surface.decision === "global_blocklist_candidate")
+        .map((surface) => ({
+          ...(surface.note === undefined ? {} : { note: surface.note }),
+          surface: surface.text,
+        })),
+    );
+  }
+
+  return candidates.filter((candidate) =>
+    allowedSurfaces.has(candidate.surface),
+  );
+}
+
+async function judgeCandidates(input: {
+  readonly candidates: readonly WikimatchCandidate[];
+  readonly chapterId: number;
+  readonly fragments: readonly FragmentRecord[];
+  readonly policyPrompt: string;
+  readonly request: GuaranteedRequest;
+  readonly text: string;
+}): Promise<readonly MentionRecord[]> {
+  const mentions: MentionRecord[] = [];
+  let mentionIndex = 1;
+
+  for (const window of buildWikimatchWindows({
+    candidateBudget: 35,
+    candidates: input.candidates,
+    contextWords: 220,
+    text: input.text,
+  })) {
+    const result = await judgeWikimatchPolicy({
+      candidates: window.candidates,
+      policyPrompt: input.policyPrompt,
+      request: input.request,
+      window,
+    });
+
+    for (const mention of result.mentions) {
+      const location = locateMention(input.fragments, mention.range.start);
+
+      mentions.push(
+        toMentionRecord(input.chapterId, mention, location, mentionIndex),
+      );
+      mentionIndex += 1;
+    }
+  }
+
+  return mentions;
+}
+
+function toMentionRecord(
+  chapterId: number,
+  mention: WikimatchAcceptedMention,
+  location: {
+    readonly fragmentId: number;
+    readonly rangeStart: number;
+    readonly sentenceIndex: number;
+  },
+  index: number,
+): MentionRecord {
+  return {
+    chapterId,
+    ...(mention.confidence === undefined
+      ? {}
+      : { confidence: mention.confidence }),
+    fragmentId: location.fragmentId,
+    id: `m${chapterId}-${index}`,
+    ...(mention.note === undefined ? {} : { note: mention.note }),
+    qid: mention.qid,
+    rangeEnd: location.rangeStart + mention.surface.length,
+    rangeStart: location.rangeStart,
+    sentenceIndex: location.sentenceIndex,
+    surface: mention.surface,
+  };
+}
+
+function locateMention(
+  fragments: readonly FragmentRecord[],
+  absoluteOffset: number,
+): {
+  readonly fragmentId: number;
+  readonly rangeStart: number;
+  readonly sentenceIndex: number;
+} {
+  for (const fragment of fragments) {
+    for (
+      let sentenceIndex = 0;
+      sentenceIndex < fragment.sentences.length;
+      sentenceIndex += 1
+    ) {
+      const sentence = fragment.sentences[sentenceIndex]!;
+      const rangeStart = getSentenceAbsoluteStart(
+        fragments,
+        fragment.fragmentId,
+        sentenceIndex,
+      );
+      const rangeEnd = rangeStart + sentence.text.length;
+
+      if (absoluteOffset >= rangeStart && absoluteOffset < rangeEnd) {
+        return {
+          fragmentId: fragment.fragmentId,
+          rangeStart: absoluteOffset - rangeStart,
+          sentenceIndex,
+        };
+      }
+    }
+  }
+
+  throw new Error(`Mention offset ${absoluteOffset} is outside chapter text.`);
+}
+
+function getSentenceAbsoluteStart(
+  fragments: readonly FragmentRecord[],
+  fragmentId: number,
+  sentenceIndex: number,
+): number {
+  let offset = 0;
+
+  for (const fragment of fragments) {
+    for (let index = 0; index < fragment.sentences.length; index += 1) {
+      if (fragment.fragmentId === fragmentId && index === sentenceIndex) {
+        return offset;
+      }
+
+      offset += fragment.sentences[index]!.text.length + 1;
+    }
+  }
+
+  throw new Error(`Sentence ${fragmentId}:${sentenceIndex} does not exist.`);
+}
+
+async function readChapterFragments(
+  document: ReadonlyDocument,
+  chapterId: number,
+): Promise<readonly FragmentRecord[]> {
+  const serialFragments = document.getSerialFragments(chapterId);
+
+  return await Promise.all(
+    (await serialFragments.listFragmentIds()).map(
+      async (fragmentId) => await serialFragments.getFragment(fragmentId),
+    ),
+  );
+}
+
+function joinFragmentText(fragments: readonly FragmentRecord[]): string {
+  return fragments
+    .flatMap((fragment) => fragment.sentences.map((sentence) => sentence.text))
+    .join(" ");
+}
+
+function createWikimatchSentences(
+  fragments: readonly FragmentRecord[],
+): readonly WikimatchSentence[] {
+  const sentences: WikimatchSentence[] = [];
+  let offset = 0;
+
+  for (const fragment of fragments) {
+    for (let index = 0; index < fragment.sentences.length; index += 1) {
+      const sentence = fragment.sentences[index]!;
+
+      sentences.push({
+        id: `${fragment.serialId}:${fragment.fragmentId}:${index}`,
+        range: {
+          end: offset + sentence.text.length,
+          start: offset,
+        },
+        text: sentence.text,
+      });
+      offset += sentence.text.length + 1;
+    }
+  }
+
+  return sentences;
 }
 
 export async function commitChapterKnowledgeGraphArtifact(

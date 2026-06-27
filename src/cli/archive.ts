@@ -808,9 +808,9 @@ function formatStage(stage: ChapterStage): string {
     case "sourced":
       return "source";
     case "graphed":
-      return "graph";
+      return "reading-graph";
     case "summarized":
-      return "summary";
+      return "reading-summary";
   }
 }
 
@@ -821,12 +821,10 @@ function formatEstimateStage(stage: ArchiveEstimate["targetStage"]): string {
     case "source":
     case "sourced":
       return "source";
-    case "graph":
     case "graphed":
-      return "graph";
-    case "summary":
+      return "reading-graph";
     case "summarized":
-      return "summary";
+      return "reading-summary";
     default:
       return stage;
   }

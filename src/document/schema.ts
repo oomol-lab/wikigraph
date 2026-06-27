@@ -35,7 +35,7 @@ export const SCHEMA_SQL = `
     PRIMARY KEY (chunk_id, serial_id, fragment_id, sentence_index)
   );
 
-  CREATE TABLE IF NOT EXISTS knowledge_edges (
+  CREATE TABLE IF NOT EXISTS reading_edges (
     from_id INTEGER NOT NULL,
     to_id INTEGER NOT NULL,
     strength TEXT,

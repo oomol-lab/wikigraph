@@ -2,7 +2,7 @@ import type {
   ChunkImportance,
   ChunkRecord,
   ChunkRetention,
-  KnowledgeEdgeRecord,
+  ReadingEdgeRecord,
   ReadonlyDocument,
   SentenceId,
 } from "../document/index.js";
@@ -63,7 +63,7 @@ export async function getGraphStatus(
   const [serial, nodes, edges] = await Promise.all([
     document.serials.getById(chapterId),
     listGraphNodes(document, chapterId),
-    document.knowledgeEdges.listBySerial(chapterId),
+    document.readingEdges.listBySerial(chapterId),
   ]);
 
   return {
@@ -143,8 +143,8 @@ export async function listGraphNeighbors(
 ): Promise<readonly GraphNeighbor[]> {
   await requireChapterNode(document, chapterId, nodeId);
   const [incoming, outgoing] = await Promise.all([
-    document.knowledgeEdges.listIncoming(nodeId),
-    document.knowledgeEdges.listOutgoing(nodeId),
+    document.readingEdges.listIncoming(nodeId),
+    document.readingEdges.listOutgoing(nodeId),
   ]);
   const neighbors = await Promise.all([
     ...incoming.map(async (edge) => ({
@@ -195,7 +195,7 @@ export async function findGraphPath(
     return [{ node: await getGraphNode(document, chapterId, fromNodeId) }];
   }
 
-  const edges = (await document.knowledgeEdges.listBySerial(chapterId)).map(
+  const edges = (await document.readingEdges.listBySerial(chapterId)).map(
     formatGraphEdge,
   );
   const outgoing = new Map<number, GraphEdge[]>();
@@ -320,7 +320,7 @@ function formatGraphNode(chunk: ChunkRecord): GraphNode {
   };
 }
 
-function formatGraphEdge(edge: KnowledgeEdgeRecord): GraphEdge {
+function formatGraphEdge(edge: ReadingEdgeRecord): GraphEdge {
   return {
     fromId: edge.fromId,
     toId: edge.toId,

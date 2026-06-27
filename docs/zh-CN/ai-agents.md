@@ -15,13 +15,13 @@
 优先使用 archive-first CLI：
 
 ```bash
-spinedigest chapter tree book.sdpub --json
-spinedigest list book.sdpub --type node --chapter 3,7,12
-spinedigest find book.sdpub "keyword" --type fragment --chapter 3,7,12
-spinedigest page book.sdpub --fragment 3:4
-spinedigest page book.sdpub --node 84
-spinedigest read book.sdpub --chapter 12
-spinedigest pack book.sdpub --node 84 --budget 5000
+wikigraph chapter tree book.sdpub --json
+wikigraph list book.sdpub --type node --chapter 3,7,12
+wikigraph find book.sdpub "keyword" --type fragment --chapter 3,7,12
+wikigraph page book.sdpub --fragment 3:4
+wikigraph page book.sdpub --node 84
+wikigraph read book.sdpub --chapter 12
+wikigraph pack book.sdpub --node 84 --budget 5000
 ```
 
 优先先选择三种探索模式之一。对于综合理解、时间线、关系分析、过程梳理或概念结构任务，先走结构模式：用 `chapter tree --json` 查看压缩后的目录地图，再选择可能相关的 chapter id，并用带范围的 `list --chapter <ids>` 或 `page --chapter <id>` 展开局部。搜索模式用 `find --type <lens>` 做候选定位，用 `grep --type <lens>` 检查连续精确短语。`find` 默认是 `--match any`；只有必须要求全部关键词出现在同一个对象内时，才使用 `--match all`。阅读模式适合在选定相关 chapter、fragment 或 node 后用 `read` 输出连续文本。
@@ -40,8 +40,8 @@ spinedigest pack book.sdpub --node 84 --budget 5000
 - 创建源：EPUB、Markdown、TXT 和文本管道
 - 可读对象：`--chapter <id>`、`--node <id>`、`--fragment <chapter>:<fragment>`、`--summary <id>`、`--meta book`
 - 便宜操作：`status`、`index`、`list`、`find`、`grep`、`page`、`read`、`links`、`backlinks`、`pack`、`export`
-- 昂贵操作：graph 或 summary `queue add`
-- 先估算：`spinedigest estimate <archive.sdpub> --stage summary`
+- 昂贵操作：Reading Graph、Reading Summary 或 Knowledge Graph `queue add`
+- 先估算：`wikigraph estimate <archive.sdpub> --stage reading-summary`
 - 机器消费：组合工具时传 `--json`
 
 ## 推荐执行策略
@@ -61,14 +61,14 @@ spinedigest pack book.sdpub --node 84 --budget 5000
 ## Queue 流程
 
 ```bash
-spinedigest create book.sdpub ./book.epub
-spinedigest status book.sdpub
-spinedigest estimate book.sdpub --stage summary
-spinedigest queue add book.sdpub --chapter 3 --to graph --accept-cost
-spinedigest queue watch <job-id> --jsonl
+wikigraph create book.sdpub ./book.epub
+wikigraph status book.sdpub
+wikigraph estimate book.sdpub --stage reading-summary
+wikigraph queue add book.sdpub --chapter 3 --task reading-graph --accept-cost
+wikigraph queue watch <job-id> --jsonl
 ```
 
-Create/source 是安全第一步。Graph 和 summary 阶段可能调用 LLM provider。
+Create/source 是安全第一步。Reading Graph、Reading Summary 和 Knowledge Graph 任务可能调用 LLM provider。
 
 ## 避免
 

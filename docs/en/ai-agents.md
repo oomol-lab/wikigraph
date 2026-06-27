@@ -15,13 +15,13 @@ Do not treat `.sdpub` as a ZIP payload for routine retrieval. Treat it as a mana
 Prefer archive-first CLI commands:
 
 ```bash
-spinedigest chapter tree book.sdpub --json
-spinedigest list book.sdpub --type node --chapter 3,7,12
-spinedigest find book.sdpub "keyword" --type fragment --chapter 3,7,12
-spinedigest page book.sdpub --fragment 3:4
-spinedigest page book.sdpub --node 84
-spinedigest read book.sdpub --chapter 12
-spinedigest pack book.sdpub --node 84 --budget 5000
+wikigraph chapter tree book.sdpub --json
+wikigraph list book.sdpub --type node --chapter 3,7,12
+wikigraph find book.sdpub "keyword" --type fragment --chapter 3,7,12
+wikigraph page book.sdpub --fragment 3:4
+wikigraph page book.sdpub --node 84
+wikigraph read book.sdpub --chapter 12
+wikigraph pack book.sdpub --node 84 --budget 5000
 ```
 
 Use three exploration modes. For synthesis, timelines, relationship analysis, process reconstruction, or concept-structure tasks, start with Structure mode: `chapter tree --json` for a compact table-of-contents map, then choose likely chapter ids and expand them with scoped `list --chapter <ids>` or `page --chapter <id>`. Search mode uses `find --type <lens>` for candidate discovery and `grep --type <lens>` for exact phrases. `find` defaults to `--match any`; use `--match all` only when every keyword must appear in the same object. Reading mode uses `read` after the relevant chapter, fragment, or node has been selected.
@@ -40,8 +40,8 @@ Use the library API only when the surrounding system explicitly needs in-process
 - Creation sources: EPUB, Markdown, TXT, and text pipelines
 - Read objects: `--chapter <id>`, `--node <id>`, `--fragment <chapter>:<fragment>`, `--summary <id>`, `--meta book`
 - Cheap operations: `status`, `index`, `list`, `find`, `grep`, `page`, `read`, `links`, `backlinks`, `pack`, `export`
-- Expensive operations: graph or summary `queue add`
-- Estimate first: `spinedigest estimate <archive.sdpub> --stage summary`
+- Expensive operations: Reading Graph, Reading Summary, or Knowledge Graph `queue add`
+- Estimate first: `wikigraph estimate <archive.sdpub> --stage reading-summary`
 - JSON: pass `--json` when composing with tools
 
 ## Recommended Execution Strategy
@@ -61,14 +61,14 @@ Use the library API only when the surrounding system explicitly needs in-process
 ## Queue Workflow
 
 ```bash
-spinedigest create book.sdpub ./book.epub
-spinedigest status book.sdpub
-spinedigest estimate book.sdpub --stage summary
-spinedigest queue add book.sdpub --chapter 3 --to graph --accept-cost
-spinedigest queue watch <job-id> --jsonl
+wikigraph create book.sdpub ./book.epub
+wikigraph status book.sdpub
+wikigraph estimate book.sdpub --stage reading-summary
+wikigraph queue add book.sdpub --chapter 3 --task reading-graph --accept-cost
+wikigraph queue watch <job-id> --jsonl
 ```
 
-Create/source is the safe first step. Graph and summary stages may call an LLM provider.
+Create/source is the safe first step. Reading Graph, Reading Summary, and Knowledge Graph tasks may call an LLM provider.
 
 ## Avoid
 

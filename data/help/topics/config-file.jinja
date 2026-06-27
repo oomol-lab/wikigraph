@@ -47,7 +47,7 @@ Top-level structure:
 
 Fields:
   `prompt`
-    Default extraction prompt for graph generation.
+    Default extraction prompt for reading-graph generation.
     Type: non-empty string.
 
   `llm.provider`
@@ -119,7 +119,7 @@ Minimum LLM-backed operation config:
   }
 
 Applicability:
-  - `llm.*`, `prompt`, `paths.cacheDir`, and `request.*` matter for source digest runs and queue graph/summary jobs.
+  - `llm.*`, `prompt`, `paths.cacheDir`, and `request.*` matter for source digest runs and queue reading-graph, reading-summary, and knowledge-graph jobs.
   - `.sdpub` re-export through the main convert command does not require LLM settings.
   - `meta`, `cover`, and non-generating `chapter` maintenance commands do not require LLM settings.
   - `paths.debugLogDir` can still matter outside source digest runs when the app emits debug logs.

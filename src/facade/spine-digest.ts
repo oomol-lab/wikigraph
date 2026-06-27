@@ -114,7 +114,7 @@ export class SpineDigest {
 
       if (summary === undefined) {
         throw new Error(
-          `Chapter ${serialId} summary is missing. Run \`wikigraph queue add <archive.sdpub> --chapter ${serialId} --task summary --accept-cost\` before export, or inspect the archive with \`wikigraph index <archive.sdpub>\`.`,
+          `Chapter ${serialId} summary is missing. Run \`wikigraph queue add <archive.sdpub> --chapter ${serialId} --task reading-summary --accept-cost\` before export, or inspect the archive with \`wikigraph index <archive.sdpub>\`.`,
         );
       }
 
