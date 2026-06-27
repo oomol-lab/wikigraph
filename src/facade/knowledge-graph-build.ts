@@ -96,19 +96,20 @@ export async function generateChapterKnowledgeGraphArtifact(
     includeDisambiguation: true,
     sentences,
   });
-  const enrichedCandidates = await enrichWikimatchCandidates(rawCandidates);
   const blocklist = await WikimatchSurfaceBlocklist.open();
 
   try {
     const screenedCandidates = await screenCandidates({
       blocklist,
-      candidates: enrichedCandidates,
+      candidates: rawCandidates,
       policyPrompt: options.policyPrompt,
       request: options.request,
       text,
     });
+    const enrichedCandidates =
+      await enrichWikimatchCandidates(screenedCandidates);
     const mentions = await judgeCandidates({
-      candidates: screenedCandidates,
+      candidates: enrichedCandidates,
       chapterId,
       fragments,
       policyPrompt: options.policyPrompt,
