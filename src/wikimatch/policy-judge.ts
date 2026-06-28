@@ -133,6 +133,14 @@ export function parsePolicyResponse(
       const candidate = candidatesById.get(decision.candidateId)!;
 
       if (decision.decision === "continue") {
+        if (candidate.hasMoreOptions !== true) {
+          policyUpdates.push({
+            candidateId: candidate.id,
+            decision: "skip_this_time",
+            surface: candidate.surface,
+          });
+          continue;
+        }
         continuedCandidateIds.push(candidate.id);
         continue;
       }
@@ -243,11 +251,6 @@ export function validatePolicyResponse(
         if (decision.qid !== undefined) {
           issues.push(
             `Candidate ${candidate.id} uses decision "continue" but includes qid. Continue means this candidate page has no final choice yet.`,
-          );
-        }
-        if (candidate.hasMoreOptions !== true) {
-          issues.push(
-            `Candidate ${candidate.id} uses decision "continue", but there are no more candidate pages for "${candidate.surface}". Use recall, skip_this_time, or never_recall.`,
           );
         }
         continue;

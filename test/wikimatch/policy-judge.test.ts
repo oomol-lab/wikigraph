@@ -228,7 +228,7 @@ describe("wikimatch/policy-judge", () => {
     expect(request).toHaveBeenCalledTimes(1);
   });
 
-  it("allows continue only when the candidate page is incomplete", () => {
+  it("normalizes continue on the last candidate page to skip this time", () => {
     const input = createInput();
 
     const result = parsePolicyResponse(
@@ -266,7 +266,8 @@ describe("wikimatch/policy-judge", () => {
         groupId: "g1",
       },
     ]);
-    expect(() =>
+
+    expect(
       parsePolicyResponse(
         [input.candidates[0]!],
         {
@@ -289,8 +290,14 @@ describe("wikimatch/policy-judge", () => {
             range: input.candidates[0]!.range,
           },
         ],
-      ),
-    ).toThrow(ParsedJsonError);
+      ).policyUpdates,
+    ).toStrictEqual([
+      {
+        candidateId: "c1",
+        decision: "skip_this_time",
+        surface: "北京大学",
+      },
+    ]);
   });
 });
 
