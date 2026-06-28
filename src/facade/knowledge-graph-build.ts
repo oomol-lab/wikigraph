@@ -181,7 +181,7 @@ export async function generateChapterKnowledgeGraphArtifact(
   await options.progressTracker?.throwIfStopped();
   await options.progressTracker?.updatePhase({
     done: 0,
-    phase: "writing",
+    phase: "relation-discovery",
     total: mentions.length,
     unit: "record",
   });
@@ -202,7 +202,7 @@ export async function generateChapterKnowledgeGraphArtifact(
   });
   await options.progressTracker?.updatePhase({
     done: mentions.length,
-    phase: "writing",
+    phase: "relation-discovery",
     total: mentions.length,
     unit: "record",
   });
@@ -708,7 +708,7 @@ async function discoverMentionLinks(input: {
 
   await input.progressTracker?.updatePhase({
     done: 0,
-    phase: "writing",
+    phase: "relation-discovery",
     total: fragmentWindows.length,
     unit: "window",
   });
@@ -729,7 +729,7 @@ async function discoverMentionLinks(input: {
       completedWindows += 1;
       await input.progressTracker?.updatePhase({
         done: completedWindows,
-        phase: "writing",
+        phase: "relation-discovery",
         total: fragmentWindows.length,
         unit: "window",
       });

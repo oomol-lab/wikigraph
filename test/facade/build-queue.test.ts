@@ -270,7 +270,7 @@ describe("facade/build-queue", () => {
             await releaseCanceledJobSignal;
             await reporter.updatePhase({
               done: 1,
-              phase: "writing",
+              phase: "relation-discovery",
               total: 1,
               unit: "window",
             });

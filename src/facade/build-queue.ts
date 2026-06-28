@@ -26,8 +26,8 @@ export type BuildJobProgressPhase =
   | "grounding"
   | "matching"
   | "narrowing"
-  | "screening"
-  | "writing";
+  | "relation-discovery"
+  | "screening";
 export type BuildJobProgressUnit =
   | "candidate"
   | "page"
