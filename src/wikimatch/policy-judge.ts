@@ -13,6 +13,7 @@ import type {
   WikimatchAcceptedMention,
   WikimatchCandidate,
   WikimatchConflictGroup,
+  WikimatchPolicyContinuation,
   WikimatchQidOption,
   WikimatchPolicyDecisionOutput,
   WikimatchPolicyJudgeInput,
@@ -25,8 +26,8 @@ const policyDecisionSchema = z
   .object({
     candidateId: z.string().min(1),
     confidence: z.number().min(0).max(1).optional(),
-    decision: z.enum(["recall", "skip_this_time", "never_recall"]),
-    qid: z.string().min(1).optional(),
+    decision: z.enum(["continue", "recall", "skip_this_time", "never_recall"]),
+    qid: z.string().optional(),
   })
   .strict();
 
@@ -71,6 +72,7 @@ export async function judgeWikimatchPolicy(
     });
   } catch (error) {
     return {
+      continuations: [],
       fallback: {
         issues: [formatFallbackIssue(error)],
         reason: "guaranteed_json_failed",
@@ -92,12 +94,22 @@ function normalizePolicyResponse(
           ? {}
           : { confidence: decision.confidence }),
         decision: decision.decision,
-        ...(decision.qid === undefined ? {} : { qid: decision.qid }),
+        ...normalizeDecisionQid(decision.qid),
       })),
       groupId: group.groupId,
       ...(group.note === undefined ? {} : { note: group.note }),
     })),
   };
+}
+
+function normalizeDecisionQid(qid: string | undefined): {
+  readonly qid?: string;
+} {
+  const normalized = qid?.trim();
+
+  return normalized === undefined || normalized === ""
+    ? {}
+    : { qid: normalized };
 }
 
 export function parsePolicyResponse(
@@ -112,12 +124,20 @@ export function parsePolicyResponse(
   }
 
   const candidatesById = createCandidateMap(candidates);
+  const continuations: WikimatchPolicyContinuation[] = [];
   const mentions: WikimatchAcceptedMention[] = [];
   const policyUpdates: WikimatchPolicyUpdate[] = [];
 
   for (const group of response.groups) {
+    const continuedCandidateIds: string[] = [];
+
     for (const decision of group.decisions) {
       const candidate = candidatesById.get(decision.candidateId)!;
+
+      if (decision.decision === "continue") {
+        continuedCandidateIds.push(candidate.id);
+        continue;
+      }
 
       if (decision.decision === "recall") {
         mentions.push({
@@ -141,9 +161,17 @@ export function parsePolicyResponse(
         surface: candidate.surface,
       });
     }
+
+    if (continuedCandidateIds.length > 0) {
+      continuations.push({
+        candidateIds: continuedCandidateIds,
+        groupId: group.groupId,
+      });
+    }
   }
 
   return {
+    continuations,
     mentions,
     policyUpdates,
   };
@@ -215,11 +243,24 @@ export function validatePolicyResponse(
         continue;
       }
 
-      if (
-        decision.qid !== undefined &&
-        !isAllowedQid(candidate, decision.qid)
-      ) {
-        issues.push(formatIllegalQidIssue(candidate, decision.qid));
+      if (decision.decision === "continue") {
+        if (decision.qid !== undefined) {
+          issues.push(
+            `Candidate ${candidate.id} uses decision "continue" but includes qid. Continue means this candidate page has no final choice yet.`,
+          );
+        }
+        if (candidate.hasMoreOptions !== true) {
+          issues.push(
+            `Candidate ${candidate.id} uses decision "continue", but there are no more candidate pages for "${candidate.surface}". Use recall, skip_this_time, or never_recall.`,
+          );
+        }
+        continue;
+      }
+
+      if (decision.qid !== undefined) {
+        issues.push(
+          `Candidate ${candidate.id} uses decision "${decision.decision}" but includes qid. Include qid only when decision is "recall".`,
+        );
       }
     }
   }
@@ -370,8 +411,13 @@ function formatPolicySystemPrompt(input: WikimatchPolicyJudgeInput): string {
     "- Return JSON only.",
     "- Return exactly one group result for every input group.",
     "- Use decisions: [] only when this group has no selected mention and no policy update.",
+    "- Candidate lists may be incomplete when a candidate has more pages.",
+    '- Use decision "continue" only when the current candidate page has no good QID but more pages are available.',
+    '- "continue" is not a rejection. It asks to inspect the next candidate page for that candidate.',
+    '- If a surface should be recalled but the current incomplete page lacks a suitable QID, use "continue" instead of skip_this_time.',
     "- Do not invent candidates, ranges, surfaces, or QIDs.",
     "- A recalled mention must choose a QID from entityOptions or disambiguationOptions.meanings.",
+    '- Include qid only when decision is "recall"; do not include qid for continue, skip_this_time, or never_recall.',
     "- Never return DIS identifiers as qid values; DIS identifiers are only disambiguation references.",
     "- Overlapping recalled ranges are illegal; choose the most specific valid mention.",
   ].join("\n");
@@ -394,8 +440,8 @@ function formatPolicyPrompt(input: WikimatchPolicyJudgeInput): string {
               {
                 candidateId: "candidate id from this group",
                 confidence: 0.9,
-                decision: "recall | skip_this_time | never_recall",
-                qid: "required only for recall; optional for non-recall",
+                decision: "recall | continue | skip_this_time | never_recall",
+                qid: "required only when decision is recall",
               },
             ],
             groupId: "group id from the input",
@@ -466,6 +512,7 @@ export function formatCandidateForPrompt(
 
   return {
     candidateId: candidate.id,
+    ...(candidate.hasMoreOptions === true ? { hasMoreOptions: true } : {}),
     ...(formattedOptions.disambiguationOptions.length === 0
       ? {}
       : { disambiguationOptions: formattedOptions.disambiguationOptions }),

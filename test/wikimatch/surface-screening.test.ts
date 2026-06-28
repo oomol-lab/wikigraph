@@ -2,120 +2,82 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { GuaranteedRequest } from "../../src/guaranteed/index.js";
 import {
-  buildWikimatchSurfaceWindows,
-  judgeWikimatchSurfaceScreening,
-  parseSurfaceScreeningResponse,
-  type WikimatchCandidate,
+  judgeWikimatchSurfaceProtection,
+  parseSurfaceProtectionResponse,
+  type WikimatchSurface,
 } from "../../src/wikimatch/index.js";
 import { ParsedJsonError } from "../../src/guaranteed/index.js";
 
 describe("wikimatch/surface-screening", () => {
-  it("screens plain surfaces without qids", async () => {
-    const input = createInput();
+  it("asks the model to protect useful high-frequency surfaces only", async () => {
     const request = vi.fn<GuaranteedRequest>().mockResolvedValue(
       JSON.stringify({
-        surfaces: [
+        protectedSurfaces: [
           {
-            decision: "allow",
-            note: "神学语境",
-            surfaceId: "s1",
-          },
-          {
-            decision: "global_blocklist_candidate",
-            note: "纯数字",
+            note: "人物",
             surfaceId: "s2",
           },
         ],
       }),
     );
 
-    const result = await judgeWikimatchSurfaceScreening({
-      ...input,
+    const result = await judgeWikimatchSurfaceProtection({
+      policyPrompt: "只召回主线人物和关键地点。",
       request,
+      suspiciousSurfaces: createSurfaces(),
     });
 
     expect(request.mock.calls[0]?.[0][0]?.content).toContain(
-      "User recall policy:\n只召回神学实体。",
+      "A surface that is not protected will be removed before grounding.",
     );
-    expect(request.mock.calls[0]?.[0][1]?.content).toContain("Context:");
     expect(request.mock.calls[0]?.[0][1]?.content).toContain(
-      '"surfaceId": "s1"',
+      "Suspicious high-frequency surfaces:",
     );
-    expect(request.mock.calls[0]?.[0][1]?.content).not.toContain("qid");
-    expect(result.surfaces).toStrictEqual([
+    expect(request.mock.calls[0]?.[0][1]?.content).toContain(
+      '"protectedSurfaces"',
+    );
+    expect(request.mock.calls[0]?.[0][1]?.content).not.toContain(
+      "skip_this_time",
+    );
+    expect(result.protectedSurfaces).toStrictEqual([
       {
-        decision: "allow",
-        note: "神学语境",
-        surfaceId: "s1",
-        text: "恩典",
-      },
-      {
-        decision: "global_blocklist_candidate",
-        note: "纯数字",
+        note: "人物",
         surfaceId: "s2",
-        text: "1234",
+        text: "陈友谅",
       },
     ]);
   });
 
-  it("rejects missing surface results", () => {
-    const input = createInput();
-
+  it("rejects protected surface ids outside the suspicious pool", () => {
     try {
-      parseSurfaceScreeningResponse(input.window.surfaces, {
-        surfaces: [
+      parseSurfaceProtectionResponse(createSurfaces(), {
+        protectedSurfaces: [
           {
-            decision: "allow",
-            surfaceId: "s1",
+            surfaceId: "missing",
           },
         ],
       });
-      throw new Error("Expected parseSurfaceScreeningResponse to fail");
+      throw new Error("Expected parseSurfaceProtectionResponse to fail");
     } catch (error) {
       expect(error).toBeInstanceOf(ParsedJsonError);
       expect((error as ParsedJsonError).issues[0]).toContain(
-        "Missing result for s2",
+        'Unknown surfaceId "missing"',
       );
     }
   });
 });
 
-function createInput(): {
-  readonly policyPrompt: string;
-  readonly window: ReturnType<typeof buildWikimatchSurfaceWindows>[number];
-} {
-  const text = "恩典在神学语境中很重要。1234 不重要。";
-  const candidates: WikimatchCandidate[] = [
-    candidate("c1", "恩典", 0, 2),
-    candidate("c2", "1234", 13, 17),
+function createSurfaces(): readonly WikimatchSurface[] {
+  return [
+    {
+      count: 302,
+      id: "s1",
+      text: "的",
+    },
+    {
+      count: 87,
+      id: "s2",
+      text: "陈友谅",
+    },
   ];
-  const [window] = buildWikimatchSurfaceWindows({
-    candidates,
-    contextWords: 20,
-    surfaceBudget: 10,
-    text,
-  });
-
-  if (window === undefined) {
-    throw new Error("Missing test window");
-  }
-
-  return {
-    policyPrompt: "只召回神学实体。",
-    window,
-  };
-}
-
-function candidate(
-  id: string,
-  surface: string,
-  start: number,
-  end: number,
-): WikimatchCandidate {
-  return {
-    id,
-    qidOptions: [],
-    range: { end, start },
-    surface,
-  };
 }

@@ -7,6 +7,7 @@ import {
   listArchiveCollection,
   listArchiveEvidence,
   listArchiveObjects,
+  listRelatedArchiveObjects,
   readArchiveText,
   readArchivePage,
 } from "../../src/facade/archive-view.js";
@@ -107,7 +108,7 @@ describe("facade/archive-view", () => {
               shown: 1,
               sources: [
                 expect.objectContaining({
-                  id: "wikigraph://source/chapter/1/fragment/0#0..0",
+                  id: "wikigraph://chapter/1/source/0#0..0",
                   source:
                     "An LLM Wiki exposes pages, links, and source fragments to agents.",
                 }),
@@ -647,16 +648,144 @@ describe("facade/archive-view", () => {
 
       try {
         await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(2)
+            .createDraft();
+
+          draft.addSentence("Second chapter repeats LLM Wiki.", 5);
+          await draft.commit();
+          await openedDocument.chunks.save({
+            content: "Second chapter chunk.",
+            generation: 0,
+            id: 200,
+            label: "Second chunk",
+            sentenceId: [2, 0, 0],
+            sentenceIds: [[2, 0, 0]],
+            wordsCount: 3,
+            weight: 1,
+          });
+          await openedDocument.writeSummary(2, "Second summary.");
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "m1",
+              qid: "Q1",
+              rangeEnd: 11,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "LLM Wiki",
+            },
+            {
+              chapterId: 2,
+              fragmentId: 0,
+              id: "m2",
+              qid: "Q1",
+              rangeEnd: 26,
+              rangeStart: 15,
+              sentenceIndex: 0,
+              surface: "LLM Wiki",
+            },
+            {
+              chapterId: 2,
+              fragmentId: 0,
+              id: "m3",
+              qid: "Q2",
+              rangeEnd: 14,
+              rangeStart: 7,
+              sentenceIndex: 0,
+              surface: "chapter",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceEnd: 32,
+            evidenceStart: 0,
+            id: "l1",
+            predicate: "mentions",
+            sourceMentionId: "m2",
+            targetMentionId: "m3",
+          });
+          await openedDocument.replaceToc({
+            items: [
+              {
+                children: [],
+                serialId: 1,
+                title: "Introduction",
+              },
+              {
+                children: [],
+                serialId: 2,
+                title: "Second",
+              },
+            ],
+            version: 1,
+          });
+        });
 
         const result = await listArchiveCollection(document, {
           chapters: [1],
-          types: ["node"],
+          types: ["chapter", "entity", "fragment", "node", "summary", "triple"],
         });
 
-        expect(result.items).toStrictEqual([
-          expect.objectContaining({ id: "node:100", type: "node" }),
-          expect.objectContaining({ id: "node:101", type: "node" }),
-        ]);
+        expect(result.items.map((item) => item.id)).toEqual(
+          expect.arrayContaining([
+            "chapter:1",
+            "wikigraph://entity/Q1",
+            "fragment:1:0",
+            "node:100",
+            "node:101",
+            "summary:1",
+          ]),
+        );
+        expect(result.items.map((item) => item.id)).not.toEqual(
+          expect.arrayContaining([
+            "chapter:2",
+            "node:200",
+            "summary:2",
+            "wikigraph://triple/Q1/mentions/Q2",
+          ]),
+        );
+
+        const scopedSecond = await listArchiveCollection(document, {
+          chapters: [2],
+          types: ["entity", "triple"],
+        });
+
+        expect(scopedSecond.items).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              chapter: 2,
+              id: "wikigraph://entity/Q1",
+              type: "entity",
+            }),
+            expect.objectContaining({
+              chapter: 2,
+              id: "wikigraph://triple/Q1/mentions/Q2",
+              type: "triple",
+            }),
+          ]),
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("rejects malformed top-level chunk and entity URIs", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(
+          readArchivePage(document, "wikigraph://chunk/100/extra"),
+        ).rejects.toThrow("Invalid Wiki Graph URI");
+        await expect(
+          readArchivePage(document, "wikigraph://entity/Q1/extra"),
+        ).rejects.toThrow("Invalid Wiki Graph URI");
       } finally {
         await document.release();
       }
@@ -754,7 +883,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wikigraph://source/chapter/1/fragment/0#0..0",
+              id: "wikigraph://chapter/1/source/0#0..0",
               source:
                 "An LLM Wiki exposes pages, links, and source fragments to agents.",
               type: "source",
@@ -766,7 +895,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wikigraph://source/chapter/1/fragment/0#0..0",
+              id: "wikigraph://chapter/1/source/0#0..0",
               type: "source",
             },
           ],
@@ -776,7 +905,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wikigraph://source/chapter/1/fragment/0#0..0",
+              id: "wikigraph://chapter/1/source/0#0..0",
               type: "source",
             },
           ],
@@ -788,7 +917,7 @@ describe("facade/archive-view", () => {
             shown: 1,
             sources: [
               {
-                id: "wikigraph://source/chapter/1/fragment/0#0..0",
+                id: "wikigraph://chapter/1/source/0#0..0",
                 type: "source",
               },
             ],
@@ -807,7 +936,7 @@ describe("facade/archive-view", () => {
             shown: 1,
             sources: [
               {
-                id: "wikigraph://source/chapter/1/fragment/0#0..0",
+                id: "wikigraph://chapter/1/source/0#0..0",
                 type: "source",
               },
             ],
@@ -820,36 +949,54 @@ describe("facade/archive-view", () => {
           type: "triple",
         });
         await expect(
+          listRelatedArchiveObjects(document, "wikigraph://entity/Q1"),
+        ).resolves.toStrictEqual([
+          {
+            id: "wikigraph://triple/Q1/mentions/Q2",
+            label: "LLM Wiki mentions agents",
+            summary: "Q1 mentions Q2",
+            type: "triple",
+          },
+        ]);
+        await expect(
+          listRelatedArchiveObjects(
+            document,
+            "wikigraph://triple/Q1/mentions/Q2",
+          ),
+        ).resolves.toStrictEqual([
+          {
+            id: "wikigraph://entity/Q1",
+            label: "LLM Wiki",
+            summary: "1 mentions",
+            type: "entity",
+          },
+          {
+            id: "wikigraph://entity/Q2",
+            label: "agents",
+            summary: "1 mentions",
+            type: "entity",
+          },
+        ]);
+        await expect(
           listArchiveEvidence(document, "wikigraph://entity/Q3"),
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wikigraph://source/chapter/1/fragment/1#1..1",
+              id: "wikigraph://chapter/1/source/1#1..1",
               source: "Second fragment mentions Augustine.",
               type: "source",
             },
           ],
         });
         await expect(
-          listArchiveEvidence(
-            document,
-            "wikigraph://source/chapter/1/fragment/1#1..1",
-          ),
-        ).resolves.toMatchObject({
-          items: [
-            {
-              id: "wikigraph://source/chapter/1/fragment/1#1..1",
-              source: "Second fragment mentions Augustine.",
-              type: "source",
-            },
-          ],
-        });
+          listArchiveEvidence(document, "wikigraph://chapter/1/source/1#1..1"),
+        ).rejects.toThrow("Evidence is not available");
         await expect(
           listArchiveEvidence(document, "wikigraph://entity/Q4"),
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wikigraph://source/chapter/1/fragment/0#2..2",
+              id: "wikigraph://chapter/1/source/0#2..2",
               type: "source",
             },
           ],

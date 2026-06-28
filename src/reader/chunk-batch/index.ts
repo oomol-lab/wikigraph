@@ -2,6 +2,9 @@ export {
   extractBookCoherenceChunkBatch,
   extractUserFocusedChunkBatch,
 } from "./extract.js";
+export { EvidenceResolver } from "./evidence-resolver.js";
+export { FragmentProjection } from "./fragment-projection.js";
+export type { TextSpan } from "./fragment-projection.js";
 export type {
   ChunkBatch,
   ChunkBatchOptions,
@@ -17,3 +20,8 @@ export type {
   ExtractUserFocusedResult,
   SentenceTextSource,
 } from "./types.js";
+export type {
+  EvidenceResolutionFailure,
+  EvidenceResolutionResult,
+  RankedSentenceCandidate,
+} from "./evidence-types.js";

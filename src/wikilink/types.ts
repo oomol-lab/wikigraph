@@ -2,7 +2,9 @@ import type { WikimatchTextRange } from "../wikimatch/index.js";
 
 export interface WikilinkMention {
   readonly id: string;
+  readonly qid?: string;
   readonly range: WikimatchTextRange;
+  readonly surface?: string;
 }
 
 export interface WikilinkEvidenceWindow {
