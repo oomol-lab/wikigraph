@@ -43,39 +43,29 @@ describe("facade/knowledge-graph-build", () => {
 
   it("grounds oversized candidate pages without narrowing", async () => {
     const updates: unknown[] = [];
-    const request = vi
-      .fn<GuaranteedRequest>()
-      .mockResolvedValueOnce(
+    const request = vi.fn<GuaranteedRequest>().mockImplementation((messages) =>
+      Promise.resolve(
         JSON.stringify({
           groups: [
             {
               decisions: [
-                {
-                  candidateId: "c1",
-                  decision: "continue",
-                },
+                readUserPrompt(messages).includes('"qid": "Q40"')
+                  ? {
+                      candidateId: "c1",
+                      decision: "recall",
+                      qid: "Q40",
+                    }
+                  : {
+                      candidateId: "c1",
+                      decision: "continue",
+                    },
               ],
               groupId: "g1",
             },
           ],
         }),
-      )
-      .mockResolvedValueOnce(
-        JSON.stringify({
-          groups: [
-            {
-              decisions: [
-                {
-                  candidateId: "c1",
-                  decision: "recall",
-                  qid: "Q40",
-                },
-              ],
-              groupId: "g1",
-            },
-          ],
-        }),
-      );
+      ),
+    );
 
     const mentions = await groundWikimatchCandidates({
       candidates: [
@@ -113,9 +103,12 @@ describe("facade/knowledge-graph-build", () => {
       text: "舰队发动攻击。",
     });
 
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenCalledTimes(4);
     expect(request.mock.calls[0]?.[0][1]?.content).toContain(
       '"hasMoreOptions": true',
+    );
+    expect(request.mock.calls[0]?.[0][1]?.content).not.toContain(
+      '"qid": "Q6"',
     );
     expect(mentions).toStrictEqual([
       {
@@ -128,6 +121,12 @@ describe("facade/knowledge-graph-build", () => {
     expect(updates).not.toContainEqual(
       expect.objectContaining({ phase: "narrowing" }),
     );
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        phase: "grounding",
+        phaseDetail: "efficiency qid/mention=40.0 qids=40 mentions=1 pages=4",
+      }),
+    );
   });
 
   it("does not repeat shown qids when recall history changes paging order", async () => {
@@ -135,22 +134,26 @@ describe("facade/knowledge-graph-build", () => {
       .fn<GuaranteedRequest>()
       .mockImplementation((messages) => {
         const prompt = readUserPrompt(messages);
+        const groups = readCandidateGroups(prompt);
 
         if (prompt.includes('"candidateId": "history"')) {
           return Promise.resolve(
             JSON.stringify({
-              groups: [
-                {
-                  decisions: [
-                    {
-                      candidateId: "history",
-                      decision: "recall",
-                      qid: "Q2",
-                    },
-                  ],
-                  groupId: "g1",
-                },
-              ],
+              groups: groups.map((group) => ({
+                decisions: group.candidates.map((candidate) =>
+                  candidate.candidateId === "history"
+                    ? {
+                        candidateId: "history",
+                        decision: "recall",
+                        qid: "Q2",
+                      }
+                    : {
+                        candidateId: candidate.candidateId,
+                        decision: "continue",
+                      },
+                ),
+                groupId: group.groupId,
+              })),
             }),
           );
         }
@@ -158,35 +161,27 @@ describe("facade/knowledge-graph-build", () => {
         if (prompt.includes('"qid": "Q41"')) {
           return Promise.resolve(
             JSON.stringify({
-              groups: [
-                {
-                  decisions: [
-                    {
-                      candidateId: "paged",
-                      decision: "recall",
-                      qid: "Q41",
-                    },
-                  ],
-                  groupId: "g1",
-                },
-              ],
+              groups: groups.map((group) => ({
+                decisions: group.candidates.map((candidate) => ({
+                  candidateId: candidate.candidateId,
+                  decision: "recall",
+                  qid: "Q41",
+                })),
+                groupId: group.groupId,
+              })),
             }),
           );
         }
 
         return Promise.resolve(
           JSON.stringify({
-            groups: [
-              {
-                decisions: [
-                  {
-                    candidateId: "paged",
-                    decision: "continue",
-                  },
-                ],
-                groupId: "g1",
-              },
-            ],
+            groups: groups.map((group) => ({
+              decisions: group.candidates.map((candidate) => ({
+                candidateId: candidate.candidateId,
+                decision: "continue",
+              })),
+              groupId: group.groupId,
+            })),
           }),
         );
       });
@@ -195,7 +190,10 @@ describe("facade/knowledge-graph-build", () => {
       candidates: [
         {
           id: "history",
-          qidOptions: [{ qid: "Q2" }],
+          qidOptions: Array.from({ length: 31 }, (_value, index) => ({
+            label: `History ${index + 1}`,
+            qid: `Q${index + 1}`,
+          })),
           range: { end: 2, start: 0 },
           surface: "舰队",
         },
@@ -237,6 +235,81 @@ describe("facade/knowledge-graph-build", () => {
         },
       ]),
     );
+  });
+
+  it("uses slower continued pages after strong surface prior", async () => {
+    const request = vi.fn<GuaranteedRequest>().mockImplementation((messages) => {
+      const prompt = readUserPrompt(messages);
+      const groups = readCandidateGroups(prompt);
+
+      return Promise.resolve(
+        JSON.stringify({
+          groups: groups.map((group) => ({
+            decisions: group.candidates.map((candidate) => {
+              if (prompt.includes('"qid": "Q6"')) {
+                return {
+                  candidateId: candidate.candidateId,
+                  decision: "recall",
+                  qid: "Q6",
+                };
+              }
+
+              return candidate.candidateId === "c4"
+                ? {
+                    candidateId: "c4",
+                    decision: "continue",
+                  }
+                : {
+                    candidateId: candidate.candidateId,
+                    decision: "never_recall",
+                  };
+            }),
+            groupId: group.groupId,
+          })),
+        }),
+      );
+    });
+
+    await groundWikimatchCandidates({
+      candidates: [
+        {
+          id: "c1",
+          qidOptions: [{ qid: "Q1" }],
+          range: { end: 2, start: 0 },
+          surface: "舰队",
+        },
+        {
+          id: "c2",
+          qidOptions: [{ qid: "Q1" }],
+          range: { end: 5, start: 3 },
+          surface: "舰队",
+        },
+        {
+          id: "c3",
+          qidOptions: [{ qid: "Q1" }],
+          range: { end: 8, start: 6 },
+          surface: "舰队",
+        },
+        {
+          id: "c4",
+          qidOptions: Array.from({ length: 12 }, (_value, index) => ({
+            label: `Option ${index + 1}`,
+            qid: `Q${index + 1}`,
+          })),
+          range: { end: 11, start: 9 },
+          surface: "舰队",
+        },
+      ],
+      policyPrompt: "召回历史叙事中的实体。",
+      request,
+      text: "舰队 舰队 舰队 舰队",
+    });
+
+    const prompt = readUserPrompt(request.mock.calls[1]![0]);
+
+    expect(prompt).toContain('"candidateId": "c4"');
+    expect(prompt).toContain('"qid": "Q10"');
+    expect(prompt).not.toContain('"qid": "Q11"');
   });
 
   it("commits chapter mention evidence from JSONL artifacts", async () => {
@@ -415,4 +488,24 @@ function readUserPrompt(messages: Parameters<GuaranteedRequest>[0]): string {
   const content = messages[1]?.content;
 
   return typeof content === "string" ? content : "";
+}
+
+function readCandidateGroups(prompt: string): Array<{
+  readonly candidates: Array<{ readonly candidateId: string }>;
+  readonly groupId: string;
+}> {
+  const match = /Candidate groups:\n(?<groups>[\s\S]+?)\n\nReturn this JSON shape:/u.exec(
+    prompt,
+  );
+
+  const groupsJson = match?.groups?.["groups"];
+
+  if (groupsJson === undefined) {
+    throw new Error("Missing candidate groups in prompt.");
+  }
+
+  return JSON.parse(groupsJson) as Array<{
+    readonly candidates: Array<{ readonly candidateId: string }>;
+    readonly groupId: string;
+  }>;
 }
