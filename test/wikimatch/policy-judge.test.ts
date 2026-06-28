@@ -53,7 +53,6 @@ describe("wikimatch/policy-judge", () => {
                 },
               ],
               groupId: "g1",
-              note: "整体实体",
             },
             {
               decisions: [],
@@ -76,7 +75,6 @@ describe("wikimatch/policy-judge", () => {
           end: 9,
           start: 5,
         },
-        note: "整体实体",
         surface: "北京大学",
       },
     ]);
@@ -84,7 +82,6 @@ describe("wikimatch/policy-judge", () => {
       {
         candidateId: "c2",
         decision: "skip_this_time",
-        note: "整体实体",
         surface: "北京",
       },
     ]);
@@ -135,6 +132,7 @@ describe("wikimatch/policy-judge", () => {
       "isDisambiguation",
     );
     expect(request.mock.calls[0]?.[0][1]?.content).not.toContain('"range"');
+    expect(request.mock.calls[0]?.[0][1]?.content).not.toContain('"note"');
     expect(result).toMatchObject({
       fallback: {
         reason: "guaranteed_json_failed",

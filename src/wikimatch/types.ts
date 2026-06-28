@@ -176,7 +176,6 @@ export interface WikimatchPolicyDecisionOutput {
 export interface WikimatchPolicyGroupOutput {
   readonly decisions: readonly WikimatchPolicyDecisionOutput[];
   readonly groupId: string;
-  readonly note?: string;
 }
 
 export interface WikimatchPolicyResponse {

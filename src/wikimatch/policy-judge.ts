@@ -35,7 +35,6 @@ const policyGroupSchema = z
   .object({
     decisions: z.array(policyDecisionSchema),
     groupId: z.string().min(1),
-    note: z.string().max(24).optional(),
   })
   .strict();
 
@@ -97,7 +96,6 @@ function normalizePolicyResponse(
         ...normalizeDecisionQid(decision.qid),
       })),
       groupId: group.groupId,
-      ...(group.note === undefined ? {} : { note: group.note }),
     })),
   };
 }
@@ -145,7 +143,6 @@ export function parsePolicyResponse(
           ...(decision.confidence === undefined
             ? {}
             : { confidence: decision.confidence }),
-          ...(group.note === undefined ? {} : { note: group.note }),
           qid: decision.qid!,
           range: candidate.range,
           surface: candidate.surface,
@@ -156,7 +153,6 @@ export function parsePolicyResponse(
       policyUpdates.push({
         candidateId: candidate.id,
         decision: decision.decision,
-        ...(group.note === undefined ? {} : { note: group.note }),
         ...(decision.qid === undefined ? {} : { qid: decision.qid }),
         surface: candidate.surface,
       });
@@ -449,7 +445,6 @@ function formatPolicyPrompt(input: WikimatchPolicyJudgeInput): string {
               },
             ],
             groupId: "group id from the input",
-            note: "optional, <= 12 Chinese chars or 6 English words",
           },
         ],
       },
