@@ -741,7 +741,6 @@ async function discoverMentionLinks(input: {
     evidenceEnd: link.evidenceEnd,
     evidenceStart: link.evidenceStart,
     id: `l${input.fragments[0]?.serialId ?? 0}-${index + 1}`,
-    ...(link.note === undefined ? {} : { note: link.note }),
     predicate: link.predicate,
     sourceMentionId: link.sourceMentionId,
     targetMentionId: link.targetMentionId,

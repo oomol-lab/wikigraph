@@ -23,7 +23,6 @@ export interface WikilinkDiscoveredRelation {
   readonly confidence?: number;
   readonly evidenceEnd: number;
   readonly evidenceStart: number;
-  readonly note?: string;
   readonly predicate: string;
   readonly sourceMentionId: string;
   readonly targetMentionId: string;
@@ -56,7 +55,6 @@ const relationSchema = z
         start_anchor: z.union([z.string(), evidenceAnchorSchema]),
       })
       .strict(),
-    note: z.string().max(80).optional(),
     predicate: z.string().min(1).max(64),
     sourceMentionId: z.string().min(1),
     targetMentionId: z.string().min(1),
@@ -269,7 +267,6 @@ function parseRelationResponse(
         : { confidence: relation.confidence }),
       evidenceEnd: endOffset,
       evidenceStart: startOffset,
-      ...(relation.note === undefined ? {} : { note: relation.note }),
       predicate,
       sourceMentionId: source.id,
       targetMentionId: target.id,
@@ -349,7 +346,6 @@ function formatRelationUserPrompt(
                 text: "exact original source quote",
               },
             },
-            note: "optional short reason",
             predicate: "predicate_name",
             sourceMentionId: "source mention id",
             targetMentionId: "target mention id",
