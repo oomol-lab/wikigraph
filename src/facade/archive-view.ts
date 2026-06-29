@@ -1422,7 +1422,7 @@ export async function listArchiveEvidence(
     case "triple":
       return await createSourceEvidencePage(
         document,
-        await createMentionLinkEvidenceRanges(
+        createMentionLinkEvidenceRanges(
           document,
           await filterMentionLinksByChapter(
             document,
@@ -2713,84 +2713,28 @@ async function createMentionLinkEvidencePreview(
 ): Promise<ArchiveFindEvidencePreview> {
   return await createSourceEvidencePreview(
     document,
-    await createMentionLinkEvidenceRanges(document, links),
+    createMentionLinkEvidenceRanges(document, links),
     limit,
   );
 }
 
-async function createMentionLinkEvidenceRanges(
-  document: ReadonlyDocument,
+function createMentionLinkEvidenceRanges(
+  _document: ReadonlyDocument,
   links: readonly MentionLinkRecord[],
-): Promise<
-  Array<{
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly startSentenceIndex: number;
-  }>
-> {
-  return (
-    await Promise.all(
-      links.map(async (link) => {
-        const [source, target] = await Promise.all([
-          document.mentions.getById(link.sourceMentionId),
-          document.mentions.getById(link.targetMentionId),
-        ]);
-
-        if (source === undefined || target === undefined) {
-          return undefined;
-        }
-
-        const chapterId = source.chapterId;
-        const fragmentId = source.fragmentId;
-        const sourceSentenceIndex =
-          source.sentenceIndex ??
-          (await findSentenceIndexAtOffset(
-            document,
-            chapterId,
-            fragmentId,
-            source.rangeStart,
-          ));
-        const targetSentenceIndex =
-          target.chapterId === chapterId && target.fragmentId === fragmentId
-            ? (target.sentenceIndex ??
-              (await findSentenceIndexAtOffset(
-                document,
-                chapterId,
-                fragmentId,
-                target.rangeStart,
-              )))
-            : sourceSentenceIndex;
-        const evidenceStart = link.evidenceStart;
-        const evidenceEnd = link.evidenceEnd;
-        const startSentenceIndex =
-          evidenceStart === undefined
-            ? Math.min(sourceSentenceIndex, targetSentenceIndex)
-            : await findSentenceIndexAtOffset(
-                document,
-                chapterId,
-                fragmentId,
-                evidenceStart,
-              );
-        const endSentenceIndex =
-          evidenceEnd === undefined
-            ? Math.max(sourceSentenceIndex, targetSentenceIndex)
-            : await findSentenceIndexAtOffset(
-                document,
-                chapterId,
-                fragmentId,
-                Math.max(0, evidenceEnd - 1),
-              );
-
-        return {
-          chapterId,
-          endSentenceIndex,
-          fragmentId,
-          startSentenceIndex,
-        };
-      }),
-    )
-  ).filter(isDefined);
+): Array<{
+  readonly chapterId: number;
+  readonly endSentenceIndex: number;
+  readonly fragmentId: number;
+  readonly startSentenceIndex: number;
+}> {
+  return links.flatMap((link) =>
+    link.evidenceSentenceIds.map(([chapterId, fragmentId, sentenceIndex]) => ({
+      chapterId,
+      endSentenceIndex: sentenceIndex,
+      fragmentId,
+      startSentenceIndex: sentenceIndex,
+    })),
+  );
 }
 
 function filterMentionsByChapter(

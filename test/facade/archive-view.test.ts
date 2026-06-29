@@ -688,6 +688,7 @@ describe("facade/archive-view", () => {
             },
           ]);
           await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 0, 2]],
             id: "triple-link",
             predicate: "mentions",
             sourceMentionId: "triple-source",
@@ -746,6 +747,7 @@ describe("facade/archive-view", () => {
           ]);
           await openedDocument.mentionLinks.saveMany(
             Array.from({ length: 11 }, (_, index) => ({
+              evidenceSentenceIds: [[1, 0, index]],
               id: `link-${index}`,
               predicate: "supports",
               sourceMentionId: `source-${index}`,
@@ -1275,8 +1277,7 @@ describe("facade/archive-view", () => {
             },
           ]);
           await openedDocument.mentionLinks.save({
-            evidenceEnd: 32,
-            evidenceStart: 0,
+            evidenceSentenceIds: [[2, 0, 0]],
             id: "l1",
             predicate: "mentions",
             sourceMentionId: "m2",
@@ -1522,8 +1523,7 @@ describe("facade/archive-view", () => {
             },
           ]);
           await openedDocument.mentionLinks.save({
-            evidenceEnd: 65,
-            evidenceStart: 0,
+            evidenceSentenceIds: [[1, 0, 0]],
             id: "l1",
             predicate: "mentions",
             sourceMentionId: "m1",

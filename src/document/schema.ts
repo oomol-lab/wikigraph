@@ -117,13 +117,23 @@ export const SCHEMA_SQL = `
     source_mention_id TEXT NOT NULL,
     target_mention_id TEXT NOT NULL,
     predicate TEXT NOT NULL,
-    evidence_start INTEGER,
-    evidence_end INTEGER,
     confidence REAL,
     note TEXT,
     FOREIGN KEY (source_mention_id) REFERENCES mentions(id),
     FOREIGN KEY (target_mention_id) REFERENCES mentions(id)
   );
+
+  CREATE TABLE IF NOT EXISTS mention_link_evidence_sentences (
+    link_id TEXT NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    fragment_id INTEGER NOT NULL,
+    sentence_index INTEGER NOT NULL,
+    FOREIGN KEY (link_id) REFERENCES mention_links(id),
+    PRIMARY KEY (link_id, chapter_id, fragment_id, sentence_index)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_mention_link_evidence_sentences_sentence
+  ON mention_link_evidence_sentences(chapter_id, fragment_id, sentence_index);
 
   CREATE INDEX IF NOT EXISTS idx_mention_links_source
   ON mention_links(source_mention_id);
