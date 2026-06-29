@@ -148,6 +148,7 @@ export type CLIArchiveAction =
   | "get"
   | "index"
   | "list"
+  | "next"
   | "pack"
   | "related"
   | "search";
@@ -162,6 +163,7 @@ export interface CLIArchiveArguments {
   readonly chapterId?: number;
   readonly confirm?: boolean;
   readonly cursor?: string;
+  readonly evidenceLimit?: number;
   readonly format?: CLIResultFormat;
   readonly inputFormat?: CLIFormat;
   readonly json?: boolean;
@@ -209,6 +211,7 @@ interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly cursor?: string;
   readonly "digest-dir"?: string;
   readonly "dry-run"?: boolean;
+  readonly evidence?: string;
   readonly first?: boolean;
   readonly from?: string;
   readonly help?: boolean;
@@ -306,7 +309,7 @@ export function parseCLIArguments(
 ): ParsedCLIArguments {
   const { positionals, values } = parseArgs({
     allowPositionals: true,
-    args: argv,
+    args: normalizeEvidenceFlagArgv(argv),
     options: {
       author: {
         multiple: true,
@@ -422,6 +425,9 @@ export function parseCLIArguments(
         type: "boolean",
       },
       cursor: {
+        type: "string",
+      },
+      evidence: {
         type: "string",
       },
       parent: {
@@ -546,6 +552,7 @@ function parseTransformArguments(
   rejectTransformFlag("chapter", values.chapter, helpRoute);
   rejectTransformFlag("confirm", values.confirm, helpRoute);
   rejectTransformFlag("cursor", values.cursor, helpRoute);
+  rejectTransformFlag("evidence", values.evidence, helpRoute);
   rejectTransformFlag("json", values.json, helpRoute);
   rejectTransformFlag("limit", values.limit, helpRoute);
   rejectTransformFlag("parent", values.parent, helpRoute);
@@ -1120,6 +1127,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
@@ -1150,6 +1158,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
@@ -1171,6 +1180,7 @@ function parseArchiveArguments(
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
@@ -1187,6 +1197,7 @@ function parseArchiveArguments(
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
@@ -1221,6 +1232,7 @@ function parseArchiveArguments(
           action,
           archivePath,
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
+          ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           ...(values.limit === undefined
             ? {}
@@ -1253,6 +1265,7 @@ function parseArchiveArguments(
           action,
           archivePath,
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
+          ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           ...(values.limit === undefined
             ? {}
@@ -1286,6 +1299,7 @@ function parseArchiveArguments(
         args: {
           action,
           archivePath,
+          ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           objectId: archivePath,
         },
@@ -1308,6 +1322,7 @@ function parseArchiveArguments(
         args: {
           action,
           archivePath,
+          ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           objectId: archivePath,
         },
@@ -1323,6 +1338,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--type", values.type, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
@@ -1353,6 +1369,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--type", values.type, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       return {
         args: {
@@ -1364,6 +1381,38 @@ function parseArchiveArguments(
               : parsePositiveIntegerFlag(values.budget, "--budget", helpRoute),
           format: parseResultFormat(values),
           objectId: archivePath,
+        },
+        help: false,
+        kind: "archive",
+      };
+    }
+    case "next": {
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
+      rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
+      rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+      rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveFlag(action, "--type", values.type, helpRoute);
+      rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+
+      return {
+        args: {
+          action,
+          archivePath,
+          ...(positionals[1] === undefined ? {} : { cursor: positionals[1] }),
+          format: parseResultFormat(values),
+          ...(values.limit === undefined
+            ? {}
+            : {
+                limit: parsePositiveIntegerFlag(
+                  values.limit,
+                  "--limit",
+                  helpRoute,
+                ),
+              }),
         },
         help: false,
         kind: "archive",
@@ -1383,14 +1432,16 @@ function formatMissingArchiveInputMessage(action: CLIArchiveAction): string {
     case "index":
       return "Missing archive path. Use `wikigraph index <archive.sdpub>`.";
     case "search":
-      return "Missing archive or scope URI. Use `wikigraph search wikigraph://<archive.sdpub> <query>`.";
+      return "Missing Wiki Graph URI with .sdpub locator. Use `wikigraph search wikigraph://<archive.sdpub> <query>`.";
     case "list":
-      return "Missing archive or scope URI. Use `wikigraph list wikigraph://<archive.sdpub>`.";
+      return "Missing Wiki Graph URI with .sdpub locator. Use `wikigraph list wikigraph://<archive.sdpub>`.";
     case "get":
     case "related":
     case "evidence":
     case "pack":
       return `Missing object URI. Use \`wikigraph ${action} wikigraph://<archive.sdpub>/<object>\`.`;
+    case "next":
+      return "Missing continuation cursor. Use `wikigraph next <cursor>`.";
   }
 }
 
@@ -2675,6 +2726,7 @@ function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
     value === "get" ||
     value === "index" ||
     value === "list" ||
+    value === "next" ||
     value === "pack" ||
     value === "related" ||
     value === "search"
@@ -2802,6 +2854,19 @@ function parseResultFormat(values: {
   return "text";
 }
 
+function parseEvidenceFlag(
+  value: string | undefined,
+  helpRoute: string,
+): { readonly evidenceLimit?: number } {
+  if (value === undefined) {
+    return {};
+  }
+
+  return {
+    evidenceLimit: parsePositiveIntegerFlag(value, "--evidence", helpRoute),
+  };
+}
+
 function parsePositiveIntegerFlag(
   value: string,
   flag: string,
@@ -2878,6 +2943,55 @@ function normalizeArchiveInlineOptions(
     positionals: normalizedPositionals,
     values: normalizedValues,
   };
+}
+
+function normalizeEvidenceFlagArgv(argv: readonly string[]): readonly string[] {
+  const normalized: string[] = [];
+  let stopped = false;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const item = argv[index];
+
+    if (item === undefined) {
+      continue;
+    }
+
+    if (stopped) {
+      normalized.push(item);
+      continue;
+    }
+
+    if (item === "--") {
+      normalized.push(item);
+      stopped = true;
+      continue;
+    }
+
+    if (item !== "--evidence") {
+      normalized.push(item);
+      continue;
+    }
+
+    const value = argv[index + 1];
+
+    if (value !== undefined && !value.startsWith("-")) {
+      normalized.push(item);
+      normalized.push(value);
+      index += 1;
+      continue;
+    }
+
+    if (value !== undefined && /^-\d/.test(value)) {
+      normalized.push(`${item}=${value}`);
+      index += 1;
+      continue;
+    }
+
+    normalized.push(item);
+    normalized.push("3");
+  }
+
+  return normalized;
 }
 
 function rejectArchiveExtraPositionals(

@@ -11,6 +11,7 @@ import {
   readArchiveText,
   readArchivePage,
 } from "../../src/facade/archive-view.js";
+import { deleteArchiveSearchSessions } from "../../src/facade/search-cache.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
@@ -78,8 +79,222 @@ describe("facade/archive-view", () => {
     });
   });
 
+  it("caches empty search results for repeated queries", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const first = await findArchiveObjects(document, "缓存空结果", {
+          archiveKey: `${path}/book.sdpub`,
+          types: ["entity"],
+        });
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.save({
+            chapterId: 1,
+            fragmentId: 0,
+            id: "late-empty-cache-hit",
+            qid: "Q1",
+            rangeEnd: 5,
+            rangeStart: 0,
+            sentenceIndex: 0,
+            surface: "缓存空结果",
+          });
+        });
+        const second = await findArchiveObjects(document, "缓存空结果", {
+          archiveKey: `${path}/book.sdpub`,
+          types: ["entity"],
+        });
+
+        expect(first.items).toStrictEqual([]);
+        expect(second.items).toStrictEqual([]);
+      } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
+        await document.release();
+      }
+    });
+  });
+
+  it("keeps search caches isolated by type and chapter filters", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(2)
+            .createDraft();
+
+          draft.addSentence("Cache Split appears in chapter two.", 6);
+          await draft.commit();
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "cache-split-one",
+              qid: "Q1",
+              rangeEnd: 11,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Cache Split",
+            },
+            {
+              chapterId: 2,
+              fragmentId: 0,
+              id: "cache-split-two",
+              qid: "Q2",
+              rangeEnd: 11,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Cache Split",
+            },
+          ]);
+          await openedDocument.replaceToc({
+            items: [
+              {
+                children: [],
+                serialId: 1,
+                title: "Introduction",
+              },
+              {
+                children: [],
+                serialId: 2,
+                title: "Second",
+              },
+            ],
+            version: 1,
+          });
+        });
+
+        const archiveKey = `${path}/book.sdpub`;
+        const chapterOne = await findArchiveObjects(document, "Cache Split", {
+          archiveKey,
+          chapters: [1],
+          types: ["entity"],
+        });
+        const chapterTwo = await findArchiveObjects(document, "Cache Split", {
+          archiveKey,
+          chapters: [2],
+          types: ["entity"],
+        });
+        const sourceOnly = await findArchiveObjects(document, "Cache Split", {
+          archiveKey,
+          chapters: [2],
+          types: ["fragment"],
+        });
+
+        expect(chapterOne.items.map((item) => item.id)).toStrictEqual([
+          "wikigraph://entity/Q1",
+        ]);
+        expect(chapterTwo.items.map((item) => item.id)).toStrictEqual([
+          "wikigraph://entity/Q2",
+        ]);
+        expect(sourceOnly.items.map((item) => item.type)).toStrictEqual([
+          "fragment",
+        ]);
+      } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
+        await document.release();
+      }
+    });
+  });
+
+  it("groups field-level hits into one object search result", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.chunks.save({
+            content: "SharedTerm appears in content too.",
+            generation: 0,
+            id: 300,
+            label: "SharedTerm label",
+            sentenceId: [1, 0, 0],
+            sentenceIds: [[1, 0, 0]],
+            wordsCount: 5,
+            weight: 1,
+          });
+        });
+
+        const result = await findArchiveObjects(document, "SharedTerm", {
+          archiveKey: `${path}/book.sdpub`,
+          types: ["node"],
+        });
+
+        expect(result.items).toStrictEqual([
+          expect.objectContaining({
+            id: "node:300",
+            type: "node",
+          }),
+        ]);
+      } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
+        await document.release();
+      }
+    });
+  });
+
+  it("refreshes cached search results after archive cache invalidation", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        const archiveKey = `${path}/book.sdpub`;
+
+        const first = await findArchiveObjects(document, "Invalidate Me", {
+          archiveKey,
+          types: ["entity"],
+        });
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.save({
+            chapterId: 1,
+            fragmentId: 0,
+            id: "invalidate-me",
+            qid: "Q1",
+            rangeEnd: 13,
+            rangeStart: 0,
+            sentenceIndex: 0,
+            surface: "Invalidate Me",
+          });
+        });
+        await deleteArchiveSearchSessions(archiveKey);
+        const second = await findArchiveObjects(document, "Invalidate Me", {
+          archiveKey,
+          types: ["entity"],
+        });
+
+        expect(first.items).toStrictEqual([]);
+        expect(second.items).toStrictEqual([
+          expect.objectContaining({
+            id: "wikigraph://entity/Q1",
+            title: "Invalidate Me",
+            type: "entity",
+          }),
+        ]);
+      } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
+        await document.release();
+      }
+    });
+  });
+
   it("prioritizes entity matches before source fallback", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
       process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
       const document = await DirectoryDocument.open(`${path}/document`);
 
@@ -100,11 +315,14 @@ describe("facade/archive-view", () => {
           ]);
         });
 
-        const result = await findArchiveObjects(document, "Augustine");
+        const result = await findArchiveObjects(document, "Augustine", {
+          evidenceLimit: 3,
+        });
 
-        expect(result.items).toStrictEqual([
-          expect.objectContaining({
+        expect(result.items).toMatchObject([
+          {
             evidence: {
+              nextCursor: null,
               shown: 1,
               sources: [
                 expect.objectContaining({
@@ -118,9 +336,10 @@ describe("facade/archive-view", () => {
             id: "wikigraph://entity/Q8018",
             title: "Augustine",
             type: "entity",
-          }),
+          },
         ]);
       } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();
       }
     });
@@ -128,6 +347,7 @@ describe("facade/archive-view", () => {
 
   it("hydrates entity evidence after reading a search session page", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
       process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
       const document = await DirectoryDocument.open(`${path}/document`);
 
@@ -159,6 +379,7 @@ describe("facade/archive-view", () => {
         });
 
         const firstPage = await findArchiveObjects(document, "Wiki Source", {
+          evidenceLimit: 3,
           limit: 1,
           types: ["entity"],
         });
@@ -166,6 +387,7 @@ describe("facade/archive-view", () => {
           ...(firstPage.nextCursor === null
             ? {}
             : { cursor: firstPage.nextCursor }),
+          evidenceLimit: 3,
           limit: 1,
           types: ["entity"],
         });
@@ -193,6 +415,7 @@ describe("facade/archive-view", () => {
           "evidenceMentions",
         );
       } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();
       }
     });
@@ -200,6 +423,7 @@ describe("facade/archive-view", () => {
 
   it("continues entity search cursors without repeating --type", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
       process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
       const document = await DirectoryDocument.open(`${path}/document`);
 
@@ -253,6 +477,173 @@ describe("facade/archive-view", () => {
         expect(secondPage.types).toStrictEqual(["entity"]);
         expect(secondPage.items[0]).toMatchObject({ type: "entity" });
       } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
+        await document.release();
+      }
+    });
+  });
+
+  it("keeps exact entity surfaces ahead of weaker same-qid mentions", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "same-qid-weaker",
+              qid: "Q1",
+              rangeEnd: 1,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "战船",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "exact-later",
+              qid: "Q1",
+              rangeEnd: 3,
+              rangeStart: 2,
+              sentenceIndex: 1,
+              surface: "战舰",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "other-qid-weaker",
+              qid: "Q2",
+              rangeEnd: 5,
+              rangeStart: 4,
+              sentenceIndex: 2,
+              surface: "战船",
+            },
+          ]);
+        });
+
+        const result = await findArchiveObjects(document, "战舰", {
+          evidenceLimit: 3,
+          types: ["entity"],
+        });
+
+        expect(result.items[0]).toMatchObject({
+          id: "wikigraph://entity/Q1",
+          title: "战舰",
+          type: "entity",
+        });
+      } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
+        await document.release();
+      }
+    });
+  });
+
+  it("does not expand entity matches through qid aliases", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "exact",
+              qid: "Q1",
+              rangeEnd: 2,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "战舰",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "same-qid-alias",
+              qid: "Q1",
+              rangeEnd: 5,
+              rangeStart: 3,
+              sentenceIndex: 1,
+              surface: "军舰",
+            },
+          ]);
+        });
+
+        const result = await findArchiveObjects(document, "战舰", {
+          evidenceLimit: 3,
+          types: ["entity"],
+        });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0]).toMatchObject({
+          evidence: {
+            nextCursor: null,
+            total: 1,
+          },
+          id: "wikigraph://entity/Q1",
+          title: "战舰",
+          type: "entity",
+        });
+      } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
+        await document.release();
+      }
+    });
+  });
+
+  it("adds only a small bonus for repeated entity evidence", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            ...Array.from({ length: 10 }, (_, index) => ({
+              chapterId: 1,
+              fragmentId: 0,
+              id: `multi-${index}`,
+              qid: "Q1",
+              rangeEnd: index * 2 + 1,
+              rangeStart: index * 2,
+              sentenceIndex: index,
+              surface: "舰",
+            })),
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "single",
+              qid: "Q2",
+              rangeEnd: 31,
+              rangeStart: 30,
+              sentenceIndex: 10,
+              surface: "舰",
+            },
+          ]);
+        });
+
+        const result = await findArchiveObjects(document, "舰", {
+          types: ["entity"],
+        });
+        const multi = result.items.find(
+          (item) => item.id === "wikigraph://entity/Q1",
+        );
+        const single = result.items.find(
+          (item) => item.id === "wikigraph://entity/Q2",
+        );
+
+        expect(multi?.score).toBeCloseTo((single?.score ?? 0) * 1.3, 10);
+      } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();
       }
     });
@@ -260,6 +651,7 @@ describe("facade/archive-view", () => {
 
   it("finds triples when only one endpoint matches the query", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
       process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
       const document = await DirectoryDocument.open(`${path}/document`);
 
@@ -308,6 +700,66 @@ describe("facade/archive-view", () => {
           }),
         );
       } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
+        await document.release();
+      }
+    });
+  });
+
+  it("adds only a small bonus for repeated triple evidence", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            ...Array.from({ length: 11 }, (_, index) => ({
+              chapterId: 1,
+              fragmentId: 0,
+              id: `source-${index}`,
+              qid: index < 10 ? "Q1" : "Q3",
+              rangeEnd: index * 4 + 1,
+              rangeStart: index * 4,
+              sentenceIndex: index,
+              surface: "舰",
+            })),
+            ...Array.from({ length: 11 }, (_, index) => ({
+              chapterId: 1,
+              fragmentId: 0,
+              id: `target-${index}`,
+              qid: index < 10 ? "Q2" : "Q4",
+              rangeEnd: index * 4 + 3,
+              rangeStart: index * 4 + 2,
+              sentenceIndex: index,
+              surface: "队",
+            })),
+          ]);
+          await openedDocument.mentionLinks.saveMany(
+            Array.from({ length: 11 }, (_, index) => ({
+              id: `link-${index}`,
+              predicate: "supports",
+              sourceMentionId: `source-${index}`,
+              targetMentionId: `target-${index}`,
+            })),
+          );
+        });
+
+        const result = await findArchiveObjects(document, "舰", {
+          types: ["triple"],
+        });
+        const multi = result.items.find(
+          (item) => item.id === "wikigraph://triple/Q1/supports/Q2",
+        );
+        const single = result.items.find(
+          (item) => item.id === "wikigraph://triple/Q3/supports/Q4",
+        );
+
+        expect(multi?.score).toBeCloseTo((single?.score ?? 0) * 1.3, 10);
+      } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();
       }
     });
@@ -315,6 +767,7 @@ describe("facade/archive-view", () => {
 
   it("falls back to lexical source scan with session cursors", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
+      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
       process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
       const document = await DirectoryDocument.open(`${path}/document`);
 
@@ -337,6 +790,7 @@ describe("facade/archive-view", () => {
         expect(secondPage.query).toBe("Wiki");
         expect(secondPage.items[0]?.id).not.toBe(firstPage.items[0]?.id);
       } finally {
+        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();
       }
     });
@@ -925,6 +1379,7 @@ describe("facade/archive-view", () => {
           },
           id: "wikigraph://entity/Q1",
           label: "LLM Wiki",
+          labels: ["LLM Wiki"],
           mentionCount: 1,
           qid: "Q1",
           type: "entity",
@@ -954,6 +1409,11 @@ describe("facade/archive-view", () => {
           {
             id: "wikigraph://triple/Q1/mentions/Q2",
             label: "LLM Wiki mentions agents",
+            objectLabel: "agents",
+            objectQid: "Q2",
+            predicate: "mentions",
+            subjectLabel: "LLM Wiki",
+            subjectQid: "Q1",
             summary: "Q1 mentions Q2",
             type: "triple",
           },

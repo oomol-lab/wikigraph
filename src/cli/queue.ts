@@ -29,10 +29,16 @@ import {
   type BuildJobState,
 } from "../facade/index.js";
 import { SpineDigestFile } from "../facade/spine-digest-file.js";
+import type {
+  GuaranteedRequest,
+  GuaranteedRequestController,
+} from "../guaranteed/index.js";
+import type { LLMessage } from "../llm/index.js";
 
 import type { CLIQueueArguments } from "./args.js";
 import { loadCLIConfig } from "./config.js";
 import { writeTextToStdout } from "./io.js";
+import { formatCLIJSON, formatCLIJSONLine } from "./json.js";
 import {
   createStageLLM,
   loadRequiredStageConfig,
@@ -182,8 +188,8 @@ async function executeBuildJob(
   const extractionPrompt = resolveExtractionPrompt(promptSource);
   const knowledgeGraphRecallPrompt =
     resolveKnowledgeGraphRecallPrompt(promptSource);
-  const request = async (
-    messages: Parameters<typeof llm.request>[0],
+  const request: GuaranteedRequestController = async (
+    messages: readonly LLMessage[],
     index: number,
     maxRetries: number,
   ): Promise<string> =>
@@ -192,6 +198,9 @@ async function executeBuildJob(
       retryMax: maxRetries,
       scope: SpineDigestScope.ReaderExtraction,
     });
+  request.lazy = async <T>(
+    operation: (request: GuaranteedRequest) => Promise<T>,
+  ): Promise<T> => await llm.request(async () => await operation(request));
 
   const buildInput = await new SpineDigestFile(job.archivePath).readDocument(
     async (document) => await readChapterBuildInput(document, job.chapterId),
@@ -358,9 +367,7 @@ async function writeWatchEvent(
   jsonl: boolean,
 ): Promise<void> {
   if (jsonl) {
-    await writeTextToStdout(
-      `${JSON.stringify(formatWatchEventJSONL(event))}\n`,
-    );
+    await writeTextToStdout(formatCLIJSONLine(formatWatchEventJSONL(event)));
     return;
   }
 
@@ -531,9 +538,7 @@ async function writeJobList(
   options: { readonly json: boolean },
 ): Promise<void> {
   if (options.json) {
-    await writeTextToStdout(
-      `${JSON.stringify({ items: jobs.map(formatJobJSON) }, null, 2)}\n`,
-    );
+    await writeTextToStdout(formatCLIJSON({ items: jobs.map(formatJobJSON) }));
     return;
   }
 
@@ -561,7 +566,7 @@ async function writeJobStatus(
   options: { readonly json: boolean },
 ): Promise<void> {
   if (options.json) {
-    await writeTextToStdout(`${JSON.stringify(formatJobJSON(job), null, 2)}\n`);
+    await writeTextToStdout(formatCLIJSON(formatJobJSON(job)));
     return;
   }
 

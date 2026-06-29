@@ -1,15 +1,6 @@
-import type { MentionRecord } from "../document/index.js";
-
 export interface LexicalQuery {
-  readonly entityTerms: readonly LexicalEntityTerm[];
   readonly phrases: readonly string[];
   readonly terms: readonly string[];
-}
-
-export interface LexicalEntityTerm {
-  readonly qid: string;
-  readonly surface: string;
-  readonly weight: number;
 }
 
 export interface LexicalScore {
@@ -22,14 +13,10 @@ export interface LexicalScore {
 
 const HAN_RE = /\p{Script=Han}/u;
 const LATIN_TOKEN_RE = /[\p{Script=Latin}\p{Number}]+/gu;
-const ENTITY_TERM_WEIGHT = 3;
 const PHRASE_WEIGHT = 2;
 const TERM_WEIGHT = 1;
 
-export function createLexicalQuery(
-  query: string,
-  mentions: readonly MentionRecord[] = [],
-): LexicalQuery | undefined {
+export function createLexicalQuery(query: string): LexicalQuery | undefined {
   const normalizedQuery = query.trim();
 
   if (normalizedQuery === "") {
@@ -46,22 +33,12 @@ export function createLexicalQuery(
     ...latinTerms,
     ...characterTerms,
   ]);
-  const entityTerms = dedupeEntityTerms(
-    mentions
-      .filter((mention) => normalizedQuery.includes(mention.surface))
-      .map((mention) => ({
-        qid: mention.qid,
-        surface: mention.surface,
-        weight: ENTITY_TERM_WEIGHT,
-      })),
-  );
 
-  if (terms.length === 0 && entityTerms.length === 0) {
+  if (terms.length === 0) {
     return undefined;
   }
 
   return {
-    entityTerms,
     phrases: phraseTerms,
     terms,
   };
@@ -84,29 +61,11 @@ export function listLexicalQueryCandidateTerms(
 export function scoreLexicalText(
   value: string,
   query: LexicalQuery,
-  options: {
-    readonly mentionQids?: readonly string[];
-    readonly mentionSurfaces?: readonly string[];
-  } = {},
 ): LexicalScore | undefined {
   const normalizedText = value.toLowerCase();
   const matchedTerms: string[] = [];
   const missingTerms: string[] = [];
   let score = 0;
-
-  for (const entity of query.entityTerms) {
-    const surfaceMatched =
-      normalizedText.includes(entity.surface.toLowerCase()) ||
-      options.mentionSurfaces?.includes(entity.surface) === true;
-    const qidMatched = options.mentionQids?.includes(entity.qid) === true;
-
-    if (surfaceMatched || qidMatched) {
-      matchedTerms.push(entity.surface);
-      score += qidMatched ? entity.weight * 1.5 : entity.weight;
-    } else {
-      missingTerms.push(entity.surface);
-    }
-  }
 
   for (const phrase of query.phrases) {
     const normalizedPhrase = phrase.toLowerCase();
@@ -158,19 +117,18 @@ export function scoreLexicalText(
   };
 }
 
-export function createMentionLexicalHits(
-  mentions: readonly MentionRecord[],
+export function createMentionLexicalHits<
+  T extends { readonly surface: string },
+>(
+  mentions: readonly T[],
   query: LexicalQuery,
 ): readonly {
   readonly match: LexicalScore;
-  readonly mention: MentionRecord;
+  readonly mention: T;
 }[] {
   return mentions
     .map((mention) => {
-      const match = scoreLexicalText(mention.surface, query, {
-        mentionQids: [mention.qid],
-        mentionSurfaces: [mention.surface],
-      });
+      const match = scoreLexicalText(mention.surface, query);
 
       return match === undefined ? undefined : { match, mention };
     })
@@ -212,7 +170,7 @@ function calculateCoverageBonus(
   matchedTerms: readonly string[],
   query: LexicalQuery,
 ): number {
-  const total = query.terms.length + query.entityTerms.length;
+  const total = query.terms.length;
 
   if (total === 0) {
     return 0;
@@ -247,24 +205,6 @@ function selectSnippetNeedle(matchedTerms: readonly string[]): string {
 
 function dedupeStrings(values: readonly string[]): readonly string[] {
   return [...new Set(values.filter((value) => value !== ""))];
-}
-
-function dedupeEntityTerms(
-  values: readonly LexicalEntityTerm[],
-): readonly LexicalEntityTerm[] {
-  const seen = new Set<string>();
-  const terms: LexicalEntityTerm[] = [];
-
-  for (const value of values) {
-    const key = `${value.qid}:${value.surface}`;
-
-    if (!seen.has(key)) {
-      seen.add(key);
-      terms.push(value);
-    }
-  }
-
-  return terms;
 }
 
 function isDefined<T>(value: T | undefined): value is T {

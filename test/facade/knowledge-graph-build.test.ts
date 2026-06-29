@@ -342,6 +342,48 @@ describe("facade/knowledge-graph-build", () => {
     expect(prompt).not.toContain('"qid":"Q11"');
   });
 
+  it("keeps non-lazy grounding requests sequential", async () => {
+    let activeRequests = 0;
+    let maxActiveRequests = 0;
+    const request = vi
+      .fn<GuaranteedRequest>()
+      .mockImplementation(async (messages) => {
+        activeRequests += 1;
+        maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+        await wait(0);
+        activeRequests -= 1;
+        const groups = readCandidateGroups(readUserPrompt(messages));
+
+        return JSON.stringify({
+          groups: groups.map((group) => ({
+            decisions: group.candidates.map((candidate) => ({
+              candidateId: candidate.candidateId,
+              decision: "never_recall",
+            })),
+            groupId: group.groupId,
+          })),
+        });
+      });
+
+    await groundWikimatchCandidates({
+      candidates: Array.from({ length: 11 }, (_value, index) => ({
+        id: `c${index + 1}`,
+        qidOptions: Array.from({ length: 30 }, (_value, optionIndex) => ({
+          label: `Option ${optionIndex + 1}`,
+          qid: `Q${index * 30 + optionIndex + 1}`,
+        })),
+        range: { end: index * 3 + 1, start: index * 3 },
+        surface: "舰",
+      })),
+      policyPrompt: "召回历史叙事中的实体。",
+      request,
+      text: "舰 队 舰 队 舰 队 舰 队",
+    });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(maxActiveRequests).toBe(1);
+  });
+
   it("commits chapter mention evidence from JSONL artifacts", async () => {
     await withTempDir("spinedigest-knowledge-graph-build-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
@@ -548,4 +590,8 @@ function readCandidateGroups(prompt: string): Array<{
     readonly candidates: Array<{ readonly candidateId: string }>;
     readonly groupId: string;
   }>;
+}
+
+async function wait(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }

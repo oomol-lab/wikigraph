@@ -19,7 +19,9 @@ export interface SearchSessionInput {
   readonly items: readonly ArchiveFindHit[];
   readonly lens: string;
   readonly match: string;
+  readonly order: string;
   readonly query: string;
+  readonly records: readonly ArchiveFindHit[];
   readonly terms: readonly string[];
   readonly types: readonly string[] | null;
 }
@@ -36,6 +38,7 @@ export interface EntitySearchMentionHit {
   readonly qid: string;
   readonly rangeEnd: number;
   readonly rangeStart: number;
+  readonly resultScore: number;
   readonly score: number;
   readonly sentenceIndex?: number;
   readonly surface: string;
@@ -47,6 +50,7 @@ export interface EntitySearchSessionInput {
   readonly hits: readonly EntitySearchMentionHit[];
   readonly lens: string;
   readonly match: string;
+  readonly order: string;
   readonly query: string;
   readonly terms: readonly string[];
   readonly types: readonly string[] | null;
@@ -78,6 +82,7 @@ export interface EntitySearchSessionPage {
 
 export interface SearchSessionDescriptor {
   readonly chapters: readonly number[] | null;
+  readonly createdAt: number;
   readonly lens: string;
   readonly match: string;
   readonly query: string;
@@ -107,6 +112,13 @@ CREATE TABLE IF NOT EXISTS search_results (
   PRIMARY KEY (session_id, rank)
 );
 
+CREATE TABLE IF NOT EXISTS search_record_hits (
+  session_id TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  item_json TEXT NOT NULL,
+  PRIMARY KEY (session_id, rank)
+);
+
 CREATE TABLE IF NOT EXISTS search_mention_hits (
   session_id TEXT NOT NULL,
   mention_id TEXT NOT NULL,
@@ -120,6 +132,7 @@ CREATE TABLE IF NOT EXISTS search_mention_hits (
   note TEXT,
   confidence REAL,
   score REAL NOT NULL,
+  result_score REAL NOT NULL DEFAULT 0,
   match_count INTEGER NOT NULL,
   matched_terms_json TEXT NOT NULL,
   missing_terms_json TEXT NOT NULL,
@@ -136,7 +149,55 @@ CREATE INDEX IF NOT EXISTS idx_search_sessions_expires
 ON search_sessions(expires_at);
 `;
 
-const SEARCH_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+const SEARCH_SESSION_MIGRATION_SQL = `
+ALTER TABLE search_mention_hits
+ADD COLUMN result_score REAL NOT NULL DEFAULT 0;
+`;
+
+const SEARCH_RANKING_VERSION = 2;
+const SEARCH_SESSION_MAX_COUNT = 500;
+const SEARCH_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+type SearchSessionCacheInput = Omit<SearchSessionInput, "items" | "records">;
+type EntitySearchSessionCacheInput = Omit<EntitySearchSessionInput, "hits">;
+
+export async function readCachedSearchSessionPage(
+  input: SearchSessionCacheInput,
+  offset: number,
+  limit: number,
+): Promise<SearchSessionPage | undefined> {
+  const sessionId = createSearchSessionId(input);
+
+  if (!(await hasSearchSession(sessionId, input.archiveKey))) {
+    return undefined;
+  }
+
+  return await readSearchSessionPage(
+    sessionId,
+    offset,
+    limit,
+    input.archiveKey,
+  );
+}
+
+export async function readCachedEntitySearchSessionPage(
+  input: EntitySearchSessionCacheInput,
+  offset: number,
+  limit: number,
+): Promise<EntitySearchSessionPage | undefined> {
+  const sessionId = createEntitySearchSessionId(input);
+
+  if (!(await hasSearchSession(sessionId, input.archiveKey))) {
+    return undefined;
+  }
+
+  return await readEntitySearchSessionPage(
+    sessionId,
+    offset,
+    limit,
+    input.archiveKey,
+  );
+}
 
 export async function createSearchSession(
   input: SearchSessionInput,
@@ -146,13 +207,15 @@ export async function createSearchSession(
   try {
     await cleanExpiredSearchSessions(database);
     const now = Date.now();
-    const sessionId = createSearchSessionId(input, now);
+    const sessionId = createSearchSessionId(input);
     const optionsJSON = JSON.stringify({
       chapters: input.chapters,
+      order: input.order,
       types: input.types,
     });
 
     await database.transaction(async () => {
+      await deleteSearchSession(database, sessionId);
       await database.run(
         `
           INSERT INTO search_sessions (
@@ -184,6 +247,16 @@ export async function createSearchSession(
           [sessionId, index, JSON.stringify(item)],
         );
       }
+      for (const [index, record] of input.records.entries()) {
+        await database.run(
+          `
+            INSERT INTO search_record_hits (session_id, rank, item_json)
+            VALUES (?, ?, ?)
+          `,
+          [sessionId, index, JSON.stringify(record)],
+        );
+      }
+      await pruneSearchSessions(database);
     });
 
     return sessionId;
@@ -200,13 +273,15 @@ export async function createEntitySearchSession(
   try {
     await cleanExpiredSearchSessions(database);
     const now = Date.now();
-    const sessionId = createEntitySearchSessionId(input, now);
+    const sessionId = createEntitySearchSessionId(input);
     const optionsJSON = JSON.stringify({
       chapters: input.chapters,
+      order: input.order,
       types: input.types,
     });
 
     await database.transaction(async () => {
+      await deleteSearchSession(database, sessionId);
       await database.run(
         `
           INSERT INTO search_sessions (
@@ -235,10 +310,10 @@ export async function createEntitySearchSession(
             INSERT INTO search_mention_hits (
               session_id, mention_id, qid, chapter_id, fragment_id,
               sentence_index, range_start, range_end, surface, note,
-              confidence, score, match_count, matched_terms_json,
+              confidence, score, result_score, match_count, matched_terms_json,
               missing_terms_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `,
           [
             sessionId,
@@ -253,15 +328,43 @@ export async function createEntitySearchSession(
             hit.note ?? null,
             hit.confidence ?? null,
             hit.score,
+            hit.resultScore,
             hit.matchCount,
             JSON.stringify(hit.matchedTerms),
             JSON.stringify(hit.missingTerms),
           ],
         );
       }
+      await pruneSearchSessions(database);
     });
 
     return sessionId;
+  } finally {
+    await database.close();
+  }
+}
+
+export async function deleteArchiveSearchSessions(
+  archiveKey: string,
+): Promise<void> {
+  const database = await openSearchSessionDatabase();
+
+  try {
+    const sessionIds = await database.queryAll(
+      `
+        SELECT session_id
+        FROM search_sessions
+        WHERE archive_key = ?
+      `,
+      [archiveKey],
+      (row) => getString(row, "session_id"),
+    );
+
+    await database.transaction(async () => {
+      for (const sessionId of sessionIds) {
+        await deleteSearchSession(database, sessionId);
+      }
+    });
   } finally {
     await database.close();
   }
@@ -272,6 +375,7 @@ export async function readSearchSessionPage(
   offset: number,
   limit: number,
   expectedArchiveKey?: string,
+  expectedCreatedAt?: number,
 ): Promise<SearchSessionPage> {
   const database = await openSearchSessionDatabase();
 
@@ -281,6 +385,7 @@ export async function readSearchSessionPage(
       database,
       sessionId,
       expectedArchiveKey,
+      expectedCreatedAt,
     );
 
     await touchSearchSession(database, sessionId);
@@ -309,7 +414,11 @@ export async function readSearchSessionPage(
       match: session.match,
       nextCursor:
         rows.length > limit && last !== undefined
-          ? encodeSearchSessionCursor(sessionId, last.rank + 1)
+          ? encodeSearchSessionCursor(
+              sessionId,
+              last.rank + 1,
+              session.createdAt,
+            )
           : null,
       query: session.query,
       sessionId,
@@ -326,6 +435,7 @@ export async function readEntitySearchSessionPage(
   offset: number,
   limit: number,
   expectedArchiveKey?: string,
+  expectedCreatedAt?: number,
 ): Promise<EntitySearchSessionPage> {
   const database = await openSearchSessionDatabase();
 
@@ -335,6 +445,7 @@ export async function readEntitySearchSessionPage(
       database,
       sessionId,
       expectedArchiveKey,
+      expectedCreatedAt,
     );
 
     await touchSearchSession(database, sessionId);
@@ -346,6 +457,7 @@ export async function readEntitySearchSessionPage(
           surface,
           note,
           score,
+          result_score,
           match_count,
           matched_terms_json,
           missing_terms_json,
@@ -358,6 +470,7 @@ export async function readEntitySearchSessionPage(
             surface,
             note,
             score,
+            result_score,
             match_count,
             matched_terms_json,
             missing_terms_json,
@@ -373,7 +486,7 @@ export async function readEntitySearchSessionPage(
           WHERE session_id = ?
         )
         WHERE entity_row_number = 1
-        ORDER BY score DESC, match_count DESC, chapter_id, fragment_id, qid
+        ORDER BY result_score DESC, score DESC, match_count DESC, chapter_id, fragment_id, qid
         LIMIT ? OFFSET ?
       `,
       [sessionId, limit + 1, offset],
@@ -389,7 +502,7 @@ export async function readEntitySearchSessionPage(
       match: session.match,
       nextCursor:
         rows.length > limit
-          ? encodeSearchSessionCursor(sessionId, nextOffset)
+          ? encodeSearchSessionCursor(sessionId, nextOffset, session.createdAt)
           : null,
       query: session.query,
       sessionId,
@@ -419,6 +532,7 @@ export async function readSearchSessionDescriptor(
 
     return {
       chapters: session.options.chapters,
+      createdAt: session.createdAt,
       lens: session.lens,
       match: session.match,
       query: session.query,
@@ -453,6 +567,7 @@ export async function readEntitySearchEvidenceMentions(
           note,
           confidence,
           score,
+          result_score,
           match_count,
           matched_terms_json,
           missing_terms_json
@@ -473,13 +588,15 @@ export async function readEntitySearchEvidenceMentions(
 export function encodeSearchSessionCursor(
   sessionId: string,
   offset: number,
+  createdAt: number,
 ): string {
-  return Buffer.from(JSON.stringify({ offset, sessionId, v: 2 })).toString(
-    "base64url",
-  );
+  return Buffer.from(
+    JSON.stringify({ createdAt, offset, sessionId, v: 3 }),
+  ).toString("base64url");
 }
 
 export function decodeSearchSessionCursor(cursor: string): {
+  readonly createdAt?: number;
   readonly offset: number;
   readonly sessionId: string;
 } {
@@ -488,6 +605,29 @@ export function decodeSearchSessionCursor(cursor: string): {
       Buffer.from(cursor, "base64url").toString("utf8"),
     );
 
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "offset" in parsed &&
+      "sessionId" in parsed &&
+      "createdAt" in parsed &&
+      "v" in parsed &&
+      parsed.v === 3 &&
+      typeof parsed.sessionId === "string" &&
+      parsed.sessionId !== "" &&
+      typeof parsed.createdAt === "number" &&
+      Number.isInteger(parsed.createdAt) &&
+      parsed.createdAt >= 0 &&
+      typeof parsed.offset === "number" &&
+      Number.isInteger(parsed.offset) &&
+      parsed.offset >= 0
+    ) {
+      return {
+        createdAt: parsed.createdAt,
+        offset: parsed.offset,
+        sessionId: parsed.sessionId,
+      };
+    }
     if (
       typeof parsed === "object" &&
       parsed !== null &&
@@ -511,10 +651,29 @@ export function decodeSearchSessionCursor(cursor: string): {
 }
 
 async function openSearchSessionDatabase(): Promise<Database> {
-  return await openSharedStateDatabase(
+  const database = await openSharedStateDatabase(
     join(getSearchSessionStateDirectoryPath(), "search-sessions.sqlite"),
     SEARCH_SESSION_SCHEMA_SQL,
   );
+
+  await runSearchSessionMigrations(database);
+
+  return database;
+}
+
+async function runSearchSessionMigrations(database: Database): Promise<void> {
+  try {
+    await database.run(SEARCH_SESSION_MIGRATION_SQL);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("duplicate column name")
+    ) {
+      return;
+    }
+
+    throw error;
+  }
 }
 
 function getSearchSessionStateDirectoryPath(): string {
@@ -545,25 +704,77 @@ async function cleanExpiredSearchSessions(database: Database): Promise<void> {
 
   await database.transaction(async () => {
     for (const sessionId of expiredSessionIds) {
-      await database.run("DELETE FROM search_results WHERE session_id = ?", [
-        sessionId,
-      ]);
-      await database.run(
-        "DELETE FROM search_mention_hits WHERE session_id = ?",
-        [sessionId],
-      );
-      await database.run("DELETE FROM search_sessions WHERE session_id = ?", [
-        sessionId,
-      ]);
+      await deleteSearchSession(database, sessionId);
     }
   });
+}
+
+async function hasSearchSession(
+  sessionId: string,
+  archiveKey: string,
+): Promise<boolean> {
+  const database = await openSearchSessionDatabase();
+
+  try {
+    await cleanExpiredSearchSessions(database);
+    const row = await database.queryOne(
+      `
+        SELECT session_id
+        FROM search_sessions
+        WHERE session_id = ? AND archive_key = ?
+      `,
+      [sessionId, archiveKey],
+      () => true,
+    );
+
+    return row === true;
+  } finally {
+    await database.close();
+  }
+}
+
+async function deleteSearchSession(
+  database: Database,
+  sessionId: string,
+): Promise<void> {
+  await database.run("DELETE FROM search_results WHERE session_id = ?", [
+    sessionId,
+  ]);
+  await database.run("DELETE FROM search_record_hits WHERE session_id = ?", [
+    sessionId,
+  ]);
+  await database.run("DELETE FROM search_mention_hits WHERE session_id = ?", [
+    sessionId,
+  ]);
+  await database.run("DELETE FROM search_sessions WHERE session_id = ?", [
+    sessionId,
+  ]);
+}
+
+async function pruneSearchSessions(database: Database): Promise<void> {
+  const prunedSessionIds = await database.queryAll(
+    `
+      SELECT session_id
+      FROM search_sessions
+      ORDER BY accessed_at DESC, created_at DESC, session_id
+      LIMIT -1 OFFSET ?
+    `,
+    [SEARCH_SESSION_MAX_COUNT],
+    (row) => getString(row, "session_id"),
+  );
+
+  for (const sessionId of prunedSessionIds) {
+    await deleteSearchSession(database, sessionId);
+  }
 }
 
 async function readSearchSessionMetadata(
   database: Database,
   sessionId: string,
   expectedArchiveKey: string | undefined,
+  expectedCreatedAt?: number,
 ): Promise<{
+  readonly createdAt: number;
   readonly lens: string;
   readonly match: string;
   readonly options: {
@@ -582,15 +793,20 @@ async function readSearchSessionMetadata(
         options_json,
         terms_json,
         lens,
-        match
+        match,
+        created_at
       FROM search_sessions
       WHERE session_id = ?
         ${expectedArchiveKey === undefined ? "" : "AND archive_key = ?"}
+        ${expectedCreatedAt === undefined ? "" : "AND created_at = ?"}
     `,
-    expectedArchiveKey === undefined
-      ? [sessionId]
-      : [sessionId, expectedArchiveKey],
+    [
+      sessionId,
+      ...(expectedArchiveKey === undefined ? [] : [expectedArchiveKey]),
+      ...(expectedCreatedAt === undefined ? [] : [expectedCreatedAt]),
+    ],
     (row) => ({
+      createdAt: getNumber(row, "created_at"),
       lens: getString(row, "lens"),
       match: getString(row, "match"),
       options: parseSessionOptions(getString(row, "options_json")),
@@ -622,16 +838,20 @@ async function touchSearchSession(
 }
 
 function createEntitySearchSessionId(
-  input: EntitySearchSessionInput,
-  now: number,
+  input: EntitySearchSessionCacheInput,
 ): string {
   return createHash("sha256")
     .update(
       JSON.stringify({
         archiveKey: input.archiveKey,
         entity: true,
-        now,
-        query: input.query,
+        lens: input.lens,
+        match: input.match,
+        order: input.order,
+        rankingVersion: SEARCH_RANKING_VERSION,
+        scope: normalizeSearchSessionScope(input.chapters),
+        terms: input.terms,
+        types: normalizeSearchSessionTypes(input.types),
       }),
     )
     .digest("hex");
@@ -649,6 +869,7 @@ function mapEntitySearchObjectRow(
   return {
     chapter: chapterId,
     evidence: {
+      nextCursor: null,
       shown: 0,
       sources: [],
       total: getNumber(row, "evidence_count"),
@@ -662,7 +883,7 @@ function mapEntitySearchObjectRow(
       chapter: chapterId,
       fragment: fragmentId,
     },
-    score: getNumber(row, "score"),
+    score: getNumber(row, "result_score"),
     snippet: getOptionalString(row, "note") ?? getString(row, "surface"),
     title: getString(row, "surface"),
     type: "entity",
@@ -690,22 +911,45 @@ function mapEntitySearchMentionHitRow(
     qid: getString(row, "qid"),
     rangeEnd: getNumber(row, "range_end"),
     rangeStart: getNumber(row, "range_start"),
+    resultScore: getNumber(row, "result_score"),
     score: getNumber(row, "score"),
     ...(sentenceIndex === undefined ? {} : { sentenceIndex }),
     surface: getString(row, "surface"),
   };
 }
 
-function createSearchSessionId(input: SearchSessionInput, now: number): string {
+function createSearchSessionId(input: SearchSessionCacheInput): string {
   return createHash("sha256")
     .update(
       JSON.stringify({
         archiveKey: input.archiveKey,
-        now,
-        query: input.query,
+        entity: false,
+        lens: input.lens,
+        match: input.match,
+        order: input.order,
+        rankingVersion: SEARCH_RANKING_VERSION,
+        scope: normalizeSearchSessionScope(input.chapters),
+        terms: input.terms,
+        types: normalizeSearchSessionTypes(input.types),
       }),
     )
     .digest("hex");
+}
+
+function normalizeSearchSessionScope(
+  chapters: readonly number[] | null,
+): readonly number[] | null {
+  return chapters === null ? null : [...new Set(chapters)].sort(compareNumbers);
+}
+
+function normalizeSearchSessionTypes(
+  types: readonly string[] | null,
+): readonly string[] | null {
+  return types === null ? null : [...new Set(types)].sort();
+}
+
+function compareNumbers(left: number, right: number): number {
+  return left - right;
 }
 
 function parseSearchResultItem(value: string): ArchiveFindHit {
