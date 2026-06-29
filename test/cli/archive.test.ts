@@ -134,8 +134,8 @@ const archiveMockState = vi.hoisted(() => ({
     ],
     limit: 20,
     nextCursor: null,
-    order: "doc-asc",
-    types: ["entity"],
+    order: "doc-asc" as const,
+    types: ["entity"] as const,
   },
   page: {
     generatedNodeSummary: "RAG appears in this chunk.",
@@ -443,6 +443,53 @@ describe("cli/archive", () => {
     );
     expect(archiveMockState.textWrites[0]).toContain("wikigraph://entity/Q1");
     expect(archiveMockState.textWrites[0]).toContain("RAG");
+  });
+
+  it("prints listed entity evidence when requested", async () => {
+    vi.mocked(listArchiveCollection).mockResolvedValueOnce({
+      ...archiveMockState.collection,
+      items: archiveMockState.entityFindHits,
+    });
+
+    await runArchiveCommand({
+      action: "list",
+      archivePath: "wikigraph:///tmp/book.sdpub/chapter/2",
+      evidenceLimit: 3,
+      format: "json",
+      kinds: ["entity"],
+    });
+
+    expect(listArchiveCollection).toHaveBeenCalledWith(
+      {},
+      {
+        chapters: [2],
+        evidenceLimit: 3,
+        types: ["entity"],
+      },
+    );
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      limit: 20,
+      nextCursor: null,
+      objects: [
+        {
+          evidence: {
+            nextCursor: null,
+            shown: 1,
+            sources: [
+              {
+                text: "RAG original source fragment.",
+                uri: "wikigraph://chapter/2/source/0#0..1",
+              },
+            ],
+            total: 3,
+          },
+          label: "RAG",
+          score: 1,
+          type: "entity",
+          uri: "wikigraph://entity/Q1",
+        },
+      ],
+    });
   });
 
   it("prints search objects as JSON", async () => {

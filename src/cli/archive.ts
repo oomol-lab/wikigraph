@@ -510,6 +510,9 @@ function createCollectionOptions(
   return {
     ...createScopeOptions(args.archivePath),
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
+    ...(args.evidenceLimit === undefined
+      ? {}
+      : { evidenceLimit: args.evidenceLimit }),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
     ...(types === undefined ? {} : { types }),
   };
@@ -1018,7 +1021,10 @@ async function createFindObject(
         }),
     label: hit.title,
     ...(hit.score === undefined ? {} : { score: hit.score }),
-    summary: hit.snippet,
+    ...(context.evidenceLimit !== undefined &&
+    (hit.type === "entity" || hit.type === "triple")
+      ? {}
+      : { summary: hit.snippet }),
     type: hit.type === "node" ? "chunk" : hit.type,
     uri,
   };

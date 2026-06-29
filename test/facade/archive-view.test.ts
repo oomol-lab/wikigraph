@@ -1288,6 +1288,21 @@ describe("facade/archive-view", () => {
             }),
           ]),
         );
+
+        const scopedSecondWithEvidence = await listArchiveCollection(document, {
+          chapters: [2],
+          evidenceLimit: 1,
+          types: ["entity"],
+        });
+        const entityWithEvidence = scopedSecondWithEvidence.items.find(
+          (item) => item.id === "wikigraph://entity/Q1",
+        );
+
+        expect(entityWithEvidence?.type).toBe("entity");
+        expect(entityWithEvidence?.evidence?.shown).toBe(1);
+        expect(entityWithEvidence?.evidence?.sources[0]?.id).toBe(
+          "wikigraph://chapter/2/source/0#0..0",
+        );
       } finally {
         await document.release();
       }

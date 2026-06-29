@@ -175,6 +175,7 @@ export interface ArchiveFindLensHint {
 export interface ArchiveCollectionOptions {
   readonly chapters?: readonly number[];
   readonly cursor?: string;
+  readonly evidenceLimit?: number;
   readonly ids?: readonly string[];
   readonly limit?: number;
   readonly order?: ArchiveFindOrder;
@@ -588,7 +589,14 @@ export async function listArchiveCollection(
     items.push(...(await listTripleCollection(document, chapterFilter)));
   }
 
-  return createCollectionResult(items, options);
+  return createCollectionResult(
+    await hydrateFindHitEvidence(document, items, {
+      ...(options.evidenceLimit === undefined
+        ? {}
+        : { evidenceLimit: options.evidenceLimit }),
+    }),
+    options,
+  );
 }
 
 function filterChapters<T extends { readonly chapterId: number }>(
