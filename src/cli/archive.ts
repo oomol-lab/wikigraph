@@ -176,7 +176,11 @@ export async function runArchiveCommand(
         getArchivePath(args.archivePath),
         async (document) => {
           await writePage(
-            await readArchivePage(document, getObjectUri(args.objectId!)),
+            await readArchivePage(document, getObjectUri(args.objectId!), {
+              ...(args.evidenceLimit === undefined
+                ? {}
+                : { evidenceLimit: args.evidenceLimit }),
+            }),
             createArchiveOutputContext(args),
             args.format ?? "text",
           );

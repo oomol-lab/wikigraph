@@ -301,6 +301,13 @@ describe("facade/archive-view", () => {
       try {
         await seedSourcedDocument(document);
         await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(2)
+            .createDraft();
+
+          draft.addSentence("Limited Entity appears later.", 5);
+          await draft.commit();
           await openedDocument.mentions.saveMany([
             {
               chapterId: 1,
@@ -1369,6 +1376,69 @@ describe("facade/archive-view", () => {
         await expect(
           readArchivePage(document, "wikigraph://entity/Q1/extra"),
         ).rejects.toThrow("Invalid Wiki Graph URI");
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("applies evidence limits when reading entity pages", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "limited-one",
+              qid: "Q1",
+              rangeEnd: 11,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Limited Entity",
+            },
+            {
+              chapterId: 2,
+              fragmentId: 0,
+              id: "limited-two",
+              qid: "Q1",
+              rangeEnd: 12,
+              rangeStart: 0,
+              sentenceIndex: 1,
+              surface: "Limited Entity",
+            },
+          ]);
+          await openedDocument.replaceToc({
+            items: [
+              {
+                children: [],
+                serialId: 1,
+                title: "Introduction",
+              },
+              {
+                children: [],
+                serialId: 2,
+                title: "Second",
+              },
+            ],
+            version: 1,
+          });
+        });
+
+        const page = await readArchivePage(document, "wikigraph://entity/Q1", {
+          evidenceLimit: 1,
+        });
+
+        expect(page.type).toBe("entity");
+        if (page.type !== "entity") {
+          throw new Error("Expected entity page.");
+        }
+        expect(page.evidence.shown).toBe(1);
+        expect(page.evidence.total).toBe(2);
+        expect(page.evidence.nextCursor).not.toBeNull();
       } finally {
         await document.release();
       }

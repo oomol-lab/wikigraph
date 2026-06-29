@@ -358,6 +358,10 @@ export interface ArchiveEvidenceOptions {
   readonly limit?: number;
 }
 
+export interface ArchivePageOptions {
+  readonly evidenceLimit?: number;
+}
+
 export async function getArchiveIndex(
   document: ReadonlyDocument,
 ): Promise<ArchiveIndex> {
@@ -934,9 +938,10 @@ export async function readArchiveText(
 export async function readArchivePage(
   document: ReadonlyDocument,
   id: string,
+  options: ArchivePageOptions = {},
 ): Promise<ArchivePage> {
   if (id.startsWith("wikigraph://")) {
-    return await readWikiGraphPage(document, id);
+    return await readWikiGraphPage(document, id, options);
   }
 
   const reference = parseArchiveReference(id);
@@ -1034,16 +1039,18 @@ export async function readArchivePage(
 async function readWikiGraphPage(
   document: ReadonlyDocument,
   uri: string,
+  options: ArchivePageOptions = {},
 ): Promise<ArchivePage> {
   const reference = parseWikiGraphReference(uri);
 
   switch (reference.type) {
     case "meta":
-      return await readArchivePage(document, ARCHIVE_ROOT_ID);
+      return await readArchivePage(document, ARCHIVE_ROOT_ID, options);
     case "chapter":
       return await readArchivePage(
         document,
         formatChapterId(reference.chapterId),
+        options,
       );
     case "chapter-tree":
       return {
@@ -1063,7 +1070,11 @@ async function readWikiGraphPage(
       }
 
       return {
-        evidence: await createMentionEvidencePreview(document, mentions),
+        evidence: await createMentionEvidencePreview(
+          document,
+          mentions,
+          options.evidenceLimit,
+        ),
         id: uri,
         label: selectEntityLabel(mentions),
         labels: selectEntityLabels(mentions),
@@ -1088,7 +1099,11 @@ async function readWikiGraphPage(
       }
 
       return {
-        evidence: await createMentionLinkEvidencePreview(document, links),
+        evidence: await createMentionLinkEvidencePreview(
+          document,
+          links,
+          options.evidenceLimit,
+        ),
         id: uri,
         label: await createTriplePageLabel(document, reference),
         objectQid: reference.objectQid,
@@ -1105,7 +1120,11 @@ async function readWikiGraphPage(
           throw new Error(`Chunk ${uri} was not found in this archive.`);
         }
       }
-      return await readArchivePage(document, formatNodeId(reference.id));
+      return await readArchivePage(
+        document,
+        formatNodeId(reference.id),
+        options,
+      );
     }
     case "source":
       return {
@@ -1121,6 +1140,7 @@ async function readWikiGraphPage(
       return await readArchivePage(
         document,
         formatSummaryId(reference.chapterId),
+        options,
       );
   }
 }

@@ -663,7 +663,7 @@ describe("cli/archive", () => {
       objectId: "wikigraph:///tmp/book.sdpub/chunk/9",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://chunk/9");
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://chunk/9", {});
     expect(archiveMockState.textWrites[0]).toContain("node:9");
     expect(archiveMockState.textWrites[0]).toContain("Source Fragments:");
   });
@@ -676,7 +676,11 @@ describe("cli/archive", () => {
       objectId: "wikigraph:///tmp/book.sdpub/chapter/2",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://chapter/2");
+    expect(readArchivePage).toHaveBeenCalledWith(
+      {},
+      "wikigraph://chapter/2",
+      {},
+    );
     expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
       uri: "wikigraph://chapter/2",
       title: "Chapter 2",
@@ -692,7 +696,7 @@ describe("cli/archive", () => {
       objectId: "wikigraph:///tmp/book.sdpub/",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://");
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://", {});
     expect(archiveMockState.textWrites[0]).toBe(
       [
         "uri: wikigraph://",
@@ -714,7 +718,9 @@ describe("cli/archive", () => {
       objectId: "wikigraph:///tmp/book.sdpub/entity/Q1",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://entity/Q1");
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://entity/Q1", {
+      evidenceLimit: 3,
+    });
     expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
       uri: "wikigraph://entity/Q1",
       labels: [
@@ -763,6 +769,7 @@ describe("cli/archive", () => {
     expect(readArchivePage).toHaveBeenCalledWith(
       {},
       "wikigraph://triple/Q1/mentions/Q2",
+      { evidenceLimit: 3 },
     );
     expect(output).toStrictEqual({
       evidence: {
