@@ -137,9 +137,7 @@ describe("facade/knowledge-graph-build", () => {
     expect(request.mock.calls[0]?.[0][1]?.content).toContain(
       '"hasMoreOptions":true',
     );
-    expect(request.mock.calls[0]?.[0][1]?.content).not.toContain(
-      '"qid":"Q6"',
-    );
+    expect(request.mock.calls[0]?.[0][1]?.content).not.toContain('"qid":"Q6"');
     expect(mentions).toStrictEqual([
       {
         candidateId: "c1",
@@ -268,37 +266,39 @@ describe("facade/knowledge-graph-build", () => {
   });
 
   it("uses slower continued pages after strong surface prior", async () => {
-    const request = vi.fn<GuaranteedRequest>().mockImplementation((messages) => {
-      const prompt = readUserPrompt(messages);
-      const groups = readCandidateGroups(prompt);
+    const request = vi
+      .fn<GuaranteedRequest>()
+      .mockImplementation((messages) => {
+        const prompt = readUserPrompt(messages);
+        const groups = readCandidateGroups(prompt);
 
-      return Promise.resolve(
-        JSON.stringify({
-          groups: groups.map((group) => ({
-            decisions: group.candidates.map((candidate) => {
-              if (prompt.includes('"qid":"Q6"')) {
-                return {
-                  candidateId: candidate.candidateId,
-                  decision: "recall",
-                  qid: "Q6",
-                };
-              }
-
-              return candidate.candidateId === "c4"
-                ? {
-                    candidateId: "c4",
-                    decision: "continue",
-                  }
-                : {
+        return Promise.resolve(
+          JSON.stringify({
+            groups: groups.map((group) => ({
+              decisions: group.candidates.map((candidate) => {
+                if (prompt.includes('"qid":"Q6"')) {
+                  return {
                     candidateId: candidate.candidateId,
-                    decision: "never_recall",
+                    decision: "recall",
+                    qid: "Q6",
                   };
-            }),
-            groupId: group.groupId,
-          })),
-        }),
-      );
-    });
+                }
+
+                return candidate.candidateId === "c4"
+                  ? {
+                      candidateId: "c4",
+                      decision: "continue",
+                    }
+                  : {
+                      candidateId: candidate.candidateId,
+                      decision: "never_recall",
+                    };
+              }),
+              groupId: group.groupId,
+            })),
+          }),
+        );
+      });
 
     await groundWikimatchCandidates({
       candidates: [
@@ -524,9 +524,10 @@ function readCandidateGroups(prompt: string): Array<{
   readonly candidates: Array<{ readonly candidateId: string }>;
   readonly groupId: string;
 }> {
-  const match = /Candidate groups:\n(?<groups>[\s\S]+?)\n\nReturn this JSON shape:/u.exec(
-    prompt,
-  );
+  const match =
+    /Candidate groups:\n(?<groups>[\s\S]+?)\n\nReturn this JSON shape:/u.exec(
+      prompt,
+    );
 
   const groupsJson = match?.groups?.["groups"];
 

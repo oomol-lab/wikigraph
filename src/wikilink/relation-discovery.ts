@@ -619,7 +619,3 @@ function escapeXmlText(value: string): string {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 }
-
-function stripXmlLikeTags(value: string): string {
-  return value.replace(/<[^>]*>/gu, "");
-}

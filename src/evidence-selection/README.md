@@ -31,6 +31,11 @@ The module also retains the older anchor resolver because existing retry
 responses and tests still exercise that shape. New prompts should prefer the
 selection protocol above.
 
+`quote` should be short enough to be cheap but distinctive enough to identify
+the intended sentence. It is compared against visible source text after shared
+normalization; callers that include markup such as mention tags in their prompt
+must strip or normalize those tags before passing sentences to this module.
+
 ## Responsibilities
 
 - Normalize evidence text according to the shared surface-normalization
@@ -48,3 +53,6 @@ selection protocol above.
   objects.
 - Recovery loops remain caller-owned because each graph builder has different
   retry semantics and result objects.
+- The module may return ambiguity or low-confidence candidates, but it does not
+  decide whether a graph builder should retry, accept the model's sentence ID,
+  drop a partial result, or ask the model to choose from candidates.

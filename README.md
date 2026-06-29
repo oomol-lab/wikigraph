@@ -16,9 +16,9 @@ It is not a one-shot book-to-summary converter. Summaries, EPUB, Markdown, and J
 
 There are three main ways to explore a `.sdpub` archive:
 
-- **Search mode:** use `find` to discover keyword-related objects and `grep` to check exact continuous text.
-- **Structure mode:** use `chapter tree --json` for the table-of-contents hierarchy, `list` for chapter and knowledge-node collections, then `page` to open a page and follow related nodes, source fragments, and links.
-- **Reading mode:** use `read` for continuous reading of chapters, knowledge nodes, or source fragments.
+- **Search mode:** use `search` to discover URI-addressable source, summary, chunk, entity, and triple objects.
+- **Structure mode:** use `chapter tree --json` for the table-of-contents hierarchy, then `list` or scoped `search` to inspect local object collections.
+- **Reading mode:** use `get` on source, chapter, summary, chunk, entity, or triple URIs after selecting the relevant object.
 
 Together, these modes let long documents behave like navigable knowledge bases: start with structure, locate relevant content, then return to source text and knowledge nodes for deeper reading.
 
@@ -85,21 +85,20 @@ wikigraph queue watch <job-id> --jsonl
 Search, browse, and read through the knowledge-base interface:
 
 ```bash
-wikigraph list ./book.sdpub --type chapter
-wikigraph page ./book.sdpub --chapter 12
-wikigraph find ./book.sdpub "RAG" --type node
-wikigraph grep ./book.sdpub "exact source phrase" --type fragment
-wikigraph page ./book.sdpub --node 84
-wikigraph read ./book.sdpub --chapter 12
-wikigraph links ./book.sdpub --node 84
-wikigraph related ./book.sdpub --node 84
-wikigraph pack ./book.sdpub --node 84 --budget 5000
+wikigraph chapter tree ./book.sdpub --json
+wikigraph search wikigraph://book.sdpub "RAG" --type chunk
+wikigraph search wikigraph://book.sdpub/chapter/12 "exact source phrase" --type source
+wikigraph get wikigraph://book.sdpub/chapter/12
+wikigraph get wikigraph://book.sdpub/chunk/84
+wikigraph related wikigraph://book.sdpub/chunk/84
+wikigraph evidence wikigraph://book.sdpub/chunk/84
+wikigraph pack wikigraph://book.sdpub/chunk/84 --budget 5000
 ```
 
 Output a projection only when you need a portable view. For example, read one chapter into Markdown text, or export the full archive as an EPUB:
 
 ```bash
-wikigraph read ./book.sdpub --chapter 12 > ./chapter-12.md
+wikigraph get wikigraph://book.sdpub/chapter/12/source/ > ./chapter-12.md
 wikigraph export ./book.sdpub --output-format epub --output ./digest.epub
 ```
 
@@ -109,7 +108,7 @@ Cost rule:
 Create is cheap.
 Estimate before queueing Reading Graph, Reading Summary, or Knowledge Graph jobs.
 Queue Reading Graph, Reading Summary, or Knowledge Graph jobs only when the cost and wait time are acceptable.
-Search, read, navigate, pack, and export are cheap after build.
+Search, get, related, evidence, pack, and export are cheap after build.
 ```
 
 Full flag reference: [CLI Reference](./docs/en/cli.md).
@@ -130,7 +129,7 @@ First, an LLM reads the source text section by section, simulating how human att
 
 Next, a classical algorithm takes over. I build a knowledge graph with chunks as nodes, connect them by conceptual relevance, then use graph traversal and community detection to cluster semantically related chunks. Each cluster is serialized in original reading order into what I call a snake: a knowledge chain that moves through the source text and links dispersed but related ideas.
 
-Finally, the LLM returns to work on that structure. The old use case compressed those structures into a summary; the more important use now is to save them into `.sdpub`. Later, you can use it like a Wiki: open chapter pages, inspect `nodeGroups`, enter nodes, trace source fragments, check links and backlinks, and pack an evidence-bounded context before answering.
+Finally, the LLM returns to work on that structure. The old use case compressed those structures into a summary; the more important use now is to save them into `.sdpub`. Later, you can use it like a Wiki: open chapter and chunk objects, trace source evidence, follow related objects, and pack an evidence-bounded context before answering.
 
 **Every professor holds a snake.**
 
@@ -148,11 +147,11 @@ With that archive on hand, you can search and navigate the knowledge structure d
 
 ```bash
 wikigraph index ./book.sdpub
-wikigraph list ./book.sdpub --type chapter
-wikigraph list ./book.sdpub --type node --chapter 12
-wikigraph find ./book.sdpub "central argument" --type node
-wikigraph page ./book.sdpub --chapter 12
-wikigraph read ./book.sdpub --chapter 12
+wikigraph chapter tree ./book.sdpub --json
+wikigraph list wikigraph://book.sdpub/chapter/12 --type chunk
+wikigraph search wikigraph://book.sdpub "central argument" --type chunk
+wikigraph get wikigraph://book.sdpub/chapter/12
+wikigraph get wikigraph://book.sdpub/chapter/12/source/
 ```
 
 Markdown, EPUB, txt, and JSON-style outputs are projections of the archive. They are useful for portability and reading, but they do not replace the `.sdpub` object when graph links and source fragments matter.
@@ -186,12 +185,12 @@ SpineDigest also exposes a programmatic API for embedding lower-level import, bu
 SpineDigest's CLI-first design exposes `.sdpub` as a managed LLM Wiki archive.
 
 - **Treat `.sdpub` as the primary object.** Use archive commands before unpacking or inspecting internals.
-- **Choose an exploration mode first.** For synthesis and structural understanding, start with `list/page`; use `find/grep` for candidate discovery and exact wording; use `read` for continuous prose after selecting the relevant object.
+- **Choose an exploration mode first.** For synthesis and structural understanding, start with `chapter tree --json`; use `search` for candidate discovery and exact wording; use `get` for continuous prose after selecting the relevant URI.
 - **Use help as the discovery surface.** Start with `wikigraph --help` as the root page, then follow `wikigraph help overview`, `wikigraph help ai`, topic pages, or command-specific `--help` before guessing behavior.
 - **Prefer `--json`.** Use it when composing with tools.
 - **Estimate before queueing jobs.** Do not queue broad Reading Graph, Reading Summary, or Knowledge Graph work without `wikigraph estimate`.
 - **Check exit codes.** Success returns `0`; failure returns non-zero with a plain-text error on `stderr`.
-- **Do not inspect `database.db` routinely.** Use `list`, `page`, `read`, and graph navigation commands instead.
+- **Do not inspect `database.db` routinely.** Use `search`, `list`, `get`, and graph navigation commands instead.
 
 Useful help entry points:
 

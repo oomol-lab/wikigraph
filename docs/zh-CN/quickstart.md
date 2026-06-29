@@ -64,16 +64,18 @@ wikigraph queue list --input ./book.sdpub
 ## 6. 搜索、浏览和阅读
 
 ```bash
-wikigraph list ./book.sdpub --type chapter
-wikigraph page ./book.sdpub --chapter 3
-wikigraph find ./book.sdpub "central argument" --type node
-wikigraph page ./book.sdpub --node 84
-wikigraph read ./book.sdpub --chapter 3
-wikigraph links ./book.sdpub --node 84
-wikigraph pack ./book.sdpub --node 84 --budget 5000
+wikigraph chapter tree ./book.sdpub --json
+wikigraph search wikigraph://book.sdpub "central argument" --type chunk
+wikigraph get wikigraph://book.sdpub/chapter/3
+wikigraph get wikigraph://book.sdpub/chunk/84
+wikigraph related wikigraph://book.sdpub/chunk/84
+wikigraph evidence wikigraph://book.sdpub/chunk/84
+wikigraph pack wikigraph://book.sdpub/chunk/84 --budget 5000
 ```
 
-使用 `--type` 选择 search lens：`--type node` 用于拓扑结构，`--type summary` 用于快速概览，`--type fragment` 用于原文措辞。
+使用 `--type` 选择 search lens：`--type chunk` 用于 Reading Graph 结构，`--type summary` 用于快速概览，`--type source` 用于原文措辞，`--type entity,triple` 用于 Knowledge Graph 对象。
+
+Object command 使用 Wiki Graph URI。手动构造 URI 时，先读 `wikigraph help uri`。
 
 输出要交给其他工具消费时，使用 `--json`。
 
@@ -82,7 +84,7 @@ wikigraph pack ./book.sdpub --node 84 --budget 5000
 只有需要便携视图时再输出 projection。比如只需要某一章的 `.md` 文本，可以读取该章；需要完整电子书视图时再导出 EPUB：
 
 ```bash
-wikigraph read ./book.sdpub --chapter 3 > ./chapter-3.md
+wikigraph get wikigraph://book.sdpub/chapter/3/source/ > ./chapter-3.md
 wikigraph export ./book.sdpub --output-format epub --output ./digest.epub
 ```
 

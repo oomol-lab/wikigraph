@@ -64,16 +64,18 @@ wikigraph queue list --input ./book.sdpub
 ## 6. Search, Browse, And Read
 
 ```bash
-wikigraph list ./book.sdpub --type chapter
-wikigraph page ./book.sdpub --chapter 3
-wikigraph find ./book.sdpub "central argument" --type node
-wikigraph page ./book.sdpub --node 84
-wikigraph read ./book.sdpub --chapter 3
-wikigraph links ./book.sdpub --node 84
-wikigraph pack ./book.sdpub --node 84 --budget 5000
+wikigraph chapter tree ./book.sdpub --json
+wikigraph search wikigraph://book.sdpub "central argument" --type chunk
+wikigraph get wikigraph://book.sdpub/chapter/3
+wikigraph get wikigraph://book.sdpub/chunk/84
+wikigraph related wikigraph://book.sdpub/chunk/84
+wikigraph evidence wikigraph://book.sdpub/chunk/84
+wikigraph pack wikigraph://book.sdpub/chunk/84 --budget 5000
 ```
 
-Use `--type` to choose a search lens: `--type node` for topology, `--type summary` for quick overview, or `--type fragment` for original source wording.
+Use `--type` to choose a search lens: `--type chunk` for Reading Graph structure, `--type summary` for quick overview, `--type source` for original source wording, or `--type entity,triple` for Knowledge Graph objects.
+
+Object commands use Wiki Graph URIs. Read `wikigraph help uri` when constructing URIs manually.
 
 Use `--json` when another tool will consume the output.
 
@@ -82,7 +84,7 @@ Use `--json` when another tool will consume the output.
 Use projections when you need a portable view. For example, read one chapter into Markdown text, or export the full archive as an EPUB:
 
 ```bash
-wikigraph read ./book.sdpub --chapter 3 > ./chapter-3.md
+wikigraph get wikigraph://book.sdpub/chapter/3/source/ > ./chapter-3.md
 wikigraph export ./book.sdpub --output-format epub --output ./digest.epub
 ```
 

@@ -15,17 +15,12 @@ wikigraph create <archive.sdpub> [source] [--input-format <format>] [--llm <json
 wikigraph estimate <archive.sdpub> [--stage <source|reading-graph|reading-summary>] [--json]
 wikigraph status <archive.sdpub> [--json]
 wikigraph index <archive.sdpub> [--json]
-wikigraph list <archive.sdpub> --type <types> [--id <ids>] [--chapter <ids>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
-wikigraph find <archive.sdpub> <query> --type <types> [--match <any|all>] [--chapter <ids>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
-wikigraph grep <archive.sdpub> <query> --type <types> [--chapter <ids>] [--order <doc-asc|doc-desc>] [--limit <n>] [--cursor <token>] [--json]
-wikigraph page <archive.sdpub> <selector> [--json]
-wikigraph read <archive.sdpub> <selector>
-wikigraph links <archive.sdpub> --node <id> [--json]
-wikigraph backlinks <archive.sdpub> --node <id> [--json]
-wikigraph related <archive.sdpub> --node <id> [--json]
-wikigraph path <archive.sdpub> --from <id> --to <id> --chapter <id>
-wikigraph map <archive.sdpub> [--json]
-wikigraph pack <archive.sdpub> <selector> [--budget <chars>] [--json]
+wikigraph search <archive-or-scope-uri> <query> [--type <chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph list <archive-or-scope-uri> [--type <chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph get <object-uri> [--json|--jsonl]
+wikigraph related <object-uri> [--json|--jsonl]
+wikigraph evidence <object-uri> [--limit <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph pack <object-uri> [--budget <chars>] [--json|--jsonl]
 wikigraph export <archive.sdpub> --output-format <format> [--output <path>]
 wikigraph queue add <archive.sdpub> --chapter <id> [--task reading-graph|reading-summary|knowledge-graph] --accept-cost [--boost] [--llm <json>] [--prompt <text>]
 wikigraph queue list [--all] [--active] [--input <archive.sdpub>] [--json]
@@ -44,23 +39,14 @@ Exploration modes:
 
 Search and collection behavior:
 
-- `find` is deterministic keyword discovery. It splits the query on whitespace, defaults to `--match any`, and ranks objects that match more terms first.
-- `--type` is required for `list`, `find`, and `grep`. For content understanding, choose a search lens: `--type node` for topology / LLM Wiki structure, `--type summary` for quick overview, or `--type fragment` for original source wording.
-- `find --match all` is the strict mode where every keyword must appear in the same object.
-- `grep` is exact text search. It treats the query as one continuous string.
-- `--chapter 12` or `--chapter 11,12` limits results to chapters.
-- `--type chapter,summary,node,fragment,meta` limits `list`; `find` and `grep` accept `--type summary,node,fragment` as search lenses.
-- `--order doc-asc|doc-desc` sorts by stable document position. Default is `doc-asc`.
+- `search` finds URI-addressable objects from query text. Search results are leads, not source evidence.
+- `list` enumerates URI-addressable objects without query text.
+- Object commands use Wiki Graph URIs. Convert archive paths to archive URIs such as `wikigraph:///Users/me/book.sdpub` before using `search`, `list`, `get`, `related`, `evidence`, or `pack`.
+- For content understanding, choose a search lens: `--type chunk` for Reading Graph structure, `--type summary` for quick overview, `--type source` for original source wording, or `--type entity,triple` for Knowledge Graph objects.
+- Use a chapter scope URI such as `wikigraph:///Users/me/book.sdpub/chapter/12` to keep search or list local to one chapter.
 - `--limit` defaults to `20`; pass returned `nextCursor` back through `--cursor` for the next page.
-- Neither command does semantic expansion, fuzzy matching, stemming, or vector search.
-
-Object ids:
-
-- `--chapter <id>`
-- `--node <id>`
-- `--fragment <chapter>:<fragment>`
-- `--summary <id>`
-- `--meta book`
+- Search does not do semantic expansion, stemming, or vector search.
+- Read `wikigraph help uri` for the URI grammar and object boundary rules.
 
 ## Build Stages
 
@@ -69,6 +55,7 @@ User-facing stages:
 - `source`: imported normalized source data
 - `reading-graph`: reading-oriented chunks, edges, and source-backed knowledge units
 - `reading-summary`: readable chapter summaries
+- `knowledge-graph`: grounded entity mentions and source-backed relations
 
 `source` is cheap. Reading Graph, Reading Summary, and Knowledge Graph queue tasks may call an LLM provider. Run `estimate` first, then use `queue add` for the chapter ids you want to generate.
 
@@ -99,8 +86,8 @@ Extension mapping:
 Read/search/navigation commands support `--json` for machine consumption:
 
 ```bash
-wikigraph find book.sdpub "RAG" --type node --json
-wikigraph page book.sdpub --chapter 3 --json
+wikigraph search wikigraph:///Users/me/book.sdpub "RAG" --type chunk --json
+wikigraph get wikigraph:///Users/me/book.sdpub/chapter/3 --json
 ```
 
 Human-readable stdout is Markdown-like text with stable ids and suggested next commands.

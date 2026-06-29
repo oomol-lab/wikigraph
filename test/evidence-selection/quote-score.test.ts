@@ -54,7 +54,7 @@ const REPORT_CASES: readonly ReportCase[] = [
     id: "exact_full_sentence",
     mode: "exact_or_substring",
     note: "完整原句，应该 exact=1，且 top1 明显突出。",
-    quote: FREUD_SENTENCES[6]!,
+    quote: FREUD_SENTENCES[6],
   },
   {
     expected: "unique_high",
@@ -223,7 +223,7 @@ describe("evidence-selection/quote-score", () => {
   });
 
   it("scores exact and substring evidence quotes highly", () => {
-    const sentence = FREUD_SENTENCES[6]!;
+    const sentence = FREUD_SENTENCES[6];
 
     expect(scoreEvidenceQuote({ quote: sentence, sentence }).score).toBe(1);
     expect(
@@ -244,7 +244,7 @@ describe("evidence-selection/quote-score", () => {
   });
 
   it("strips mention tags before scoring evidence quotes", () => {
-    const sentence = FREUD_SENTENCES[9]!;
+    const sentence = FREUD_SENTENCES[9];
     const taggedQuote =
       '弗洛伊德阐述了他的<mention id="m1" qid="Q41631">潜意识理论</mention>';
 
@@ -254,7 +254,7 @@ describe("evidence-selection/quote-score", () => {
   });
 
   it("keeps fuzzy omissions high but penalizes reordered excerpts", () => {
-    const sentence = FREUD_SENTENCES[8]!;
+    const sentence = FREUD_SENTENCES[8];
     const omitted = "梦解释为愿望的满足提供了对症状形成和压抑的临床分析模型";
     const reordered = "临床分析模型提供了梦解释为愿望的满足和压抑";
 
@@ -304,7 +304,7 @@ describe("evidence-selection/quote-score", () => {
         ...item,
         normalizedQuote: scoreEvidenceQuote({
           quote: item.quote,
-          sentence: FREUD_SENTENCES[0]!,
+          sentence: FREUD_SENTENCES[0],
         }).normalizedQuote,
         scoreStats: createScoreStats(
           ranked.map((candidate) => candidate.score),

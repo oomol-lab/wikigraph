@@ -11,8 +11,8 @@ SpineDigest is built around one primary object: the `.sdpub` knowledge-base arch
 At a high level, SpineDigest has four layers:
 
 1. Source layer: read EPUB, Markdown, plain text, or stdin and normalize it into source-backed chapter data.
-2. Knowledge layer: build Reading Graph chunks and summaries, and build Knowledge Graph entity mentions and relationships from source fragments.
-3. Retrieval layer: expose existing archive data through CLI primitives such as `index`, `list`, `find`, `grep`, `page`, `read`, `links`, `backlinks`, `related`, and `pack`.
+2. Knowledge layer: build Reading Graph chunks and summaries, and build Knowledge Graph entity mentions, mention links, and entity-level relations from source fragments.
+3. Retrieval layer: expose existing archive data through CLI primitives such as `index`, `chapter tree`, `search`, `list`, `get`, `related`, `evidence`, and `pack`.
 4. Projection layer: export portable views such as Markdown, txt, EPUB, JSON-style command output, or one-shot `transform` results.
 
 The archive is the durable object. Projections are useful views, but they do not replace the `.sdpub` when graph links, source fragments, and repeatable retrieval matter.
@@ -23,9 +23,15 @@ The archive is the durable object. Projections are useful views, but they do not
 - `cli`: command-line assembly, argument parsing, help routing, and config loading
 - `source`: readers for EPUB, Markdown, and plain text
 - `document`: on-disk document state, archive I/O, metadata, fragments, and schema ownership
+- `llm`: provider configuration, model requests, request cache, request logs, sampling options, and provider error normalization
+- `guaranteed`: shared structured-output retry flow used when an LLM response must satisfy a schema
+- `evidence-selection`: shared sentence evidence positioning for Reading Graph and Knowledge Graph builders
 - `reader`: LLM-guided extraction over the text stream
 - `topology`: graph construction from reader output
 - `editor`: summary/projection generation from topology groups
+- `wikimatch`: Knowledge Graph surface screening, Wikidata/Wikipedia candidate enrichment, and LLM grounding decisions
+- `wikilink`: Knowledge Graph mention-link windowing and relation discovery support
+- `wikipage`: Wikipedia page/QID resolution, caching, normalization, and request throttling
 - `progress`: progress tracking and event callbacks for LLM-backed build work
 - `serial.ts`: glue between source serials, reader output, topology, and summaries
 
@@ -36,9 +42,11 @@ User-facing stages describe how much knowledge has been built into the archive:
 - `source`: normalized source data and metadata are present
 - `reading-graph`: reading-oriented chunks, links, and source-backed knowledge units are present
 - `reading-summary`: readable chapter summaries and export projections are available
-- `knowledge-graph`: entity mentions and relationships are available for URI-based search and evidence tracing
+- `knowledge-graph`: grounded entity mentions and source-backed relations are available for URI-based search and evidence tracing
 
 `source` is cheap and does not require LLM access. Reading Graph, Reading Summary, and Knowledge Graph queue tasks may call an LLM provider and should be estimated before full-archive builds.
+
+Knowledge Graph construction is source-first. It screens source text for mention candidates, grounds those mentions to QIDs, then asks the model to discover relations between grounded mention IDs. Relation evidence is resolved through the shared evidence-selection protocol, which uses sentence IDs plus short source quotes so both Reading Graph and Knowledge Graph builders can correct sentence drift without owning each other's business objects.
 
 ## Why `.sdpub` Exists
 

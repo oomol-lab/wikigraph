@@ -125,9 +125,7 @@ describe("wikimatch/policy-judge", () => {
     expect(request.mock.calls[0]?.[0][1]?.content).toContain(
       '<group id="g2">Mercury</group>',
     );
-    expect(request.mock.calls[0]?.[0][1]?.content).not.toContain(
-      '"id":"DIS1"',
-    );
+    expect(request.mock.calls[0]?.[0][1]?.content).not.toContain('"id":"DIS1"');
     expect(request.mock.calls[0]?.[0][1]?.content).toContain('"qid":"Q308"');
     expect(request.mock.calls[0]?.[0][1]?.content).not.toContain("sourceQid");
     expect(request.mock.calls[0]?.[0][1]?.content).not.toContain(

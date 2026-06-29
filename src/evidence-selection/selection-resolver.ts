@@ -122,9 +122,7 @@ export function resolveEvidenceSelectionList(input: {
   resolution: EvidenceSelectionResolution | undefined,
   failure: EvidenceSelectionFailure | undefined,
 ] {
-  const selections = Array.isArray(input.evidence)
-    ? input.evidence
-    : [input.evidence];
+  const selections = normalizeEvidenceSelectionList(input.evidence);
 
   if (selections.length === 0) {
     return [
@@ -189,6 +187,22 @@ export function resolveEvidenceSelectionList(input: {
     },
     undefined,
   ];
+}
+
+function normalizeEvidenceSelectionList(
+  evidence: EvidenceSelectionList,
+): readonly EvidenceSelection[] {
+  if (isEvidenceSelectionArray(evidence)) {
+    return evidence;
+  }
+
+  return [evidence];
+}
+
+function isEvidenceSelectionArray(
+  evidence: EvidenceSelectionList,
+): evidence is readonly EvidenceSelection[] {
+  return Array.isArray(evidence);
 }
 
 export function rankEvidenceQuote(
