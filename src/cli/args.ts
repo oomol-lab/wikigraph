@@ -1383,9 +1383,9 @@ function formatMissingArchiveInputMessage(action: CLIArchiveAction): string {
     case "index":
       return "Missing archive path. Use `wikigraph index <archive.sdpub>`.";
     case "search":
-      return "Missing archive or scope URI. Use `wikigraph search wikigraph://<archive.sdpub> <query>`.";
+      return "Missing Wiki Graph URI with .sdpub locator. Use `wikigraph search wikigraph://<archive.sdpub> <query>`.";
     case "list":
-      return "Missing archive or scope URI. Use `wikigraph list wikigraph://<archive.sdpub>`.";
+      return "Missing Wiki Graph URI with .sdpub locator. Use `wikigraph list wikigraph://<archive.sdpub>`.";
     case "get":
     case "related":
     case "evidence":

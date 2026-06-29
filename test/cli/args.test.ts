@@ -928,8 +928,12 @@ describe("cli/args", () => {
     const commandHelpText = renderHelpTopicText("command");
 
     expect(rootHelpText).toContain("wikigraph help [topic]");
-    expect(rootHelpText).toContain("wikigraph search <archive-or-scope-uri>");
-    expect(rootHelpText).toContain("wikigraph list <archive-or-scope-uri>");
+    expect(rootHelpText).toContain(
+      "wikigraph search <wikigraph-uri-with-sdpub-locator>",
+    );
+    expect(rootHelpText).toContain(
+      "wikigraph list <wikigraph-uri-with-sdpub-locator>",
+    );
     expect(rootHelpText).toContain("wikigraph help overview");
     expect(rootHelpText).toContain("wikigraph help uri");
     expect(rootHelpText).toContain("wikigraph help env");

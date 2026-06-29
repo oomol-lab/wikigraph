@@ -13,19 +13,23 @@ Object model:
 
 Object workflow:
   - `search` returns candidate Wiki Graph URIs from query text.
-  - `list` enumerates objects from an archive or scope URI.
+  - `list` enumerates objects from a located Wiki Graph URI.
   - `get` opens one readable URI.
   - `related` expands from one URI to nearby URIs.
   - `evidence` traces a URI to source-backed evidence.
   - `pack` builds bounded Agent-readable context around one readable URI.
 
 Object commands:
-  wikigraph search <archive-or-scope-uri> <query> [--type <chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
-  wikigraph list <archive-or-scope-uri> [--type <chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+  wikigraph search <wikigraph-uri-with-sdpub-locator> <query> [--type <chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+  wikigraph list <wikigraph-uri-with-sdpub-locator> [--type <chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
   wikigraph get <object-uri> [--json|--jsonl]
   wikigraph related <object-uri> [--json|--jsonl]
   wikigraph evidence <entity|triple|summary|chunk-uri> [--limit <n>] [--cursor <token>] [--json|--jsonl]
   wikigraph pack <object-uri> [--budget <chars>] [--json|--jsonl]
+
+URI requirement:
+  `search`, `list`, `get`, `related`, `evidence`, and `pack` use Wiki Graph URIs, not bare filesystem paths.
+  Read `wikigraph help uri` before using these commands; skipping the URI rules commonly leads to invalid commands.
 
 Archive commands:
   wikigraph create <archive.sdpub> [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
@@ -63,6 +67,6 @@ Formats:
 
 Start here:
   - Read `wikigraph help overview` for the archive-first mental model.
-  - Read `wikigraph help uri` before constructing object command inputs.
+  - Read `wikigraph help uri` before using object commands: search, list, get, related, evidence, pack.
   - Read `wikigraph help ai` for the agent operating contract.
   - Read `wikigraph help command` for command shapes.

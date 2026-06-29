@@ -4,15 +4,16 @@ Topic: command
 Command Overview
 
 Object commands:
-  wikigraph search <archive-or-scope-uri> <query>
-  wikigraph list <archive-or-scope-uri>
+  wikigraph search <wikigraph-uri-with-sdpub-locator> <query>
+  wikigraph list <wikigraph-uri-with-sdpub-locator>
   wikigraph get <object-uri>
   wikigraph related <object-uri>
   wikigraph evidence <object-uri>
   wikigraph pack <object-uri>
 
 URI routing:
-  Read `wikigraph help uri` before using object commands.
+  `search`, `list`, `get`, `related`, `evidence`, and `pack` use Wiki Graph URIs, not bare filesystem paths.
+  Read `wikigraph help uri` before using object commands; skipping the URI rules commonly leads to invalid commands.
 
 Archive commands:
   wikigraph create <archive.sdpub>
