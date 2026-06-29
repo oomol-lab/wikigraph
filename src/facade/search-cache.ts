@@ -36,6 +36,7 @@ export interface EntitySearchMentionHit {
   readonly qid: string;
   readonly rangeEnd: number;
   readonly rangeStart: number;
+  readonly resultScore: number;
   readonly score: number;
   readonly sentenceIndex?: number;
   readonly surface: string;
@@ -120,6 +121,7 @@ CREATE TABLE IF NOT EXISTS search_mention_hits (
   note TEXT,
   confidence REAL,
   score REAL NOT NULL,
+  result_score REAL NOT NULL DEFAULT 0,
   match_count INTEGER NOT NULL,
   matched_terms_json TEXT NOT NULL,
   missing_terms_json TEXT NOT NULL,
@@ -134,6 +136,11 @@ ON search_mention_hits(session_id, score DESC, chapter_id, fragment_id, sentence
 
 CREATE INDEX IF NOT EXISTS idx_search_sessions_expires
 ON search_sessions(expires_at);
+`;
+
+const SEARCH_SESSION_MIGRATION_SQL = `
+ALTER TABLE search_mention_hits
+ADD COLUMN result_score REAL NOT NULL DEFAULT 0;
 `;
 
 const SEARCH_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
@@ -235,10 +242,10 @@ export async function createEntitySearchSession(
             INSERT INTO search_mention_hits (
               session_id, mention_id, qid, chapter_id, fragment_id,
               sentence_index, range_start, range_end, surface, note,
-              confidence, score, match_count, matched_terms_json,
+              confidence, score, result_score, match_count, matched_terms_json,
               missing_terms_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `,
           [
             sessionId,
@@ -253,6 +260,7 @@ export async function createEntitySearchSession(
             hit.note ?? null,
             hit.confidence ?? null,
             hit.score,
+            hit.resultScore,
             hit.matchCount,
             JSON.stringify(hit.matchedTerms),
             JSON.stringify(hit.missingTerms),
@@ -346,6 +354,7 @@ export async function readEntitySearchSessionPage(
           surface,
           note,
           score,
+          result_score,
           match_count,
           matched_terms_json,
           missing_terms_json,
@@ -358,6 +367,7 @@ export async function readEntitySearchSessionPage(
             surface,
             note,
             score,
+            result_score,
             match_count,
             matched_terms_json,
             missing_terms_json,
@@ -373,7 +383,7 @@ export async function readEntitySearchSessionPage(
           WHERE session_id = ?
         )
         WHERE entity_row_number = 1
-        ORDER BY score DESC, match_count DESC, chapter_id, fragment_id, qid
+        ORDER BY result_score DESC, score DESC, match_count DESC, chapter_id, fragment_id, qid
         LIMIT ? OFFSET ?
       `,
       [sessionId, limit + 1, offset],
@@ -453,6 +463,7 @@ export async function readEntitySearchEvidenceMentions(
           note,
           confidence,
           score,
+          result_score,
           match_count,
           matched_terms_json,
           missing_terms_json
@@ -511,10 +522,29 @@ export function decodeSearchSessionCursor(cursor: string): {
 }
 
 async function openSearchSessionDatabase(): Promise<Database> {
-  return await openSharedStateDatabase(
+  const database = await openSharedStateDatabase(
     join(getSearchSessionStateDirectoryPath(), "search-sessions.sqlite"),
     SEARCH_SESSION_SCHEMA_SQL,
   );
+
+  await runSearchSessionMigrations(database);
+
+  return database;
+}
+
+async function runSearchSessionMigrations(database: Database): Promise<void> {
+  try {
+    await database.run(SEARCH_SESSION_MIGRATION_SQL);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("duplicate column name")
+    ) {
+      return;
+    }
+
+    throw error;
+  }
 }
 
 function getSearchSessionStateDirectoryPath(): string {
@@ -662,7 +692,7 @@ function mapEntitySearchObjectRow(
       chapter: chapterId,
       fragment: fragmentId,
     },
-    score: getNumber(row, "score"),
+    score: getNumber(row, "result_score"),
     snippet: getOptionalString(row, "note") ?? getString(row, "surface"),
     title: getString(row, "surface"),
     type: "entity",
@@ -690,6 +720,7 @@ function mapEntitySearchMentionHitRow(
     qid: getString(row, "qid"),
     rangeEnd: getNumber(row, "range_end"),
     rangeStart: getNumber(row, "range_start"),
+    resultScore: getNumber(row, "result_score"),
     score: getNumber(row, "score"),
     ...(sentenceIndex === undefined ? {} : { sentenceIndex }),
     surface: getString(row, "surface"),

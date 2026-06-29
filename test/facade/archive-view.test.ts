@@ -258,6 +258,163 @@ describe("facade/archive-view", () => {
     });
   });
 
+  it("keeps exact entity surfaces ahead of weaker same-qid mentions", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "same-qid-weaker",
+              qid: "Q1",
+              rangeEnd: 1,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "战船",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "exact-later",
+              qid: "Q1",
+              rangeEnd: 3,
+              rangeStart: 2,
+              sentenceIndex: 1,
+              surface: "战舰",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "other-qid-weaker",
+              qid: "Q2",
+              rangeEnd: 5,
+              rangeStart: 4,
+              sentenceIndex: 2,
+              surface: "战船",
+            },
+          ]);
+        });
+
+        const result = await findArchiveObjects(document, "战舰", {
+          types: ["entity"],
+        });
+
+        expect(result.items[0]).toMatchObject({
+          id: "wikigraph://entity/Q1",
+          title: "战舰",
+          type: "entity",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("does not expand entity matches through qid aliases", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "exact",
+              qid: "Q1",
+              rangeEnd: 2,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "战舰",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "same-qid-alias",
+              qid: "Q1",
+              rangeEnd: 5,
+              rangeStart: 3,
+              sentenceIndex: 1,
+              surface: "军舰",
+            },
+          ]);
+        });
+
+        const result = await findArchiveObjects(document, "战舰", {
+          types: ["entity"],
+        });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0]).toMatchObject({
+          evidence: {
+            total: 1,
+          },
+          id: "wikigraph://entity/Q1",
+          title: "战舰",
+          type: "entity",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("adds only a small bonus for repeated entity evidence", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            ...Array.from({ length: 10 }, (_, index) => ({
+              chapterId: 1,
+              fragmentId: 0,
+              id: `multi-${index}`,
+              qid: "Q1",
+              rangeEnd: index * 2 + 1,
+              rangeStart: index * 2,
+              sentenceIndex: index,
+              surface: "舰",
+            })),
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "single",
+              qid: "Q2",
+              rangeEnd: 31,
+              rangeStart: 30,
+              sentenceIndex: 10,
+              surface: "舰",
+            },
+          ]);
+        });
+
+        const result = await findArchiveObjects(document, "舰", {
+          types: ["entity"],
+        });
+        const multi = result.items.find(
+          (item) => item.id === "wikigraph://entity/Q1",
+        );
+        const single = result.items.find(
+          (item) => item.id === "wikigraph://entity/Q2",
+        );
+
+        expect(multi?.score).toBeCloseTo((single?.score ?? 0) * 1.3, 10);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("finds triples when only one endpoint matches the query", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
@@ -307,6 +464,63 @@ describe("facade/archive-view", () => {
             type: "triple",
           }),
         );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("adds only a small bonus for repeated triple evidence", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            ...Array.from({ length: 11 }, (_, index) => ({
+              chapterId: 1,
+              fragmentId: 0,
+              id: `source-${index}`,
+              qid: index < 10 ? "Q1" : "Q3",
+              rangeEnd: index * 4 + 1,
+              rangeStart: index * 4,
+              sentenceIndex: index,
+              surface: "舰",
+            })),
+            ...Array.from({ length: 11 }, (_, index) => ({
+              chapterId: 1,
+              fragmentId: 0,
+              id: `target-${index}`,
+              qid: index < 10 ? "Q2" : "Q4",
+              rangeEnd: index * 4 + 3,
+              rangeStart: index * 4 + 2,
+              sentenceIndex: index,
+              surface: "队",
+            })),
+          ]);
+          await openedDocument.mentionLinks.saveMany(
+            Array.from({ length: 11 }, (_, index) => ({
+              id: `link-${index}`,
+              predicate: "supports",
+              sourceMentionId: `source-${index}`,
+              targetMentionId: `target-${index}`,
+            })),
+          );
+        });
+
+        const result = await findArchiveObjects(document, "舰", {
+          types: ["triple"],
+        });
+        const multi = result.items.find(
+          (item) => item.id === "wikigraph://triple/Q1/supports/Q2",
+        );
+        const single = result.items.find(
+          (item) => item.id === "wikigraph://triple/Q3/supports/Q4",
+        );
+
+        expect(multi?.score).toBeCloseTo((single?.score ?? 0) * 1.3, 10);
       } finally {
         await document.release();
       }

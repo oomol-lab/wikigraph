@@ -88,7 +88,7 @@ export interface ArchiveIndex {
 export interface ArchiveFindHit {
   readonly chapter?: number;
   readonly evidence?: ArchiveFindEvidencePreview;
-  readonly evidenceMentions?: readonly MentionRecord[];
+  readonly evidenceMentions?: readonly EntityEvidenceMention[];
   readonly field: ArchiveFindField;
   readonly id: string;
   readonly matchCount?: number;
@@ -99,6 +99,14 @@ export interface ArchiveFindHit {
   readonly snippet: string;
   readonly title: string;
   readonly type: ArchiveFindObjectType;
+}
+
+interface EntityEvidenceMention {
+  readonly match: Pick<
+    ArchiveFindHit,
+    "matchCount" | "matchedTerms" | "missingTerms" | "score"
+  >;
+  readonly mention: MentionRecord;
 }
 
 export interface ArchiveFindEvidencePreview {
@@ -641,7 +649,7 @@ export async function findArchiveObjects(
         listLexicalQueryCandidateTerms(query),
       )
     : [];
-  const search = createLexicalQuery(query, initialMentions);
+  const search = createLexicalQuery(query);
 
   if (search === undefined) {
     return createFindResult(query, [], options);
@@ -1464,7 +1472,18 @@ function findEntities(
 
     return {
       ...best.hit,
-      evidenceMentions: rankedCandidates.map((candidate) => candidate.mention),
+      score: aggregateEvidenceScores(
+        rankedCandidates.map((candidate) => candidate.hit.score ?? 0),
+      ),
+      evidenceMentions: rankedCandidates.map((candidate) => ({
+        match: {
+          matchCount: candidate.hit.matchCount ?? 0,
+          matchedTerms: candidate.hit.matchedTerms ?? [],
+          missingTerms: candidate.hit.missingTerms ?? [],
+          score: candidate.hit.score ?? 0,
+        },
+        mention: candidate.mention,
+      })),
     };
   });
 }
@@ -1479,7 +1498,7 @@ async function findTriples(
   const mentionsById = new Map(
     context.mentions.map((mention) => [mention.id, mention]),
   );
-  const hitsByTriple = new Map<string, ArchiveFindHit>();
+  const hitsByTriple = new Map<string, ArchiveFindHit[]>();
 
   for (const chapter of await listChapters(document)) {
     for (const link of await document.mentionLinks.listByChapter(
@@ -1495,17 +1514,13 @@ async function findTriples(
       }
 
       const text = `${source.surface} ${link.predicate} ${target.surface}`;
-      const match = scoreLexicalText(text, search, {
-        mentionQids: [source.qid, target.qid],
-        mentionSurfaces: [source.surface, target.surface],
-      });
+      const match = scoreLexicalText(text, search);
 
       if (match === undefined) {
         continue;
       }
 
       const id = formatTripleUri(source.qid, link.predicate, target.qid);
-      const current = hitsByTriple.get(id);
       const next = {
         chapter: source.chapterId,
         field: "content" as const,
@@ -1519,14 +1534,14 @@ async function findTriples(
         title: text,
         type: "triple" as const,
       };
+      const values = hitsByTriple.get(id) ?? [];
 
-      if (current === undefined || (current.score ?? 0) < (next.score ?? 0)) {
-        hitsByTriple.set(id, next);
-      }
+      values.push(next);
+      hitsByTriple.set(id, values);
     }
   }
 
-  return [...hitsByTriple.values()];
+  return [...hitsByTriple.values()].map(groupTripleEvidenceHits);
 }
 
 async function listAllMentions(
@@ -1540,6 +1555,24 @@ async function listAllMentions(
       ),
     )
   ).flat();
+}
+
+function groupTripleEvidenceHits(
+  evidenceHits: readonly ArchiveFindHit[],
+): ArchiveFindHit {
+  const rankedHits = [...evidenceHits].sort(compareFindEvidenceHits);
+  const [best] = rankedHits;
+
+  if (best === undefined) {
+    throw new Error("Internal error: triple search candidate is empty.");
+  }
+
+  return {
+    ...best,
+    score: aggregateEvidenceScores(
+      rankedHits.map((hit) => hit.score ?? 0),
+    ),
+  };
 }
 
 function listEntityCollection(
@@ -1563,7 +1596,9 @@ function listEntityCollection(
 
     return {
       chapter: first.chapterId,
-      evidenceMentions: qidMentions,
+      evidenceMentions: qidMentions.map((mention) =>
+        createUnscoredEntityEvidenceMention(mention),
+      ),
       field: "title",
       id: `wikigraph://entity/${qid}`,
       position: {
@@ -1681,7 +1716,7 @@ async function hydrateFindHitEvidence(
 
       const evidence = await createMentionEvidencePreview(
         document,
-        hit.evidenceMentions,
+        hit.evidenceMentions.map((item) => item.mention),
       );
       const { evidenceMentions: _evidenceMentions, ...publicHit } = hit;
 
@@ -1691,6 +1726,20 @@ async function hydrateFindHitEvidence(
       };
     }),
   );
+}
+
+function createUnscoredEntityEvidenceMention(
+  mention: MentionRecord,
+): EntityEvidenceMention {
+  return {
+    match: {
+      matchCount: 0,
+      matchedTerms: [],
+      missingTerms: [],
+      score: 0,
+    },
+    mention,
+  };
 }
 
 async function hydrateEntitySessionHitEvidence(
@@ -1779,25 +1828,28 @@ function createEntitySearchMentionHits(
       return [];
     }
 
-    return hit.evidenceMentions.map((mention) => ({
-      chapterId: mention.chapterId,
-      ...(mention.confidence === undefined
+    return hit.evidenceMentions.map((evidenceMention) => ({
+      chapterId: evidenceMention.mention.chapterId,
+      ...(evidenceMention.mention.confidence === undefined
         ? {}
-        : { confidence: mention.confidence }),
-      fragmentId: mention.fragmentId,
-      matchCount: hit.matchCount ?? 0,
-      matchedTerms: hit.matchedTerms ?? [],
-      mentionId: mention.id,
-      missingTerms: hit.missingTerms ?? [],
-      ...(mention.note === undefined ? {} : { note: mention.note }),
-      qid: mention.qid,
-      rangeEnd: mention.rangeEnd,
-      rangeStart: mention.rangeStart,
-      score: hit.score ?? 0,
-      ...(mention.sentenceIndex === undefined
+        : { confidence: evidenceMention.mention.confidence }),
+      fragmentId: evidenceMention.mention.fragmentId,
+      matchCount: evidenceMention.match.matchCount ?? 0,
+      matchedTerms: evidenceMention.match.matchedTerms ?? [],
+      mentionId: evidenceMention.mention.id,
+      missingTerms: evidenceMention.match.missingTerms ?? [],
+      ...(evidenceMention.mention.note === undefined
         ? {}
-        : { sentenceIndex: mention.sentenceIndex }),
-      surface: mention.surface,
+        : { note: evidenceMention.mention.note }),
+      qid: evidenceMention.mention.qid,
+      rangeEnd: evidenceMention.mention.rangeEnd,
+      rangeStart: evidenceMention.mention.rangeStart,
+      resultScore: hit.score ?? 0,
+      score: evidenceMention.match.score ?? 0,
+      ...(evidenceMention.mention.sentenceIndex === undefined
+        ? {}
+        : { sentenceIndex: evidenceMention.mention.sentenceIndex }),
+      surface: evidenceMention.mention.surface,
     }));
   });
 }
@@ -1872,7 +1924,6 @@ function filterLexicalHitsByMatch(
   }
 
   const requiredTerms = [
-    ...search.entityTerms.map((term) => term.surface),
     ...search.phrases,
   ];
 
@@ -3204,6 +3255,8 @@ interface ArchiveTextMatch {
 }
 
 const DEFAULT_FIND_LIMIT = 20;
+const GROUP_SCORE_EVIDENCE_LIMIT = 10;
+const GROUP_SCORE_MAX_EQUAL_EVIDENCE_BONUS = 0.3;
 const PAGE_SUMMARY_LIMIT = 1600;
 
 const BROAD_FIND_LENS_HINT = {
@@ -3270,6 +3323,59 @@ function createFindMatchFields(
     missingTerms: match.missingTerms,
     score: match.score,
   };
+}
+
+function aggregateEvidenceScores(scores: readonly number[]): number {
+  const rankedScores = [...scores]
+    .filter((score) => score > 0)
+    .sort((left, right) => right - left)
+    .slice(0, GROUP_SCORE_EVIDENCE_LIMIT);
+  const [bestScore] = rankedScores;
+
+  if (bestScore === undefined) {
+    return 0;
+  }
+
+  const evidenceDecayFactor =
+    GROUP_SCORE_MAX_EQUAL_EVIDENCE_BONUS / calculateEvidenceDecayBase();
+
+  return rankedScores.reduce(
+    (total, score, index) =>
+      total +
+      score *
+        (index === 0
+          ? 1
+          : evidenceDecayFactor / Math.log2(index + 2)),
+    0,
+  );
+}
+
+function calculateEvidenceDecayBase(): number {
+  let total = 0;
+
+  for (let rank = 2; rank <= GROUP_SCORE_EVIDENCE_LIMIT; rank += 1) {
+    total += 1 / Math.log2(rank + 1);
+  }
+
+  return total;
+}
+
+function compareFindEvidenceHits(
+  left: ArchiveFindHit,
+  right: ArchiveFindHit,
+): number {
+  const scoreComparison = (right.score ?? 0) - (left.score ?? 0);
+
+  if (scoreComparison !== 0) {
+    return scoreComparison;
+  }
+  if (left.position === undefined) {
+    return right.position === undefined ? 0 : 1;
+  }
+  if (right.position === undefined) {
+    return -1;
+  }
+  return compareArchivePositions(left.position, right.position);
 }
 
 function getSnippetNeedle(match: ArchiveTextMatch): string {
