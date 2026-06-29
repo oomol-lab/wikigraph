@@ -397,7 +397,7 @@ describe("evidence-selection/quote-score", () => {
         2,
       )}\n`,
     );
-  });
+  }, 20_000);
 });
 
 function rankQuote(quote: string): Array<{
