@@ -1,5 +1,6 @@
 import type {
   ChunkRecord,
+  FragmentRecord,
   MentionLinkRecord,
   MentionRecord,
   ReadonlyDocument,
@@ -90,6 +91,7 @@ export interface ArchiveIndex {
 export interface ArchiveFindHit {
   readonly chapter?: number;
   readonly evidence?: ArchiveFindEvidencePreview;
+  readonly evidenceLinks?: readonly MentionLinkRecord[];
   readonly evidenceMentions?: readonly EntityEvidenceMention[];
   readonly field: ArchiveFindField;
   readonly id: string;
@@ -101,6 +103,11 @@ export interface ArchiveFindHit {
   readonly snippet: string;
   readonly stage?: ChapterEntry["stage"];
   readonly title: string;
+  readonly triple?: {
+    readonly objectLabel: string;
+    readonly predicate: string;
+    readonly subjectLabel: string;
+  };
   readonly type: ArchiveFindObjectType;
 }
 
@@ -110,6 +117,11 @@ interface EntityEvidenceMention {
     "matchCount" | "matchedTerms" | "missingTerms" | "score"
   >;
   readonly mention: MentionRecord;
+}
+
+interface EvidenceReadContext {
+  readonly chapters: Map<number, Promise<ChapterEntry>>;
+  readonly fragments: Map<string, Promise<FragmentRecord>>;
 }
 
 export interface ArchiveFindEvidencePreview {
@@ -861,7 +873,9 @@ async function findArchiveObjectsUncached(
     requestedTypes === null || requestedTypes.includes("entity");
   const shouldFindTriples =
     requestedTypes === null || requestedTypes.includes("triple");
-  const hasStructuredTypeRequest = shouldFindEntities || shouldFindTriples;
+  const hasOnlyStructuredTypeRequest =
+    requestedTypes !== null &&
+    requestedTypes.every((type) => type === "entity" || type === "triple");
   const hasTextTypeRequest =
     requestedTypes === null ||
     requestedTypes.includes("meta") ||
@@ -881,7 +895,7 @@ async function findArchiveObjectsUncached(
       : []),
   ];
 
-  if (structuredHits.length > 0 && hasStructuredTypeRequest) {
+  if (structuredHits.length > 0 && hasOnlyStructuredTypeRequest) {
     return structuredHits;
   }
   if (!hasTextTypeRequest) {
@@ -1643,6 +1657,7 @@ async function findTriples(
       const id = formatTripleUri(source.qid, link.predicate, target.qid);
       const next = {
         chapter: source.chapterId,
+        evidenceLinks: [link],
         field: "content" as const,
         id,
         ...createFindMatchFields(match),
@@ -1652,6 +1667,11 @@ async function findTriples(
         },
         snippet: link.note ?? text,
         title: text,
+        triple: {
+          objectLabel: target.surface,
+          predicate: link.predicate,
+          subjectLabel: source.surface,
+        },
         type: "triple" as const,
       };
       const values = hitsByTriple.get(id) ?? [];
@@ -1689,6 +1709,7 @@ function groupTripleEvidenceHits(
 
   return {
     ...best,
+    evidenceLinks: rankedHits.flatMap((hit) => hit.evidenceLinks ?? []),
     score: aggregateEvidenceScores(rankedHits.map((hit) => hit.score ?? 0)),
   };
 }
@@ -1753,13 +1774,19 @@ async function listTripleCollection(
       }
 
       const id = formatTripleUri(source.qid, link.predicate, target.qid);
+      const existing = hitsById.get(id);
 
-      if (hitsById.has(id)) {
+      if (existing !== undefined) {
+        hitsById.set(id, {
+          ...existing,
+          evidenceLinks: [...(existing.evidenceLinks ?? []), link],
+        });
         continue;
       }
 
       hitsById.set(id, {
         chapter: source.chapterId,
+        evidenceLinks: [link],
         field: "title",
         id,
         position: {
@@ -1768,6 +1795,11 @@ async function listTripleCollection(
         },
         snippet: `${source.surface} ${link.predicate} ${target.surface}`,
         title: `${source.qid} ${link.predicate} ${target.qid}`,
+        triple: {
+          objectLabel: target.surface,
+          predicate: link.predicate,
+          subjectLabel: source.surface,
+        },
         type: "triple",
       });
     }
@@ -1813,6 +1845,8 @@ async function hydrateFindHitEvidence(
     readonly sessionId?: string;
   } = {},
 ): Promise<readonly ArchiveFindHit[]> {
+  const evidenceContext = createEvidenceReadContext();
+
   return await Promise.all(
     hits.map(async (hit) => {
       if (hit.evidence !== undefined && hit.evidence.sources.length > 0) {
@@ -1828,7 +1862,28 @@ async function hydrateFindHitEvidence(
           hit,
           options.sessionId,
           options.evidenceLimit,
+          evidenceContext,
         );
+      }
+      if (hit.evidenceLinks !== undefined) {
+        if (options.evidenceLimit === undefined) {
+          const { evidenceLinks: _evidenceLinks, ...publicHit } = hit;
+
+          return publicHit;
+        }
+
+        const evidence = await createMentionLinkEvidencePreview(
+          document,
+          hit.evidenceLinks,
+          options.evidenceLimit,
+          evidenceContext,
+        );
+        const { evidenceLinks: _evidenceLinks, ...publicHit } = hit;
+
+        return {
+          ...publicHit,
+          evidence,
+        };
       }
       if (hit.evidenceMentions === undefined) {
         return hit;
@@ -1843,6 +1898,7 @@ async function hydrateFindHitEvidence(
         document,
         hit.evidenceMentions.map((item) => item.mention),
         options.evidenceLimit,
+        evidenceContext,
       );
       const { evidenceMentions: _evidenceMentions, ...publicHit } = hit;
 
@@ -1888,6 +1944,7 @@ async function hydrateEntitySessionHitEvidence(
   hit: ArchiveFindHit,
   sessionId: string,
   evidenceLimit: number | undefined,
+  context: EvidenceReadContext = createEvidenceReadContext(),
 ): Promise<ArchiveFindHit> {
   if (evidenceLimit === undefined) {
     const { evidence: _evidence, ...publicHit } = hit;
@@ -1917,6 +1974,7 @@ async function hydrateEntitySessionHitEvidence(
             range.startSentenceIndex,
             range.endSentenceIndex,
             range.fragmentId,
+            context,
           ),
       ),
   );
@@ -2325,12 +2383,14 @@ async function createSourceRangeFragment(
   document: ReadonlyDocument,
   reference: Extract<WikiGraphReference, { readonly type: "source" }>,
 ): Promise<ArchiveSourceFragment> {
+  const context = createEvidenceReadContext();
   const evidence = await createSourceEvidenceItem(
     document,
     reference.chapterId,
     reference.startSentenceIndex,
     reference.endSentenceIndex,
     reference.fragmentId,
+    context,
   );
 
   return {
@@ -2658,11 +2718,13 @@ async function createMentionEvidencePreview(
   document: ReadonlyDocument,
   mentions: readonly MentionRecord[],
   limit = 3,
+  context: EvidenceReadContext = createEvidenceReadContext(),
 ): Promise<ArchiveFindEvidencePreview> {
   return await createSourceEvidencePreview(
     document,
     await createMentionEvidenceRanges(document, mentions),
     limit,
+    context,
   );
 }
 
@@ -2710,11 +2772,13 @@ async function createMentionLinkEvidencePreview(
   document: ReadonlyDocument,
   links: readonly MentionLinkRecord[],
   limit = 3,
+  context: EvidenceReadContext = createEvidenceReadContext(),
 ): Promise<ArchiveFindEvidencePreview> {
   return await createSourceEvidencePreview(
     document,
     createMentionLinkEvidenceRanges(document, links),
     limit,
+    context,
   );
 }
 
@@ -2787,6 +2851,7 @@ async function createSourceEvidencePage(
   }[],
   options: ArchiveEvidenceOptions,
 ): Promise<ArchiveEvidence> {
+  const context = createEvidenceReadContext();
   const limit = options.limit ?? DEFAULT_FIND_LIMIT;
   const start = decodeFindCursor(options.cursor);
   const mergedRanges = mergeSourceEvidenceRanges(ranges);
@@ -2801,6 +2866,7 @@ async function createSourceEvidencePage(
           range.startSentenceIndex,
           range.endSentenceIndex,
           range.fragmentId,
+          context,
         ),
     ),
   );
@@ -2822,6 +2888,7 @@ async function createSourceEvidencePreview(
     readonly startSentenceIndex: number;
   }[],
   limit: number,
+  context: EvidenceReadContext = createEvidenceReadContext(),
 ): Promise<ArchiveFindEvidencePreview> {
   const mergedRanges = mergeSourceEvidenceRanges(ranges);
   const sources = await Promise.all(
@@ -2835,6 +2902,7 @@ async function createSourceEvidencePreview(
             range.startSentenceIndex,
             range.endSentenceIndex,
             range.fragmentId,
+            context,
           ),
       ),
   );
@@ -2894,8 +2962,9 @@ async function createSourceEvidenceItem(
   startSentenceIndex: number,
   endSentenceIndex: number,
   fragmentId?: number,
+  context: EvidenceReadContext = createEvidenceReadContext(),
 ): Promise<ArchiveEvidenceItem> {
-  const chapter = await requireChapter(document, chapterId);
+  const chapter = await getEvidenceChapter(document, chapterId, context);
   const resolvedFragmentId =
     fragmentId ??
     (await document.getSerialFragments(chapterId).listFragmentIds())[0];
@@ -2904,9 +2973,12 @@ async function createSourceEvidenceItem(
     throw new Error(`Chapter ${formatChapterId(chapterId)} has no source.`);
   }
 
-  const fragment = await document
-    .getSerialFragments(chapterId)
-    .getFragment(resolvedFragmentId);
+  const fragment = await getEvidenceFragment(
+    document,
+    chapterId,
+    resolvedFragmentId,
+    context,
+  );
   const lastSentenceIndex = Math.max(0, fragment.sentences.length - 1);
   const start = clampInteger(startSentenceIndex, 0, lastSentenceIndex);
   const end = clampInteger(endSentenceIndex, start, lastSentenceIndex);
@@ -2925,6 +2997,45 @@ async function createSourceEvidenceItem(
     title: chapter.title ?? `[chapter ${chapterId}]`,
     type: "source",
   };
+}
+
+function createEvidenceReadContext(): EvidenceReadContext {
+  return {
+    chapters: new Map(),
+    fragments: new Map(),
+  };
+}
+
+async function getEvidenceChapter(
+  document: ReadonlyDocument,
+  chapterId: number,
+  context: EvidenceReadContext,
+): Promise<ChapterEntry> {
+  let chapter = context.chapters.get(chapterId);
+
+  if (chapter === undefined) {
+    chapter = requireChapter(document, chapterId);
+    context.chapters.set(chapterId, chapter);
+  }
+
+  return await chapter;
+}
+
+async function getEvidenceFragment(
+  document: ReadonlyDocument,
+  chapterId: number,
+  fragmentId: number,
+  context: EvidenceReadContext,
+): Promise<FragmentRecord> {
+  const key = `${chapterId}:${fragmentId}`;
+  let fragment = context.fragments.get(key);
+
+  if (fragment === undefined) {
+    fragment = document.getSerialFragments(chapterId).getFragment(fragmentId);
+    context.fragments.set(key, fragment);
+  }
+
+  return await fragment;
 }
 
 async function findSentenceIndexAtOffset(
@@ -3617,6 +3728,7 @@ function compareFindHits(
 ): number {
   const direction = order === "doc-asc" ? 1 : -1;
   const relevance =
+    compareNumbers(getSearchBucket(left.type), getSearchBucket(right.type)) ||
     compareNumbers(right.score ?? 0, left.score ?? 0) ||
     compareNumbers(right.matchCount ?? 0, left.matchCount ?? 0);
   const position =
@@ -3626,6 +3738,22 @@ function compareFindHits(
     left.id.localeCompare(right.id);
 
   return relevance || position * direction;
+}
+
+function getSearchBucket(type: ArchiveFindObjectType): number {
+  switch (type) {
+    case "entity":
+    case "triple":
+      return 0;
+    case "node":
+      return 1;
+    case "fragment":
+    case "summary":
+    case "chapter":
+    case "chapter-tree":
+    case "meta":
+      return 2;
+  }
 }
 
 function createSearchTerms(query: string): readonly string[] {

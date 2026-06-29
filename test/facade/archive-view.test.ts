@@ -1,4 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { mkdtemp, rm } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { DirectoryDocument } from "../../src/document/index.js";
 import {
@@ -15,10 +19,20 @@ import { deleteArchiveSearchSessions } from "../../src/facade/search-cache.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
+let testStateDir: string | undefined;
 
 describe("facade/archive-view", () => {
-  afterEach(() => {
+  beforeEach(async () => {
+    testStateDir = await mkdtemp(join(tmpdir(), "spinedigest-state-"));
+    process.env.WIKIGRAPH_STATE_DIR = testStateDir;
+  });
+
+  afterEach(async () => {
     restoreEnv("WIKIGRAPH_STATE_DIR", originalStateDir);
+    if (testStateDir !== undefined) {
+      await rm(testStateDir, { force: true, recursive: true });
+      testStateDir = undefined;
+    }
   });
 
   it("searches sourced fragments before graph or summary build", async () => {
@@ -347,6 +361,46 @@ describe("facade/archive-view", () => {
         ]);
       } finally {
         restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
+        await document.release();
+      }
+    });
+  });
+
+  it("keeps entity results ahead of high-frequency source matches", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          draft.addSentence("陈友谅 陈友谅 陈友谅 陈友谅 陈友谅。", 5);
+          await draft.commit();
+          await openedDocument.mentions.save({
+            chapterId: 1,
+            fragmentId: 0,
+            id: "mention-chen",
+            qid: "Q1336609",
+            rangeEnd: 3,
+            rangeStart: 0,
+            sentenceIndex: 0,
+            surface: "陈友谅",
+          });
+        });
+
+        const result = await findArchiveObjects(document, "陈友谅", {
+          limit: 3,
+        });
+
+        expect(result.items[0]).toMatchObject({
+          id: "wikigraph://entity/Q1336609",
+          title: "陈友谅",
+          type: "entity",
+        });
+      } finally {
         await document.release();
       }
     });
@@ -697,16 +751,26 @@ describe("facade/archive-view", () => {
         });
 
         const result = await findArchiveObjects(document, "Wiki", {
+          evidenceLimit: 3,
           types: ["triple"],
         });
 
-        expect(result.items).toContainEqual(
-          expect.objectContaining({
-            id: "wikigraph://triple/Q1/mentions/Q2",
-            title: "Wiki mentions Source",
-            type: "triple",
-          }),
+        const triple = result.items.find(
+          (item) => item.id === "wikigraph://triple/Q1/mentions/Q2",
         );
+
+        expect(triple).toMatchObject({
+          id: "wikigraph://triple/Q1/mentions/Q2",
+          title: "Wiki mentions Source",
+          type: "triple",
+        });
+        expect(triple?.evidence?.total).toBe(1);
+        expect(triple?.evidence?.sources).toStrictEqual([
+          expect.objectContaining({
+            id: "wikigraph://chapter/1/source/0#2..2",
+            source: "Source-only archives should be searchable.",
+          }),
+        ]);
       } finally {
         restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();

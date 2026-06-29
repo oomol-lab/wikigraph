@@ -87,7 +87,7 @@ interface ArchiveOutputSource {
 interface ArchiveOutputContext {
   readonly archiveKey: string;
   readonly archivePath: string;
-  readonly continuationKind?: "evidence" | "search";
+  readonly continuationKind?: "collection" | "evidence" | "search";
   readonly evidenceLimit?: number;
   readonly format: ResultFormat;
   readonly limit: number;
@@ -165,7 +165,10 @@ export async function runArchiveCommand(
                 createCollectionOptions(args),
               ),
             ),
-            createArchiveOutputContext(args),
+            {
+              ...createArchiveOutputContext(args),
+              continuationKind: "collection",
+            },
             args.format ?? "text",
           );
         },
@@ -318,6 +321,40 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
     const limit = args.limit ?? cursor.limit;
 
     switch (cursor.kind) {
+      case "collection": {
+        const collectionOptions: ArchiveCollectionOptions = {
+          cursor: cursor.cursor,
+          ...(cursor.evidenceLimit === undefined
+            ? {}
+            : { evidenceLimit: cursor.evidenceLimit }),
+          limit,
+        };
+
+        if (cursor.types !== null) {
+          Object.assign(collectionOptions, {
+            types: cursor.types as ArchiveCollectionOptions["types"],
+          });
+        }
+
+        await writeFindHits(
+          createCollectionFindResult(
+            await listArchiveCollection(document, collectionOptions),
+          ),
+          {
+            archiveKey: cursor.archiveKey,
+            archivePath: cursor.archivePath,
+            continuationKind: "collection",
+            ...(cursor.evidenceLimit === undefined
+              ? {}
+              : { evidenceLimit: cursor.evidenceLimit }),
+            format,
+            limit,
+            types: cursor.types,
+          },
+          format,
+        );
+        return;
+      }
       case "search": {
         const findOptions: ArchiveFindOptions = {
           archiveKey: cursor.archiveKey,
@@ -490,7 +527,8 @@ async function createOutputContinuationCursor(
             ? {}
             : { evidenceLimit: context.evidenceLimit }),
           format: context.format,
-          kind: "search",
+          kind:
+            context.continuationKind === "collection" ? "collection" : "search",
           limit: context.limit,
           types: context.types,
         };
@@ -1012,6 +1050,26 @@ async function createFindObject(
       uri,
     };
   }
+  if (hit.type === "triple") {
+    const triple = hit.triple;
+
+    return {
+      ...(context.evidenceLimit === undefined || hit.evidence === undefined
+        ? {}
+        : {
+            evidence: await createEvidencePreviewObject(hit.evidence, {
+              ...context,
+              continuationKind: "evidence",
+              targetUri: uri,
+            }),
+          }),
+      objectLabel: triple?.objectLabel ?? "",
+      predicate: triple?.predicate ?? "",
+      ...(hit.score === undefined ? {} : { score: hit.score }),
+      subjectLabel: triple?.subjectLabel ?? "",
+      uri,
+    };
+  }
 
   return {
     ...(context.evidenceLimit === undefined || hit.evidence === undefined
@@ -1025,8 +1083,7 @@ async function createFindObject(
         }),
     label: hit.title,
     ...(hit.score === undefined ? {} : { score: hit.score }),
-    ...(context.evidenceLimit !== undefined &&
-    (hit.type === "entity" || hit.type === "triple")
+    ...(context.evidenceLimit !== undefined && hit.type === "entity"
       ? {}
       : { summary: hit.snippet }),
     type: hit.type === "node" ? "chunk" : hit.type,

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ArchiveFindHit } from "../../src/facade/archive-view.js";
+import type {
+  ArchiveCollectionResult,
+  ArchiveFindHit,
+} from "../../src/facade/archive-view.js";
 
 const archiveMockState = vi.hoisted(() => ({
   entityFindHits: [
@@ -30,6 +33,39 @@ const archiveMockState = vi.hoisted(() => ({
       snippet: "RAG original source fragment.",
       title: "RAG",
       type: "entity",
+    },
+  ] satisfies ArchiveFindHit[],
+  tripleFindHits: [
+    {
+      chapter: 2,
+      evidence: {
+        nextCursor: null,
+        shown: 1,
+        sources: [
+          {
+            chapterId: 2,
+            endSentenceIndex: 1,
+            fragmentId: 0,
+            id: "wikigraph://chapter/2/source/0#0..1",
+            source: "RAG original source fragment.",
+            startSentenceIndex: 0,
+            title: "Chapter 2",
+            type: "source",
+          },
+        ],
+        total: 1,
+      },
+      field: "title",
+      id: "wikigraph://triple/Q1/mentions/Q2",
+      position: { chapter: 2, fragment: 0 },
+      snippet: "RAG mentions agent",
+      title: "Q1 mentions Q2",
+      triple: {
+        objectLabel: "agent",
+        predicate: "mentions",
+        subjectLabel: "RAG",
+      },
+      type: "triple",
     },
   ] satisfies ArchiveFindHit[],
   findHits: [
@@ -136,7 +172,7 @@ const archiveMockState = vi.hoisted(() => ({
     nextCursor: null,
     order: "doc-asc" as const,
     types: ["entity"] as const,
-  },
+  } satisfies ArchiveCollectionResult,
   page: {
     generatedNodeSummary: "RAG appears in this chunk.",
     id: "node:9",
@@ -445,6 +481,69 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain("RAG");
   });
 
+  it("creates collection continuation cursors for listed archive pages", async () => {
+    vi.mocked(listArchiveCollection).mockResolvedValueOnce({
+      ...archiveMockState.collection,
+      nextCursor: "raw-collection-cursor",
+    });
+
+    await runArchiveCommand({
+      action: "list",
+      archivePath: "wikigraph:///tmp/book.sdpub/chapter/2",
+      evidenceLimit: 3,
+      format: "json",
+      kinds: ["entity"],
+    });
+
+    expect(createContinuationCursor).toHaveBeenCalledWith({
+      archiveKey: "/tmp/book.sdpub",
+      archivePath: "/tmp/book.sdpub",
+      cursor: "raw-collection-cursor",
+      evidenceLimit: 3,
+      format: "json",
+      kind: "collection",
+      limit: 20,
+      types: ["entity"],
+    });
+  });
+
+  it("continues a listed archive page from a short cursor", async () => {
+    vi.mocked(readContinuationCursor).mockResolvedValueOnce({
+      archiveKey: "/tmp/book.sdpub",
+      archivePath: "/tmp/book.sdpub",
+      cursor: "raw-collection-cursor",
+      format: "json",
+      kind: "collection",
+      limit: 20,
+      types: ["entity"],
+    });
+
+    await runArchiveCommand({
+      action: "next",
+      archivePath: "c_next",
+      format: "json",
+    });
+
+    expect(listArchiveCollection).toHaveBeenCalledWith(
+      {},
+      {
+        cursor: "raw-collection-cursor",
+        limit: 20,
+        types: ["entity"],
+      },
+    );
+    expect(findArchiveObjects).not.toHaveBeenCalled();
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toMatchObject({
+      limit: 20,
+      nextCursor: null,
+      objects: [
+        {
+          uri: "wikigraph://entity/Q1",
+        },
+      ],
+    });
+  });
+
   it("prints listed entity evidence when requested", async () => {
     vi.mocked(listArchiveCollection).mockResolvedValueOnce({
       ...archiveMockState.collection,
@@ -490,6 +589,56 @@ describe("cli/archive", () => {
         },
       ],
     });
+  });
+
+  it("prints listed triple evidence as structured JSON when requested", async () => {
+    vi.mocked(listArchiveCollection).mockResolvedValueOnce({
+      ...archiveMockState.collection,
+      items: archiveMockState.tripleFindHits,
+    });
+
+    await runArchiveCommand({
+      action: "list",
+      archivePath: "wikigraph:///tmp/book.sdpub/chapter/2",
+      evidenceLimit: 3,
+      format: "json",
+      kinds: ["triple"],
+    });
+
+    expect(listArchiveCollection).toHaveBeenCalledWith(
+      {},
+      {
+        chapters: [2],
+        evidenceLimit: 3,
+        types: ["triple"],
+      },
+    );
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      limit: 20,
+      nextCursor: null,
+      objects: [
+        {
+          evidence: {
+            nextCursor: null,
+            shown: 1,
+            sources: [
+              {
+                text: "RAG original source fragment.",
+                uri: "wikigraph://chapter/2/source/0#0..1",
+              },
+            ],
+            total: 1,
+          },
+          objectLabel: "agent",
+          predicate: "mentions",
+          subjectLabel: "RAG",
+          uri: "wikigraph://triple/Q1/mentions/Q2",
+        },
+      ],
+    });
+    expect(archiveMockState.textWrites[0]).not.toContain('"type":"triple"');
+    expect(archiveMockState.textWrites[0]).not.toContain('"label":"Q1');
+    expect(archiveMockState.textWrites[0]).not.toContain('"summary"');
   });
 
   it("prints search objects as JSON", async () => {

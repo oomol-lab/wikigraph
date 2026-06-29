@@ -17,6 +17,16 @@ export type ContinuationCursor =
       readonly cursor: string;
       readonly evidenceLimit?: number;
       readonly format: "json" | "jsonl" | "text";
+      readonly kind: "collection";
+      readonly limit: number;
+      readonly types: readonly string[] | null;
+    }
+  | {
+      readonly archiveKey: string;
+      readonly archivePath: string;
+      readonly cursor: string;
+      readonly evidenceLimit?: number;
+      readonly format: "json" | "jsonl" | "text";
       readonly kind: "search";
       readonly limit: number;
       readonly types: readonly string[] | null;
@@ -134,6 +144,7 @@ export async function readContinuationCursor(
 
 function createCursorPayload(input: ContinuationCursor): object {
   switch (input.kind) {
+    case "collection":
     case "search":
       return {
         cursor: input.cursor,
@@ -160,14 +171,14 @@ function parseContinuationCursorRecord(record: {
 }): ContinuationCursor {
   const payload = parsePayload(record.payloadJSON);
 
-  if (record.kind === "search") {
+  if (record.kind === "collection" || record.kind === "search") {
     return {
       archiveKey: record.archiveKey,
       archivePath: record.archivePath,
       cursor: getPayloadString(payload, "cursor"),
       ...getPayloadOptionalPositiveInteger(payload, "evidenceLimit"),
       format: record.format,
-      kind: "search",
+      kind: record.kind,
       limit: record.limit,
       types: getPayloadStringArrayOrNull(payload, "types"),
     };
