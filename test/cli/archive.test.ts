@@ -154,6 +154,20 @@ const archiveMockState = vi.hoisted(() => ({
     title: "Retrieval design",
     type: "node",
   },
+  chapterPage: {
+    id: "chapter:2",
+    stage: "graphed",
+    title: "Chapter 2",
+    type: "chapter",
+  },
+  metaPage: {
+    authors: ["Archive Author"],
+    description: "Archive description.",
+    id: "meta:root",
+    publisher: "Archive Press",
+    title: "Archive Fixture",
+    type: "meta",
+  },
   entityPage: {
     evidence: {
       shown: 1,
@@ -323,7 +337,11 @@ vi.mock("../../src/facade/index.js", () => ({
         ? archiveMockState.entityPage
         : id === "wikigraph://triple/Q1/mentions/Q2"
           ? archiveMockState.triplePage
-          : archiveMockState.page,
+          : id === "wikigraph://chapter/2"
+            ? archiveMockState.chapterPage
+            : id === "wikigraph://"
+              ? archiveMockState.metaPage
+              : archiveMockState.page,
     ),
   ),
 }));
@@ -601,6 +619,43 @@ describe("cli/archive", () => {
     expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://chunk/9");
     expect(archiveMockState.textWrites[0]).toContain("node:9");
     expect(archiveMockState.textWrites[0]).toContain("Source Fragments:");
+  });
+
+  it("gets a chapter as a minimal object", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wikigraph:///tmp/book.sdpub",
+      format: "json",
+      objectId: "wikigraph:///tmp/book.sdpub/chapter/2",
+    });
+
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://chapter/2");
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      uri: "wikigraph://chapter/2",
+      title: "Chapter 2",
+      stage: "reading-graph",
+    });
+  });
+
+  it("gets archive metadata from a root object URI", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wikigraph:///tmp/book.sdpub",
+      format: "text",
+      objectId: "wikigraph:///tmp/book.sdpub/",
+    });
+
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://");
+    expect(archiveMockState.textWrites[0]).toBe(
+      [
+        "uri: wikigraph://",
+        "title: Archive Fixture",
+        "authors: Archive Author",
+        "publisher: Archive Press",
+        "description: Archive description.",
+        "",
+      ].join("\n"),
+    );
   });
 
   it("gets an entity by Wiki Graph URI", async () => {
