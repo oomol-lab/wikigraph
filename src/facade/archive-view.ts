@@ -589,14 +589,16 @@ export async function listArchiveCollection(
     items.push(...(await listTripleCollection(document, chapterFilter)));
   }
 
-  return createCollectionResult(
-    await hydrateFindHitEvidence(document, items, {
+  const result = createCollectionResult(items, options);
+
+  return {
+    ...result,
+    items: await hydrateFindHitEvidence(document, result.items, {
       ...(options.evidenceLimit === undefined
         ? {}
         : { evidenceLimit: options.evidenceLimit }),
     }),
-    options,
-  );
+  };
 }
 
 function filterChapters<T extends { readonly chapterId: number }>(

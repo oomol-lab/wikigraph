@@ -1090,6 +1090,53 @@ describe("facade/archive-view", () => {
     });
   });
 
+  it("hydrates collection evidence only after pagination", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "paged-valid",
+              qid: "Q1",
+              rangeEnd: 10,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Paged Valid",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 99,
+              id: "paged-not-on-first-page",
+              qid: "Q2",
+              rangeEnd: 10,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Paged Later",
+            },
+          ]);
+        });
+
+        const result = await listArchiveCollection(document, {
+          evidenceLimit: 1,
+          limit: 1,
+          types: ["entity"],
+        });
+        const [first] = result.items;
+
+        expect(first?.id).toBe("wikigraph://entity/Q1");
+        expect(first?.evidence?.shown).toBe(1);
+        expect(result.nextCursor).not.toBeNull();
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("labels source fragments with their chapter title", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
