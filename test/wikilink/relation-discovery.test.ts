@@ -200,7 +200,7 @@ describe("wikilink/relation-discovery", () => {
     ]);
   });
 
-  it("uses untagged sentence IDs and quote evidence in the relation prompt", async () => {
+  it("uses tagged sentence IDs and quote evidence in the relation prompt", async () => {
     const sentences = [{ text: "Alpha founded Beta.", wordsCount: 3 }];
     const window = buildWikilinkEvidenceWindows({
       maxEvidenceDistance: 10,
@@ -239,10 +239,15 @@ describe("wikilink/relation-discovery", () => {
 
     expect(systemPrompt).toContain("Evidence selection:");
     expect(systemPrompt).toContain("do not copy the tags into quote");
-    expect(userPrompt).toContain(
+    expect(systemPrompt).toContain("ignore the tags when copying evidence");
+    expect(userPrompt).toContain("Source sentences with mention tags:");
+    expect(userPrompt).not.toContain("Tagged source context:");
+    expect(userPrompt).not.toContain(
       "Untagged source sentences for evidence quotes:",
     );
-    expect(userPrompt).toContain("S1: Alpha founded Beta.");
+    expect(userPrompt).toContain(
+      'S1: <mention id="m1" qid="Q1">Alpha</mention> founded <mention id="m2" qid="Q2">Beta</mention>.',
+    );
     expect(userPrompt).toContain('"sentence_id"');
     expect(userPrompt).toContain('"quote"');
   });
@@ -296,6 +301,67 @@ describe("wikilink/relation-discovery", () => {
         window,
       }),
     ).resolves.toStrictEqual([]);
+  });
+
+  it("keeps relations between distinct mentions grounded to the same QID", async () => {
+    const sentences = [
+      { text: "Alpha changed after Alpha returned.", wordsCount: 5 },
+    ];
+    const window = buildWikilinkEvidenceWindows({
+      maxEvidenceDistance: 10,
+      mentions: [
+        {
+          id: "m1",
+          qid: "Q1",
+          range: { end: 5, start: 0 },
+          surface: "Alpha",
+        },
+        {
+          id: "m2",
+          qid: "Q1",
+          range: { end: 25, start: 20 },
+          surface: "Alpha",
+        },
+      ],
+      text: sentences[0]!.text,
+      windowLength: 80,
+    })[0]!;
+    const request = vi.fn<GuaranteedRequest>().mockResolvedValue(
+      JSON.stringify({
+        relations: [
+          {
+            evidence: [
+              {
+                quote: "Alpha changed after Alpha returned",
+                sentence_id: "S1",
+              },
+            ],
+            predicate: "changed_after",
+            sourceMentionId: "m1",
+            targetMentionId: "m2",
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      discoverWikilinkRelations({
+        chapterId: 1,
+        fragmentId: 0,
+        maxRetries: 0,
+        request,
+        sentences,
+        window,
+      }),
+    ).resolves.toStrictEqual([
+      {
+        evidenceEnd: sentences[0]!.text.length,
+        evidenceStart: 0,
+        predicate: "changed_after",
+        sourceMentionId: "m1",
+        targetMentionId: "m2",
+      },
+    ]);
   });
 
   it("rejects predicates that normalize to an empty label", async () => {
@@ -394,7 +460,7 @@ describe("wikilink/relation-discovery", () => {
     expect(prompt).not.toContain("Mentions:");
     expect(prompt).toContain('<mention id="m1" qid="Q1">Alpha</mention>');
     expect(prompt).toContain('&lt;mention id="fake"&gt;');
-    expect(prompt).toContain("S1: Alpha founded Beta & Co.");
+    expect(prompt).toContain("S1:");
     expect(prompt).toContain("&amp; Co.");
     expect(prompt).not.toContain('<mention id="fake">');
   });

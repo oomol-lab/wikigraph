@@ -20,7 +20,7 @@ import {
 } from "../evidence-selection/index.js";
 import { FragmentProjection } from "../reader/chunk-batch/index.js";
 
-import type { WikilinkEvidenceWindow } from "./types.js";
+import type { WikilinkEvidenceWindow, WikilinkMention } from "./types.js";
 
 export interface WikilinkSentence {
   readonly text: string;
@@ -224,10 +224,6 @@ function parseRelationResponse(
       issues.push(`${prefix} links a mention to itself.`);
       continue;
     }
-    if (source.qid !== undefined && source.qid === target.qid) {
-      issues.push(`${prefix} links two mentions grounded to the same QID.`);
-      continue;
-    }
 
     const predicate = normalizePredicate(relation.predicate);
 
@@ -353,6 +349,7 @@ function formatRelationSystemPrompt(): string {
     "- If none fits, create one short snake_case predicate.",
     "- Never use mentions as a predicate.",
     EVIDENCE_SELECTION_PROMPT_FRAGMENT,
+    "- Source sentences may contain XML-like mention tags. Use those tags for mention IDs, but ignore the tags when copying evidence quote text.",
     "- Do not use offsets or invented paraphrases as evidence.",
     "",
     "Suggested predicates:",
@@ -364,11 +361,8 @@ function formatRelationUserPrompt(
   input: DiscoverWikilinkRelationsOptions,
 ): string {
   return [
-    "Tagged source context:",
-    formatTaggedContext(input.window),
-    "",
-    "Untagged source sentences for evidence quotes:",
-    formatEvidenceSentences(input),
+    "Source sentences with mention tags:",
+    formatTaggedEvidenceSentences(input),
     "",
     "Return this JSON shape:",
     JSON.stringify(
@@ -392,17 +386,84 @@ function formatRelationUserPrompt(
   ].join("\n");
 }
 
-function formatEvidenceSentences(
+function formatTaggedEvidenceSentences(
   input: DiscoverWikilinkRelationsOptions,
 ): string {
-  return input.sentences
-    .map(
-      (sentence, index) =>
-        `S${index + 1}: ${normalizeEvidenceDisplayText(
-          stripXmlLikeTags(sentence.text),
-        )}`,
+  const sourceOffsets = buildSentenceOffsets(input.sentences);
+  const lines = input.sentences.flatMap((sentence, index) => {
+    const offset = sourceOffsets[index];
+
+    if (offset === undefined || !rangesOverlap(offset, input.window.range)) {
+      return [];
+    }
+
+    return [
+      `S${index + 1}: ${normalizeEvidenceDisplayText(
+        formatTaggedSentence({
+          mentions: input.window.mentions,
+          sentence,
+          sentenceOffset: offset,
+        }),
+      )}`,
+    ];
+  });
+
+  return lines.length === 0
+    ? formatTaggedContext(input.window)
+    : lines.join("\n");
+}
+
+function formatTaggedSentence(input: {
+  readonly mentions: readonly WikilinkMention[];
+  readonly sentence: WikilinkSentence;
+  readonly sentenceOffset: { readonly end: number; readonly start: number };
+}): string {
+  const mentions = input.mentions
+    .filter(
+      (mention) =>
+        mention.range.start >= input.sentenceOffset.start &&
+        mention.range.end <= input.sentenceOffset.end,
     )
-    .join("\n");
+    .sort((left, right) => left.range.start - right.range.start);
+  const parts: string[] = [];
+  let cursor = input.sentenceOffset.start;
+
+  for (const mention of mentions) {
+    parts.push(
+      escapeXmlText(
+        input.sentence.text.slice(
+          cursor - input.sentenceOffset.start,
+          mention.range.start - input.sentenceOffset.start,
+        ),
+      ),
+    );
+    parts.push(
+      `<mention id="${escapeXmlAttribute(mention.id)}" qid="${escapeXmlAttribute(
+        mention.qid ?? "",
+      )}">${escapeXmlText(
+        input.sentence.text.slice(
+          mention.range.start - input.sentenceOffset.start,
+          mention.range.end - input.sentenceOffset.start,
+        ),
+      )}</mention>`,
+    );
+    cursor = mention.range.end;
+  }
+
+  parts.push(
+    escapeXmlText(
+      input.sentence.text.slice(cursor - input.sentenceOffset.start),
+    ),
+  );
+
+  return parts.join("");
+}
+
+function rangesOverlap(
+  left: { readonly end: number; readonly start: number },
+  right: { readonly end: number; readonly start: number },
+): boolean {
+  return left.start < right.end && right.start < left.end;
 }
 
 function resolveRelationEvidence(input: {
