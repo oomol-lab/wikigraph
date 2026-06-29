@@ -696,8 +696,7 @@ export async function findArchiveObjects(
           createFindEvidenceHydrationOptions(options, cachedPage.sessionId),
         ),
         lens: parseFindLens(cachedPage.lens),
-        lensHint:
-          cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
+        lensHint: cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
         limit,
         match: parseFindMatch(cachedPage.match),
         nextCursor: cachedPage.nextCursor,
@@ -719,8 +718,7 @@ export async function findArchiveObjects(
           createFindEvidenceHydrationOptions(options),
         ),
         lens: parseFindLens(cachedPage.lens),
-        lensHint:
-          cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
+        lensHint: cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
         limit,
         match: parseFindMatch(cachedPage.match),
         nextCursor: cachedPage.nextCursor,
@@ -1665,9 +1663,7 @@ function groupTripleEvidenceHits(
 
   return {
     ...best,
-    score: aggregateEvidenceScores(
-      rankedHits.map((hit) => hit.score ?? 0),
-    ),
+    score: aggregateEvidenceScores(rankedHits.map((hit) => hit.score ?? 0)),
   };
 }
 
@@ -2053,9 +2049,7 @@ function filterLexicalHitsByMatch(
     return hits;
   }
 
-  const requiredTerms = [
-    ...search.phrases,
-  ];
+  const requiredTerms = [...search.phrases];
 
   if (requiredTerms.length === 0) {
     return hits;
@@ -2329,20 +2323,24 @@ function selectEntityLabel(mentions: readonly MentionRecord[]): string {
   return selectEntityLabels(mentions)[0] ?? mentions[0]?.qid ?? "[entity]";
 }
 
-function selectEntityLabels(mentions: readonly MentionRecord[]): readonly string[] {
+function selectEntityLabels(
+  mentions: readonly MentionRecord[],
+): readonly string[] {
   const counts = new Map<string, number>();
 
   for (const mention of mentions) {
     counts.set(mention.surface, (counts.get(mention.surface) ?? 0) + 1);
   }
 
-  return [...counts.entries()].sort((left, right) => {
-    const countComparison = right[1] - left[1];
+  return [...counts.entries()]
+    .sort((left, right) => {
+      const countComparison = right[1] - left[1];
 
-    return countComparison === 0
-      ? left[0].localeCompare(right[0])
-      : countComparison;
-  }).map(([label]) => label);
+      return countComparison === 0
+        ? left[0].localeCompare(right[0])
+        : countComparison;
+    })
+    .map(([label]) => label);
 }
 
 async function createTriplePageLabel(
@@ -3511,10 +3509,7 @@ function aggregateEvidenceScores(scores: readonly number[]): number {
   return rankedScores.reduce(
     (total, score, index) =>
       total +
-      score *
-        (index === 0
-          ? 1
-          : evidenceDecayFactor / Math.log2(index + 2)),
+      score * (index === 0 ? 1 : evidenceDecayFactor / Math.log2(index + 2)),
     0,
   );
 }

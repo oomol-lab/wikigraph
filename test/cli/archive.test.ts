@@ -321,7 +321,7 @@ vi.mock("../../src/facade/index.js", () => ({
         ? archiveMockState.entityPage
         : id === "wikigraph://triple/Q1/mentions/Q2"
           ? archiveMockState.triplePage
-        : archiveMockState.page,
+          : archiveMockState.page,
     ),
   ),
 }));
@@ -525,38 +525,34 @@ describe("cli/archive", () => {
     });
 
     expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://entity/Q1");
-    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual(
-      {
-        uri: "wikigraph://entity/Q1",
-        labels: [
-          "RAG",
-          "retrieval-augmented generation",
-          "检索增强生成",
-          "知识检索",
-          "向量检索",
-          "生成模型",
-          "问答系统",
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      uri: "wikigraph://entity/Q1",
+      labels: [
+        "RAG",
+        "retrieval-augmented generation",
+        "检索增强生成",
+        "知识检索",
+        "向量检索",
+        "生成模型",
+        "问答系统",
+      ],
+      qid: "Q1",
+      evidence: {
+        nextCursor: null,
+        shown: 1,
+        sources: [
+          {
+            uri: "wikigraph://chapter/2/source/0#0..1",
+            text: "RAG original source fragment.",
+          },
         ],
-        qid: "Q1",
-        evidence: {
-          nextCursor: null,
-          shown: 1,
-          sources: [
-            {
-              uri: "wikigraph://chapter/2/source/0#0..1",
-              text: "RAG original source fragment.",
-            },
-          ],
-          total: 1,
-        },
+        total: 1,
       },
-    );
+    });
     expect(archiveMockState.textWrites[0]).toContain(
-      [
-        '  "uri": "wikigraph://entity/Q1",',
-        '  "labels": [',
-        '    "RAG",',
-      ].join("\n"),
+      ['  "uri": "wikigraph://entity/Q1",', '  "labels": [', '    "RAG",'].join(
+        "\n",
+      ),
     );
   });
 
@@ -584,8 +580,7 @@ describe("cli/archive", () => {
         shown: 2,
         sources: [
           {
-            text:
-              "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
+            text: "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
             uri: "wikigraph://chapter/2/source/0#0..1",
           },
           {

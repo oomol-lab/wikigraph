@@ -117,7 +117,9 @@ export function scoreLexicalText(
   };
 }
 
-export function createMentionLexicalHits<T extends { readonly surface: string }>(
+export function createMentionLexicalHits<
+  T extends { readonly surface: string },
+>(
   mentions: readonly T[],
   query: LexicalQuery,
 ): readonly {

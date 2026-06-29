@@ -538,9 +538,7 @@ async function writeJobList(
   options: { readonly json: boolean },
 ): Promise<void> {
   if (options.json) {
-    await writeTextToStdout(
-      formatCLIJSON({ items: jobs.map(formatJobJSON) }),
-    );
+    await writeTextToStdout(formatCLIJSON({ items: jobs.map(formatJobJSON) }));
     return;
   }
 

@@ -1397,9 +1397,7 @@ function parseArchiveArguments(
         args: {
           action,
           archivePath,
-          ...(positionals[1] === undefined
-            ? {}
-            : { cursor: positionals[1] }),
+          ...(positionals[1] === undefined ? {} : { cursor: positionals[1] }),
           format: parseResultFormat(values),
           ...(values.limit === undefined
             ? {}

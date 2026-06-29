@@ -50,9 +50,7 @@ export class ScriptedLLM<S extends string> {
     messages: readonly LLMessage[],
     options?: LLMRequestOptions<S>,
   ): Promise<string>;
-  public async request<T>(
-    operation: LLMLazyRequestOperation<S, T>,
-  ): Promise<T>;
+  public async request<T>(operation: LLMLazyRequestOperation<S, T>): Promise<T>;
   public async request<T>(
     input: readonly LLMessage[] | LLMLazyRequestOperation<S, T>,
     options: LLMRequestOptions<S> = {},

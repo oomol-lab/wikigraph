@@ -277,7 +277,8 @@ async function createArchive(args: CLIArchiveArguments): Promise<void> {
 
 async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
   const cursorId = args.cursor ?? args.archivePath;
-  const explicitArchivePath = args.cursor === undefined ? undefined : args.archivePath;
+  const explicitArchivePath =
+    args.cursor === undefined ? undefined : args.archivePath;
   const cursor = await readContinuationCursor(cursorId);
 
   if (explicitArchivePath !== undefined) {
@@ -426,13 +427,17 @@ function createArchiveOutputContext(
       : { evidenceLimit: args.evidenceLimit }),
     format: args.format ?? "text",
     limit: args.limit ?? DEFAULT_OUTPUT_LIMIT,
-    ...(options.targetUri === undefined ? {} : { targetUri: options.targetUri }),
+    ...(options.targetUri === undefined
+      ? {}
+      : { targetUri: options.targetUri }),
     types:
       args.kinds === undefined
         ? null
         : args.kinds
             .map((kind) => toArchiveFindType(kind))
-            .filter((type): type is NonNullable<typeof type> => type !== undefined),
+            .filter(
+              (type): type is NonNullable<typeof type> => type !== undefined,
+            ),
   };
 }
 
@@ -665,9 +670,7 @@ async function writeList(
     return;
   }
 
-  await writeTextToStdout(
-    `${items.map(formatListItem).join("\n\n")}\n`,
-  );
+  await writeTextToStdout(`${items.map(formatListItem).join("\n\n")}\n`);
 }
 
 function formatListItem(item: ArchiveListItem): string {
@@ -755,7 +758,9 @@ async function writeFindHits(
   await writeTextToStdout(
     `${objects
       .map((object) => formatFindObject(object))
-      .join("\n\n")}${formatNextCursor(nextCursor)}${formatFindLensHint(result)}\n`,
+      .join(
+        "\n\n",
+      )}${formatNextCursor(nextCursor)}${formatFindLensHint(result)}\n`,
   );
 }
 
@@ -772,7 +777,9 @@ async function writeEvidence(
 
   if (format === "json") {
     await writeTextToStdout(
-      formatCLIJSON(createObjectResultPage(objects, nextCursor, evidence.limit)),
+      formatCLIJSON(
+        createObjectResultPage(objects, nextCursor, evidence.limit),
+      ),
     );
     return;
   }
@@ -817,7 +824,9 @@ async function writePage(
   format: ResultFormat,
 ): Promise<void> {
   if (format === "json") {
-    await writeTextToStdout(formatCLIJSON(await createPageObject(page, context)));
+    await writeTextToStdout(
+      formatCLIJSON(await createPageObject(page, context)),
+    );
     return;
   }
   if (format === "jsonl") {
@@ -846,9 +855,7 @@ async function writePage(
       return;
     case "meta":
       await writeTextToStdout(
-        page.meta === undefined
-          ? "No metadata.\n"
-          : formatCLIJSON(page.meta),
+        page.meta === undefined ? "No metadata.\n" : formatCLIJSON(page.meta),
       );
       return;
     case "fragment":
@@ -922,7 +929,9 @@ async function writePack(
   format: ResultFormat,
 ): Promise<void> {
   if (format === "json") {
-    await writeTextToStdout(formatCLIJSON(await createPackObject(pack, context)));
+    await writeTextToStdout(
+      formatCLIJSON(await createPackObject(pack, context)),
+    );
     return;
   }
   if (format === "jsonl") {

@@ -171,7 +171,12 @@ export async function readCachedSearchSessionPage(
     return undefined;
   }
 
-  return await readSearchSessionPage(sessionId, offset, limit, input.archiveKey);
+  return await readSearchSessionPage(
+    sessionId,
+    offset,
+    limit,
+    input.archiveKey,
+  );
 }
 
 export async function readCachedEntitySearchSessionPage(
@@ -790,7 +795,9 @@ async function touchSearchSession(
   );
 }
 
-function createEntitySearchSessionId(input: EntitySearchSessionCacheInput): string {
+function createEntitySearchSessionId(
+  input: EntitySearchSessionCacheInput,
+): string {
   return createHash("sha256")
     .update(
       JSON.stringify({
