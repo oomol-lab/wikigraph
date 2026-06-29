@@ -471,6 +471,30 @@ describe("cli/args", () => {
         "entity",
       ]),
     ).toThrow("The `evidence` command does not support --type.");
+    expect(() =>
+      parseCLIArguments(["create", "book.sdpub", "source.md", "--evidence"]),
+    ).toThrow("The `create` command does not support --evidence.");
+    expect(() =>
+      parseCLIArguments(["export", "book.sdpub", "--evidence"]),
+    ).toThrow("The `export` command does not support --evidence.");
+    expect(() =>
+      parseCLIArguments(["estimate", "book.sdpub", "--evidence"]),
+    ).toThrow("The `estimate` command does not support --evidence.");
+    expect(() =>
+      parseCLIArguments(["index", "book.sdpub", "--evidence"]),
+    ).toThrow("The `index` command does not support --evidence.");
+  });
+
+  it("keeps explicit negative evidence values for validation", () => {
+    expect(() =>
+      parseCLIArguments([
+        "search",
+        "wikigraph://book.sdpub",
+        "RAG",
+        "--evidence",
+        "-1",
+      ]),
+    ).toThrow("--evidence must be a positive integer.");
   });
 
   it("parses archive metadata and cover commands", () => {

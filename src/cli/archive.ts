@@ -455,18 +455,18 @@ async function createOutputContinuationCursor(
           archiveKey: context.archiveKey,
           archivePath: context.archivePath,
           cursor,
-          ...(context.evidenceLimit === undefined
-            ? {}
-            : { evidenceLimit: context.evidenceLimit }),
           format: context.format,
           kind: "evidence",
-          limit: context.limit,
+          limit: context.evidenceLimit ?? context.limit,
           targetUri: context.targetUri ?? "",
         }
       : {
           archiveKey: context.archiveKey,
           archivePath: context.archivePath,
           cursor,
+          ...(context.evidenceLimit === undefined
+            ? {}
+            : { evidenceLimit: context.evidenceLimit }),
           format: context.format,
           kind: "search",
           limit: context.limit,

@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ArchiveFindHit } from "../../src/facade/archive-view.js";
 
 const archiveMockState = vi.hoisted(() => ({
   entityFindHits: [
     {
       chapter: 2,
       evidence: {
+        nextCursor: null,
         shown: 1,
         sources: [
           {
@@ -29,7 +31,7 @@ const archiveMockState = vi.hoisted(() => ({
       title: "RAG",
       type: "entity",
     },
-  ],
+  ] satisfies ArchiveFindHit[],
   findHits: [
     {
       chapter: 2,
@@ -339,6 +341,7 @@ vi.mock("../../src/cli/convert.js", () => ({
 
 import { runArchiveCommand } from "../../src/cli/archive.js";
 import {
+  createContinuationCursor,
   findArchiveObjects,
   listArchiveEvidence,
   listArchiveCollection,
@@ -499,6 +502,91 @@ describe("cli/archive", () => {
           uri: "wikigraph://entity/Q1",
         },
       ],
+    });
+  });
+
+  it("preserves evidence preview limits on search continuation cursors", async () => {
+    vi.mocked(findArchiveObjects).mockResolvedValueOnce({
+      chapters: null,
+      items: archiveMockState.entityFindHits,
+      lens: "typed",
+      lensHint: null,
+      limit: 20,
+      match: "any",
+      nextCursor: "raw-next-search-cursor",
+      order: "doc-asc",
+      query: "RAG",
+      terms: ["rag"],
+      types: null,
+    });
+
+    await runArchiveCommand({
+      action: "search",
+      archivePath: "wikigraph:///tmp/book.sdpub",
+      evidenceLimit: 4,
+      format: "json",
+      kinds: ["entity"],
+      query: "RAG",
+    });
+
+    expect(createContinuationCursor).toHaveBeenCalledWith({
+      archiveKey: "/tmp/book.sdpub",
+      archivePath: "/tmp/book.sdpub",
+      cursor: "raw-next-search-cursor",
+      evidenceLimit: 4,
+      format: "json",
+      kind: "search",
+      limit: 20,
+      types: ["entity"],
+    });
+  });
+
+  it("uses evidence preview limits for embedded evidence cursors", async () => {
+    const [entityHit] = archiveMockState.entityFindHits;
+
+    if (entityHit === undefined) {
+      throw new Error("Missing entity fixture.");
+    }
+
+    vi.mocked(findArchiveObjects).mockResolvedValueOnce({
+      chapters: null,
+      items: [
+        {
+          ...entityHit,
+          evidence: {
+            ...entityHit.evidence,
+            nextCursor: "raw-next-evidence-cursor",
+          },
+        },
+      ],
+      lens: "typed",
+      lensHint: null,
+      limit: 20,
+      match: "any",
+      nextCursor: null,
+      order: "doc-asc",
+      query: "RAG",
+      terms: ["rag"],
+      types: null,
+    });
+
+    await runArchiveCommand({
+      action: "search",
+      archivePath: "wikigraph:///tmp/book.sdpub",
+      evidenceLimit: 4,
+      format: "json",
+      kinds: ["entity"],
+      query: "RAG",
+    });
+
+    expect(createContinuationCursor).toHaveBeenCalledWith({
+      archiveKey: "/tmp/book.sdpub",
+      archivePath: "/tmp/book.sdpub",
+      cursor: "raw-next-evidence-cursor",
+      format: "json",
+      kind: "evidence",
+      limit: 4,
+      targetUri: "wikigraph://entity/Q1",
     });
   });
 

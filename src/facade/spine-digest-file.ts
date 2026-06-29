@@ -82,8 +82,11 @@ export class SpineDigestFile {
       await document.flush();
       await document.release();
       if (completed) {
-        await deleteArchiveSearchSessions(this.#path);
-        await tryStartSdpubFlusher(this.#path);
+        try {
+          await deleteArchiveSearchSessions(this.#path);
+        } finally {
+          await tryStartSdpubFlusher(this.#path);
+        }
       }
     }
   }

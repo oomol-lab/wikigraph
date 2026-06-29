@@ -631,12 +631,14 @@ export async function findArchiveObjects(
           cursor.offset,
           limit,
           options.archiveKey ?? "archive",
+          cursor.createdAt,
         )
       : await readSearchSessionPage(
           cursor.sessionId,
           cursor.offset,
           limit,
           options.archiveKey ?? "archive",
+          cursor.createdAt,
         );
 
     return {

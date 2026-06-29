@@ -374,29 +374,28 @@ export async function groundWikimatchCandidates(input: {
       unit: "window",
     });
 
-    const results = await Promise.all(
-      windows.map(
-        async (window) =>
-          await runLazyGuaranteedRequest(input.request, async (request) => {
-            try {
-              await input.progressTracker?.throwIfStopped();
-              return await judgeWikimatchPolicy({
-                candidates: window.candidates,
-                policyPrompt: input.policyPrompt,
-                request,
-                window,
-              });
-            } finally {
-              completedWindows += 1;
-              await input.progressTracker?.updatePhase({
-                done: completedWindows,
-                phase: "grounding",
-                total: totalWindows,
-                unit: "window",
-              });
-            }
-          }),
-      ),
+    const results = await mapLazyGuaranteedRequests(
+      input.request,
+      windows,
+      async (window, request) => {
+        try {
+          await input.progressTracker?.throwIfStopped();
+          return await judgeWikimatchPolicy({
+            candidates: window.candidates,
+            policyPrompt: input.policyPrompt,
+            request,
+            window,
+          });
+        } finally {
+          completedWindows += 1;
+          await input.progressTracker?.updatePhase({
+            done: completedWindows,
+            phase: "grounding",
+            total: totalWindows,
+            unit: "window",
+          });
+        }
+      },
     );
 
     const continuedCandidateIds = new Set<string>();
@@ -726,13 +725,29 @@ function formatEnrichmentProgressPhase(event: WikipageResolveProgress): {
   }
 }
 
-async function runLazyGuaranteedRequest<T>(
+async function mapLazyGuaranteedRequests<TItem, TResult>(
   request: GuaranteedRequestController,
-  operation: (request: GuaranteedRequest) => Promise<T>,
-): Promise<T> {
-  return request.lazy === undefined
-    ? await operation(request)
-    : await request.lazy(operation);
+  items: readonly TItem[],
+  operation: (item: TItem, request: GuaranteedRequest) => Promise<TResult>,
+): Promise<readonly TResult[]> {
+  const lazy = request.lazy;
+
+  if (lazy !== undefined) {
+    return await Promise.all(
+      items.map(
+        async (item) =>
+          await lazy(async (request) => await operation(item, request)),
+      ),
+    );
+  }
+
+  const results: TResult[] = [];
+
+  for (const item of items) {
+    results.push(await operation(item, request));
+  }
+
+  return results;
 }
 
 async function discoverMentionLinks(input: {
@@ -758,30 +773,29 @@ async function discoverMentionLinks(input: {
   });
 
   const discoveredLinks = (
-    await Promise.all(
-      fragmentWindows.map(
-        async (item) =>
-          await runLazyGuaranteedRequest(input.request, async (request) => {
-            try {
-              await input.progressTracker?.throwIfStopped();
-              return await discoverWikilinkRelations({
-                chapterId: item.fragment.serialId,
-                fragmentId: item.fragment.fragmentId,
-                request,
-                sentences: item.fragment.sentences,
-                window: item.window,
-              });
-            } finally {
-              completedWindows += 1;
-              await input.progressTracker?.updatePhase({
-                done: completedWindows,
-                phase: "relation-discovery",
-                total: fragmentWindows.length,
-                unit: "window",
-              });
-            }
-          }),
-      ),
+    await mapLazyGuaranteedRequests(
+      input.request,
+      fragmentWindows,
+      async (item, request) => {
+        try {
+          await input.progressTracker?.throwIfStopped();
+          return await discoverWikilinkRelations({
+            chapterId: item.fragment.serialId,
+            fragmentId: item.fragment.fragmentId,
+            request,
+            sentences: item.fragment.sentences,
+            window: item.window,
+          });
+        } finally {
+          completedWindows += 1;
+          await input.progressTracker?.updatePhase({
+            done: completedWindows,
+            phase: "relation-discovery",
+            total: fragmentWindows.length,
+            unit: "window",
+          });
+        }
+      },
     )
   ).flat();
 

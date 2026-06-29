@@ -552,6 +552,7 @@ function parseTransformArguments(
   rejectTransformFlag("chapter", values.chapter, helpRoute);
   rejectTransformFlag("confirm", values.confirm, helpRoute);
   rejectTransformFlag("cursor", values.cursor, helpRoute);
+  rejectTransformFlag("evidence", values.evidence, helpRoute);
   rejectTransformFlag("json", values.json, helpRoute);
   rejectTransformFlag("limit", values.limit, helpRoute);
   rejectTransformFlag("parent", values.parent, helpRoute);
@@ -1126,6 +1127,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
@@ -1156,6 +1158,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
@@ -1177,6 +1180,7 @@ function parseArchiveArguments(
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
@@ -1193,6 +1197,7 @@ function parseArchiveArguments(
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
@@ -2942,6 +2947,7 @@ function normalizeArchiveInlineOptions(
 
 function normalizeEvidenceFlagArgv(argv: readonly string[]): readonly string[] {
   const normalized: string[] = [];
+  let stopped = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const item = argv[index];
@@ -2950,21 +2956,38 @@ function normalizeEvidenceFlagArgv(argv: readonly string[]): readonly string[] {
       continue;
     }
 
+    if (stopped) {
+      normalized.push(item);
+      continue;
+    }
+
+    if (item === "--") {
+      normalized.push(item);
+      stopped = true;
+      continue;
+    }
+
     if (item !== "--evidence") {
       normalized.push(item);
       continue;
     }
 
-    normalized.push(item);
-
     const value = argv[index + 1];
 
     if (value !== undefined && !value.startsWith("-")) {
+      normalized.push(item);
       normalized.push(value);
       index += 1;
       continue;
     }
 
+    if (value !== undefined && /^-\d/.test(value)) {
+      normalized.push(`${item}=${value}`);
+      index += 1;
+      continue;
+    }
+
+    normalized.push(item);
     normalized.push("3");
   }
 

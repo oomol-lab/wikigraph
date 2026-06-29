@@ -82,6 +82,7 @@ export interface EntitySearchSessionPage {
 
 export interface SearchSessionDescriptor {
   readonly chapters: readonly number[] | null;
+  readonly createdAt: number;
   readonly lens: string;
   readonly match: string;
   readonly query: string;
@@ -374,6 +375,7 @@ export async function readSearchSessionPage(
   offset: number,
   limit: number,
   expectedArchiveKey?: string,
+  expectedCreatedAt?: number,
 ): Promise<SearchSessionPage> {
   const database = await openSearchSessionDatabase();
 
@@ -383,6 +385,7 @@ export async function readSearchSessionPage(
       database,
       sessionId,
       expectedArchiveKey,
+      expectedCreatedAt,
     );
 
     await touchSearchSession(database, sessionId);
@@ -411,7 +414,11 @@ export async function readSearchSessionPage(
       match: session.match,
       nextCursor:
         rows.length > limit && last !== undefined
-          ? encodeSearchSessionCursor(sessionId, last.rank + 1)
+          ? encodeSearchSessionCursor(
+              sessionId,
+              last.rank + 1,
+              session.createdAt,
+            )
           : null,
       query: session.query,
       sessionId,
@@ -428,6 +435,7 @@ export async function readEntitySearchSessionPage(
   offset: number,
   limit: number,
   expectedArchiveKey?: string,
+  expectedCreatedAt?: number,
 ): Promise<EntitySearchSessionPage> {
   const database = await openSearchSessionDatabase();
 
@@ -437,6 +445,7 @@ export async function readEntitySearchSessionPage(
       database,
       sessionId,
       expectedArchiveKey,
+      expectedCreatedAt,
     );
 
     await touchSearchSession(database, sessionId);
@@ -493,7 +502,7 @@ export async function readEntitySearchSessionPage(
       match: session.match,
       nextCursor:
         rows.length > limit
-          ? encodeSearchSessionCursor(sessionId, nextOffset)
+          ? encodeSearchSessionCursor(sessionId, nextOffset, session.createdAt)
           : null,
       query: session.query,
       sessionId,
@@ -523,6 +532,7 @@ export async function readSearchSessionDescriptor(
 
     return {
       chapters: session.options.chapters,
+      createdAt: session.createdAt,
       lens: session.lens,
       match: session.match,
       query: session.query,
@@ -578,13 +588,15 @@ export async function readEntitySearchEvidenceMentions(
 export function encodeSearchSessionCursor(
   sessionId: string,
   offset: number,
+  createdAt: number,
 ): string {
-  return Buffer.from(JSON.stringify({ offset, sessionId, v: 2 })).toString(
-    "base64url",
-  );
+  return Buffer.from(
+    JSON.stringify({ createdAt, offset, sessionId, v: 3 }),
+  ).toString("base64url");
 }
 
 export function decodeSearchSessionCursor(cursor: string): {
+  readonly createdAt?: number;
   readonly offset: number;
   readonly sessionId: string;
 } {
@@ -593,6 +605,29 @@ export function decodeSearchSessionCursor(cursor: string): {
       Buffer.from(cursor, "base64url").toString("utf8"),
     );
 
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "offset" in parsed &&
+      "sessionId" in parsed &&
+      "createdAt" in parsed &&
+      "v" in parsed &&
+      parsed.v === 3 &&
+      typeof parsed.sessionId === "string" &&
+      parsed.sessionId !== "" &&
+      typeof parsed.createdAt === "number" &&
+      Number.isInteger(parsed.createdAt) &&
+      parsed.createdAt >= 0 &&
+      typeof parsed.offset === "number" &&
+      Number.isInteger(parsed.offset) &&
+      parsed.offset >= 0
+    ) {
+      return {
+        createdAt: parsed.createdAt,
+        offset: parsed.offset,
+        sessionId: parsed.sessionId,
+      };
+    }
     if (
       typeof parsed === "object" &&
       parsed !== null &&
@@ -737,7 +772,9 @@ async function readSearchSessionMetadata(
   database: Database,
   sessionId: string,
   expectedArchiveKey: string | undefined,
+  expectedCreatedAt?: number,
 ): Promise<{
+  readonly createdAt: number;
   readonly lens: string;
   readonly match: string;
   readonly options: {
@@ -756,15 +793,20 @@ async function readSearchSessionMetadata(
         options_json,
         terms_json,
         lens,
-        match
+        match,
+        created_at
       FROM search_sessions
       WHERE session_id = ?
         ${expectedArchiveKey === undefined ? "" : "AND archive_key = ?"}
+        ${expectedCreatedAt === undefined ? "" : "AND created_at = ?"}
     `,
-    expectedArchiveKey === undefined
-      ? [sessionId]
-      : [sessionId, expectedArchiveKey],
+    [
+      sessionId,
+      ...(expectedArchiveKey === undefined ? [] : [expectedArchiveKey]),
+      ...(expectedCreatedAt === undefined ? [] : [expectedCreatedAt]),
+    ],
     (row) => ({
+      createdAt: getNumber(row, "created_at"),
       lens: getString(row, "lens"),
       match: getString(row, "match"),
       options: parseSessionOptions(getString(row, "options_json")),

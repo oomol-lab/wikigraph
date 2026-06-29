@@ -113,7 +113,7 @@ export function formatCLIJSONLine(value: unknown): string {
   return `${JSON.stringify(orderCLIJSONValue(value))}\n`;
 }
 
-function orderCLIJSONValue(value: unknown): JSONLike {
+function orderCLIJSONValue(value: unknown): JSONLike | undefined {
   if (
     value === null ||
     typeof value === "boolean" ||
@@ -124,11 +124,11 @@ function orderCLIJSONValue(value: unknown): JSONLike {
   }
 
   if (Array.isArray(value)) {
-    return value.map(orderCLIJSONValue);
+    return value.map((item) => orderCLIJSONValue(item) ?? null);
   }
 
   if (typeof value !== "object") {
-    return null;
+    return undefined;
   }
 
   return orderCLIJSONObject(value as Record<string, unknown>);
@@ -146,7 +146,11 @@ function orderCLIJSONObject(value: Record<string, unknown>): JSONLike {
   for (const entry of entries.sort(
     (left, right) => left.priority - right.priority || left.index - right.index,
   )) {
-    ordered[entry.key] = orderCLIJSONValue(entry.value);
+    const orderedValue = orderCLIJSONValue(entry.value);
+
+    if (orderedValue !== undefined) {
+      ordered[entry.key] = orderedValue;
+    }
   }
 
   return ordered;
