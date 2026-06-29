@@ -3,6 +3,7 @@ import { resolve } from "path";
 import { DirectoryDocument } from "../document/index.js";
 
 import { SdpubCoordinator, tryStartSdpubFlusher } from "./sdpub-coordinator.js";
+import { deleteArchiveSearchSessions } from "./search-cache.js";
 import { SpineDigest } from "./spine-digest.js";
 
 export class SpineDigestFile {
@@ -81,6 +82,7 @@ export class SpineDigestFile {
       await document.flush();
       await document.release();
       if (completed) {
+        await deleteArchiveSearchSessions(this.#path);
         await tryStartSdpubFlusher(this.#path);
       }
     }

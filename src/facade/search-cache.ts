@@ -19,7 +19,9 @@ export interface SearchSessionInput {
   readonly items: readonly ArchiveFindHit[];
   readonly lens: string;
   readonly match: string;
+  readonly order: string;
   readonly query: string;
+  readonly records: readonly ArchiveFindHit[];
   readonly terms: readonly string[];
   readonly types: readonly string[] | null;
 }
@@ -48,6 +50,7 @@ export interface EntitySearchSessionInput {
   readonly hits: readonly EntitySearchMentionHit[];
   readonly lens: string;
   readonly match: string;
+  readonly order: string;
   readonly query: string;
   readonly terms: readonly string[];
   readonly types: readonly string[] | null;
@@ -108,6 +111,13 @@ CREATE TABLE IF NOT EXISTS search_results (
   PRIMARY KEY (session_id, rank)
 );
 
+CREATE TABLE IF NOT EXISTS search_record_hits (
+  session_id TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  item_json TEXT NOT NULL,
+  PRIMARY KEY (session_id, rank)
+);
+
 CREATE TABLE IF NOT EXISTS search_mention_hits (
   session_id TEXT NOT NULL,
   mention_id TEXT NOT NULL,
@@ -143,7 +153,45 @@ ALTER TABLE search_mention_hits
 ADD COLUMN result_score REAL NOT NULL DEFAULT 0;
 `;
 
-const SEARCH_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+const SEARCH_RANKING_VERSION = 2;
+const SEARCH_SESSION_MAX_COUNT = 500;
+const SEARCH_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+type SearchSessionCacheInput = Omit<SearchSessionInput, "items" | "records">;
+type EntitySearchSessionCacheInput = Omit<EntitySearchSessionInput, "hits">;
+
+export async function readCachedSearchSessionPage(
+  input: SearchSessionCacheInput,
+  offset: number,
+  limit: number,
+): Promise<SearchSessionPage | undefined> {
+  const sessionId = createSearchSessionId(input);
+
+  if (!(await hasSearchSession(sessionId, input.archiveKey))) {
+    return undefined;
+  }
+
+  return await readSearchSessionPage(sessionId, offset, limit, input.archiveKey);
+}
+
+export async function readCachedEntitySearchSessionPage(
+  input: EntitySearchSessionCacheInput,
+  offset: number,
+  limit: number,
+): Promise<EntitySearchSessionPage | undefined> {
+  const sessionId = createEntitySearchSessionId(input);
+
+  if (!(await hasSearchSession(sessionId, input.archiveKey))) {
+    return undefined;
+  }
+
+  return await readEntitySearchSessionPage(
+    sessionId,
+    offset,
+    limit,
+    input.archiveKey,
+  );
+}
 
 export async function createSearchSession(
   input: SearchSessionInput,
@@ -153,13 +201,15 @@ export async function createSearchSession(
   try {
     await cleanExpiredSearchSessions(database);
     const now = Date.now();
-    const sessionId = createSearchSessionId(input, now);
+    const sessionId = createSearchSessionId(input);
     const optionsJSON = JSON.stringify({
       chapters: input.chapters,
+      order: input.order,
       types: input.types,
     });
 
     await database.transaction(async () => {
+      await deleteSearchSession(database, sessionId);
       await database.run(
         `
           INSERT INTO search_sessions (
@@ -191,6 +241,16 @@ export async function createSearchSession(
           [sessionId, index, JSON.stringify(item)],
         );
       }
+      for (const [index, record] of input.records.entries()) {
+        await database.run(
+          `
+            INSERT INTO search_record_hits (session_id, rank, item_json)
+            VALUES (?, ?, ?)
+          `,
+          [sessionId, index, JSON.stringify(record)],
+        );
+      }
+      await pruneSearchSessions(database);
     });
 
     return sessionId;
@@ -207,13 +267,15 @@ export async function createEntitySearchSession(
   try {
     await cleanExpiredSearchSessions(database);
     const now = Date.now();
-    const sessionId = createEntitySearchSessionId(input, now);
+    const sessionId = createEntitySearchSessionId(input);
     const optionsJSON = JSON.stringify({
       chapters: input.chapters,
+      order: input.order,
       types: input.types,
     });
 
     await database.transaction(async () => {
+      await deleteSearchSession(database, sessionId);
       await database.run(
         `
           INSERT INTO search_sessions (
@@ -267,9 +329,36 @@ export async function createEntitySearchSession(
           ],
         );
       }
+      await pruneSearchSessions(database);
     });
 
     return sessionId;
+  } finally {
+    await database.close();
+  }
+}
+
+export async function deleteArchiveSearchSessions(
+  archiveKey: string,
+): Promise<void> {
+  const database = await openSearchSessionDatabase();
+
+  try {
+    const sessionIds = await database.queryAll(
+      `
+        SELECT session_id
+        FROM search_sessions
+        WHERE archive_key = ?
+      `,
+      [archiveKey],
+      (row) => getString(row, "session_id"),
+    );
+
+    await database.transaction(async () => {
+      for (const sessionId of sessionIds) {
+        await deleteSearchSession(database, sessionId);
+      }
+    });
   } finally {
     await database.close();
   }
@@ -575,18 +664,68 @@ async function cleanExpiredSearchSessions(database: Database): Promise<void> {
 
   await database.transaction(async () => {
     for (const sessionId of expiredSessionIds) {
-      await database.run("DELETE FROM search_results WHERE session_id = ?", [
-        sessionId,
-      ]);
-      await database.run(
-        "DELETE FROM search_mention_hits WHERE session_id = ?",
-        [sessionId],
-      );
-      await database.run("DELETE FROM search_sessions WHERE session_id = ?", [
-        sessionId,
-      ]);
+      await deleteSearchSession(database, sessionId);
     }
   });
+}
+
+async function hasSearchSession(
+  sessionId: string,
+  archiveKey: string,
+): Promise<boolean> {
+  const database = await openSearchSessionDatabase();
+
+  try {
+    await cleanExpiredSearchSessions(database);
+    const row = await database.queryOne(
+      `
+        SELECT session_id
+        FROM search_sessions
+        WHERE session_id = ? AND archive_key = ?
+      `,
+      [sessionId, archiveKey],
+      () => true,
+    );
+
+    return row === true;
+  } finally {
+    await database.close();
+  }
+}
+
+async function deleteSearchSession(
+  database: Database,
+  sessionId: string,
+): Promise<void> {
+  await database.run("DELETE FROM search_results WHERE session_id = ?", [
+    sessionId,
+  ]);
+  await database.run("DELETE FROM search_record_hits WHERE session_id = ?", [
+    sessionId,
+  ]);
+  await database.run("DELETE FROM search_mention_hits WHERE session_id = ?", [
+    sessionId,
+  ]);
+  await database.run("DELETE FROM search_sessions WHERE session_id = ?", [
+    sessionId,
+  ]);
+}
+
+async function pruneSearchSessions(database: Database): Promise<void> {
+  const prunedSessionIds = await database.queryAll(
+    `
+      SELECT session_id
+      FROM search_sessions
+      ORDER BY accessed_at DESC, created_at DESC, session_id
+      LIMIT -1 OFFSET ?
+    `,
+    [SEARCH_SESSION_MAX_COUNT],
+    (row) => getString(row, "session_id"),
+  );
+
+  for (const sessionId of prunedSessionIds) {
+    await deleteSearchSession(database, sessionId);
+  }
 }
 
 async function readSearchSessionMetadata(
@@ -651,17 +790,19 @@ async function touchSearchSession(
   );
 }
 
-function createEntitySearchSessionId(
-  input: EntitySearchSessionInput,
-  now: number,
-): string {
+function createEntitySearchSessionId(input: EntitySearchSessionCacheInput): string {
   return createHash("sha256")
     .update(
       JSON.stringify({
         archiveKey: input.archiveKey,
         entity: true,
-        now,
-        query: input.query,
+        lens: input.lens,
+        match: input.match,
+        order: input.order,
+        rankingVersion: SEARCH_RANKING_VERSION,
+        scope: normalizeSearchSessionScope(input.chapters),
+        terms: input.terms,
+        types: normalizeSearchSessionTypes(input.types),
       }),
     )
     .digest("hex");
@@ -727,16 +868,38 @@ function mapEntitySearchMentionHitRow(
   };
 }
 
-function createSearchSessionId(input: SearchSessionInput, now: number): string {
+function createSearchSessionId(input: SearchSessionCacheInput): string {
   return createHash("sha256")
     .update(
       JSON.stringify({
         archiveKey: input.archiveKey,
-        now,
-        query: input.query,
+        entity: false,
+        lens: input.lens,
+        match: input.match,
+        order: input.order,
+        rankingVersion: SEARCH_RANKING_VERSION,
+        scope: normalizeSearchSessionScope(input.chapters),
+        terms: input.terms,
+        types: normalizeSearchSessionTypes(input.types),
       }),
     )
     .digest("hex");
+}
+
+function normalizeSearchSessionScope(
+  chapters: readonly number[] | null,
+): readonly number[] | null {
+  return chapters === null ? null : [...new Set(chapters)].sort(compareNumbers);
+}
+
+function normalizeSearchSessionTypes(
+  types: readonly string[] | null,
+): readonly string[] | null {
+  return types === null ? null : [...new Set(types)].sort();
+}
+
+function compareNumbers(left: number, right: number): number {
+  return left - right;
 }
 
 function parseSearchResultItem(value: string): ArchiveFindHit {

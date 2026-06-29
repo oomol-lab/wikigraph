@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { DirectoryDocument } from "../../src/document/index.js";
 import { extractSdpubArchive } from "../../src/facade/archive.js";
+import { findArchiveObjects } from "../../src/facade/archive-view.js";
 import { SpineDigest } from "../../src/facade/spine-digest.js";
 import { SpineDigestFile } from "../../src/facade/spine-digest-file.js";
 import { withTempDir } from "../helpers/temp.js";
@@ -151,6 +152,44 @@ describe("facade/spine-digest-file", () => {
       await expect(readArchivedTitle(path, archivePath)).resolves.toBe(
         "Flushed Title",
       );
+    });
+  });
+
+  it("clears cached archive searches after successful writes", async () => {
+    await withTempDir("spinedigest-facade-file-", async (path) => {
+      useCoordinatorStateDir(`${path}/state`);
+      const archivePath = await createSeedArchive(path);
+
+      await new SpineDigestFile(archivePath).readDocument(async (document) => {
+        await expect(
+          findArchiveObjects(document, "Fresh Cache Title", {
+            archiveKey: archivePath,
+          }),
+        ).resolves.toMatchObject({ items: [] });
+      });
+
+      await new SpineDigestFile(archivePath).write(async (document) => {
+        const meta = await document.readBookMeta();
+
+        if (meta === undefined) {
+          throw new Error("Missing test metadata.");
+        }
+
+        await document.replaceBookMeta({
+          ...meta,
+          title: "Fresh Cache Title",
+        });
+      });
+
+      await new SpineDigestFile(archivePath).readDocument(async (document) => {
+        await expect(
+          findArchiveObjects(document, "Fresh Cache Title", {
+            archiveKey: archivePath,
+          }),
+        ).resolves.toMatchObject({
+          items: [expect.objectContaining({ id: "meta:book" })],
+        });
+      });
     });
   });
 

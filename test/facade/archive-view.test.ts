@@ -11,6 +11,7 @@ import {
   readArchiveText,
   readArchivePage,
 } from "../../src/facade/archive-view.js";
+import { deleteArchiveSearchSessions } from "../../src/facade/search-cache.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
@@ -72,6 +73,211 @@ describe("facade/archive-view", () => {
         });
         expect(sourceHit?.matchedTerms).toContain("朱元璋");
         expect(sourceHit?.missingTerms).toContain("不存在的关键词");
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("caches empty search results for repeated queries", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const first = await findArchiveObjects(document, "缓存空结果", {
+          archiveKey: `${path}/book.sdpub`,
+          types: ["entity"],
+        });
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.save({
+            chapterId: 1,
+            fragmentId: 0,
+            id: "late-empty-cache-hit",
+            qid: "Q1",
+            rangeEnd: 5,
+            rangeStart: 0,
+            sentenceIndex: 0,
+            surface: "缓存空结果",
+          });
+        });
+        const second = await findArchiveObjects(document, "缓存空结果", {
+          archiveKey: `${path}/book.sdpub`,
+          types: ["entity"],
+        });
+
+        expect(first.items).toStrictEqual([]);
+        expect(second.items).toStrictEqual([]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("keeps search caches isolated by type and chapter filters", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(2)
+            .createDraft();
+
+          draft.addSentence("Cache Split appears in chapter two.", 6);
+          await draft.commit();
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "cache-split-one",
+              qid: "Q1",
+              rangeEnd: 11,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Cache Split",
+            },
+            {
+              chapterId: 2,
+              fragmentId: 0,
+              id: "cache-split-two",
+              qid: "Q2",
+              rangeEnd: 11,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Cache Split",
+            },
+          ]);
+          await openedDocument.replaceToc({
+            items: [
+              {
+                children: [],
+                serialId: 1,
+                title: "Introduction",
+              },
+              {
+                children: [],
+                serialId: 2,
+                title: "Second",
+              },
+            ],
+            version: 1,
+          });
+        });
+
+        const archiveKey = `${path}/book.sdpub`;
+        const chapterOne = await findArchiveObjects(document, "Cache Split", {
+          archiveKey,
+          chapters: [1],
+          types: ["entity"],
+        });
+        const chapterTwo = await findArchiveObjects(document, "Cache Split", {
+          archiveKey,
+          chapters: [2],
+          types: ["entity"],
+        });
+        const sourceOnly = await findArchiveObjects(document, "Cache Split", {
+          archiveKey,
+          chapters: [2],
+          types: ["fragment"],
+        });
+
+        expect(chapterOne.items.map((item) => item.id)).toStrictEqual([
+          "wikigraph://entity/Q1",
+        ]);
+        expect(chapterTwo.items.map((item) => item.id)).toStrictEqual([
+          "wikigraph://entity/Q2",
+        ]);
+        expect(sourceOnly.items.map((item) => item.type)).toStrictEqual([
+          "fragment",
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("groups field-level hits into one object search result", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.chunks.save({
+            content: "SharedTerm appears in content too.",
+            generation: 0,
+            id: 300,
+            label: "SharedTerm label",
+            sentenceId: [1, 0, 0],
+            sentenceIds: [[1, 0, 0]],
+            wordsCount: 5,
+            weight: 1,
+          });
+        });
+
+        const result = await findArchiveObjects(document, "SharedTerm", {
+          archiveKey: `${path}/book.sdpub`,
+          types: ["node"],
+        });
+
+        expect(result.items).toStrictEqual([
+          expect.objectContaining({
+            id: "node:300",
+            type: "node",
+          }),
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("refreshes cached search results after archive cache invalidation", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        const archiveKey = `${path}/book.sdpub`;
+
+        const first = await findArchiveObjects(document, "Invalidate Me", {
+          archiveKey,
+          types: ["entity"],
+        });
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.save({
+            chapterId: 1,
+            fragmentId: 0,
+            id: "invalidate-me",
+            qid: "Q1",
+            rangeEnd: 13,
+            rangeStart: 0,
+            sentenceIndex: 0,
+            surface: "Invalidate Me",
+          });
+        });
+        await deleteArchiveSearchSessions(archiveKey);
+        const second = await findArchiveObjects(document, "Invalidate Me", {
+          archiveKey,
+          types: ["entity"],
+        });
+
+        expect(first.items).toStrictEqual([]);
+        expect(second.items).toStrictEqual([
+          expect.objectContaining({
+            id: "wikigraph://entity/Q1",
+            title: "Invalidate Me",
+            type: "entity",
+          }),
+        ]);
       } finally {
         await document.release();
       }

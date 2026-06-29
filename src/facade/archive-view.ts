@@ -32,6 +32,8 @@ import {
   createEntitySearchSession,
   createSearchSession,
   decodeSearchSessionCursor,
+  readCachedEntitySearchSessionPage,
+  readCachedSearchSessionPage,
   readEntitySearchEvidenceMentions,
   readEntitySearchSessionPage,
   readSearchSessionDescriptor,
@@ -644,18 +646,74 @@ export async function findArchiveObjects(
     requestedTypes === null ||
     requestedTypes.includes("entity") ||
     requestedTypes.includes("triple");
-  const initialMentions = wantsStructuredSearch
-    ? await document.mentions.listBySurfaceTerms(
-        listLexicalQueryCandidateTerms(query),
-      )
-    : [];
   const search = createLexicalQuery(query);
 
   if (search === undefined) {
     return createFindResult(query, [], options);
   }
 
-  const allMentions = initialMentions;
+  const cacheInput = {
+    archiveKey: options.archiveKey ?? "archive",
+    chapters: options.chapters ?? null,
+    lens: options.types === undefined ? "broad" : "typed",
+    match: options.match ?? "any",
+    order: options.order ?? "doc-asc",
+    query,
+    terms: search.terms,
+    types: options.types ?? null,
+  };
+
+  if (isEntityOnlySearch(options)) {
+    const cachedPage = await readCachedEntitySearchSessionPage(
+      cacheInput,
+      0,
+      limit,
+    );
+
+    if (cachedPage !== undefined) {
+      return {
+        chapters: cachedPage.chapters,
+        items: await hydrateFindHitEvidence(document, cachedPage.items, {
+          sessionId: cachedPage.sessionId,
+        }),
+        lens: parseFindLens(cachedPage.lens),
+        lensHint:
+          cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
+        limit,
+        match: parseFindMatch(cachedPage.match),
+        nextCursor: cachedPage.nextCursor,
+        order: options.order ?? "doc-asc",
+        query: cachedPage.query,
+        terms: cachedPage.terms,
+        types: parseFindTypes(cachedPage.types),
+      };
+    }
+  } else {
+    const cachedPage = await readCachedSearchSessionPage(cacheInput, 0, limit);
+
+    if (cachedPage !== undefined) {
+      return {
+        chapters: cachedPage.chapters,
+        items: await hydrateFindHitEvidence(document, cachedPage.items),
+        lens: parseFindLens(cachedPage.lens),
+        lensHint:
+          cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
+        limit,
+        match: parseFindMatch(cachedPage.match),
+        nextCursor: cachedPage.nextCursor,
+        order: options.order ?? "doc-asc",
+        query: cachedPage.query,
+        terms: cachedPage.terms,
+        types: parseFindTypes(cachedPage.types),
+      };
+    }
+  }
+
+  const allMentions = wantsStructuredSearch
+    ? await document.mentions.listBySurfaceTerms(
+        listLexicalQueryCandidateTerms(query),
+      )
+    : [];
   const hits = await findArchiveObjectsUncached(document, search, options, {
     allMentions,
   });
@@ -669,9 +727,10 @@ export async function findArchiveObjects(
     const sessionId = await createEntitySearchSession({
       archiveKey: options.archiveKey ?? "archive",
       chapters: ranked.chapters,
-      hits: createEntitySearchMentionHits(hits),
+      hits: createEntitySearchMentionHits(ranked.items),
       lens: ranked.lens,
       match: ranked.match,
+      order: ranked.order,
       query,
       terms: ranked.terms,
       types: ranked.types,
@@ -699,7 +758,9 @@ export async function findArchiveObjects(
     items: ranked.items,
     lens: ranked.lens,
     match: ranked.match,
+    order: ranked.order,
     query,
+    records: hits,
     terms: ranked.terms,
     types: ranked.types,
   });
@@ -3421,7 +3482,7 @@ function createRankedFindResult(
   const match = options.match ?? "any";
   const types = options.types ?? null;
   const ids = options.ids ?? null;
-  const filtered = hits
+  const filtered = groupFindHitsByObject(hits)
     .filter((hit) => matchesFindId(hit, ids))
     .filter((hit) => matchesFindChapter(hit, chapters))
     .filter((hit) => matchesFindType(hit, types))
@@ -3440,6 +3501,51 @@ function createRankedFindResult(
     terms,
     types,
   };
+}
+
+function groupFindHitsByObject(
+  hits: readonly ArchiveFindHit[],
+): readonly ArchiveFindHit[] {
+  const hitsById = new Map<string, ArchiveFindHit[]>();
+
+  for (const hit of hits) {
+    const values = hitsById.get(hit.id) ?? [];
+
+    values.push(hit);
+    hitsById.set(hit.id, values);
+  }
+
+  return [...hitsById.values()].map(groupObjectEvidenceHits);
+}
+
+function groupObjectEvidenceHits(
+  evidenceHits: readonly ArchiveFindHit[],
+): ArchiveFindHit {
+  const rankedHits = [...evidenceHits].sort(compareFindEvidenceHits);
+  const [best] = rankedHits;
+
+  if (best === undefined) {
+    throw new Error("Internal error: search result candidate is empty.");
+  }
+  if (rankedHits.length === 1) {
+    return best;
+  }
+
+  return {
+    ...best,
+    matchCount: Math.max(...rankedHits.map((hit) => hit.matchCount ?? 0)),
+    matchedTerms: mergeStringLists(
+      rankedHits.flatMap((hit) => hit.matchedTerms ?? []),
+    ),
+    missingTerms: mergeStringLists(
+      rankedHits.flatMap((hit) => hit.missingTerms ?? []),
+    ),
+    score: aggregateEvidenceScores(rankedHits.map((hit) => hit.score ?? 0)),
+  };
+}
+
+function mergeStringLists(values: readonly string[]): readonly string[] {
+  return [...new Set(values)];
 }
 
 function createCollectionResult(
