@@ -981,7 +981,13 @@ async function writePage(
           `Mentions: ${page.mentionCount}`,
           "",
           "Evidence:",
-          ...formatEvidencePreviewBlocks(page.evidence),
+          ...formatEvidencePreviewBlocks(
+            await createEvidencePreviewObject(page.evidence, {
+              ...context,
+              continuationKind: "evidence",
+              targetUri: page.id,
+            }),
+          ),
         ].join("\n") + "\n",
       );
       return;
@@ -992,7 +998,13 @@ async function writePage(
           page.label,
           "",
           "Evidence:",
-          ...formatEvidencePreviewBlocks(page.evidence),
+          ...formatEvidencePreviewBlocks(
+            await createEvidencePreviewObject(page.evidence, {
+              ...context,
+              continuationKind: "evidence",
+              targetUri: page.id,
+            }),
+          ),
         ].join("\n") + "\n",
       );
       return;
@@ -1253,6 +1265,7 @@ function formatFindObject(object: ArchiveOutputObject): string {
     if (hiddenEvidenceCount > 0) {
       lines.push("", `${hiddenEvidenceCount} evidence more...`);
     }
+    lines.push(...formatEvidencePreviewContinuation(object.evidence));
   }
 
   return lines.join("\n");
@@ -1376,7 +1389,7 @@ function formatSourceFragmentLines(
 }
 
 function formatEvidencePreviewBlocks(
-  evidence: ArchiveFindEvidencePreview,
+  evidence: ArchiveOutputEvidencePreview,
 ): string[] {
   if (evidence.sources.length === 0) {
     return ["[none]"];
@@ -1385,7 +1398,7 @@ function formatEvidencePreviewBlocks(
   const lines = evidence.sources.flatMap((item, index) => [
     ...(index === 0 ? [] : [""]),
     `-- evidence ${index + 1}/${evidence.shown}`,
-    formatEvidenceItem(item),
+    formatSourceObject(item),
   ]);
   const hiddenEvidenceCount = evidence.total - evidence.shown;
 
@@ -1393,7 +1406,16 @@ function formatEvidencePreviewBlocks(
     lines.push(`${hiddenEvidenceCount} evidence more...`);
   }
 
+  lines.push(...formatEvidencePreviewContinuation(evidence));
   return lines;
+}
+
+function formatEvidencePreviewContinuation(
+  evidence: ArchiveOutputEvidencePreview,
+): string[] {
+  return evidence.nextCursor === null
+    ? []
+    : ["", `More evidence: wikigraph next ${evidence.nextCursor}`];
 }
 
 function normalizeSourceText(text: string): string {
@@ -1493,7 +1515,13 @@ async function formatPackAnchor(
         `Mentions: ${anchor.mentionCount}`,
         "",
         "Evidence:",
-        ...formatEvidencePreviewBlocks(anchor.evidence),
+        ...formatEvidencePreviewBlocks(
+          await createEvidencePreviewObject(anchor.evidence, {
+            ...context,
+            continuationKind: "evidence",
+            targetUri: anchor.id,
+          }),
+        ),
       ].join("\n");
     case "triple":
       return [
@@ -1501,7 +1529,13 @@ async function formatPackAnchor(
         anchor.label,
         "",
         "Evidence:",
-        ...formatEvidencePreviewBlocks(anchor.evidence),
+        ...formatEvidencePreviewBlocks(
+          await createEvidencePreviewObject(anchor.evidence, {
+            ...context,
+            continuationKind: "evidence",
+            targetUri: anchor.id,
+          }),
+        ),
       ].join("\n");
   }
 }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ArchiveCollectionResult,
   ArchiveFindHit,
+  ArchivePage,
 } from "../../src/facade/archive-view.js";
 
 const archiveMockState = vi.hoisted(() => ({
@@ -206,6 +207,7 @@ const archiveMockState = vi.hoisted(() => ({
   },
   entityPage: {
     evidence: {
+      nextCursor: null,
       shown: 1,
       sources: [
         {
@@ -236,9 +238,10 @@ const archiveMockState = vi.hoisted(() => ({
     mentionCount: 1,
     qid: "Q1",
     type: "entity",
-  },
+  } satisfies ArchivePage,
   triplePage: {
     evidence: {
+      nextCursor: null,
       shown: 2,
       sources: [
         {
@@ -271,7 +274,7 @@ const archiveMockState = vi.hoisted(() => ({
     predicate: "mentions",
     subjectQid: "Q1",
     type: "triple",
-  },
+  } satisfies ArchivePage,
   readCalls: [] as string[],
   textWrites: [] as string[],
 }));
@@ -459,6 +462,55 @@ describe("cli/archive", () => {
       "@@ wikigraph://chapter/2/source/0#0..1 @@",
     );
     expect(archiveMockState.textWrites[0]).toContain("2 evidence more...");
+  });
+
+  it("prints text search continuation commands", async () => {
+    const [entityHit] = archiveMockState.entityFindHits;
+
+    if (entityHit === undefined) {
+      throw new Error("Missing entity fixture.");
+    }
+
+    vi.mocked(createContinuationCursor)
+      .mockResolvedValueOnce("c_more_evidence")
+      .mockResolvedValueOnce("c_more_results");
+    vi.mocked(findArchiveObjects).mockResolvedValueOnce({
+      chapters: null,
+      items: [
+        {
+          ...entityHit,
+          evidence: {
+            ...entityHit.evidence,
+            nextCursor: "raw-next-evidence-cursor",
+          },
+        },
+      ],
+      lens: "typed",
+      lensHint: null,
+      limit: 20,
+      match: "any",
+      nextCursor: "raw-next-search-cursor",
+      order: "doc-asc",
+      query: "RAG",
+      terms: ["rag"],
+      types: null,
+    });
+
+    await runArchiveCommand({
+      action: "search",
+      archivePath: "wikigraph:///tmp/book.sdpub",
+      evidenceLimit: 1,
+      format: "text",
+      kinds: ["entity"],
+      query: "RAG",
+    });
+
+    expect(archiveMockState.textWrites[0]).toContain(
+      "More evidence: wikigraph next c_more_evidence",
+    );
+    expect(archiveMockState.textWrites[0]).toContain(
+      "Next page: wikigraph next c_more_results",
+    );
   });
 
   it("prints listed archive objects as Wiki Graph URI objects", async () => {
@@ -974,6 +1026,33 @@ describe("cli/archive", () => {
         "\n",
       ),
     );
+  });
+
+  it("prints text get evidence continuation commands", async () => {
+    vi.mocked(createContinuationCursor).mockResolvedValueOnce(
+      "c_more_evidence",
+    );
+    vi.mocked(readArchivePage).mockResolvedValueOnce({
+      ...archiveMockState.entityPage,
+      evidence: Object.assign({}, archiveMockState.entityPage.evidence, {
+        nextCursor: "raw-next-evidence-cursor",
+        total: 3,
+      }),
+    });
+
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wikigraph:///tmp/book.sdpub",
+      evidenceLimit: 1,
+      format: "text",
+      objectId: "wikigraph:///tmp/book.sdpub/entity/Q1",
+    });
+
+    expect(archiveMockState.textWrites[0]).toContain("2 evidence more...");
+    expect(archiveMockState.textWrites[0]).toContain(
+      "More evidence: wikigraph next c_more_evidence",
+    );
+    expect(archiveMockState.textWrites[0]).not.toContain("Next page:");
   });
 
   it("gets a triple as concise JSON", async () => {
