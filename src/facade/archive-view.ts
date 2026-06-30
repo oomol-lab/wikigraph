@@ -1514,6 +1514,8 @@ export async function packArchiveContext(
   id: string,
   budget: number,
 ): Promise<ArchivePack> {
+  validatePackReference(id);
+
   const anchor = await readArchivePage(document, id);
   const links = await listAllArchiveLinks(document, id);
 
@@ -1522,6 +1524,27 @@ export async function packArchiveContext(
     budget,
     links,
   };
+}
+
+function validatePackReference(id: string): void {
+  const reference = parseWikiGraphReference(id);
+
+  switch (reference.type) {
+    case "chunk":
+    case "entity":
+    case "triple":
+      return;
+    case "chapter":
+    case "chapter-state":
+    case "chapter-tree":
+    case "meta":
+    case "source":
+    case "state":
+    case "summary":
+      throw new Error(
+        `Pack is only available for chunk, entity, and triple objects: ${id}`,
+      );
+  }
 }
 
 export async function estimateArchiveBuild(

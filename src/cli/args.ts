@@ -524,6 +524,10 @@ export function parseCLIArguments(
     return parseTransformArguments(positionals.slice(1), values);
   }
 
+  if (positionals[0] === "next") {
+    return parseArchiveArguments("next", positionals.slice(1), values);
+  }
+
   if (
     isArchiveMaintenanceCommand(positionals[0]) &&
     values.help === true &&
@@ -552,14 +556,10 @@ export function parseCLIArguments(
     return parseArchiveArguments(positionals[0], positionals.slice(1), values);
   }
 
-  throw new Error(
-    withHelpRoute(
-      positionals.length === 0
-        ? "Missing command."
-        : `Unknown command: ${positionals[0]}.`,
-      CLI_HELP_ROUTES.command,
-    ),
-  );
+  if (positionals.length === 0) {
+    throw new Error(withHelpRoute("Missing command.", CLI_HELP_ROUTES.command));
+  }
+  throw new Error(formatUnknownCommandMessage(positionals[0]!));
 }
 
 function parseArchiveUriFirstArguments(
@@ -604,12 +604,7 @@ function parseArchiveUriTargetArguments(
   const helpRoute = `wikigraph ${uri} ${action} --help`;
 
   if (archivePath === undefined) {
-    throw new Error(
-      withHelpRoute(
-        `Expected a Wiki Graph URI with a .sdpub archive locator: ${uri}`,
-        CLI_HELP_ROUTES.command,
-      ),
-    );
+    throw new Error(formatMissingArchiveLocatorMessage(uri));
   }
 
   if (action === "queue") {
@@ -1924,6 +1919,8 @@ function parseArchiveArguments(
     );
   }
 
+  validateArchiveCommandUriInput(action, archivePath);
+
   if (values.verbose === true) {
     throw new Error(
       withHelpRoute(
@@ -2191,6 +2188,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      validatePackTargetUri(archivePath, helpRoute);
       return {
         args: {
           action,
@@ -2238,6 +2236,114 @@ function parseArchiveArguments(
       };
     }
   }
+}
+
+function validateArchiveCommandUriInput(
+  action: CLIArchiveAction,
+  value: string,
+): void {
+  if (
+    action === "create" ||
+    action === "estimate" ||
+    action === "export" ||
+    action === "next"
+  ) {
+    return;
+  }
+
+  if (isWikiGraphUri(value) || !looksLikeSdpubPath(value)) {
+    return;
+  }
+
+  throw new Error(formatPathAsUriMessage(value));
+}
+
+function validatePackTargetUri(uri: string, helpRoute: string): void {
+  const parsed = parseLocatedWikiGraphUri(uri);
+
+  if (parsed.archivePath === undefined) {
+    throw new Error(
+      withHelpRoute(formatMissingArchiveLocatorMessage(uri), helpRoute),
+    );
+  }
+  if (parsed.objectUri === undefined) {
+    throw new Error(
+      withHelpRoute(
+        formatPackObjectMismatchMessage(uri),
+        "wikigraph help object",
+      ),
+    );
+  }
+  if (!isPackableObjectUri(parsed.objectUri)) {
+    throw new Error(
+      withHelpRoute(formatPackObjectMismatchMessage(uri), helpRoute),
+    );
+  }
+}
+
+function isPackableObjectUri(objectUri: string): boolean {
+  return (
+    /^wkg:\/\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
+    /^wkg:\/\/entity\/[^/]+$/u.test(objectUri) ||
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/entity\/[^/]+$/u.test(objectUri) ||
+    /^wkg:\/\/triple\/[^/]+\/[^/]+\/[^/]+$/u.test(objectUri) ||
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/triple\/[^/]+\/[^/]+\/[^/]+$/u.test(
+      objectUri,
+    )
+  );
+}
+
+function formatUnknownCommandMessage(command: string): string {
+  if (looksLikeSdpubPath(command)) {
+    return formatPathAsUriMessage(command);
+  }
+
+  return withHelpRoute(`Unknown command: ${command}.`, CLI_HELP_ROUTES.command);
+}
+
+function looksLikeSdpubPath(value: string): boolean {
+  return (
+    value.endsWith(".sdpub") ||
+    value.includes(".sdpub/") ||
+    value.includes(".sdpub#")
+  );
+}
+
+function formatPathAsUriMessage(path: string): string {
+  const [archivePath = path, suffix = ""] = splitSdpubPath(path);
+  const uri = archivePath.startsWith("/")
+    ? `wkg://${archivePath}${suffix}`
+    : `wkg://${archivePath.replace(/^\.\/+/u, "")}${suffix}`;
+
+  return [
+    `Expected a Wiki Graph URI, not a filesystem path: ${path}`,
+    `Use: ${uri}`,
+    "See: wikigraph help uri",
+  ].join("\n");
+}
+
+function splitSdpubPath(path: string): readonly [string, string] {
+  const archiveEnd = path.indexOf(".sdpub") + ".sdpub".length;
+
+  return [path.slice(0, archiveEnd), path.slice(archiveEnd)];
+}
+
+function formatMissingArchiveLocatorMessage(uri: string): string {
+  return [
+    `Expected a located Wiki Graph URI with a .sdpub archive locator: ${uri}`,
+    "Short object URIs from output are archive-relative handles.",
+    "Example: wkg://book.sdpub/entity/Q9957",
+    "See: wikigraph help uri",
+  ].join("\n");
+}
+
+function formatPackObjectMismatchMessage(uri: string): string {
+  return [
+    `Pack requires a graph object URI: ${uri}`,
+    "Supported pack targets are chunk, entity, and triple objects.",
+    "Use `wikigraph help object` to inspect valid object/verb pairs.",
+  ].join("\n");
 }
 
 function formatMissingArchiveInputMessage(action: CLIArchiveAction): string {

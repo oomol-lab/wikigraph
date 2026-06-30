@@ -518,6 +518,30 @@ describe("cli/args", () => {
       help: false,
       kind: "archive",
     });
+    expect(
+      parseCLIArguments(["next", "c_next", "--limit", "7", "--json"]),
+    ).toStrictEqual({
+      args: {
+        action: "next",
+        archivePath: "c_next",
+        format: "json",
+        limit: 7,
+      },
+      help: false,
+      kind: "archive",
+    });
+    expect(
+      parseCLIArguments(["next", "wkg://book.sdpub", "c_next", "--jsonl"]),
+    ).toStrictEqual({
+      args: {
+        action: "next",
+        archivePath: "wkg://book.sdpub",
+        cursor: "c_next",
+        format: "jsonl",
+      },
+      help: false,
+      kind: "archive",
+    });
 
     expect(() => parseCLIArguments(["find", "book.sdpub", "RAG"])).toThrow(
       "Unknown command: find.",
@@ -566,6 +590,9 @@ describe("cli/args", () => {
         "chunk",
       ]),
     ).toThrow("Unknown option '--type'.");
+    expect(() =>
+      parseCLIArguments(["wkg://book.sdpub/chapter/1/summary", "pack"]),
+    ).toThrow("The chapter summary resource does not support `pack`.");
   });
 
   it("keeps explicit negative evidence values for validation", () => {
@@ -989,6 +1016,14 @@ describe("cli/args", () => {
     expect(() => parseCLIArguments(["book.epub"])).toThrow(
       "Unknown command: book.epub.\nSee: wikigraph help command",
     );
+    expect(() => parseCLIArguments(["book.sdpub", "search", "RAG"])).toThrow(
+      "Expected a Wiki Graph URI, not a filesystem path: book.sdpub\nUse: wkg://book.sdpub\nSee: wikigraph help uri",
+    );
+    expect(() =>
+      parseCLIArguments(["/Users/me/book.sdpub/chapter/12", "get"]),
+    ).toThrow(
+      "Expected a Wiki Graph URI, not a filesystem path: /Users/me/book.sdpub/chapter/12\nUse: wkg:///Users/me/book.sdpub/chapter/12\nSee: wikigraph help uri",
+    );
   });
 
   it("rejects invalid format flags", () => {
@@ -1046,7 +1081,12 @@ describe("cli/args", () => {
     ).toThrow("The `cover` command does not support --json.");
     expect(() =>
       parseCLIArguments(["wkg://book.sdpub/chapter/x/source", "set"]),
-    ).toThrow("See: wikigraph help object");
+    ).toThrow(
+      "Use `wikigraph help object` to inspect valid object/verb pairs.",
+    );
+    expect(() => parseCLIArguments(["wkg://entity/Q9957", "get"])).toThrow(
+      "Short object URIs from output are archive-relative handles.",
+    );
     expect(() =>
       parseCLIArguments(["wkg://book.sdpub/chapter/1/source", "set"]),
     ).toThrow(

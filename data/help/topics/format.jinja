@@ -23,7 +23,7 @@ Inference rules:
   - Stdin requires an explicit `--input-format`.
   - Stdout text export requires an explicit or inferable output format.
 
-Object commands operate on `.sdpub` archives. `search` and `related` return URI-addressable objects, `get` opens one object, `evidence` returns source evidence items, and `pack` returns packed context.
+Object commands operate on `.sdpub` archives. `search` and `related` return URI-addressable objects, `get` opens one object, `evidence` returns source evidence items, and `pack` returns packed context for chunk, entity, and triple graph objects.
 
 Use `export` when a projection file is needed:
   wikigraph wkg://book.sdpub export --output-format markdown --output out.md

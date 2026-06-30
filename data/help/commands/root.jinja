@@ -17,7 +17,7 @@ Object workflow:
   - `get` opens one readable URI.
   - `related` expands from one URI to nearby URIs.
   - `evidence` traces a URI to source-backed evidence.
-  - `pack` builds bounded Agent-readable context around one readable URI.
+  - `pack` builds bounded Agent-readable context around one graph object URI.
 
 Object commands:
   wikigraph <located-wkg-uri> search <query> [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
@@ -28,7 +28,7 @@ Object commands:
   wikigraph <entity|triple|summary|chunk-uri> evidence [--limit <n>] [--cursor <token>] [--json|--jsonl]
   wikigraph next <cursor> [--limit <n>] [--json|--jsonl]
   wikigraph next <wikigraph-uri-with-sdpub-locator> <cursor> [--limit <n>] [--json|--jsonl]
-  wikigraph <object-uri> pack [--budget <chars>] [--json|--jsonl]
+  wikigraph <chunk|entity|triple-uri> pack [--budget <chars>] [--json|--jsonl]
 
 URI requirement:
   `search`, `list`, `get`, `related`, `evidence`, and `pack` use Wiki Graph URIs, not bare filesystem paths.
