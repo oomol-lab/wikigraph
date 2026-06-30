@@ -669,6 +669,18 @@ describe("cli/args", () => {
       parseCLIArguments(["wkg://book.sdpub", "export", "--evidence"]),
     ).toThrow("The `export` command does not support --evidence.");
     expect(() =>
+      parseCLIArguments(["wkg://book.sdpub", "create", "--backlinks"]),
+    ).toThrow("The `create` command does not support --backlinks.");
+    expect(() =>
+      parseCLIArguments(["wkg://book.sdpub", "create", "--role", "subject"]),
+    ).toThrow("The `create` command does not support --role.");
+    expect(() =>
+      parseCLIArguments(["wkg://book.sdpub", "export", "--backlinks"]),
+    ).toThrow("The `export` command does not support --backlinks.");
+    expect(() =>
+      parseCLIArguments(["wkg://book.sdpub", "export", "--role", "subject"]),
+    ).toThrow("The `export` command does not support --role.");
+    expect(() =>
       parseCLIArguments(["wkg://book.sdpub", "estimate", "--evidence"]),
     ).toThrow("The `estimate` command does not support --evidence.");
     expect(() =>
@@ -703,6 +715,14 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments(["wkg://book.sdpub", "search", "RAG", "--role", "any"]),
     ).toThrow("The `search` command does not support --role.");
+    expect(() =>
+      parseCLIArguments([
+        "wkg://book.sdpub/chunk/1",
+        "related",
+        "--role",
+        "subject",
+      ]),
+    ).toThrow("The `related` command does not support --role.");
     expect(() =>
       parseCLIArguments([
         "wkg://book.sdpub/entity/Q1",

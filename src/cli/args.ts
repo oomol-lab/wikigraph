@@ -2150,6 +2150,13 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
       return {
@@ -2181,6 +2188,13 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
       return {
@@ -2343,7 +2357,10 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
-      validateRelatedTargetUri(archivePath, helpRoute);
+      const relatedTarget = validateRelatedTargetUri(archivePath, helpRoute);
+      if (relatedTarget === "chunk") {
+        rejectArchiveFlag(action, "--role", values.role, helpRoute);
+      }
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
@@ -2354,7 +2371,9 @@ function parseArchiveArguments(
           format: parseResultFormat(values),
           objectId: archivePath,
           ...(positionals[1] === undefined ? {} : { query: positionals[1] }),
-          ...parseRelatedRoleFlag(values.role, helpRoute),
+          ...(relatedTarget === "entity"
+            ? parseRelatedRoleFlag(values.role, helpRoute)
+            : {}),
         },
         help: false,
         kind: "archive",
@@ -2514,7 +2533,10 @@ function validatePackTargetUri(uri: string, helpRoute: string): void {
   }
 }
 
-function validateRelatedTargetUri(uri: string, helpRoute: string): void {
+function validateRelatedTargetUri(
+  uri: string,
+  helpRoute: string,
+): "chunk" | "entity" {
   const parsed = parseLocatedWikiGraphUri(uri);
 
   if (parsed.archivePath === undefined) {
@@ -2530,7 +2552,9 @@ function validateRelatedTargetUri(uri: string, helpRoute: string): void {
       ),
     );
   }
-  if (!isRelatedObjectUri(parsed.objectUri)) {
+  const targetType = getRelatedObjectUriType(parsed.objectUri);
+
+  if (targetType === undefined) {
     throw new Error(
       withHelpRoute(
         `Related is only available for chunk and entity objects: ${uri}`,
@@ -2538,6 +2562,8 @@ function validateRelatedTargetUri(uri: string, helpRoute: string): void {
       ),
     );
   }
+
+  return targetType;
 }
 
 function isPackableObjectUri(objectUri: string): boolean {
@@ -2549,13 +2575,23 @@ function isPackableObjectUri(objectUri: string): boolean {
   );
 }
 
-function isRelatedObjectUri(objectUri: string): boolean {
-  return (
+function getRelatedObjectUriType(
+  objectUri: string,
+): "chunk" | "entity" | undefined {
+  if (
     /^wkg:\/\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
-    /^wkg:\/\/chapter\/[1-9][0-9]*\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/chunk\/[1-9][0-9]*$/u.test(objectUri)
+  ) {
+    return "chunk";
+  }
+  if (
     /^wkg:\/\/entity\/[^/]+$/u.test(objectUri) ||
     /^wkg:\/\/chapter\/[1-9][0-9]*\/entity\/[^/]+$/u.test(objectUri)
-  );
+  ) {
+    return "entity";
+  }
+
+  return undefined;
 }
 
 function formatUnknownCommandMessage(command: string): string {

@@ -58,7 +58,12 @@ export class WikipageCache {
       WIKIPAGE_CACHE_SCHEMA_SQL,
     );
 
-    await migrateWikipageCacheSchema(database);
+    try {
+      await migrateWikipageCacheSchema(database);
+    } catch (error) {
+      await database.close().catch(() => undefined);
+      throw error;
+    }
 
     return new WikipageCache(database);
   }
@@ -209,6 +214,12 @@ async function migrateQidCacheSchema(database: Database): Promise<void> {
   }
 
   await database.transaction(async () => {
+    const transactionColumns = await listTableColumns(database, "qid_cache");
+
+    if (transactionColumns.has("language")) {
+      return;
+    }
+
     await database.run("ALTER TABLE qid_cache RENAME TO qid_cache_legacy");
     await database.run(CREATE_QID_CACHE_SQL);
     await database.run(`
@@ -232,6 +243,15 @@ async function migrateDisambiguationCacheSchema(
   }
 
   await database.transaction(async () => {
+    const transactionColumns = await listTableColumns(
+      database,
+      "disambiguation_cache",
+    );
+
+    if (transactionColumns.has("wiki")) {
+      return;
+    }
+
     await database.run(
       "ALTER TABLE disambiguation_cache RENAME TO disambiguation_cache_legacy",
     );
