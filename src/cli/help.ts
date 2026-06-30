@@ -207,7 +207,8 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
         verb: "get",
       },
       {
-        command: "wikigraph wkg://book.sdpub/chapter/12 move --parent 3",
+        command:
+          "wikigraph wkg://book.sdpub/chapter/12 move --parent wkg://book.sdpub/chapter/3",
         note: "Move a chapter in the TOC tree.",
         verb: "move",
       },
@@ -262,7 +263,7 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
     uriForms: ["wkg://book.sdpub/chapter/tree"],
     verbs: [
       {
-        command: "wikigraph wkg://book.sdpub/chapter/tree get --json",
+        command: "wikigraph wkg://book.sdpub/chapter/tree get",
         note: "Read the full chapter tree.",
         verb: "get",
       },
@@ -333,7 +334,7 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
     uriForms: [
       "wkg://book.sdpub/source",
       "wkg://book.sdpub/chapter/12/source",
-      "wkg://book.sdpub/chapter/12/source/0#4..8",
+      "wkg://book.sdpub/chapter/12/source#4..8",
     ],
     verbs: [
       {
@@ -347,7 +348,7 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
         verb: "list",
       },
       {
-        command: "wikigraph wkg://book.sdpub/chapter/12/source/0#4..8 get",
+        command: "wikigraph wkg://book.sdpub/chapter/12/source#4..8 get",
         note: "Read source text or a source range.",
         verb: "get",
       },
@@ -444,7 +445,8 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
         verb: "get",
       },
       {
-        command: "wikigraph wkg://book.sdpub/entity/Q9957 related --role subject",
+        command:
+          "wikigraph wkg://book.sdpub/entity/Q9957 related --role subject",
         note: "List triples related to the entity.",
         verb: "related",
       },

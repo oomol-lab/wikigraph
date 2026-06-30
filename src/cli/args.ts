@@ -572,7 +572,7 @@ function parseArchiveUriFirstArguments(
   values: ArchiveArgumentValues,
 ): ParsedCLIArguments {
   const uri = positionals[0];
-  const action = positionals[1];
+  const action = positionals[1] ?? "get";
 
   if (uri === undefined) {
     throw new Error("Internal error: missing URI-first archive URI.");
@@ -581,9 +581,7 @@ function parseArchiveUriFirstArguments(
   if (!isArchiveUriAction(action)) {
     throw new Error(
       withHelpRoute(
-        action === undefined
-          ? `Missing action after ${uri}.`
-          : `The URI-first form does not support \`${action}\`. Use \`wikigraph help object\` to inspect valid object/verb pairs.`,
+        `The URI-first form does not support \`${action}\`. Use \`wikigraph help object\` to inspect valid object/verb pairs.`,
         "wikigraph help object",
       ),
     );
@@ -592,7 +590,7 @@ function parseArchiveUriFirstArguments(
   return parseArchiveUriTargetArguments(
     uri,
     action,
-    positionals.slice(2),
+    positionals[1] === undefined ? [] : positionals.slice(2),
     values,
   );
 }
@@ -2434,9 +2432,9 @@ function normalizeArchiveChapterArguments(
     readonly json?: boolean;
     readonly llm?: string;
     readonly parent?: string;
-  readonly prompt?: string;
-  readonly recursive?: boolean;
-  readonly root?: boolean;
+    readonly prompt?: string;
+    readonly recursive?: boolean;
+    readonly root?: boolean;
     readonly last?: boolean;
     readonly stage?: string;
     readonly title?: string;
@@ -2452,15 +2450,15 @@ function normalizeArchiveChapterArguments(
   const parentChapterId =
     values.parent === undefined
       ? undefined
-      : parseSerialId(values.parent, "--parent", helpRoute);
+      : parseChapterRef(values.parent, "--parent", path, helpRoute);
   const beforeChapterId =
     values.before === undefined
       ? undefined
-      : parseSerialId(values.before, "--before", helpRoute);
+      : parseChapterRef(values.before, "--before", path, helpRoute);
   const afterChapterId =
     values.after === undefined
       ? undefined
-      : parseSerialId(values.after, "--after", helpRoute);
+      : parseChapterRef(values.after, "--after", path, helpRoute);
   const inputFormat =
     values["input-format"] === undefined
       ? undefined
@@ -3065,6 +3063,44 @@ function parseSerialId(value: string, flag: string, helpRoute: string): number {
   }
 
   return Number(normalized);
+}
+
+function parseChapterRef(
+  value: string,
+  flag: string,
+  archivePath: string,
+  helpRoute: string,
+): number {
+  const normalized = value.trim();
+
+  if (!normalized.startsWith("wkg://")) {
+    return parseSerialId(value, flag, helpRoute);
+  }
+
+  const parsed = parseLocatedWikiGraphUri(normalized);
+
+  if (parsed.archivePath !== undefined && parsed.archivePath !== archivePath) {
+    throw new Error(
+      withHelpRoute(
+        `Invalid ${flag}: ${value}. Chapter URI belongs to a different archive.`,
+        helpRoute,
+      ),
+    );
+  }
+
+  const objectUri = parsed.objectUri ?? normalized;
+  const match = /^wkg:\/\/chapter\/([1-9][0-9]*)\/?$/u.exec(objectUri);
+
+  if (match?.[1] === undefined) {
+    throw new Error(
+      withHelpRoute(
+        `Invalid ${flag}: ${value}. Expected a chapter URI such as wkg://chapter/3.`,
+        helpRoute,
+      ),
+    );
+  }
+
+  return Number(match[1]);
 }
 
 function isArchiveChapterAction(
@@ -3743,7 +3779,7 @@ function parseEvidenceFlag(
   }
 
   return {
-    evidenceLimit: parsePositiveIntegerFlag(value, "--evidence", helpRoute),
+    evidenceLimit: parseNonNegativeIntegerFlag(value, "--evidence", helpRoute),
   };
 }
 
@@ -3769,6 +3805,22 @@ function parseRelatedRoleFlag(
   }
 
   return { role: value };
+}
+
+function parseNonNegativeIntegerFlag(
+  value: string,
+  flag: string,
+  helpRoute: string,
+): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(
+      withHelpRoute(`${flag} must be a non-negative integer.`, helpRoute),
+    );
+  }
+
+  return parsed;
 }
 
 function parsePositiveIntegerFlag(

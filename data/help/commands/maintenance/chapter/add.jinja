@@ -7,8 +7,8 @@ Purpose:
   Insert a new chapter into an existing `.sdpub` chapter tree.
 
 Usage:
-  wikigraph <archive-uri>/chapter add --stage planned [--title <title>] [--parent <id>] [--llm <json>] [--help|-h]
-  wikigraph <archive-uri>/chapter add --stage source [--title <title>] [--parent <id>] [--input <path>] --input-format <format> [--llm <json>] [--help|-h]
+  wikigraph <archive-uri>/chapter add --stage planned [--title <title>] [--parent <chapter-uri>] [--llm <json>] [--help|-h]
+  wikigraph <archive-uri>/chapter add --stage source [--title <title>] [--parent <chapter-uri>] [--input <path>] --input-format <format> [--llm <json>] [--help|-h]
 
 Behavior:
   - `--stage planned` creates an empty chapter with no source, graph, or summary.
@@ -19,7 +19,7 @@ Behavior:
   - `--stage source` accepts only `txt` or `markdown` for `--input-format`.
   - Omitting `--title` creates an untitled planned chapter.
   - Omitting `--parent` adds the chapter at the top level.
-  - `--parent <id>` adds the chapter under an existing chapter.
+  - `--parent <chapter-uri>` adds the chapter under an existing chapter.
   - Does not call an LLM provider.
 
 Output shape:
@@ -31,7 +31,7 @@ Typical next step:
 
 Examples:
   wikigraph wkg://book.sdpub/chapter add --stage planned --title "Part I"
-  wikigraph wkg://book.sdpub/chapter add --stage source --title "Chapter 1" --input ./chapter.md --input-format markdown --parent 3
+  wikigraph wkg://book.sdpub/chapter add --stage source --title "Chapter 1" --input ./chapter.md --input-format markdown --parent wkg://book.sdpub/chapter/3
 
 See also:
   - wikigraph wkg://book.sdpub/chapter list --help

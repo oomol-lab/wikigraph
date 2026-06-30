@@ -23,7 +23,7 @@ const SDPUB_ARCHIVE_PATTERNS = [
   /^book-meta\.json$/u,
   /^toc\.json$/u,
   /^cover\/(?:data\.bin|info\.json)$/u,
-  /^summaries\/serial-\d+\.txt$/u,
+  /^summaries\/serial-\d+\/fragment_\d+\.json$/u,
   /^fragments\/serial-\d+\/fragment_\d+\.json$/u,
 ] as const;
 

@@ -469,6 +469,26 @@ describe("cli/args", () => {
       help: false,
       kind: "archive",
     });
+    expect(parseCLIArguments(["wkg://book.sdpub/chunk/1"])).toStrictEqual({
+      args: {
+        action: "get",
+        archivePath: "wkg://book.sdpub/chunk/1",
+        format: "text",
+        objectId: "wkg://book.sdpub/chunk/1",
+      },
+      help: false,
+      kind: "archive",
+    });
+    expect(parseCLIArguments(["wkg://book.sdpub/entity/Q1"])).toStrictEqual({
+      args: {
+        action: "get",
+        archivePath: "wkg://book.sdpub/entity/Q1",
+        format: "text",
+        objectId: "wkg://book.sdpub/entity/Q1",
+      },
+      help: false,
+      kind: "archive",
+    });
 
     expect(
       parseCLIArguments(["wkg://book.sdpub/chunk/1", "related"]),
@@ -613,6 +633,9 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments(["wkg://book.sdpub/chapter/1/summary", "pack"]),
     ).toThrow("The chapter summary resource does not support `pack`.");
+    expect(() => parseCLIArguments(["wkg://book.sdpub/entity"])).toThrow(
+      "The entity collection does not support `get`. Expected list or search.",
+    );
     expect(() =>
       parseCLIArguments([
         "wkg://book.sdpub/entity/Q1",
@@ -622,19 +645,10 @@ describe("cli/args", () => {
       ]),
     ).toThrow("--role must be one of: any, subject, object, self.");
     expect(() =>
-      parseCLIArguments([
-        "wkg://book.sdpub",
-        "search",
-        "RAG",
-        "--role",
-        "any",
-      ]),
+      parseCLIArguments(["wkg://book.sdpub", "search", "RAG", "--role", "any"]),
     ).toThrow("The `search` command does not support --role.");
     expect(() =>
-      parseCLIArguments([
-        "wkg://book.sdpub/triple/Q1/mentions/Q2",
-        "related",
-      ]),
+      parseCLIArguments(["wkg://book.sdpub/triple/Q1/mentions/Q2", "related"]),
     ).toThrow("Related is only available for chunk and entity objects");
     expect(() =>
       parseCLIArguments(["wkg://book.sdpub/triple/Q1/mentions/Q2", "pack"]),
@@ -650,7 +664,25 @@ describe("cli/args", () => {
         "--evidence",
         "-1",
       ]),
-    ).toThrow("--evidence must be a positive integer.");
+    ).toThrow("--evidence must be a non-negative integer.");
+    expect(
+      parseCLIArguments([
+        "wkg://book.sdpub/entity/Q1",
+        "get",
+        "--evidence",
+        "0",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "get",
+        archivePath: "wkg://book.sdpub/entity/Q1",
+        evidenceLimit: 0,
+        format: "text",
+        objectId: "wkg://book.sdpub/entity/Q1",
+      },
+      help: false,
+      kind: "archive",
+    });
   });
 
   it("parses archive metadata and cover commands", () => {
@@ -661,6 +693,16 @@ describe("cli/args", () => {
         action: "get",
         archivePath: "wkg://book.sdpub/",
         format: "json",
+        objectId: "wkg://book.sdpub/",
+      },
+      help: false,
+      kind: "archive",
+    });
+    expect(parseCLIArguments(["wkg://book.sdpub/"])).toStrictEqual({
+      args: {
+        action: "get",
+        archivePath: "wkg://book.sdpub/",
+        format: "text",
         objectId: "wkg://book.sdpub/",
       },
       help: false,
@@ -780,6 +822,48 @@ describe("cli/args", () => {
       help: false,
       kind: "chapter",
     });
+    expect(
+      parseCLIArguments([
+        "wkg://book.sdpub/chapter/8",
+        "move",
+        "--parent",
+        "wkg://chapter/3",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "move",
+        chapterId: 8,
+        parentChapterId: 3,
+        path: archivePath,
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments([
+        "wkg://book.sdpub/chapter/8",
+        "move",
+        "--before",
+        "wkg://book.sdpub/chapter/9",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "move",
+        beforeChapterId: 9,
+        chapterId: 8,
+        path: archivePath,
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(() =>
+      parseCLIArguments([
+        "wkg://book.sdpub/chapter/8",
+        "move",
+        "--parent",
+        "wkg://other.sdpub/chapter/3",
+      ]),
+    ).toThrow("Chapter URI belongs to a different archive.");
     expect(
       parseCLIArguments([
         "wkg://book.sdpub/chapter/8",

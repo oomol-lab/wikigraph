@@ -18,7 +18,7 @@ const archiveMockState = vi.hoisted(() => ({
             chapterId: 2,
             endSentenceIndex: 1,
             fragmentId: 0,
-            id: "wkg://chapter/2/source/0#0..1",
+            id: "wkg://chapter/2/source#0..1",
             source: "RAG original source fragment.",
             startSentenceIndex: 0,
             title: "Chapter 2",
@@ -48,7 +48,7 @@ const archiveMockState = vi.hoisted(() => ({
             chapterId: 2,
             endSentenceIndex: 1,
             fragmentId: 0,
-            id: "wkg://chapter/2/source/0#0..1",
+            id: "wkg://chapter/2/source#0..1",
             source: "RAG original source fragment.",
             startSentenceIndex: 0,
             title: "Chapter 2",
@@ -83,6 +83,20 @@ const archiveMockState = vi.hoisted(() => ({
       type: "node",
     },
   ],
+  sourceFindHits: [
+    {
+      chapter: 2,
+      field: "source",
+      id: "wkg://chapter/2/source#0..1",
+      matchedTerms: ["rag"],
+      position: { chapter: 2, fragment: 0 },
+      score: 1,
+      snippet:
+        "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
+      title: "Chapter 2",
+      type: "source",
+    },
+  ] satisfies ArchiveFindHit[],
   index: {
     chapters: [
       {
@@ -116,7 +130,7 @@ const archiveMockState = vi.hoisted(() => ({
         chapterId: 2,
         endSentenceIndex: 1,
         fragmentId: 0,
-        id: "wkg://chapter/2/source/0#0..1",
+        id: "wkg://chapter/2/source#0..1",
         source:
           "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
         startSentenceIndex: 0,
@@ -127,7 +141,7 @@ const archiveMockState = vi.hoisted(() => ({
         chapterId: 2,
         endSentenceIndex: 3,
         fragmentId: 0,
-        id: "wkg://chapter/2/source/0#3..3",
+        id: "wkg://chapter/2/source#3",
         source: "Follow-up source fragment.",
         startSentenceIndex: 3,
         title: "Chapter 2",
@@ -153,7 +167,7 @@ const archiveMockState = vi.hoisted(() => ({
             chapterId: 2,
             endSentenceIndex: 1,
             fragmentId: 0,
-            id: "wkg://chapter/2/source/0#0..1",
+            id: "wkg://chapter/2/source#0..1",
             source: "RAG original source fragment.",
             startSentenceIndex: 0,
             title: "Chapter 2",
@@ -247,7 +261,7 @@ const archiveMockState = vi.hoisted(() => ({
           chapterId: 2,
           endSentenceIndex: 1,
           fragmentId: 0,
-          id: "wkg://chapter/2/source/0#0..1",
+          id: "wkg://chapter/2/source#0..1",
           source: "RAG original source fragment.",
           startSentenceIndex: 0,
           title: "Chapter 2",
@@ -272,6 +286,22 @@ const archiveMockState = vi.hoisted(() => ({
     qid: "Q1",
     type: "entity",
   } satisfies ArchivePage,
+  sourceRangePage: {
+    fragment: {
+      fragmentId: 0,
+      id: "wkg://chapter/2/source#0..1",
+      preview: "RAG original source fragment.",
+      sentenceCount: 2,
+      text: "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
+      wordsCount: 5,
+    },
+    id: "wkg://chapter/2/source#0..1",
+    nextFragmentId: undefined,
+    nodes: [],
+    previousFragmentId: undefined,
+    title: "wkg://chapter/2/source#0..1",
+    type: "fragment",
+  } satisfies ArchivePage,
   triplePage: {
     evidence: {
       nextCursor: null,
@@ -281,7 +311,7 @@ const archiveMockState = vi.hoisted(() => ({
           chapterId: 2,
           endSentenceIndex: 1,
           fragmentId: 0,
-          id: "wkg://chapter/2/source/0#0..1",
+          id: "wkg://chapter/2/source#0..1",
           source:
             "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
           startSentenceIndex: 0,
@@ -292,7 +322,7 @@ const archiveMockState = vi.hoisted(() => ({
           chapterId: 2,
           endSentenceIndex: 3,
           fragmentId: 0,
-          id: "wkg://chapter/2/source/0#3..3",
+          id: "wkg://chapter/2/source#3",
           source: "Follow-up source fragment.",
           startSentenceIndex: 3,
           title: "Chapter 2",
@@ -365,7 +395,9 @@ vi.mock("../../src/facade/index.js", () => ({
         items:
           options.types?.includes("entity") === true
             ? archiveMockState.entityFindHits
-            : archiveMockState.findHits,
+            : options.types?.includes("source") === true
+              ? archiveMockState.sourceFindHits
+              : archiveMockState.findHits,
         lens: "typed",
         lensHint: null,
         limit: 20,
@@ -410,11 +442,13 @@ vi.mock("../../src/facade/index.js", () => ({
           ? archiveMockState.triplePage
           : id === "wkg://chapter/2"
             ? archiveMockState.chapterPage
-            : id === "wkg://"
-              ? archiveMockState.metaPage
-              : id === "wkg://state"
-                ? archiveMockState.statePage
-                : archiveMockState.page,
+            : id === "wkg://chapter/2/source#0..1"
+              ? archiveMockState.sourceRangePage
+              : id === "wkg://"
+                ? archiveMockState.metaPage
+                : id === "wkg://state"
+                  ? archiveMockState.statePage
+                  : archiveMockState.page,
     ),
   ),
 }));
@@ -477,6 +511,30 @@ describe("cli/archive", () => {
     });
   });
 
+  it("prints source search hits as citation blocks", async () => {
+    await runArchiveCommand({
+      action: "search",
+      archivePath: "wkg:///tmp/book.sdpub",
+      format: "text",
+      kinds: ["source"],
+      query: "RAG",
+    });
+
+    expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
+      archiveKey: "/tmp/book.sdpub",
+      types: ["source"],
+    });
+    expect(archiveMockState.textWrites[0]).toContain(
+      [
+        "@@ wkg://chapter/2/source#0..1 @@",
+        "RAG original source fragment.",
+        "",
+        "Second paragraph.",
+      ].join("\n"),
+    );
+    expect(archiveMockState.textWrites[0]).not.toContain("Chapter 2");
+  });
+
   it("passes entity search kinds to archive search", async () => {
     await runArchiveCommand({
       action: "search",
@@ -492,10 +550,11 @@ describe("cli/archive", () => {
       evidenceLimit: 3,
       types: ["entity"],
     });
-    expect(archiveMockState.textWrites[0]).toContain("1 wkg://entity/Q1");
+    expect(archiveMockState.textWrites[0]).toContain("wkg://entity/Q1");
+    expect(archiveMockState.textWrites[0]).not.toContain("1 wkg://entity/Q1");
     expect(archiveMockState.textWrites[0]).toContain("-- evidence 1/1");
     expect(archiveMockState.textWrites[0]).toContain(
-      "@@ wkg://chapter/2/source/0#0..1 @@",
+      "@@ wkg://chapter/2/source#0..1 @@",
     );
     expect(archiveMockState.textWrites[0]).toContain("2 evidence more...");
   });
@@ -670,13 +729,41 @@ describe("cli/archive", () => {
             sources: [
               {
                 text: "RAG original source fragment.",
-                uri: "wkg://chapter/2/source/0#0..1",
+                uri: "wkg://chapter/2/source#0..1",
               },
             ],
             total: 3,
           },
           label: "RAG",
-          score: 1,
+          type: "entity",
+          uri: "wkg://entity/Q1",
+        },
+      ],
+    });
+  });
+
+  it("keeps listed object evidence disabled with evidence zero", async () => {
+    await runArchiveCommand({
+      action: "list",
+      archivePath: "wkg:///tmp/book.sdpub/chapter/2",
+      evidenceLimit: 0,
+      format: "json",
+      kinds: ["entity"],
+    });
+
+    expect(listArchiveCollection).toHaveBeenCalledWith(
+      {},
+      {
+        chapters: [2],
+        types: ["entity"],
+      },
+    );
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      limit: 20,
+      nextCursor: null,
+      objects: [
+        {
+          label: "RAG",
           type: "entity",
           uri: "wkg://entity/Q1",
         },
@@ -773,7 +860,7 @@ describe("cli/archive", () => {
             sources: [
               {
                 text: "RAG original source fragment.",
-                uri: "wkg://chapter/2/source/0#0..1",
+                uri: "wkg://chapter/2/source#0..1",
               },
             ],
             total: 1,
@@ -805,8 +892,6 @@ describe("cli/archive", () => {
       objects: [
         {
           label: "RAG",
-          score: 1,
-          snippet: "RAG original source fragment.",
           type: "entity",
           uri: "wkg://entity/Q1",
         },
@@ -817,10 +902,10 @@ describe("cli/archive", () => {
         '      "uri": "wkg://entity/Q1"',
         '      "type": "entity"',
         '      "label": "RAG"',
-        '      "score": 1',
-        '      "snippet": "RAG original source fragment."',
       ].join(",\n"),
     );
+    expect(archiveMockState.textWrites[0]).not.toContain('"score"');
+    expect(archiveMockState.textWrites[0]).not.toContain('"snippet"');
     expect(archiveMockState.textWrites[0]).not.toContain('"summary"');
     expect(archiveMockState.textWrites[0]).not.toContain('"evidence"');
   });
@@ -865,7 +950,7 @@ describe("cli/archive", () => {
             sources: [
               {
                 text: "RAG original source fragment.",
-                uri: "wkg://chapter/2/source/0#0..1",
+                uri: "wkg://chapter/2/source#0..1",
               },
             ],
             total: 1,
@@ -1049,6 +1134,34 @@ describe("cli/archive", () => {
     });
   });
 
+  it("gets a source range as a citation block", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wkg:///tmp/book.sdpub",
+      format: "text",
+      objectId: "wkg:///tmp/book.sdpub/chapter/2/source#0..1",
+    });
+
+    expect(readArchivePage).toHaveBeenCalledWith(
+      {},
+      "wkg://chapter/2/source#0..1",
+      {},
+    );
+    expect(archiveMockState.textWrites[0]).toBe(
+      [
+        "@@ wkg://chapter/2/source#0..1 @@",
+        "RAG original source fragment.",
+        "",
+        "Second paragraph.",
+        "",
+      ].join("\n"),
+    );
+    expect(archiveMockState.textWrites[0]).not.toContain("Words:");
+    expect(archiveMockState.textWrites[0]).not.toContain("Previous:");
+    expect(archiveMockState.textWrites[0]).not.toContain("Next:");
+    expect(archiveMockState.textWrites[0]).not.toContain("Related Nodes:");
+  });
+
   it("gets archive metadata from a root object URI", async () => {
     await runArchiveCommand({
       action: "get",
@@ -1074,7 +1187,6 @@ describe("cli/archive", () => {
     await runArchiveCommand({
       action: "get",
       archivePath: "wkg:///tmp/book.sdpub",
-      evidenceLimit: 3,
       format: "json",
       objectId: "wkg:///tmp/book.sdpub/entity/Q1",
     });
@@ -1099,7 +1211,7 @@ describe("cli/archive", () => {
         shown: 1,
         sources: [
           {
-            uri: "wkg://chapter/2/source/0#0..1",
+            uri: "wkg://chapter/2/source#0..1",
             text: "RAG original source fragment.",
           },
         ],
@@ -1109,6 +1221,44 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain(
       ['  "uri": "wkg://entity/Q1",', '  "labels": [', '    "RAG",'].join("\n"),
     );
+  });
+
+  it("disables single-object evidence with evidence zero", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wkg:///tmp/book.sdpub",
+      evidenceLimit: 0,
+      format: "json",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1",
+    });
+
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wkg://entity/Q1", {});
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      labels: [
+        "RAG",
+        "retrieval-augmented generation",
+        "检索增强生成",
+        "知识检索",
+        "向量检索",
+        "生成模型",
+        "问答系统",
+      ],
+      qid: "Q1",
+      uri: "wkg://entity/Q1",
+    });
+  });
+
+  it("hides text get evidence with evidence zero", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wkg:///tmp/book.sdpub",
+      evidenceLimit: 0,
+      format: "text",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1",
+    });
+
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wkg://entity/Q1", {});
+    expect(archiveMockState.textWrites[0]).toBe("wkg://entity/Q1\nRAG\n");
   });
 
   it("prints text get evidence continuation commands", async () => {
@@ -1134,6 +1284,7 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain(
       "2 more evidence: wikigraph next c_more_evidence",
     );
+    expect(archiveMockState.textWrites[0]).not.toContain("Mentions:");
     expect(archiveMockState.textWrites[0]).not.toContain("Next page:");
   });
 
@@ -1163,11 +1314,11 @@ describe("cli/archive", () => {
         sources: [
           {
             text: "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
-            uri: "wkg://chapter/2/source/0#0..1",
+            uri: "wkg://chapter/2/source#0..1",
           },
           {
             text: "Follow-up source fragment.",
-            uri: "wkg://chapter/2/source/0#3..3",
+            uri: "wkg://chapter/2/source#3",
           },
         ],
         total: 2,
@@ -1200,12 +1351,12 @@ describe("cli/archive", () => {
       [
         "wkg://chunk/11",
         "Related",
-        "Related chunk",
         "",
         "wkg://triple/Q1/mentions/Q2",
         "RAG mentions agent",
       ].join("\n"),
     );
+    expect(archiveMockState.textWrites[0]).not.toContain("Related chunk");
     expect(archiveMockState.textWrites[0]).not.toContain("Q1 mentions Q2");
   });
 
@@ -1223,7 +1374,6 @@ describe("cli/archive", () => {
       objects: [
         {
           label: "Related",
-          snippet: "Related chunk",
           type: "node",
           uri: "wkg://chunk/11",
         },
@@ -1278,7 +1428,7 @@ describe("cli/archive", () => {
             shown: 1,
             sources: [
               {
-                uri: "wkg://chapter/2/source/0#0..1",
+                uri: "wkg://chapter/2/source#0..1",
               },
             ],
             total: 1,
@@ -1303,22 +1453,22 @@ describe("cli/archive", () => {
       {},
     );
     expect(archiveMockState.textWrites[0]).toContain(
-      "wkg://chapter/2/source/0#0..1",
+      "wkg://chapter/2/source#0..1",
     );
     expect(archiveMockState.textWrites[0]).toContain(
-      "@@ wkg://chapter/2/source/0#0..1 @@",
+      "@@ wkg://chapter/2/source#0..1 @@",
     );
     expect(archiveMockState.textWrites[0]).toContain(
       "RAG original source fragment.",
     );
     expect(archiveMockState.textWrites[0]).toContain(
       [
-        "@@ wkg://chapter/2/source/0#0..1 @@",
+        "@@ wkg://chapter/2/source#0..1 @@",
         "RAG original source fragment.",
         "",
         "Second paragraph.",
         "",
-        "@@ wkg://chapter/2/source/0#3..3 @@",
+        "@@ wkg://chapter/2/source#3 @@",
         "Follow-up source fragment.",
       ].join("\n"),
     );
@@ -1335,13 +1485,13 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain(
       [
         "-- evidence 1/2",
-        "@@ wkg://chapter/2/source/0#0..1 @@",
+        "@@ wkg://chapter/2/source#0..1 @@",
         "RAG original source fragment.",
         "",
         "Second paragraph.",
         "",
         "-- evidence 2/2",
-        "@@ wkg://chapter/2/source/0#3..3 @@",
+        "@@ wkg://chapter/2/source#3 @@",
         "Follow-up source fragment.",
       ].join("\n"),
     );
@@ -1395,7 +1545,7 @@ describe("cli/archive", () => {
     });
 
     expect(archiveMockState.textWrites[0]).toContain(
-      '"uri":"wkg://chapter/2/source/0#0..1"',
+      '"uri":"wkg://chapter/2/source#0..1"',
     );
     expect(archiveMockState.textWrites[0]).not.toContain('"fragmentId"');
     expect(archiveMockState.textWrites[0]).not.toContain('"chapterId"');

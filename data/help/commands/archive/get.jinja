@@ -11,13 +11,17 @@ Use when:
 
 Usage:
   wikigraph <object-uri> get [--evidence [n]] [--json|--jsonl] [--help|-h]
+  wikigraph <object-uri> [--evidence [n]] [--json|--jsonl]
 
 Returns:
   - The selected object in human-readable text, JSON, or JSONL.
 
 Notes:
   - `get` is for readable archive objects such as chunks, source chapters or ranges, and summaries.
-  - Add `--evidence` or `--evidence <n>` on entity or triple URIs when source-backed support is needed.
+  - When a located readable object URI is passed without a verb, `get` is implied.
+  - Collection and lens URIs still require an explicit verb such as `list` or `search`.
+  - Entity and triple `get` output includes up to 3 evidence sources by default.
+  - Use `--evidence <n>` to choose a different evidence preview size, or `--evidence 0` to hide evidence.
   - Read `wikigraph help uri` before constructing object URIs.
 
 Next steps:
@@ -27,4 +31,4 @@ Next steps:
 
 Examples:
   wikigraph wkg:///books/book.sdpub/chunk/123 get
-  wikigraph wkg:///books/book.sdpub/chapter/1/source/0#42..60 get
+  wikigraph wkg:///books/book.sdpub/chapter/1/source#42..60 get

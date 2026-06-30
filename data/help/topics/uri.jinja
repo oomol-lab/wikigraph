@@ -23,7 +23,7 @@ Short object URIs:
   Commands return short object URIs without local file paths:
     wkg://chapter/3
     wkg://chapter/3/source/
-    wkg://chapter/3/source/0#4..8
+    wkg://chapter/3/source#4..8
     wkg://chapter/3/summary
     wkg://chunk/12
     wkg://entity/Q8018
@@ -32,9 +32,12 @@ Short object URIs:
 Located object URIs:
   Add an archive locator before the object path when passing a URI to a command:
     wkg:///books/book.sdpub/chapter/3
-    wkg:///books/book.sdpub/chapter/3/source/0#4..8
+    wkg:///books/book.sdpub/chapter/3/source#4..8
     wkg://book.sdpub/entity/Q8018
   Returned short URIs are archive-relative handles, not complete command targets. Prepend the archive locator before passing them back to object commands.
+  Located readable object URIs can omit the `get` verb:
+    wikigraph wkg://book.sdpub/entity/Q8018
+  Collection and lens URIs still require an explicit verb such as `list` or `search`.
 
 Object command examples:
   Search an absolute local archive:

@@ -4,13 +4,15 @@ Command: wikigraph <archive-uri>/chapter/tree
 chapter tree
 
 Purpose:
-  Get or set the complete chapter tree as a stable JSON structure.
+  Get or set the complete chapter tree.
 
 Usage:
   wikigraph <archive-uri>/chapter/tree get [--json] [--llm <json>] [--help|-h]
   wikigraph <archive-uri>/chapter/tree set [--input <path>] [--dry-run] [--llm <json>] [--help|-h]
 
 Tree JSON shape:
+  `get` without `--json` prints a readable tree. Add `--json` when you need editable tree JSON.
+
   {
     "chapters": [
       {
@@ -38,6 +40,7 @@ Dry run:
   `--dry-run` validates the input and prints moved, renamed, and unchanged counts without changing the archive.
 
 Examples:
+  wikigraph wkg://book.sdpub/chapter/tree get
   wikigraph wkg://book.sdpub/chapter/tree get --json > tree.json
   wikigraph wkg://book.sdpub/chapter/tree set --input tree.json --dry-run
   wikigraph wkg://book.sdpub/chapter/tree set --input tree.json

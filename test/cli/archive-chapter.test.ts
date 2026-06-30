@@ -438,7 +438,22 @@ describe("cli/archive-chapter", () => {
       treeAction: "show",
     });
 
-    expect(chapterMockState.textWrites[0]).toContain('"title": "Part I"');
+    expect(chapterMockState.textWrites[0]).toBe(
+      [
+        "└─ Part I  wkg://chapter/1",
+        "   └─ Chapter 1  wkg://chapter/2",
+        "",
+      ].join("\n"),
+    );
+
+    await runArchiveChapterCommand({
+      action: "tree",
+      json: true,
+      path: "/tmp/book.sdpub",
+      treeAction: "show",
+    });
+
+    expect(chapterMockState.textWrites.at(-1)).toContain('"title": "Part I"');
 
     chapterMockState.inputFileContent = JSON.stringify({
       chapters: [

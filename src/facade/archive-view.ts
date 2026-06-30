@@ -49,6 +49,7 @@ export type ArchiveObjectType =
   | "fragment"
   | "meta"
   | "node"
+  | "source"
   | "state"
   | "summary"
   | "triple";
@@ -59,6 +60,7 @@ export type ArchiveCollectionType =
   | "fragment"
   | "meta"
   | "node"
+  | "source"
   | "summary"
   | "triple";
 
@@ -69,6 +71,7 @@ export type ArchiveFindObjectType =
   | "fragment"
   | "meta"
   | "node"
+  | "source"
   | "summary"
   | "triple";
 
@@ -78,6 +81,7 @@ export type ArchiveFindFilterType =
   | "fragment"
   | "meta"
   | "node"
+  | "source"
   | "summary"
   | "triple";
 
@@ -123,6 +127,7 @@ interface EntityEvidenceMention {
 interface EvidenceReadContext {
   readonly chapters: Map<number, Promise<ChapterEntry>>;
   readonly fragments: Map<string, Promise<FragmentRecord>>;
+  readonly streamIndexes: Map<string, Promise<ArchiveTextStreamIndex>>;
 }
 
 export interface ArchiveFindEvidencePreview {
@@ -157,6 +162,7 @@ export type ArchiveFindMatch = "all" | "any";
 export interface ArchiveFindPosition {
   readonly chapter: number;
   readonly fragment?: number;
+  readonly sentence?: number;
 }
 
 export interface ArchiveFindResult {
@@ -178,8 +184,8 @@ export type ArchiveFindLens = "broad" | "exact" | "typed";
 export interface ArchiveFindLensHint {
   readonly lenses: {
     readonly chapter: string;
-    readonly fragment: string;
     readonly node: string;
+    readonly source: string;
     readonly summary: string;
   };
   readonly message: string;
@@ -384,6 +390,20 @@ export interface ArchiveSourceFragment {
   readonly wordsCount: number;
 }
 
+type ArchiveTextStreamKind = "source" | "summary";
+
+interface ArchiveTextStreamSentence {
+  readonly fragmentId: number;
+  readonly globalIndex: number;
+  readonly localIndex: number;
+  readonly text: string;
+  readonly wordsCount: number;
+}
+
+interface ArchiveTextStreamIndex {
+  readonly sentences: readonly ArchiveTextStreamSentence[];
+}
+
 export interface ArchiveNodeSourceFragment {
   readonly id: string;
   readonly text: string;
@@ -479,23 +499,27 @@ export async function listArchiveObjects(
     case "fragments":
       return (
         await Promise.all(
-          (await listChapters(document)).map(async (chapter) =>
-            (await listChapterSourceFragments(document, chapter.chapterId)).map(
-              (fragment) => ({
-                fragment,
-                title: chapter.title ?? formatChapterId(chapter.chapterId),
-              }),
-            ),
-          ),
+          (await listChapters(document)).map(async (chapter) => {
+            const title = chapter.title ?? formatChapterId(chapter.chapterId);
+
+            return listTextStreamSentenceCollection(
+              await createTextStreamIndex(
+                document,
+                chapter.chapterId,
+                "source",
+              ),
+              chapter.chapterId,
+              "source",
+              title,
+            ).map((hit) => ({
+              id: hit.id,
+              label: title,
+              summary: hit.snippet,
+              type: "source" as const,
+            }));
+          }),
         )
-      )
-        .flat()
-        .map(({ fragment, title }) => ({
-          id: fragment.id,
-          label: title,
-          summary: fragment.preview,
-          type: "fragment" as const,
-        }));
+      ).flat();
   }
 }
 
@@ -512,7 +536,7 @@ export async function listArchiveCollection(
     "entity",
     "node",
     "summary",
-    "fragment",
+    "source",
     "triple",
   ];
 
@@ -551,47 +575,33 @@ export async function listArchiveCollection(
       }
 
       if (types.includes("summary")) {
-        const summary = await document.readSummary(chapter.chapterId);
-
-        if (summary !== undefined) {
-          items.push({
-            chapter: chapter.chapterId,
-            field: "summary",
-            id: formatSummaryId(chapter.chapterId),
-            position: { chapter: chapter.chapterId },
-            snippet: createSnippet(summary),
+        items.push(
+          ...listTextStreamSentenceCollection(
+            await createTextStreamIndex(document, chapter.chapterId, "summary"),
+            chapter.chapterId,
+            "summary",
             title,
-            type: "summary",
-          });
-        }
+          ),
+        );
       }
     }
   }
 
-  if (types.includes("fragment")) {
+  if (types.includes("source") || types.includes("fragment")) {
     for (const chapter of filterChapters(
       await listChapters(document),
       chapterFilter,
     )) {
       const title = chapter.title ?? formatChapterId(chapter.chapterId);
 
-      for (const fragment of await listChapterSourceFragments(
-        document,
-        chapter.chapterId,
-      )) {
-        items.push({
-          chapter: chapter.chapterId,
-          field: "source",
-          id: fragment.id,
-          position: {
-            chapter: chapter.chapterId,
-            fragment: fragment.fragmentId,
-          },
-          snippet: fragment.preview,
+      items.push(
+        ...listTextStreamSentenceCollection(
+          await createTextStreamIndex(document, chapter.chapterId, "source"),
+          chapter.chapterId,
+          "source",
           title,
-          type: "fragment",
-        });
-      }
+        ),
+      );
     }
   }
 
@@ -907,6 +917,7 @@ async function findArchiveObjectsUncached(
     requestedTypes.includes("meta") ||
     requestedTypes.includes("fragment") ||
     requestedTypes.includes("node") ||
+    requestedTypes.includes("source") ||
     requestedTypes.includes("summary");
   const metaHits = shouldFindMeta
     ? findMetaLexical(await document.readBookMeta(), search)
@@ -956,9 +967,13 @@ export async function readArchiveText(
         )
       ).text;
     case "summary": {
-      const summary = await document.readSummary(reference.id);
+      const summary = await readTextStreamText(
+        document,
+        reference.id,
+        "summary",
+      );
 
-      if (summary === undefined) {
+      if (summary.trim() === "") {
         throw new Error(`Summary ${formatSummaryId(reference.id)} is missing.`);
       }
 
@@ -1060,9 +1075,13 @@ export async function readArchivePage(
     }
     case "summary": {
       const chapter = await requireChapter(document, reference.id);
-      const content = await document.readSummary(reference.id);
+      const content = await readTextStreamText(
+        document,
+        reference.id,
+        "summary",
+      );
 
-      if (content === undefined) {
+      if (content.trim() === "") {
         throw new Error(`Summary ${formatSummaryId(reference.id)} is missing.`);
       }
 
@@ -1183,9 +1202,9 @@ async function readWikiGraphPage(
         options,
       );
     }
-    case "source":
+    case "text-stream":
       return {
-        fragment: await createSourceRangeFragment(document, reference),
+        fragment: await createTextStreamRangeFragment(document, reference),
         id: uri,
         nextFragmentId: undefined,
         nodes: [],
@@ -1193,12 +1212,6 @@ async function readWikiGraphPage(
         title: uri,
         type: "fragment",
       };
-    case "summary":
-      return await readArchivePage(
-        document,
-        formatSummaryId(reference.chapterId),
-        options,
-      );
   }
 }
 
@@ -1267,14 +1280,14 @@ export async function listRelatedArchiveObjects(
 
   return await hydrateRelatedItemsEvidence(
     document,
-    (await listGraphNeighbors(document, chapterId, reference.id)).map(
-      (neighbor) => ({
-        id: formatNodeId(neighbor.node.id),
-        label: neighbor.node.label,
-        summary: neighbor.node.content,
-        type: "node" as const,
-      }),
-    ),
+    sortGraphNeighborsByListMode(
+      await listGraphNeighbors(document, chapterId, reference.id),
+    ).map((neighbor) => ({
+      id: formatNodeId(neighbor.node.id),
+      label: neighbor.node.label,
+      summary: neighbor.node.content,
+      type: "node" as const,
+    })),
     options,
   );
 }
@@ -1291,17 +1304,17 @@ async function listRelatedWikiGraphObjects(
       const chapter = await requireChapter(document, reference.chapterId);
       const items: ArchiveListItem[] = [
         {
-          id: `fragment:${reference.chapterId}:0`,
+          id: `wkg://chapter/${reference.chapterId}/source`,
           label: "Source",
-          summary: `${chapter.fragmentCount} fragments`,
-          type: "fragment",
+          summary: `${chapter.fragmentCount} source fragments`,
+          type: "source",
         },
       ];
       const summary = await document.readSummary(reference.chapterId);
 
       if (summary !== undefined) {
         items.push({
-          id: formatSummaryId(reference.chapterId),
+          id: `wkg://chapter/${reference.chapterId}/summary`,
           label: "Summary",
           summary: createSnippet(summary),
           type: "summary",
@@ -1324,19 +1337,18 @@ async function listRelatedWikiGraphObjects(
 
       return await hydrateRelatedItemsEvidence(
         document,
-        (await listGraphNeighbors(document, chapterId, reference.id)).map(
-          (neighbor) => ({
-            id: formatNodeId(neighbor.node.id),
-            label: neighbor.node.label,
-            summary: neighbor.node.content,
-            type: "node" as const,
-          }),
-        ),
+        sortGraphNeighborsByListMode(
+          await listGraphNeighbors(document, chapterId, reference.id),
+        ).map((neighbor) => ({
+          id: formatNodeId(neighbor.node.id),
+          label: neighbor.node.label,
+          summary: neighbor.node.content,
+          type: "node" as const,
+        })),
         options,
       );
     }
-    case "source":
-    case "summary": {
+    case "text-stream": {
       rejectRelatedRole(options.role, uri);
       const chapter = await requireChapter(document, reference.chapterId);
 
@@ -1403,7 +1415,9 @@ async function listRelatedEntityObjects(
       if (source === undefined || target === undefined) {
         continue;
       }
-      if (!matchesRelatedEntityRole(source.qid, target.qid, reference.qid, role)) {
+      if (
+        !matchesRelatedEntityRole(source.qid, target.qid, reference.qid, role)
+      ) {
         continue;
       }
 
@@ -1436,8 +1450,88 @@ async function listRelatedEntityObjects(
 
   return await hydrateRelatedItemsEvidence(
     document,
-    [...triplesById.values()],
+    sortRelatedItemsByListMode([...triplesById.values()]),
     options,
+  );
+}
+
+function sortRelatedItemsByListMode(
+  items: readonly ArchiveListItem[],
+): readonly ArchiveListItem[] {
+  return [...items].sort((left, right) =>
+    compareListHits(
+      createFindHitFromListItem(left),
+      createFindHitFromListItem(right),
+      "doc-asc",
+    ),
+  );
+}
+
+function sortGraphNeighborsByListMode(
+  neighbors: readonly GraphNeighbor[],
+): readonly GraphNeighbor[] {
+  return [...neighbors].sort((left, right) =>
+    compareSentenceIds(
+      getFirstGraphNodeSentenceId(left.node),
+      getFirstGraphNodeSentenceId(right.node),
+    ),
+  );
+}
+
+function createFindHitFromListItem(item: ArchiveListItem): ArchiveFindHit {
+  const position = createListItemPosition(item);
+  const score =
+    item.type === "triple" ? (item.evidenceLinks?.length ?? 0) : undefined;
+
+  return {
+    field: "title",
+    id: item.id,
+    ...(position === undefined ? {} : { position }),
+    ...(score === undefined ? {} : { score }),
+    snippet: item.summary,
+    title: item.label,
+    type: toFindObjectType(item.type),
+  };
+}
+
+function toFindObjectType(
+  type: ArchiveListItem["type"],
+): ArchiveFindObjectType {
+  switch (type) {
+    case "edge":
+    case "state":
+      return "meta";
+    default:
+      return type;
+  }
+}
+
+function createListItemPosition(
+  item: ArchiveListItem,
+): ArchiveFindPosition | undefined {
+  if (item.type === "triple") {
+    return createFirstMentionLinkPosition(item.evidenceLinks ?? []);
+  }
+
+  return undefined;
+}
+
+function createFirstMentionLinkPosition(
+  links: readonly MentionLinkRecord[],
+): ArchiveFindPosition | undefined {
+  const sentenceIds = links.flatMap((link) => link.evidenceSentenceIds);
+  const [first] = sentenceIds.sort(compareSentenceIds);
+
+  return first === undefined ? undefined : createSentencePosition(first);
+}
+
+function getFirstGraphNodeSentenceId(node: GraphNode): SentenceId {
+  return (
+    [...node.sentenceIds].sort(compareSentenceIds)[0] ?? [
+      Number.MAX_SAFE_INTEGER,
+      Number.MAX_SAFE_INTEGER,
+      Number.MAX_SAFE_INTEGER,
+    ]
   );
 }
 
@@ -1542,7 +1636,7 @@ export async function listArchiveEvidence(
     case "chapter-tree":
     case "meta":
     case "state":
-    case "source":
+    case "text-stream":
       throw new Error(`Evidence is not available for ${uri}.`);
     case "chunk": {
       const { chapterId, node } = await requireNode(document, reference.id);
@@ -1572,19 +1666,6 @@ export async function listArchiveEvidence(
         ),
         options,
       );
-    case "summary":
-      return {
-        items: [
-          await createSourceEvidenceItem(
-            document,
-            reference.chapterId,
-            0,
-            Number.POSITIVE_INFINITY,
-          ),
-        ],
-        limit: options.limit ?? DEFAULT_FIND_LIMIT,
-        nextCursor: null,
-      };
     case "triple":
       return await createSourceEvidencePage(
         document,
@@ -1635,9 +1716,8 @@ function validatePackReference(id: string): void {
     case "chapter-state":
     case "chapter-tree":
     case "meta":
-    case "source":
     case "state":
-    case "summary":
+    case "text-stream":
       throw new Error(
         `Pack is only available for chunk and entity objects: ${id}`,
       );
@@ -1920,11 +2000,37 @@ function listEntityCollection(
         chapter: first.chapterId,
         fragment: first.fragmentId,
       },
+      score: qidMentions.length,
       snippet: `${qidMentions.length} mentions`,
       title: selectEntityLabel(qidMentions),
       type: "entity",
     };
   });
+}
+
+function listTextStreamSentenceCollection(
+  index: ArchiveTextStreamIndex,
+  chapterId: number,
+  stream: ArchiveTextStreamKind,
+  title: string,
+): readonly ArchiveFindHit[] {
+  return index.sentences.map((sentence) => ({
+    chapter: chapterId,
+    field: stream,
+    id: formatTextStreamRangeUri(
+      chapterId,
+      stream,
+      sentence.globalIndex,
+      sentence.globalIndex,
+    ),
+    position: {
+      chapter: chapterId,
+      fragment: sentence.globalIndex,
+    },
+    snippet: createSnippet(sentence.text),
+    title,
+    type: stream === "source" ? "source" : "summary",
+  }));
 }
 
 async function listTripleCollection(
@@ -1956,6 +2062,7 @@ async function listTripleCollection(
         hitsById.set(id, {
           ...existing,
           evidenceLinks: [...(existing.evidenceLinks ?? []), link],
+          score: (existing.evidenceLinks?.length ?? 0) + 1,
         });
         continue;
       }
@@ -1969,6 +2076,7 @@ async function listTripleCollection(
           chapter: source.chapterId,
           fragment: source.fragmentId,
         },
+        score: 1,
         snippet: `${source.surface} ${link.predicate} ${target.surface}`,
         title: `${source.qid} ${link.predicate} ${target.qid}`,
         triple: {
@@ -2342,47 +2450,25 @@ async function findChaptersLexical(
       });
     }
 
-    const summary = await document.readSummary(chapter.chapterId);
-    const summaryMatch =
-      summary === undefined ? undefined : scoreLexicalText(summary, search);
-
-    if (summary !== undefined && summaryMatch !== undefined) {
-      hits.push({
-        chapter: chapter.chapterId,
-        field: "summary",
-        id: formatSummaryId(chapter.chapterId),
-        ...createFindMatchFields(summaryMatch),
-        position: {
-          chapter: chapter.chapterId,
-        },
-        snippet: createSnippet(summary, summaryMatch.snippetNeedle),
+    hits.push(
+      ...(await findTextStreamSentencesLexical(
+        document,
+        chapter.chapterId,
+        "summary",
         title,
-        type: "summary",
-      });
-    }
+        search,
+      )),
+    );
 
-    for (const fragment of await listChapterSourceFragments(
-      document,
-      chapter.chapterId,
-    )) {
-      const fragmentMatch = scoreLexicalText(fragment.text, search);
-
-      if (fragmentMatch !== undefined) {
-        hits.push({
-          chapter: chapter.chapterId,
-          field: "source",
-          id: fragment.id,
-          ...createFindMatchFields(fragmentMatch),
-          position: {
-            chapter: chapter.chapterId,
-            fragment: fragment.fragmentId,
-          },
-          snippet: createSnippet(fragment.text, fragmentMatch.snippetNeedle),
-          title,
-          type: "fragment",
-        });
-      }
-    }
+    hits.push(
+      ...(await findTextStreamSentencesLexical(
+        document,
+        chapter.chapterId,
+        "source",
+        title,
+        search,
+      )),
+    );
   }
 
   return hits;
@@ -2455,53 +2541,106 @@ async function findChapters(
       });
     }
 
-    const summary = await document.readSummary(chapter.chapterId);
-    const summaryMatch =
-      summary === undefined ? undefined : matchText(summary, search);
-
-    if (summary !== undefined && summaryMatch !== undefined) {
-      hits.push({
-        chapter: chapter.chapterId,
-        field: "summary",
-        id: formatSummaryId(chapter.chapterId),
-        ...createFindMatchFields(summaryMatch),
-        position: {
-          chapter: chapter.chapterId,
-        },
-        snippet: createSnippet(summary, getSnippetNeedle(summaryMatch)),
+    hits.push(
+      ...(await findTextStreamSentences(
+        document,
+        chapter.chapterId,
+        "summary",
         title,
-        type: "summary",
-      });
-    }
+        search,
+      )),
+    );
 
-    for (const fragment of await listChapterSourceFragments(
-      document,
-      chapter.chapterId,
-    )) {
-      const fragmentMatch = matchText(fragment.text, search);
-
-      if (fragmentMatch !== undefined) {
-        hits.push({
-          chapter: chapter.chapterId,
-          field: "source",
-          id: fragment.id,
-          ...createFindMatchFields(fragmentMatch),
-          position: {
-            chapter: chapter.chapterId,
-            fragment: fragment.fragmentId,
-          },
-          snippet: createSnippet(
-            fragment.text,
-            getSnippetNeedle(fragmentMatch),
-          ),
-          title,
-          type: "fragment",
-        });
-      }
-    }
+    hits.push(
+      ...(await findTextStreamSentences(
+        document,
+        chapter.chapterId,
+        "source",
+        title,
+        search,
+      )),
+    );
   }
 
   return hits;
+}
+
+async function findTextStreamSentencesLexical(
+  document: ReadonlyDocument,
+  chapterId: number,
+  stream: ArchiveTextStreamKind,
+  title: string,
+  search: LexicalQuery,
+): Promise<readonly ArchiveFindHit[]> {
+  const index = await createTextStreamIndex(document, chapterId, stream);
+
+  return index.sentences.flatMap((sentence) => {
+    const match = scoreLexicalText(sentence.text, search);
+
+    if (match === undefined) {
+      return [];
+    }
+
+    return [
+      {
+        chapter: chapterId,
+        field: stream,
+        id: formatTextStreamRangeUri(
+          chapterId,
+          stream,
+          sentence.globalIndex,
+          sentence.globalIndex,
+        ),
+        ...createFindMatchFields(match),
+        position: {
+          chapter: chapterId,
+          fragment: sentence.globalIndex,
+        },
+        snippet: createSnippet(sentence.text, match.snippetNeedle),
+        title,
+        type: stream === "source" ? ("source" as const) : ("summary" as const),
+      },
+    ];
+  });
+}
+
+async function findTextStreamSentences(
+  document: ReadonlyDocument,
+  chapterId: number,
+  stream: ArchiveTextStreamKind,
+  title: string,
+  search: ArchiveTextSearch,
+): Promise<readonly ArchiveFindHit[]> {
+  const index = await createTextStreamIndex(document, chapterId, stream);
+
+  return index.sentences.flatMap((sentence) => {
+    const match = matchText(sentence.text, search);
+
+    if (match === undefined) {
+      return [];
+    }
+
+    return [
+      {
+        chapter: chapterId,
+        field: stream,
+        id: formatTextStreamRangeUri(
+          chapterId,
+          stream,
+          sentence.globalIndex,
+          sentence.globalIndex,
+        ),
+        ...createFindMatchFields(match),
+        position: {
+          chapter: chapterId,
+          fragment: sentence.globalIndex,
+        },
+        snippet: createSnippet(sentence.text, getSnippetNeedle(match)),
+        title,
+        type: stream === "source" ? ("source" as const) : ("summary" as const),
+      },
+    ];
+  });
 }
 
 async function listChapterSourceFragments(
@@ -2555,28 +2694,147 @@ async function readSourceFragment(
   };
 }
 
-async function createSourceRangeFragment(
+async function createTextStreamRangeFragment(
   document: ReadonlyDocument,
-  reference: Extract<WikiGraphReference, { readonly type: "source" }>,
+  reference: Extract<WikiGraphReference, { readonly type: "text-stream" }>,
 ): Promise<ArchiveSourceFragment> {
-  const context = createEvidenceReadContext();
-  const evidence = await createSourceEvidenceItem(
+  const range = await readTextStreamRange(
     document,
     reference.chapterId,
+    reference.stream,
     reference.startSentenceIndex,
     reference.endSentenceIndex,
-    reference.fragmentId,
-    context,
   );
 
   return {
-    fragmentId: evidence.fragmentId,
-    id: evidence.id,
-    preview: createSnippet(evidence.source),
-    sentenceCount: evidence.endSentenceIndex - evidence.startSentenceIndex + 1,
-    text: evidence.source,
-    wordsCount: countWords(evidence.source),
+    fragmentId: range.fragmentId,
+    id: range.id,
+    preview: createSnippet(range.text),
+    sentenceCount: range.endSentenceIndex - range.startSentenceIndex + 1,
+    text: range.text,
+    wordsCount: countWords(range.text),
   };
+}
+
+async function readTextStreamRange(
+  document: ReadonlyDocument,
+  chapterId: number,
+  stream: ArchiveTextStreamKind,
+  startSentenceIndex: number,
+  endSentenceIndex: number,
+  context: EvidenceReadContext = createEvidenceReadContext(),
+): Promise<{
+  readonly endSentenceIndex: number;
+  readonly fragmentId: number;
+  readonly id: string;
+  readonly startSentenceIndex: number;
+  readonly text: string;
+}> {
+  const index = await getTextStreamIndex(document, chapterId, stream, context);
+  const lastSentenceIndex = Math.max(0, index.sentences.length - 1);
+  const start = clampInteger(startSentenceIndex, 0, lastSentenceIndex);
+  const end = clampInteger(endSentenceIndex, start, lastSentenceIndex);
+  const sentences = index.sentences.slice(start, end + 1);
+  const [firstSentence] = sentences;
+
+  if (firstSentence === undefined) {
+    throw new Error(
+      `Chapter ${formatChapterId(chapterId)} has no ${stream} text.`,
+    );
+  }
+
+  return {
+    endSentenceIndex: end,
+    fragmentId: firstSentence.fragmentId,
+    id: formatTextStreamRangeUri(chapterId, stream, start, end),
+    startSentenceIndex: start,
+    text: sentences.map((sentence) => sentence.text).join("\n"),
+  };
+}
+
+async function readTextStreamText(
+  document: ReadonlyDocument,
+  chapterId: number,
+  stream: ArchiveTextStreamKind,
+): Promise<string> {
+  const index = await createTextStreamIndex(document, chapterId, stream);
+
+  return index.sentences.map((sentence) => sentence.text).join("\n");
+}
+
+async function getTextStreamIndex(
+  document: ReadonlyDocument,
+  chapterId: number,
+  stream: ArchiveTextStreamKind,
+  context: EvidenceReadContext = createEvidenceReadContext(),
+): Promise<ArchiveTextStreamIndex> {
+  const key = `${chapterId}:${stream}`;
+  let index = context.streamIndexes.get(key);
+
+  if (index === undefined) {
+    index = createTextStreamIndex(document, chapterId, stream);
+    context.streamIndexes.set(key, index);
+  }
+
+  return await index;
+}
+
+async function createTextStreamIndex(
+  document: ReadonlyDocument,
+  chapterId: number,
+  stream: ArchiveTextStreamKind,
+): Promise<ArchiveTextStreamIndex> {
+  if (stream === "summary") {
+    const fragments = document.getSummaryFragments(chapterId);
+    const sentences: ArchiveTextStreamSentence[] = [];
+
+    for (const fragmentId of await fragments.listFragmentIds()) {
+      const fragment = await fragments.getFragment(fragmentId);
+
+      for (let index = 0; index < fragment.sentences.length; index += 1) {
+        const sentence = fragment.sentences[index];
+
+        if (sentence === undefined) {
+          continue;
+        }
+
+        sentences.push({
+          fragmentId,
+          globalIndex: sentences.length,
+          localIndex: index,
+          text: sentence.text,
+          wordsCount: sentence.wordsCount,
+        });
+      }
+    }
+
+    return { sentences };
+  }
+
+  const fragments = document.getSerialFragments(chapterId);
+  const sentences: ArchiveTextStreamSentence[] = [];
+
+  for (const fragmentId of await fragments.listFragmentIds()) {
+    const fragment = await fragments.getFragment(fragmentId);
+
+    for (let index = 0; index < fragment.sentences.length; index += 1) {
+      const sentence = fragment.sentences[index];
+
+      if (sentence === undefined) {
+        continue;
+      }
+
+      sentences.push({
+        fragmentId,
+        globalIndex: sentences.length,
+        localIndex: index,
+        text: sentence.text,
+        wordsCount: sentence.wordsCount,
+      });
+    }
+  }
+
+  return { sentences };
 }
 
 function selectEntityLabel(mentions: readonly MentionRecord[]): string {
@@ -2824,10 +3082,24 @@ async function readNodeSourceFragments(
         chapterId,
         fragmentId,
       );
+      const index = await createTextStreamIndex(document, chapterId, "source");
+      const fragmentSentences = index.sentences.filter(
+        (sentence) => sentence.fragmentId === fragmentId,
+      );
+      const firstSentence = fragmentSentences[0];
+      const lastSentence = fragmentSentences[fragmentSentences.length - 1];
       const text = truncateSourceExcerpt(fragment.text);
 
       return {
-        id: fragment.id,
+        id:
+          firstSentence === undefined || lastSentence === undefined
+            ? fragment.id
+            : formatTextStreamRangeUri(
+                chapterId,
+                "source",
+                firstSentence.globalIndex,
+                lastSentence.globalIndex,
+              ),
         text,
         truncated: text.length < fragment.text.length,
       };
@@ -3162,16 +3434,63 @@ async function createSourceEvidenceItem(
     .slice(start, end + 1)
     .map((sentence) => sentence.text)
     .join("\n");
+  const streamRange = await convertSourceLocalRangeToStreamRange(
+    document,
+    chapterId,
+    resolvedFragmentId,
+    start,
+    end,
+    context,
+  );
 
   return {
     chapterId,
-    endSentenceIndex: end,
+    endSentenceIndex: streamRange.endSentenceIndex,
     fragmentId: resolvedFragmentId,
-    id: formatSourceRangeUri(chapterId, resolvedFragmentId, start, end),
+    id: formatTextStreamRangeUri(
+      chapterId,
+      "source",
+      streamRange.startSentenceIndex,
+      streamRange.endSentenceIndex,
+    ),
     source,
-    startSentenceIndex: start,
+    startSentenceIndex: streamRange.startSentenceIndex,
     title: chapter.title ?? `[chapter ${chapterId}]`,
     type: "source",
+  };
+}
+
+async function convertSourceLocalRangeToStreamRange(
+  document: ReadonlyDocument,
+  chapterId: number,
+  fragmentId: number,
+  startSentenceIndex: number,
+  endSentenceIndex: number,
+  context: EvidenceReadContext,
+): Promise<{
+  readonly endSentenceIndex: number;
+  readonly startSentenceIndex: number;
+}> {
+  const index = await getTextStreamIndex(
+    document,
+    chapterId,
+    "source",
+    context,
+  );
+  const start = index.sentences.find(
+    (sentence) =>
+      sentence.fragmentId === fragmentId &&
+      sentence.localIndex === startSentenceIndex,
+  );
+  const end = index.sentences.find(
+    (sentence) =>
+      sentence.fragmentId === fragmentId &&
+      sentence.localIndex === endSentenceIndex,
+  );
+
+  return {
+    endSentenceIndex: end?.globalIndex ?? start?.globalIndex ?? 0,
+    startSentenceIndex: start?.globalIndex ?? 0,
   };
 }
 
@@ -3179,6 +3498,7 @@ function createEvidenceReadContext(): EvidenceReadContext {
   return {
     chapters: new Map(),
     fragments: new Map(),
+    streamIndexes: new Map(),
   };
 }
 
@@ -3244,13 +3564,18 @@ async function findSentenceIndexAtOffset(
   return Math.max(0, fragment.sentences.length - 1);
 }
 
-function formatSourceRangeUri(
+function formatTextStreamRangeUri(
   chapterId: number,
-  fragmentId: number,
+  stream: ArchiveTextStreamKind,
   startSentenceIndex: number,
   endSentenceIndex: number,
 ): string {
-  return `wkg://chapter/${chapterId}/source/${fragmentId}#${startSentenceIndex}..${endSentenceIndex}`;
+  const hash =
+    startSentenceIndex === endSentenceIndex
+      ? String(startSentenceIndex)
+      : `${startSentenceIndex}..${endSentenceIndex}`;
+
+  return `wkg://chapter/${chapterId}/${stream}#${hash}`;
 }
 
 function mergeEvidenceRanges(
@@ -3321,15 +3646,9 @@ type WikiGraphReference =
   | {
       readonly chapterId: number;
       readonly endSentenceIndex: number;
-      readonly fragmentId?: number;
+      readonly stream: ArchiveTextStreamKind;
       readonly startSentenceIndex: number;
-      readonly type: "source";
-    }
-  | {
-      readonly chapterId: number;
-      readonly endSentenceIndex: number;
-      readonly startSentenceIndex: number;
-      readonly type: "summary";
+      readonly type: "text-stream";
     }
   | {
       readonly chapterId?: number;
@@ -3357,8 +3676,9 @@ function parseWikiGraphReference(uri: string): WikiGraphReference {
         return {
           chapterId: archiveReference.id,
           endSentenceIndex: Number.POSITIVE_INFINITY,
+          stream: "summary",
           startSentenceIndex: 0,
-          type: "summary",
+          type: "text-stream",
         };
       case "fragment":
       case "meta":
@@ -3421,29 +3741,28 @@ function parseWikiGraphReference(uri: string): WikiGraphReference {
             }
             break;
           case "source":
-            if (pathParts.length === 3 || pathParts.length === 4) {
+            if (pathParts.length === 3) {
               const [start, end] = parseSentenceRange(hash);
-              const fragmentId =
-                pathParts[3] === undefined
-                  ? undefined
-                  : parseNonNegativeInteger(pathParts[3], uri);
 
               return {
                 chapterId,
                 endSentenceIndex: end,
-                ...(fragmentId === undefined ? {} : { fragmentId }),
+                stream: "source",
                 startSentenceIndex: start,
-                type: "source",
+                type: "text-stream",
               };
             }
             break;
           case "summary":
             if (pathParts.length === 3) {
+              const [start, end] = parseSentenceRange(hash);
+
               return {
                 chapterId,
-                endSentenceIndex: Number.POSITIVE_INFINITY,
-                startSentenceIndex: 0,
-                type: "summary",
+                endSentenceIndex: end,
+                stream: "summary",
+                startSentenceIndex: start,
+                type: "text-stream",
               };
             }
             break;
@@ -3510,7 +3829,7 @@ function parseSentenceRange(hash: string): readonly [number, number] {
     return [0, Number.POSITIVE_INFINITY];
   }
 
-  const [start, end] = hash.slice(1).split("..", 2);
+  const [start, end = start] = hash.split("..", 2);
   const parsedStart = Number(start);
   const parsedEnd = Number(end);
 
@@ -3621,8 +3940,8 @@ const ARCHIVE_ROOT_ID = "meta:root";
 const BROAD_FIND_LENS_HINT = {
   lenses: {
     chapter: "book outline and chapter titles",
-    fragment: "original source wording",
     node: "topology / LLM Wiki structure",
+    source: "original source wording",
     summary: "quick overview",
   },
   message:
@@ -3781,7 +4100,7 @@ function createRankedFindResult(
     .filter((hit) => matchesFindId(hit, ids))
     .filter((hit) => matchesFindChapter(hit, chapters))
     .filter((hit) => matchesFindType(hit, types))
-    .sort((left, right) => compareFindHits(left, right, order));
+    .sort((left, right) => compareSearchHits(left, right, order));
 
   return {
     chapters,
@@ -3857,7 +4176,7 @@ function createCollectionResult(
     .filter((hit) => matchesFindId(hit, ids))
     .filter((hit) => matchesFindChapter(hit, chapters))
     .filter((hit) => matchesCollectionType(hit, types))
-    .sort((left, right) => compareFindHits(left, right, order));
+    .sort((left, right) => compareListHits(left, right, order));
   const items = filtered.slice(start, start + limit);
   const nextOffset = start + items.length;
 
@@ -3911,7 +4230,7 @@ function matchesCollectionType(
   );
 }
 
-function compareFindHits(
+function compareSearchHits(
   left: ArchiveFindHit,
   right: ArchiveFindHit,
   order: ArchiveFindOrder,
@@ -3924,10 +4243,76 @@ function compareFindHits(
   const position =
     compareNumbers(getPositionChapter(left), getPositionChapter(right)) ||
     compareNumbers(getPositionFragment(left), getPositionFragment(right)) ||
+    compareNumbers(getPositionSentence(left), getPositionSentence(right)) ||
     compareNumbers(getTypeOrder(left.type), getTypeOrder(right.type)) ||
     left.id.localeCompare(right.id);
 
   return relevance || position * direction;
+}
+
+function compareListHits(
+  left: ArchiveFindHit,
+  right: ArchiveFindHit,
+  order: ArchiveFindOrder,
+): number {
+  const direction = order === "doc-asc" ? 1 : -1;
+  const bucketComparison =
+    compareNumbers(getListBucket(left.type), getListBucket(right.type)) ||
+    compareListBucketItems(left, right);
+
+  if (bucketComparison !== 0) {
+    return bucketComparison;
+  }
+
+  return compareListPosition(left, right) * direction;
+}
+
+function compareListBucketItems(
+  left: ArchiveFindHit,
+  right: ArchiveFindHit,
+): number {
+  const leftBucket = getListBucket(left.type);
+
+  if (leftBucket !== getListBucket(right.type)) {
+    return 0;
+  }
+  if (leftBucket === 0) {
+    return compareNumbers(right.score ?? 0, left.score ?? 0);
+  }
+
+  return 0;
+}
+
+function compareListPosition(
+  left: ArchiveFindHit,
+  right: ArchiveFindHit,
+): number {
+  return (
+    compareNumbers(getPositionChapter(left), getPositionChapter(right)) ||
+    compareNumbers(getPositionFragment(left), getPositionFragment(right)) ||
+    compareNumbers(getPositionSentence(left), getPositionSentence(right)) ||
+    compareNumbers(getTypeOrder(left.type), getTypeOrder(right.type)) ||
+    left.id.localeCompare(right.id)
+  );
+}
+
+function getListBucket(type: ArchiveFindObjectType): number {
+  switch (type) {
+    case "entity":
+    case "triple":
+      return 0;
+    case "node":
+      return 1;
+    case "summary":
+      return 2;
+    case "source":
+    case "fragment":
+      return 3;
+    case "chapter":
+    case "chapter-tree":
+    case "meta":
+      return 4;
+  }
 }
 
 function getSearchBucket(type: ArchiveFindObjectType): number {
@@ -3937,11 +4322,13 @@ function getSearchBucket(type: ArchiveFindObjectType): number {
       return 0;
     case "node":
       return 1;
-    case "fragment":
+    case "source":
     case "summary":
     case "chapter":
     case "chapter-tree":
     case "meta":
+      return 2;
+    case "fragment":
       return 2;
   }
 }
@@ -3962,6 +4349,10 @@ function getPositionFragment(hit: ArchiveFindHit): number {
   return hit.position?.fragment ?? 0;
 }
 
+function getPositionSentence(hit: ArchiveFindHit): number {
+  return hit.position?.sentence ?? 0;
+}
+
 function getTypeOrder(type: ArchiveFindObjectType): number {
   switch (type) {
     case "chapter":
@@ -3976,6 +4367,8 @@ function getTypeOrder(type: ArchiveFindObjectType): number {
       return 4;
     case "node":
       return 5;
+    case "source":
+      return 6;
     case "fragment":
       return 6;
     case "meta":
@@ -3995,6 +4388,7 @@ function createSentencePosition(sentenceId: SentenceId): ArchiveFindPosition {
   return {
     chapter: sentenceId[0],
     fragment: sentenceId[1],
+    sentence: sentenceId[2],
   };
 }
 
@@ -4012,7 +4406,8 @@ function compareArchivePositions(
 ): number {
   return (
     compareNumbers(left.chapter, right.chapter) ||
-    compareNumbers(left.fragment ?? 0, right.fragment ?? 0)
+    compareNumbers(left.fragment ?? 0, right.fragment ?? 0) ||
+    compareNumbers(left.sentence ?? 0, right.sentence ?? 0)
   );
 }
 
@@ -4029,6 +4424,7 @@ function isFindFilterType(
     type === "fragment" ||
     type === "meta" ||
     type === "node" ||
+    type === "source" ||
     type === "summary" ||
     type === "triple"
   );
@@ -4043,6 +4439,7 @@ function isCollectionType(
     type === "fragment" ||
     type === "meta" ||
     type === "node" ||
+    type === "source" ||
     type === "summary" ||
     type === "triple"
   );
@@ -4077,6 +4474,7 @@ function parseFindTypes(
       value === "fragment" ||
       value === "meta" ||
       value === "node" ||
+      value === "source" ||
       value === "summary" ||
       value === "chapter" ||
       value === "triple"

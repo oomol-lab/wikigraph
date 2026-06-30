@@ -7,27 +7,27 @@ Purpose:
   Move one existing chapter to a new parent or sibling position.
 
 Usage:
-  wikigraph <chapter-uri> move --parent <id> [--first|--last] [--llm <json>] [--help|-h]
+  wikigraph <chapter-uri> move --parent <chapter-uri> [--first|--last] [--llm <json>] [--help|-h]
   wikigraph <chapter-uri> move --root [--first|--last] [--llm <json>] [--help|-h]
-  wikigraph <chapter-uri> move --before <id> [--llm <json>] [--help|-h]
-  wikigraph <chapter-uri> move --after <id> [--llm <json>] [--help|-h]
+  wikigraph <chapter-uri> move --before <chapter-uri> [--llm <json>] [--help|-h]
+  wikigraph <chapter-uri> move --after <chapter-uri> [--llm <json>] [--help|-h]
   wikigraph <chapter-uri> move --first [--llm <json>] [--help|-h]
   wikigraph <chapter-uri> move --last [--llm <json>] [--help|-h]
 
 Behavior:
   - Moves only the chapter tree node. Source text, Reading Graph data, and summary stay attached to the same chapter id.
-  - `--parent <id>` moves the chapter under another chapter.
+  - `--parent <chapter-uri>` moves the chapter under another chapter.
   - `--root` moves the chapter to the top level.
-  - `--before <id>` or `--after <id>` moves the chapter next to the target chapter.
+  - `--before <chapter-uri>` or `--after <chapter-uri>` moves the chapter next to the target chapter.
   - `--first` or `--last` moves within the target parent when combined with `--parent` or `--root`.
   - Without `--parent` or `--root`, `--first` and `--last` reorder within the current parent.
   - Cannot move a chapter into or next to its own descendant.
   - Does not call an LLM provider.
 
 Examples:
-  wikigraph wkg://book.sdpub/chapter/8 move --parent 3 --first
+  wikigraph wkg://book.sdpub/chapter/8 move --parent wkg://book.sdpub/chapter/3 --first
   wikigraph wkg://book.sdpub/chapter/8 move --root --last
-  wikigraph wkg://book.sdpub/chapter/8 move --before 9
+  wikigraph wkg://book.sdpub/chapter/8 move --before wkg://book.sdpub/chapter/9
 
 See also:
   - wikigraph wkg://book.sdpub/chapter list --help
