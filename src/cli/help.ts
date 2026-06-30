@@ -247,11 +247,20 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
     description: "One chapter's current stage and stored artifacts.",
     name: "chapter-state",
     title: "Chapter State",
-    uriForms: ["wkg://book.sdpub/chapter/12/state"],
+    uriForms: [
+      "wkg://book.sdpub/chapter/12/state",
+      "wkg://book.sdpub/chapter/12/state/knowledge-graph",
+    ],
     verbs: [
       {
         command: "wikigraph wkg://book.sdpub/chapter/12/state get --json",
-        note: "Inspect one chapter state.",
+        note: "Inspect aggregate chapter state.",
+        verb: "get",
+      },
+      {
+        command:
+          "wikigraph wkg://book.sdpub/chapter/12/state/reading-graph get --json",
+        note: "Inspect one chapter state target.",
         verb: "get",
       },
     ],

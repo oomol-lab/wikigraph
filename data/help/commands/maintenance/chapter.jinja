@@ -6,6 +6,7 @@ Edit chapters inside an existing `.sdpub` archive.
 Usage:
   wikigraph <archive-uri>/chapter list [--llm <json>] [--help|-h]
   wikigraph <chapter-uri>/state get [--json] [--help|-h]
+  wikigraph <chapter-uri>/state/<source|reading-graph|reading-summary|knowledge-graph> get [--json] [--help|-h]
   wikigraph <archive-uri>/chapter add --stage <planned|source> [--title <title>] [--parent <id>] [--input <path>] [--input-format <format>] [--llm <json>] [--help|-h]
   wikigraph <chapter-uri> move (--parent <id>|--root|--before <id>|--after <id>|--first|--last) [--llm <json>] [--help|-h]
   wikigraph <chapter-uri> remove [--recursive] [--llm <json>] [--help|-h]
@@ -36,11 +37,13 @@ Input rules:
   - `reset --to` accepts `planned`, `source`, or `reading-graph`.
   - Structure edits, `/title set`, `/source set`, `/summary set`, and `reset` do not call an LLM provider.
   - To generate reading-graph, reading-summary, or knowledge-graph for a chapter, use `wikigraph <chapter-uri> queue add --task <reading-graph|reading-summary|knowledge-graph> --accept-cost`.
+  - `<chapter-uri>/state get` shows the aggregate chapter state. `<chapter-uri>/state/<target> get` checks one target.
   - Append `--help` after an action for action-specific details, for example `wikigraph wkg://book.sdpub/chapter/3 reset --help`.
 
 See also:
   - wikigraph wkg://book.sdpub/chapter list
   - wikigraph wkg://book.sdpub/chapter/3/state get --json
+  - wikigraph wkg://book.sdpub/chapter/3/state/knowledge-graph get --json
   - wikigraph wkg://book.sdpub/chapter/tree get --json
   - wikigraph wkg://book.sdpub/chapter/3/title set --title "New Title"
   - wikigraph wkg://book.sdpub/chapter/3/source set --input chapter.md --input-format markdown

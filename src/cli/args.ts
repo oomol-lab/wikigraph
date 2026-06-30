@@ -170,6 +170,11 @@ type CLIArchiveRootAction = CLIArchiveAction | "set" | "queue";
 type CLIArchiveUriAction = CLIArchiveRootAction | CLIArchiveChapterAction;
 type CLIJobAction = CLIQueueAction | "get" | "set";
 type ArchiveUriLens = Exclude<CLIObjectKind, "meta">;
+type ChapterStateUriTarget =
+  | "knowledge-graph"
+  | "reading-graph"
+  | "reading-summary"
+  | "source";
 
 export interface CLIArchiveArguments {
   readonly action: CLIArchiveAction;
@@ -867,7 +872,11 @@ type ChapterUriTarget =
       readonly kind: "chapter-triple-pattern-lens";
       readonly pattern: ArchiveTriplePattern;
     }
-  | { readonly chapterId: number; readonly kind: "chapter-state" }
+  | {
+      readonly chapterId: number;
+      readonly kind: "chapter-state";
+      readonly target?: ChapterStateUriTarget;
+    }
   | {
       readonly chapterId: number;
       readonly kind: "chapter-resource";
@@ -921,6 +930,16 @@ function parseChapterTarget(objectUri: string): ChapterUriTarget | undefined {
     };
   }
 
+  const chapterStateTarget = parseChapterStateSuffix(suffix);
+
+  if (chapterStateTarget !== undefined) {
+    return {
+      chapterId,
+      kind: "chapter-state",
+      ...(chapterStateTarget === "all" ? {} : { target: chapterStateTarget }),
+    };
+  }
+
   const resource = parseChapterResourceSuffix(suffix);
 
   if (suffix !== undefined && resource === undefined) {
@@ -941,6 +960,27 @@ function parseChapterTarget(objectUri: string): ChapterUriTarget | undefined {
   }
 
   return { chapterId, kind: "chapter-resource", resource };
+}
+
+function parseChapterStateSuffix(
+  suffix: string | undefined,
+): ChapterStateUriTarget | "all" | undefined {
+  if (suffix === "state") {
+    return "all";
+  }
+
+  switch (suffix) {
+    case "state/source":
+      return "source";
+    case "state/reading-graph":
+      return "reading-graph";
+    case "state/reading-summary":
+      return "reading-summary";
+    case "state/knowledge-graph":
+      return "knowledge-graph";
+    default:
+      return undefined;
+  }
 }
 
 function parseChapterResourceSuffix(

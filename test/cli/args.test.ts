@@ -1051,6 +1051,22 @@ describe("cli/args", () => {
       kind: "archive",
     });
     expect(
+      parseCLIArguments([
+        "wkg://book.sdpub/chapter/12/state/reading-graph",
+        "get",
+        "--json",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "get",
+        archivePath: "wkg://book.sdpub/chapter/12/state/reading-graph",
+        format: "json",
+        objectId: "wkg://book.sdpub/chapter/12/state/reading-graph",
+      },
+      help: false,
+      kind: "archive",
+    });
+    expect(
       parseCLIArguments(["wkg://book.sdpub/chapter/12/entity", "list"]),
     ).toStrictEqual({
       args: {

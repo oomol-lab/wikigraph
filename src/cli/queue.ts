@@ -3,7 +3,6 @@ import { spawn } from "child_process";
 import { SpineDigestScope } from "../common/llm-scope.js";
 import {
   addBuildJob,
-  assertNoActiveBuildJobs,
   boostBuildJob,
   buildChapterGraphArtifact,
   buildChapterSummaryArtifactFromSnapshot,
@@ -143,11 +142,6 @@ async function assertQueueAddReady(args: CLIQueueArguments): Promise<void> {
         `Chapter ${args.chapterId!} is planned. Set source before queueing a build job.`,
       );
     }
-  });
-  await assertNoActiveBuildJobs({
-    archivePath: args.archivePath!,
-    chapterIds: [args.chapterId!],
-    operation: "Queueing build job",
   });
 }
 

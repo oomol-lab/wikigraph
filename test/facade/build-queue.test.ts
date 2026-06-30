@@ -23,23 +23,52 @@ describe("facade/build-queue", () => {
     restoreEnv("WIKIGRAPH_STATE_DIR", originalStateDir);
   });
 
-  it("allows only one active job for an archive chapter", async () => {
+  it("merges active reading lane jobs for an archive chapter", async () => {
     await withTempDir("spinedigest-build-queue-", async (path) => {
       useStateDir(`${path}/state`);
 
-      await addBuildJob({
+      const job = await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "reading-graph",
+      });
+
+      const merged = await addBuildJob({
         archivePath: `${path}/book.sdpub`,
         chapterId: 1,
         target: "reading-summary",
       });
 
-      await expect(
-        addBuildJob({
-          archivePath: `${path}/book.sdpub`,
-          chapterId: 1,
-          target: "reading-graph",
-        }),
-      ).rejects.toThrow();
+      expect(merged.jobId).toBe(job.jobId);
+      expect(merged.target).toBe("reading-summary");
+      expect(await listBuildJobs()).toHaveLength(1);
+      expect(
+        (await readBuildJobEvents(job)).some(
+          (event) => event.type === "target_changed",
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("allows reading and knowledge graph lanes to run for the same chapter", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+
+      const reading = await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "reading-summary",
+      });
+      const knowledge = await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "knowledge-graph",
+      });
+
+      expect(knowledge.jobId).not.toBe(reading.jobId);
+      expect((await listBuildJobs()).map((item) => item.target).sort()).toEqual(
+        ["knowledge-graph", "reading-summary"],
+      );
     });
   });
 
@@ -126,6 +155,26 @@ describe("facade/build-queue", () => {
       await cancelBuildJob(job.jobId);
       releaseWorker();
       await worker;
+    });
+  });
+
+  it("rejects target changes that would collide with an active lane", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+      const reading = await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "reading-summary",
+      });
+      await addBuildJob({
+        archivePath: `${path}/book.sdpub`,
+        chapterId: 1,
+        target: "knowledge-graph",
+      });
+
+      await expect(
+        updateBuildJobTarget(reading.jobId, "knowledge-graph"),
+      ).rejects.toThrow("already has active knowledge-graph job");
     });
   });
 
@@ -402,7 +451,7 @@ describe("facade/build-queue", () => {
     });
   });
 
-  it("recovers stale running jobs back to queued", async () => {
+  it("fails stale running jobs and removes their workspace", async () => {
     await withTempDir("spinedigest-build-queue-", async (path) => {
       useStateDir(`${path}/state`);
       const job = await addBuildJob({
@@ -420,12 +469,16 @@ describe("facade/build-queue", () => {
       const jobs = await listBuildJobs();
       const updated = jobs.find((item) => item.jobId === job.jobId);
 
-      expect(updated?.state).toBe("queued");
+      expect(updated).toBeUndefined();
+      await expect(getBuildJob(job.jobId)).resolves.toMatchObject({
+        state: "failed",
+      });
       expect(
         (await readBuildJobEvents(job)).filter(
-          (event) => event.type === "requeued",
+          (event) => event.type === "failed",
         ),
       ).toHaveLength(1);
+      await expect(access(job.workspacePath)).rejects.toThrow();
     });
   });
 

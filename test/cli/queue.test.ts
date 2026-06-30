@@ -292,7 +292,7 @@ describe("cli/queue", () => {
     process.env.WIKIGRAPH_QUEUE_DISABLE_AUTOSTART = originalDisableAutostart;
   });
 
-  it("checks archive and active job preconditions before the cost gate", async () => {
+  it("checks archive source before the cost gate", async () => {
     await expect(
       runQueueCommand({
         action: "add",
@@ -303,13 +303,7 @@ describe("cli/queue", () => {
     ).rejects.toThrow("consume tokens");
 
     expect(queueMockState.openPaths).toStrictEqual(["book.sdpub"]);
-    expect(queueMockState.activeJobChecks).toStrictEqual([
-      {
-        archivePath: "book.sdpub",
-        chapterIds: [12],
-        operation: "Queueing build job",
-      },
-    ]);
+    expect(queueMockState.activeJobChecks).toStrictEqual([]);
     expect(queueMockState.addCalls).toStrictEqual([]);
   });
 
@@ -344,21 +338,6 @@ describe("cli/queue", () => {
     ).rejects.toThrow("Set source before queueing");
 
     expect(queueMockState.activeJobChecks).toStrictEqual([]);
-    expect(queueMockState.addCalls).toStrictEqual([]);
-  });
-
-  it("reports active job conflicts before the cost gate", async () => {
-    queueMockState.activeError = new Error("active job conflict");
-
-    await expect(
-      runQueueCommand({
-        action: "add",
-        archivePath: "book.sdpub",
-        chapterId: 12,
-        target: "reading-summary",
-      }),
-    ).rejects.toThrow("active job conflict");
-
     expect(queueMockState.addCalls).toStrictEqual([]);
   });
 
