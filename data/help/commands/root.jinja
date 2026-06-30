@@ -13,7 +13,7 @@ Object model:
 
 Object workflow:
   - `search` returns candidate Wiki Graph URIs from query text.
-  - `list` enumerates objects from a located Wiki Graph URI.
+  - `list` is search without query text: it enumerates objects from a located Wiki Graph URI and optional `--type` filter.
   - `get` opens one readable URI.
   - `related` expands from one URI to nearby URIs.
   - `evidence` traces a URI to source-backed evidence.
@@ -49,8 +49,8 @@ Generation queue:
   Queue generation tasks call an LLM, consume tokens, and may incur provider charges.
 
 Maintenance:
-  wikigraph <archive-root-uri> get [--json|--jsonl]
-  wikigraph <archive-root-uri> set [metadata options] [--llm <json>]
+  wikigraph <archive-uri> get [--json|--jsonl]
+  wikigraph <archive-uri> set [metadata options] [--llm <json>]
   wikigraph <cover-uri> get
   wikigraph <chapter-collection-uri> add|list [options]
   wikigraph <chapter-uri> status|move|remove|reset [options]
@@ -59,6 +59,7 @@ Maintenance:
   wikigraph <chapter-uri>/title set (--title <title>|--clear)
   wikigraph <archive-uri>/chapter/tree get|set [options]
   wikigraph config status [--llm <json>] [--help|-h]
+    Prints JSON by default and does not accept `--json`.
   wikigraph help [topic] [--help|-h]
 
 Help contract:

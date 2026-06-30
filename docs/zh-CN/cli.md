@@ -108,7 +108,7 @@ wikigraph transform [--input <path>] [--output <path>] [--input-format <format>]
 维护命令使用 URI target：
 
 ```bash
-wikigraph <archive-root-uri> get|set [metadata options]
+wikigraph <archive-uri> get|set [metadata options]
 wikigraph <cover-uri> get
 wikigraph <archive-uri>/chapter list|add [options]
 wikigraph <chapter-uri> status|move|remove|reset [options]

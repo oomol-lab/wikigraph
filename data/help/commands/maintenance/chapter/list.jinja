@@ -7,10 +7,11 @@ Purpose:
   List every chapter in the `.sdpub` chapter tree.
 
 Usage:
-  wikigraph <archive-uri>/chapter list [--llm <json>] [--help|-h]
+  wikigraph <archive-uri>/chapter list [--json] [--llm <json>] [--help|-h]
 
 Output shape:
   [<chapterId>] <stage> <title-or-[untitled]>
+  With `--json`, prints `{ "chapters": [...] }`.
 
 Behavior:
   - Includes summary-stage and unfinished chapters.

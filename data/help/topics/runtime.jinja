@@ -13,7 +13,9 @@ Archive-first streams:
 
 Exit behavior:
   - Success returns exit code 0.
-  - Failures return non-zero and print a plain-text error to stderr.
+  - Failures return non-zero.
+  - Commands that accept `--json` or `--jsonl` emit machine-readable error objects when those flags are present.
+  - Commands without machine-readable output support print plain-text errors.
 
 Queue behavior:
   - Reading Graph, Reading Summary, and Knowledge Graph generation run as device-local queue jobs.

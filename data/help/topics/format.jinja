@@ -6,7 +6,22 @@ Format Rules
 `.sdpub` is the managed Wiki Graph archive format.
 
 Source formats for archive creation:
-  sdpub, epub, txt, markdown
+  epub, txt, markdown
+
+Managed archive format:
+  sdpub
+
+Export formats:
+  txt, markdown
+
+Transform input/output formats:
+  input: sdpub, epub, txt, markdown
+  output: sdpub, txt, markdown
+
+Inference rules:
+  - File paths use their extension when the format flag is omitted.
+  - Stdin requires an explicit `--input-format`.
+  - Stdout text export requires an explicit or inferable output format.
 
 Object commands operate on `.sdpub` archives. `search` and `related` return URI-addressable objects, `get` opens one object, `evidence` returns source evidence items, and `pack` returns packed context.
 

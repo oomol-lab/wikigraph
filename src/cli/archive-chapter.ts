@@ -54,7 +54,10 @@ export async function runArchiveChapterCommand(
       return;
     case "list":
       await new SpineDigestFile(args.path).readDocument(async (document) => {
-        await writeChapterList(await listChapters(document));
+        await writeChapterList(
+          await listChapters(document),
+          args.json ?? false,
+        );
       });
       return;
     case "move":
@@ -256,7 +259,21 @@ async function writeChapterDetails(details: ChapterDetails): Promise<void> {
 
 async function writeChapterList(
   entries: readonly ChapterEntry[],
+  json: boolean,
 ): Promise<void> {
+  if (json) {
+    await writeTextToStdout(
+      formatCLIJSON({
+        chapters: entries.map((entry) => ({
+          uri: `wkg://chapter/${entry.chapterId}`,
+          title: entry.title,
+          stage: formatStage(entry.stage),
+        })),
+      }),
+    );
+    return;
+  }
+
   if (entries.length === 0) {
     await writeTextToStdout("No chapters.\n");
     return;

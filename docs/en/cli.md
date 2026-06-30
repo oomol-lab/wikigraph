@@ -108,7 +108,7 @@ There is no bare transform shortcut. Use `wikigraph transform ...` explicitly.
 Maintenance commands use URI targets:
 
 ```bash
-wikigraph <archive-root-uri> get|set [metadata options]
+wikigraph <archive-uri> get|set [metadata options]
 wikigraph <cover-uri> get
 wikigraph <archive-uri>/chapter list|add [options]
 wikigraph <chapter-uri> status|move|remove|reset [options]

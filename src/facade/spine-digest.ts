@@ -106,7 +106,7 @@ export class SpineDigest {
 
       if (record === undefined) {
         throw new Error(
-          `No completed summary exists for id ${serialId}. Use \`wikigraph wkg://<archive.sdpub> list --type chapter\` to discover chapter ids, then \`wikigraph wkg://<archive.sdpub>/chapter/${serialId}/summary/ get\` after summary is ready.`,
+          `No completed summary exists for id ${serialId}. Use \`wikigraph wkg://<archive.sdpub> list --type chapter\` to discover chapter ids, then \`wikigraph wkg://<archive.sdpub>/chapter/${serialId}/summary get\` after summary is ready.`,
         );
       }
 

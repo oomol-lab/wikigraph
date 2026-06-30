@@ -16,6 +16,7 @@ URI routing:
   `search`, `list`, `get`, `related`, `evidence`, and `pack` use Wiki Graph URIs, not bare filesystem paths.
   Read `wikigraph help uri` before using object commands; skipping the URI rules commonly leads to invalid commands.
   Read `wikigraph help object` to start from a URI target, or `wikigraph help verb` to start from an operation.
+  Conceptually, `list` is `search` without query text, scoped by URI and filtered by `--type`.
 
 Archive commands:
   wikigraph <archive-uri> create
@@ -31,7 +32,7 @@ Generation:
   wikigraph wkg-job://<job-id> get|watch|pause|resume|cancel|boost|set
 
 Maintenance:
-  wikigraph <archive-root-uri> get|set
+  wikigraph <archive-uri> get|set
   wikigraph <cover-uri> get
   wikigraph <chapter-collection-uri> add|list
   wikigraph <chapter-uri> status|move|remove|reset
@@ -40,3 +41,4 @@ Maintenance:
   wikigraph <chapter-uri>/title set
   wikigraph <archive-uri>/chapter/tree get|set
   wikigraph config status
+    Prints JSON by default and does not accept `--json`.

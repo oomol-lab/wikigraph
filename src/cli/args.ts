@@ -20,7 +20,12 @@ import {
   renderStatusHelpText,
   renderTransformHelpText,
 } from "./help.js";
-import { parseLocatedWikiGraphUri } from "../facade/archive-uri.js";
+import {
+  formatLocatedChapterResourceUri,
+  formatLocatedChapterSourceCollectionUri,
+  formatLocatedChapterUri,
+  parseLocatedWikiGraphUri,
+} from "../facade/archive-uri.js";
 
 export interface CLIArguments {
   readonly digestDirPath?: string;
@@ -634,16 +639,6 @@ function parseArchiveUriTargetArguments(
     );
   }
 
-  if (objectUri === "wkg://") {
-    return parseArchiveRootObjectArguments(
-      uri,
-      archivePath,
-      action,
-      tail,
-      values,
-    );
-  }
-
   if (objectUri === "wkg://cover") {
     return parseArchiveCoverUriArguments(
       uri,
@@ -686,6 +681,10 @@ function parseArchiveUriArchiveArguments(
   values: ArchiveArgumentValues,
   helpRoute: string,
 ): ParsedCLIArguments {
+  if (action === "set") {
+    return parseArchiveRootSetArguments(archivePath, tail, values, helpRoute);
+  }
+
   if (!isArchiveAction(action)) {
     throw new Error(
       withHelpRoute(
@@ -693,6 +692,10 @@ function parseArchiveUriArchiveArguments(
         "wikigraph help object archive",
       ),
     );
+  }
+
+  if (action === "get") {
+    return parseArchiveArguments(action, [uri, ...tail], values, helpRoute);
   }
 
   if (
@@ -714,34 +717,19 @@ function parseArchiveUriArchiveArguments(
 
   return parseArchiveArguments(
     action,
-    [archivePath, ...tail],
+    [
+      action === "create" ||
+      action === "estimate" ||
+      action === "export" ||
+      action === "index" ||
+      action === "status"
+        ? archivePath
+        : uri,
+      ...tail,
+    ],
     values,
     helpRoute,
   );
-}
-
-function parseArchiveRootObjectArguments(
-  uri: string,
-  archivePath: string,
-  action: CLIArchiveUriAction,
-  tail: readonly string[],
-  values: ArchiveArgumentValues,
-): ParsedCLIArguments {
-  const helpRoute = `wikigraph ${uri} ${action} --help`;
-
-  switch (action) {
-    case "get":
-      return parseArchiveArguments(action, [uri, ...tail], values, helpRoute);
-    case "set":
-      return parseArchiveRootSetArguments(archivePath, tail, values, helpRoute);
-    default:
-      throw new Error(
-        withHelpRoute(
-          `The archive root object does not support \`${action}\`. Expected get or set.`,
-          "wikigraph help object archive-root",
-        ),
-      );
-  }
 }
 
 function parseArchiveRootSetArguments(
@@ -750,6 +738,14 @@ function parseArchiveRootSetArguments(
   values: ArchiveArgumentValues,
   helpRoute: string,
 ): ParsedCLIArguments {
+  if (values.help === true) {
+    return {
+      help: true,
+      helpText: renderArchiveMaintenanceCommandHelpText("meta"),
+      kind: "maintenance",
+    };
+  }
+
   rejectArchiveMaintenanceExtraPositionals("meta", tail, 0, helpRoute);
   rejectMetaCommandFlag("budget", values.budget, helpRoute);
   rejectMetaCommandFlag("chapter", values.chapter, helpRoute);
@@ -805,6 +801,14 @@ function parseArchiveCoverUriArguments(
   values: ArchiveArgumentValues,
 ): ParsedCLIArguments {
   const helpRoute = `wikigraph ${uri} ${action} --help`;
+
+  if (values.help === true) {
+    return {
+      help: true,
+      helpText: renderArchiveMaintenanceCommandHelpText("cover"),
+      kind: "maintenance",
+    };
+  }
 
   if (action !== "get") {
     throw new Error(
@@ -998,14 +1002,14 @@ function parseSingleChapterUriArguments(
     case "list":
       return parseArchiveArguments(
         action,
-        [`wkg://${archivePath}/chapter/${chapterId}`, ...tail],
+        [formatLocatedChapterUri(archivePath, chapterId), ...tail],
         values,
         helpRoute,
       );
     case "get":
       return parseArchiveArguments(
         "get",
-        [`wkg://${archivePath}/chapter/${chapterId}`, ...tail],
+        [formatLocatedChapterUri(archivePath, chapterId), ...tail],
         values,
         helpRoute,
       );
@@ -1029,7 +1033,7 @@ function parseSingleChapterUriArguments(
       );
     case "queue":
       return parseArchiveUriQueueArguments(
-        `wkg://${archivePath}/chapter/${chapterId}`,
+        formatLocatedChapterUri(archivePath, chapterId),
         archivePath,
         `wkg://chapter/${chapterId}`,
         tail,
@@ -1066,8 +1070,8 @@ function parseChapterResourceUriArguments(
   if (action === "get") {
     const objectUri =
       resource === "source"
-        ? `wkg://${archivePath}/chapter/${chapterId}/source/`
-        : `wkg://${archivePath}/chapter/${chapterId}/${resource}`;
+        ? formatLocatedChapterSourceCollectionUri(archivePath, chapterId)
+        : formatLocatedChapterResourceUri(archivePath, chapterId, resource);
 
     return parseArchiveArguments(
       "get",
@@ -1101,6 +1105,14 @@ function parseArchiveChapterLikeArguments(
   helpRoute: string,
   treeAction?: "apply",
 ): ParsedCLIArguments {
+  if (values.help === true) {
+    return {
+      help: true,
+      helpText: renderArchiveMaintenanceChapterActionHelpText(action),
+      kind: "chapter",
+    };
+  }
+
   rejectArchiveChapterFlag("digest-dir", values["digest-dir"], helpRoute);
   rejectArchiveChapterFlag("limit", values.limit, helpRoute);
   rejectArchiveChapterFlag("output", values.output, helpRoute);
@@ -2222,6 +2234,7 @@ function normalizeArchiveChapterArguments(
       );
       return {
         action,
+        ...(values.json === undefined ? {} : { json: values.json }),
         path,
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       };

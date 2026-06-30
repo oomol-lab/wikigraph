@@ -32,7 +32,6 @@ export type HelpTopic = (typeof HELP_TOPICS)[number];
 
 export type HelpObjectName =
   | "archive"
-  | "archive-root"
   | "chapter"
   | "chapter-source"
   | "chapter-summary"
@@ -116,6 +115,16 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
     uriForms: ["wkg://book.sdpub", "wkg:///Users/me/book.sdpub"],
     verbs: [
       {
+        command: "wikigraph wkg://book.sdpub get --json",
+        note: "Read archive metadata as an object.",
+        verb: "get",
+      },
+      {
+        command: 'wikigraph wkg://book.sdpub set --title "New Title"',
+        note: "Edit archive metadata fields.",
+        verb: "set",
+      },
+      {
         command: "wikigraph wkg://book.sdpub create ./book.md",
         note: "Create or replace the archive from source material.",
         verb: "create",
@@ -149,25 +158,6 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
         command: "wikigraph wkg://book.sdpub list --type chapter",
         note: "List archive-level object collections.",
         verb: "list",
-      },
-    ],
-  },
-  {
-    aliases: ["meta", "metadata"],
-    description: "The archive root object that stores book metadata.",
-    name: "archive-root",
-    title: "Archive Root",
-    uriForms: ["wkg://book.sdpub/"],
-    verbs: [
-      {
-        command: "wikigraph wkg://book.sdpub/ get --json",
-        note: "Read metadata as an object.",
-        verb: "get",
-      },
-      {
-        command: 'wikigraph wkg://book.sdpub/ set --title "New Title"',
-        note: "Edit metadata fields.",
-        verb: "set",
       },
     ],
   },
@@ -332,15 +322,15 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
     description: "Readable chapter summary text as a searchable object.",
     name: "summary",
     title: "Summary",
-    uriForms: ["wkg://book.sdpub/chapter/12/summary/"],
+    uriForms: ["wkg://book.sdpub/chapter/12/summary"],
     verbs: [
       {
-        command: "wikigraph wkg://book.sdpub/chapter/12/summary/ get",
+        command: "wikigraph wkg://book.sdpub/chapter/12/summary get",
         note: "Read summary text.",
         verb: "get",
       },
       {
-        command: "wikigraph wkg://book.sdpub/chapter/12/summary/ evidence",
+        command: "wikigraph wkg://book.sdpub/chapter/12/summary evidence",
         note: "Trace summary support back to source.",
         verb: "evidence",
       },

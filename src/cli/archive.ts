@@ -31,7 +31,7 @@ import {
 } from "../facade/index.js";
 import {
   parseLocatedWikiGraphUri,
-  requireLocatedObjectUri,
+  requireLocatedObjectOrArchiveUri,
 } from "../facade/archive-uri.js";
 import { SpineDigestFile } from "../facade/spine-digest-file.js";
 import type { ReadonlyDocument } from "../document/index.js";
@@ -642,25 +642,9 @@ function getArchivePath(uri: string): string {
 }
 
 function getObjectUri(uri: string): string {
-  return requireLocatedObjectUri(uri).objectUri;
-}
+  const parsed = requireLocatedObjectOrArchiveUri(uri);
 
-function requireLocatedObjectOrArchiveUri(uri: string): {
-  readonly archivePath: string;
-} {
-  const parsed = parseLocatedWikiGraphUri(uri);
-
-  if (parsed.archivePath === undefined) {
-    throw new Error(
-      [
-        `Expected a Wiki Graph URI with a .sdpub archive locator: ${uri}`,
-        `Example: ${uri.endsWith(".sdpub") && uri.startsWith("/") ? `wkg://${uri}` : "wkg:///absolute/path/book.sdpub"}`,
-        "See: wikigraph help uri",
-      ].join("\n"),
-    );
-  }
-
-  return { archivePath: parsed.archivePath };
+  return parsed.objectUri ?? "wkg://";
 }
 
 function parseChapterScope(uri: string): number | undefined {
@@ -1595,7 +1579,7 @@ function toWikiGraphUri(id: string): string {
     case "node":
       return `wkg://chunk/${first ?? ""}`;
     case "summary":
-      return `wkg://chapter/${first ?? ""}/summary/`;
+      return `wkg://chapter/${first ?? ""}/summary`;
     default:
       return id;
   }

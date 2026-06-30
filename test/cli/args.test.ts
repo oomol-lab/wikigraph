@@ -377,7 +377,7 @@ describe("cli/args", () => {
     ).toStrictEqual({
       args: {
         action: "search",
-        archivePath,
+        archivePath: "wkg://book.sdpub",
         format: "json",
         kinds: ["meta", "chapter", "chunk"],
         query: "RAG",
@@ -418,9 +418,49 @@ describe("cli/args", () => {
     ).toStrictEqual({
       args: {
         action: "list",
-        archivePath,
+        archivePath: "wkg://book.sdpub",
         format: "text",
         kinds: ["entity"],
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments([
+        "wkg:///Users/me/book.sdpub",
+        "search",
+        "RAG",
+        "--limit",
+        "3",
+        "--json",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "search",
+        archivePath: "wkg:///Users/me/book.sdpub",
+        format: "json",
+        limit: 3,
+        query: "RAG",
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments([
+        "wkg:///Users/me/book.sdpub",
+        "list",
+        "--limit",
+        "10",
+        "--json",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "list",
+        archivePath: "wkg:///Users/me/book.sdpub",
+        format: "json",
+        limit: 10,
       },
       help: false,
       kind: "archive",
@@ -597,6 +637,13 @@ describe("cli/args", () => {
       help: false,
       kind: "cover",
     });
+
+    expect(
+      parseCLIArguments(["wkg://book.sdpub/", "set", "--help"]),
+    ).toMatchObject({
+      help: true,
+      kind: "maintenance",
+    });
   });
 
   it("parses archive chapter edit actions", () => {
@@ -722,6 +769,29 @@ describe("cli/args", () => {
         treeAction: "show",
       },
       help: false,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments(["wkg://book.sdpub/chapter", "list", "--help"]),
+    ).toMatchObject({
+      help: true,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments(["wkg://book.sdpub/chapter", "list", "--json"]),
+    ).toStrictEqual({
+      args: {
+        action: "list",
+        json: true,
+        path: archivePath,
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(
+      parseCLIArguments(["wkg://book.sdpub/chapter/12/title", "set", "--help"]),
+    ).toMatchObject({
+      help: true,
       kind: "chapter",
     });
     expect(
@@ -1009,7 +1079,7 @@ describe("cli/args", () => {
     expect(rootHelpText).toContain("wikigraph help uri");
     expect(rootHelpText).toContain("wikigraph help env");
     expect(rootHelpText).toContain("wikigraph help config-file");
-    expect(rootHelpText).toContain("wikigraph <archive-root-uri> get");
+    expect(rootHelpText).toContain("wikigraph <archive-uri> get");
     expect(rootHelpText).toContain(
       "wikigraph <archive-uri>/chapter/tree get|set",
     );

@@ -24,7 +24,7 @@ Short object URIs:
     wkg://chapter/3
     wkg://chapter/3/source/
     wkg://chapter/3/source/0#4..8
-    wkg://chapter/3/summary/
+    wkg://chapter/3/summary
     wkg://chunk/12
     wkg://entity/Q8018
     wkg://triple/Q8018/discusses/Q123
@@ -34,6 +34,7 @@ Located object URIs:
     wkg:///books/book.sdpub/chapter/3
     wkg:///books/book.sdpub/chapter/3/source/0#4..8
     wkg://book.sdpub/entity/Q8018
+  Returned short URIs are archive-relative handles, not complete command targets. Prepend the archive locator before passing them back to object commands.
 
 Object command examples:
   Search an absolute local archive:
@@ -55,6 +56,7 @@ Job URIs:
 
 Scopes:
   - `wkg:///book.sdpub` addresses the whole archive.
+  - `wkg:///book.sdpub/` is the same archive target; a trailing slash does not create a separate object.
   - `wkg:///book.sdpub/chapter/3` scopes search and list to chapter 3.
   - `wkg://chapter/3/entity/Q8018` is the entity view whose evidence must appear in chapter 3.
 
