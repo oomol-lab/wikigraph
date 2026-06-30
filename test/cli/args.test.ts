@@ -1067,6 +1067,9 @@ describe("cli/args", () => {
       "Unknown command: sdpub.",
     );
     expect(() => parseCLIArguments(["meta"])).toThrow("Unknown command: meta.");
+    expect(() => parseCLIArguments(["chapter", "set", "--help"])).toThrow(
+      "Use concrete chapter resource URIs such as /source, /summary, or /title for set operations.",
+    );
     expect(() =>
       parseCLIArguments([
         "wkg://book.sdpub/",
