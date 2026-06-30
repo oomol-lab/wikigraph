@@ -1574,6 +1574,21 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toBe("wkg://entity/Q1\nRAG\n");
   });
 
+  it("defaults evidence for chapter-scoped entity pages", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wkg:///tmp/book.sdpub",
+      format: "json",
+      objectId: "wkg:///tmp/book.sdpub/chapter/2/entity/Q1",
+    });
+
+    expect(readArchivePage).toHaveBeenCalledWith(
+      {},
+      "wkg://chapter/2/entity/Q1",
+      { evidenceLimit: 3 },
+    );
+  });
+
   it("prints text get evidence continuation commands", async () => {
     vi.mocked(createContinuationCursor).mockResolvedValueOnce(
       "c_more_evidence",
@@ -1904,6 +1919,19 @@ describe("cli/archive", () => {
       ].join("\n"),
     );
     expect(archiveMockState.textWrites[0]).not.toContain("# Links");
+  });
+
+  it("preserves evidence zero for pack output", async () => {
+    await runArchiveCommand({
+      action: "pack",
+      archivePath: "wkg:///tmp/book.sdpub",
+      budget: 1000,
+      evidenceLimit: 0,
+      format: "json",
+      objectId: "wkg:///tmp/book.sdpub/chunk/9",
+    });
+
+    expect(archiveMockState.textWrites[0]).not.toContain('"evidence"');
   });
 
   it("prints a context pack as anchor plus related JSON", async () => {

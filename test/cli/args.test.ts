@@ -704,6 +704,23 @@ describe("cli/args", () => {
       parseCLIArguments(["wkg://book.sdpub", "search", "RAG", "--role", "any"]),
     ).toThrow("The `search` command does not support --role.");
     expect(() =>
+      parseCLIArguments([
+        "wkg://book.sdpub/entity/Q1",
+        "related",
+        "--backlinks",
+      ]),
+    ).toThrow("The `related` command does not support --backlinks.");
+    expect(() =>
+      parseCLIArguments([
+        "wkg://book.sdpub/entity/Q1",
+        "evidence",
+        "--backlinks",
+      ]),
+    ).toThrow("The `evidence` command does not support --backlinks.");
+    expect(() =>
+      parseCLIArguments(["wkg://book.sdpub/entity/Q1", "pack", "--backlinks"]),
+    ).toThrow("The `pack` command does not support --backlinks.");
+    expect(() =>
       parseCLIArguments(["wkg://book.sdpub/triple/Q1/mentions/Q2", "related"]),
     ).toThrow("Related is only available for chunk and entity objects");
     expect(() =>

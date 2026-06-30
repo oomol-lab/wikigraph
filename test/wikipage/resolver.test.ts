@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { Database } from "../../src/document/index.js";
 import { WikipageResolver } from "../../src/wikipage/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
@@ -207,6 +208,133 @@ describe("wikipage/resolver", () => {
       expect(
         calls.filter((call) => call.includes("wbgetentities")),
       ).toHaveLength(2);
+    });
+  });
+
+  it("keeps cache entries across resolver reopen", async () => {
+    await withTempDir("spinedigest-wikipage-", async (path) => {
+      const calls: string[] = [];
+      const fetch = createMockFetch(calls);
+      const cacheDatabasePath = `${path}/cache.sqlite`;
+      const firstResolver = await WikipageResolver.open({
+        cacheDatabasePath,
+        fetch,
+        language: "en",
+        minRequestIntervalMs: 0,
+        retryBaseDelayMs: 0,
+      });
+
+      try {
+        await expect(firstResolver.resolveQids(["Q1"])).resolves.toMatchObject([
+          {
+            description: "totality of space and time",
+            label: "Universe",
+            qid: "Q1",
+          },
+        ]);
+      } finally {
+        await firstResolver.close();
+      }
+
+      const firstCallCount = calls.length;
+      const secondResolver = await WikipageResolver.open({
+        cacheDatabasePath,
+        fetch,
+        language: "en",
+        minRequestIntervalMs: 0,
+        retryBaseDelayMs: 0,
+      });
+
+      try {
+        await expect(secondResolver.resolveQids(["Q1"])).resolves.toMatchObject(
+          [
+            {
+              description: "totality of space and time",
+              label: "Universe",
+              qid: "Q1",
+            },
+          ],
+        );
+      } finally {
+        await secondResolver.close();
+      }
+
+      expect(calls).toHaveLength(firstCallCount);
+    });
+  });
+
+  it("migrates legacy language-insensitive cache entries once", async () => {
+    await withTempDir("spinedigest-wikipage-", async (path) => {
+      const cacheDatabasePath = `${path}/cache.sqlite`;
+      const database = await Database.open(
+        cacheDatabasePath,
+        `
+CREATE TABLE qid_cache (
+  qid TEXT PRIMARY KEY,
+  label TEXT,
+  description TEXT,
+  pages_json TEXT NOT NULL,
+  checked_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE disambiguation_cache (
+  qid TEXT PRIMARY KEY,
+  pages_json TEXT NOT NULL,
+  profile_json TEXT,
+  checked_at TEXT NOT NULL
+);
+`,
+      );
+
+      try {
+        await database.run(
+          `
+INSERT INTO qid_cache (
+  qid, label, description, pages_json, checked_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?)
+`,
+          [
+            "Q1",
+            "Universe",
+            "totality of space and time",
+            JSON.stringify([
+              {
+                isDisambiguation: false,
+                title: "Universe",
+                wiki: "enwiki",
+              },
+            ]),
+            "2026-01-01T00:00:00.000Z",
+            "2026-01-01T00:00:00.000Z",
+          ],
+        );
+      } finally {
+        await database.close();
+      }
+
+      const calls: string[] = [];
+      const resolver = await WikipageResolver.open({
+        cacheDatabasePath,
+        fetch: createMockFetch(calls),
+        language: "en",
+        minRequestIntervalMs: 0,
+        retryBaseDelayMs: 0,
+      });
+
+      try {
+        await expect(resolver.resolveQids(["Q1"])).resolves.toMatchObject([
+          {
+            description: "totality of space and time",
+            label: "Universe",
+            qid: "Q1",
+          },
+        ]);
+      } finally {
+        await resolver.close();
+      }
+
+      expect(calls).toStrictEqual([]);
     });
   });
 });

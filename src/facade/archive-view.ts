@@ -2262,7 +2262,8 @@ function listTextStreamSentenceCollection(
     ),
     position: {
       chapter: chapterId,
-      fragment: sentence.globalIndex,
+      fragment: sentence.fragmentId,
+      sentence: sentence.localIndex,
     },
     snippet: createSnippet(sentence.text),
     title,
@@ -3088,7 +3089,8 @@ async function findTextStreamSentencesLexical(
         ...createFindMatchFields(match),
         position: {
           chapter: chapterId,
-          fragment: sentence.globalIndex,
+          fragment: sentence.fragmentId,
+          sentence: sentence.localIndex,
         },
         snippet: createSnippet(sentence.text, match.snippetNeedle),
         title,
@@ -3127,7 +3129,8 @@ async function findTextStreamSentences(
         ...createFindMatchFields(match),
         position: {
           chapter: chapterId,
-          fragment: sentence.globalIndex,
+          fragment: sentence.fragmentId,
+          sentence: sentence.localIndex,
         },
         snippet: createSnippet(sentence.text, getSnippetNeedle(match)),
         title,
@@ -4467,9 +4470,14 @@ function parseSentenceRange(hash: string): readonly [number, number] {
     return [0, Number.POSITIVE_INFINITY];
   }
 
-  const [start, end = start] = hash.split("..", 2);
-  const parsedStart = Number(start);
-  const parsedEnd = Number(end);
+  const match = /^([0-9]+)(?:\.\.([0-9]+))?$/u.exec(hash);
+
+  if (match?.[1] === undefined) {
+    throw new Error(`Invalid source sentence range: ${hash}`);
+  }
+
+  const parsedStart = Number(match[1]);
+  const parsedEnd = Number(match[2] ?? match[1]);
 
   if (
     Number.isInteger(parsedStart) &&

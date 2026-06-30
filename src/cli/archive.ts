@@ -105,6 +105,7 @@ interface ArchiveOutputContext {
   readonly backlinks?: boolean;
   readonly chapters?: readonly number[];
   readonly continuationKind?: "collection" | "evidence" | "search";
+  readonly evidenceDisabled?: boolean;
   readonly evidenceLimit?: number;
   readonly format: ResultFormat;
   readonly ids?: readonly string[];
@@ -542,6 +543,9 @@ function createArchiveOutputContext(
     archiveKey: getArchivePath(args.archivePath),
     archivePath: getArchivePath(args.archivePath),
     ...(args.backlinks === undefined ? {} : { backlinks: args.backlinks }),
+    ...(isEvidenceDisabled(args.evidenceLimit)
+      ? { evidenceDisabled: true }
+      : {}),
     ...(options.continuationKind === undefined
       ? {}
       : { continuationKind: options.continuationKind }),
@@ -606,7 +610,7 @@ function createOptionalEvidenceLimit(args: CLIArchiveArguments): {
 }
 
 function isEvidenceBackedObjectUri(uri: string): boolean {
-  return /^wkg:\/\/(?:entity\/Q[1-9][0-9]*|triple\/Q[1-9][0-9]*\/[^/]+\/Q[1-9][0-9]*)\/?$/u.test(
+  return /^wkg:\/\/(?:(?:chapter\/[1-9][0-9]*\/)?entity\/Q[1-9][0-9]*|(?:chapter\/[1-9][0-9]*\/)?triple\/Q[1-9][0-9]*\/[^/]+\/Q[1-9][0-9]*)\/?$/u.test(
     uri,
   );
 }
@@ -1090,7 +1094,11 @@ async function writePage(
       );
       return;
     case "fragment":
-      if (page.id.startsWith("wkg://") && !page.id.includes("#")) {
+      if (
+        page.id.startsWith("wkg://") &&
+        !page.id.includes("#") &&
+        page.backlinks === undefined
+      ) {
         await writeTextToStdout(`${page.fragment.text}\n`);
         return;
       }
@@ -1224,7 +1232,13 @@ async function writePack(
   context: ArchiveOutputContext,
   format: ResultFormat,
 ): Promise<void> {
-  const packContext = { ...context, evidenceLimit: context.evidenceLimit ?? 3 };
+  const packContext =
+    context.evidenceDisabled === true
+      ? context
+      : {
+          ...context,
+          evidenceLimit: context.evidenceLimit ?? DEFAULT_GET_EVIDENCE_LIMIT,
+        };
 
   if (format === "json") {
     await writeTextToStdout(

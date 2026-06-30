@@ -2332,6 +2332,12 @@ function parseArchiveArguments(
     case "related": {
       rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
@@ -2357,6 +2363,12 @@ function parseArchiveArguments(
     case "evidence": {
       rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
@@ -2389,6 +2401,12 @@ function parseArchiveArguments(
     case "pack": {
       rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);

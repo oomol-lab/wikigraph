@@ -57,6 +57,11 @@ describe("facade/archive-view", () => {
           expect.objectContaining({
             field: "source",
             id: "wkg://chapter/1/source#0",
+            position: {
+              chapter: 1,
+              fragment: 0,
+              sentence: 0,
+            },
             type: "source",
           }),
         );
@@ -970,7 +975,7 @@ describe("facade/archive-view", () => {
           expect.objectContaining({
             chapter: 1,
             id: "wkg://chapter/1/source#0",
-            position: { chapter: 1, fragment: 0 },
+            position: { chapter: 1, fragment: 0, sentence: 0 },
             type: "source",
           }),
         ]);
@@ -1336,6 +1341,22 @@ describe("facade/archive-view", () => {
           },
           type: "fragment",
         });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("rejects malformed source sentence ranges", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(
+          readArchivePage(document, "wkg://chapter/1/source#1..2..3"),
+        ).rejects.toThrow("Invalid source sentence range: 1..2..3");
       } finally {
         await document.release();
       }
