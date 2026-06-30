@@ -8,6 +8,11 @@ import type {
   SentenceId,
 } from "../document/index.js";
 import type { BookMeta } from "../source/index.js";
+import {
+  WikipageResolver,
+  type WikipageResolverOptions,
+} from "../wikipage/index.js";
+import type { QidResolution, WikipageSitelink } from "../wikipage/index.js";
 
 import {
   getGraphNode,
@@ -94,6 +99,7 @@ export interface ArchiveIndex {
 }
 
 export interface ArchiveFindHit {
+  readonly backlinks?: ArchiveBacklinks;
   readonly chapter?: number;
   readonly evidence?: ArchiveFindEvidencePreview;
   readonly evidenceLinks?: readonly MentionLinkRecord[];
@@ -146,6 +152,7 @@ export type ArchiveFindField =
 
 export interface ArchiveFindOptions {
   readonly archiveKey?: string;
+  readonly backlinks?: boolean;
   readonly chapters?: readonly number[];
   readonly cursor?: string;
   readonly evidenceLimit?: number;
@@ -153,6 +160,7 @@ export interface ArchiveFindOptions {
   readonly limit?: number;
   readonly match?: ArchiveFindMatch;
   readonly order?: ArchiveFindOrder;
+  readonly triplePattern?: ArchiveTriplePattern;
   readonly types?: readonly ArchiveFindFilterType[];
 }
 
@@ -192,13 +200,21 @@ export interface ArchiveFindLensHint {
 }
 
 export interface ArchiveCollectionOptions {
+  readonly backlinks?: boolean;
   readonly chapters?: readonly number[];
   readonly cursor?: string;
   readonly evidenceLimit?: number;
   readonly ids?: readonly string[];
   readonly limit?: number;
   readonly order?: ArchiveFindOrder;
+  readonly triplePattern?: ArchiveTriplePattern;
   readonly types?: readonly ArchiveCollectionType[];
+}
+
+export interface ArchiveTriplePattern {
+  readonly objectQid?: string;
+  readonly predicate?: string;
+  readonly subjectQid?: string;
 }
 
 export interface ArchiveCollectionResult {
@@ -209,6 +225,18 @@ export interface ArchiveCollectionResult {
   readonly nextCursor: string | null;
   readonly order: ArchiveFindOrder;
   readonly types: readonly ArchiveCollectionType[] | null;
+}
+
+export interface ArchiveBacklinks {
+  readonly chunks: ArchiveBacklinkBucket;
+  readonly entities: ArchiveBacklinkBucket;
+  readonly triples: ArchiveBacklinkBucket;
+}
+
+export interface ArchiveBacklinkBucket {
+  readonly items: readonly ArchiveFindHit[];
+  readonly limit: number;
+  readonly nextCursor: string | null;
 }
 
 export type ArchiveListKind =
@@ -224,6 +252,7 @@ export type ArchiveListItem =
       readonly evidence?: ArchiveFindEvidencePreview;
       readonly id: string;
       readonly label: string;
+      readonly score?: number;
       readonly summary: string;
       readonly type: Exclude<ArchiveObjectType, "triple">;
     }
@@ -235,6 +264,7 @@ export type ArchiveListItem =
       readonly objectLabel: string;
       readonly objectQid: string;
       readonly predicate: string;
+      readonly score?: number;
       readonly subjectLabel: string;
       readonly subjectQid: string;
       readonly summary: string;
@@ -266,6 +296,7 @@ export type ArchivePage =
       readonly type: "node";
     }
   | {
+      readonly backlinks?: ArchiveBacklinks;
       readonly fragment: ArchiveSourceFragment;
       readonly id: string;
       readonly nextFragmentId: string | undefined;
@@ -288,6 +319,12 @@ export type ArchivePage =
       readonly mentionCount: number;
       readonly qid: string;
       readonly type: "entity";
+    }
+  | {
+      readonly en: ArchiveEntityWikipageLocale | null;
+      readonly id: string;
+      readonly type: "entity-wikipage";
+      readonly zh: ArchiveEntityWikipageLocale | null;
     }
   | {
       readonly evidence: ArchiveFindEvidencePreview;
@@ -321,6 +358,12 @@ export type ArchivePage =
       readonly type: "state";
     };
 
+export interface ArchiveEntityWikipageLocale {
+  readonly description?: string;
+  readonly title: string;
+  readonly url: string;
+}
+
 export interface ArchiveEstimate {
   readonly estimatedCostUsd: {
     readonly max: number;
@@ -351,6 +394,7 @@ export type ArchiveRelatedRole = "any" | "object" | "self" | "subject";
 
 export interface ArchiveRelatedOptions {
   readonly evidenceLimit?: number;
+  readonly query?: string;
   readonly role?: ArchiveRelatedRole;
 }
 
@@ -365,6 +409,7 @@ export interface ArchiveEvidenceItem {
   readonly endSentenceIndex: number;
   readonly fragmentId: number;
   readonly id: string;
+  readonly score?: number;
   readonly source: string;
   readonly startSentenceIndex: number;
   readonly title: string;
@@ -413,10 +458,13 @@ export interface ArchiveNodeSourceFragment {
 export interface ArchiveEvidenceOptions {
   readonly cursor?: string;
   readonly limit?: number;
+  readonly query?: string;
 }
 
 export interface ArchivePageOptions {
+  readonly backlinks?: boolean;
   readonly evidenceLimit?: number;
+  readonly wikipageResolverOptions?: WikipageResolverOptions;
 }
 
 export async function getArchiveIndex(
@@ -641,14 +689,15 @@ export async function listArchiveCollection(
   }
 
   const result = createCollectionResult(items, options);
+  const evidenceItems = await hydrateFindHitEvidence(document, result.items, {
+    ...(options.evidenceLimit === undefined
+      ? {}
+      : { evidenceLimit: options.evidenceLimit }),
+  });
 
   return {
     ...result,
-    items: await hydrateFindHitEvidence(document, result.items, {
-      ...(options.evidenceLimit === undefined
-        ? {}
-        : { evidenceLimit: options.evidenceLimit }),
-    }),
+    items: await hydrateFindHitBacklinks(document, evidenceItems, options),
   };
 }
 
@@ -700,23 +749,27 @@ export async function findArchiveObjects(
           cursor.createdAt,
         );
 
-    return {
-      chapters: page.chapters,
-      items: await hydrateFindHitEvidence(
-        document,
-        page.items,
-        createFindEvidenceHydrationOptions(options, cursor.sessionId),
-      ),
-      lens: parseFindLens(page.lens),
-      lensHint: page.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
-      limit,
-      match: parseFindMatch(page.match),
-      nextCursor: page.nextCursor,
-      order: options.order ?? "doc-asc",
-      query: page.query,
-      terms: page.terms,
-      types: parseFindTypes(descriptor.types),
-    };
+    return await hydrateFindResultBacklinks(
+      document,
+      {
+        chapters: page.chapters,
+        items: await hydrateFindHitEvidence(
+          document,
+          page.items,
+          createFindEvidenceHydrationOptions(options, cursor.sessionId),
+        ),
+        lens: parseFindLens(page.lens),
+        lensHint: page.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
+        limit,
+        match: parseFindMatch(page.match),
+        nextCursor: page.nextCursor,
+        order: options.order ?? "doc-asc",
+        query: page.query,
+        terms: page.terms,
+        types: parseFindTypes(descriptor.types),
+      },
+      options,
+    );
   }
 
   const requestedTypes = options.types ?? null;
@@ -740,8 +793,9 @@ export async function findArchiveObjects(
     terms: search.terms,
     types: options.types ?? null,
   };
+  const canReadSearchCache = options.triplePattern === undefined;
 
-  if (isEntityOnlySearch(options)) {
+  if (canReadSearchCache && isEntityOnlySearch(options)) {
     const cachedPage = await readCachedEntitySearchSessionPage(
       cacheInput,
       0,
@@ -749,45 +803,53 @@ export async function findArchiveObjects(
     );
 
     if (cachedPage !== undefined) {
-      return {
-        chapters: cachedPage.chapters,
-        items: await hydrateFindHitEvidence(
-          document,
-          cachedPage.items,
-          createFindEvidenceHydrationOptions(options, cachedPage.sessionId),
-        ),
-        lens: parseFindLens(cachedPage.lens),
-        lensHint: cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
-        limit,
-        match: parseFindMatch(cachedPage.match),
-        nextCursor: cachedPage.nextCursor,
-        order: options.order ?? "doc-asc",
-        query: cachedPage.query,
-        terms: cachedPage.terms,
-        types: parseFindTypes(cachedPage.types),
-      };
+      return await hydrateFindResultBacklinks(
+        document,
+        {
+          chapters: cachedPage.chapters,
+          items: await hydrateFindHitEvidence(
+            document,
+            cachedPage.items,
+            createFindEvidenceHydrationOptions(options, cachedPage.sessionId),
+          ),
+          lens: parseFindLens(cachedPage.lens),
+          lensHint: cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
+          limit,
+          match: parseFindMatch(cachedPage.match),
+          nextCursor: cachedPage.nextCursor,
+          order: options.order ?? "doc-asc",
+          query: cachedPage.query,
+          terms: cachedPage.terms,
+          types: parseFindTypes(cachedPage.types),
+        },
+        options,
+      );
     }
-  } else {
+  } else if (canReadSearchCache) {
     const cachedPage = await readCachedSearchSessionPage(cacheInput, 0, limit);
 
     if (cachedPage !== undefined) {
-      return {
-        chapters: cachedPage.chapters,
-        items: await hydrateFindHitEvidence(
-          document,
-          cachedPage.items,
-          createFindEvidenceHydrationOptions(options),
-        ),
-        lens: parseFindLens(cachedPage.lens),
-        lensHint: cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
-        limit,
-        match: parseFindMatch(cachedPage.match),
-        nextCursor: cachedPage.nextCursor,
-        order: options.order ?? "doc-asc",
-        query: cachedPage.query,
-        terms: cachedPage.terms,
-        types: parseFindTypes(cachedPage.types),
-      };
+      return await hydrateFindResultBacklinks(
+        document,
+        {
+          chapters: cachedPage.chapters,
+          items: await hydrateFindHitEvidence(
+            document,
+            cachedPage.items,
+            createFindEvidenceHydrationOptions(options),
+          ),
+          lens: parseFindLens(cachedPage.lens),
+          lensHint: cachedPage.lens === "broad" ? BROAD_FIND_LENS_HINT : null,
+          limit,
+          match: parseFindMatch(cachedPage.match),
+          nextCursor: cachedPage.nextCursor,
+          order: options.order ?? "doc-asc",
+          query: cachedPage.query,
+          terms: cachedPage.terms,
+          types: parseFindTypes(cachedPage.types),
+        },
+        options,
+      );
     }
   }
 
@@ -819,15 +881,19 @@ export async function findArchiveObjects(
     });
     const firstPage = await readEntitySearchSessionPage(sessionId, 0, limit);
 
-    return {
-      ...ranked,
-      items: await hydrateFindHitEvidence(
-        document,
-        firstPage.items,
-        createFindEvidenceHydrationOptions(options, sessionId),
-      ),
-      nextCursor: firstPage.nextCursor,
-    };
+    return await hydrateFindResultBacklinks(
+      document,
+      {
+        ...ranked,
+        items: await hydrateFindHitEvidence(
+          document,
+          firstPage.items,
+          createFindEvidenceHydrationOptions(options, sessionId),
+        ),
+        nextCursor: firstPage.nextCursor,
+      },
+      options,
+    );
   }
 
   const ranked = createRankedFindResult(
@@ -850,15 +916,19 @@ export async function findArchiveObjects(
   });
   const firstPage = await readSearchSessionPage(sessionId, 0, limit);
 
-  return {
-    ...ranked,
-    items: await hydrateFindHitEvidence(
-      document,
-      firstPage.items,
-      createFindEvidenceHydrationOptions(options),
-    ),
-    nextCursor: firstPage.nextCursor,
-  };
+  return await hydrateFindResultBacklinks(
+    document,
+    {
+      ...ranked,
+      items: await hydrateFindHitEvidence(
+        document,
+        firstPage.items,
+        createFindEvidenceHydrationOptions(options),
+      ),
+      nextCursor: firstPage.nextCursor,
+    },
+    options,
+  );
 }
 
 export async function grepArchiveObjects(
@@ -1159,6 +1229,12 @@ async function readWikiGraphPage(
         type: "entity",
       };
     }
+    case "entity-wikipage":
+      return {
+        ...(await resolveEntityWikipage(reference.qid, options)),
+        id: uri,
+        type: "entity-wikipage",
+      };
     case "triple": {
       const links = await filterMentionLinksByChapter(
         document,
@@ -1204,6 +1280,9 @@ async function readWikiGraphPage(
     }
     case "text-stream":
       return {
+        ...(options.backlinks === true
+          ? { backlinks: await createTextStreamBacklinks(document, reference) }
+          : {}),
         fragment: await createTextStreamRangeFragment(document, reference),
         id: uri,
         nextFragmentId: undefined,
@@ -1372,12 +1451,82 @@ async function listRelatedWikiGraphObjects(
         `Related is only available for chunk and entity objects: ${uri}`,
       );
     case "chapter-tree":
+    case "entity-wikipage":
     case "meta":
     case "state":
     case "chapter-state":
       rejectRelatedRole(options.role, uri);
       return [];
   }
+}
+
+async function resolveEntityWikipage(
+  qid: string,
+  options: ArchivePageOptions,
+): Promise<{
+  readonly en: ArchiveEntityWikipageLocale | null;
+  readonly zh: ArchiveEntityWikipageLocale | null;
+}> {
+  const [en, zh] = await Promise.all([
+    resolveEntityWikipageLocale(qid, "en", "enwiki", options),
+    resolveEntityWikipageLocale(qid, "zh", "zhwiki", options),
+  ]);
+
+  return { en, zh };
+}
+
+async function resolveEntityWikipageLocale(
+  qid: string,
+  language: "en" | "zh",
+  wiki: "enwiki" | "zhwiki",
+  options: ArchivePageOptions,
+): Promise<ArchiveEntityWikipageLocale | null> {
+  const resolver = await WikipageResolver.open({
+    ...options.wikipageResolverOptions,
+    language,
+    wiki,
+  });
+
+  try {
+    const [resolution] = await resolver.resolveQids([qid]);
+
+    if (resolution === undefined) {
+      return null;
+    }
+
+    return createEntityWikipageLocale(resolution, wiki);
+  } finally {
+    await resolver.close();
+  }
+}
+
+function createEntityWikipageLocale(
+  resolution: QidResolution,
+  wiki: "enwiki" | "zhwiki",
+): ArchiveEntityWikipageLocale | null {
+  const sitelink =
+    resolution.sitelinks?.find((item) => item.wiki === wiki) ??
+    (resolution.sitelink?.wiki === wiki ? resolution.sitelink : undefined);
+
+  if (sitelink === undefined) {
+    return null;
+  }
+
+  return {
+    ...(resolution.description === undefined
+      ? {}
+      : { description: resolution.description }),
+    title: sitelink.title,
+    url: formatWikipediaPageUrl(sitelink),
+  };
+}
+
+function formatWikipediaPageUrl(sitelink: WikipageSitelink): string {
+  const language = sitelink.wiki === "zhwiki" ? "zh" : "en";
+
+  return `https://${language}.wikipedia.org/wiki/${encodeURIComponent(
+    sitelink.title.replace(/ /gu, "_"),
+  )}`;
 }
 
 async function listRelatedEntityObjects(
@@ -1571,8 +1720,14 @@ async function hydrateRelatedItemsEvidence(
   items: readonly ArchiveListItem[],
   options: ArchiveRelatedOptions,
 ): Promise<readonly ArchiveListItem[]> {
+  const filteredItems = await filterAndSortRelatedItemsByQuery(
+    document,
+    items,
+    options.query,
+  );
+
   if (options.evidenceLimit === undefined) {
-    return items.map((item) => {
+    return filteredItems.map((item) => {
       if (item.type !== "triple") {
         return item;
       }
@@ -1585,7 +1740,7 @@ async function hydrateRelatedItemsEvidence(
   const evidenceLimit = options.evidenceLimit;
 
   return await Promise.all(
-    items.map(async (item) => {
+    filteredItems.map(async (item) => {
       if (item.evidence !== undefined) {
         return item;
       }
@@ -1623,6 +1778,86 @@ async function hydrateRelatedItemsEvidence(
   );
 }
 
+async function filterAndSortRelatedItemsByQuery(
+  document: ReadonlyDocument,
+  items: readonly ArchiveListItem[],
+  queryText: string | undefined,
+): Promise<readonly ArchiveListItem[]> {
+  const query =
+    queryText === undefined ? undefined : createLexicalQuery(queryText);
+
+  if (query === undefined) {
+    return items;
+  }
+  const context = createEvidenceReadContext();
+
+  const matched = await Promise.all(
+    items.map(async (item) => {
+      const match = scoreLexicalText(
+        await createRelatedItemSearchText(document, item, context),
+        query,
+      );
+
+      return match === undefined ? undefined : { item, match };
+    }),
+  );
+
+  return matched
+    .filter(isDefined)
+    .sort((left, right) => {
+      const scoreComparison = right.match.score - left.match.score;
+
+      if (scoreComparison !== 0) {
+        return scoreComparison;
+      }
+
+      return compareListHits(
+        createFindHitFromListItem(left.item),
+        createFindHitFromListItem(right.item),
+        "doc-asc",
+      );
+    })
+    .map(({ item, match }) => ({ ...item, score: match.score }));
+}
+
+async function createRelatedItemSearchText(
+  document: ReadonlyDocument,
+  item: ArchiveListItem,
+  context: EvidenceReadContext,
+): Promise<string> {
+  if (item.type !== "triple") {
+    return `${item.label}\n${item.summary}`;
+  }
+
+  return [
+    item.label,
+    item.summary,
+    item.subjectLabel,
+    item.subjectQid,
+    item.predicate,
+    item.objectLabel,
+    item.objectQid,
+    ...(item.evidenceLinks ?? []).map((link) => link.note ?? ""),
+    ...(await readMentionLinkEvidenceTexts(
+      document,
+      item.evidenceLinks ?? [],
+      context,
+    )),
+  ].join("\n");
+}
+
+async function readMentionLinkEvidenceTexts(
+  document: ReadonlyDocument,
+  links: readonly MentionLinkRecord[],
+  context: EvidenceReadContext,
+): Promise<readonly string[]> {
+  return await Promise.all(
+    createMentionLinkEvidenceRanges(document, links).map(
+      async (range) => await readEvidenceRangeText(document, range, context),
+    ),
+  );
+}
+
 export async function listArchiveEvidence(
   document: ReadonlyDocument,
   uri: string,
@@ -1634,6 +1869,7 @@ export async function listArchiveEvidence(
     case "chapter":
     case "chapter-state":
     case "chapter-tree":
+    case "entity-wikipage":
     case "meta":
     case "state":
     case "text-stream":
@@ -1715,6 +1951,7 @@ function validatePackReference(id: string): void {
     case "chapter":
     case "chapter-state":
     case "chapter-tree":
+    case "entity-wikipage":
     case "meta":
     case "state":
     case "text-stream":
@@ -2194,6 +2431,62 @@ async function hydrateFindHitEvidence(
   );
 }
 
+async function hydrateFindResultBacklinks(
+  document: ReadonlyDocument,
+  result: ArchiveFindResult,
+  options: Pick<ArchiveFindOptions, "backlinks">,
+): Promise<ArchiveFindResult> {
+  return {
+    ...result,
+    items: await hydrateFindHitBacklinks(document, result.items, options),
+  };
+}
+
+async function hydrateFindHitBacklinks(
+  document: ReadonlyDocument,
+  hits: readonly ArchiveFindHit[],
+  options:
+    | Pick<ArchiveFindOptions, "backlinks">
+    | Pick<ArchiveCollectionOptions, "backlinks">,
+): Promise<readonly ArchiveFindHit[]> {
+  if (options.backlinks !== true) {
+    return hits;
+  }
+
+  return await Promise.all(
+    hits.map(async (hit) => {
+      const reference = parseSourceBacklinkReference(hit.id);
+
+      if (reference === undefined) {
+        return hit;
+      }
+
+      return {
+        ...hit,
+        backlinks: await createTextStreamBacklinks(document, reference),
+      };
+    }),
+  );
+}
+
+function parseSourceBacklinkReference(
+  uri: string,
+): Extract<WikiGraphReference, { readonly type: "text-stream" }> | undefined {
+  if (!uri.startsWith("wkg://")) {
+    return undefined;
+  }
+
+  try {
+    const reference = parseWikiGraphReference(uri);
+
+    return reference.type === "text-stream" && reference.stream === "source"
+      ? reference
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function createFindEvidenceHydrationOptions(
   options: ArchiveFindOptions,
   sessionId?: string,
@@ -2207,6 +2500,207 @@ function createFindEvidenceHydrationOptions(
       : { evidenceLimit: options.evidenceLimit }),
     ...(sessionId === undefined ? {} : { sessionId }),
   };
+}
+
+async function createTextStreamBacklinks(
+  document: ReadonlyDocument,
+  reference: Extract<WikiGraphReference, { readonly type: "text-stream" }>,
+): Promise<ArchiveBacklinks> {
+  if (reference.stream !== "source") {
+    return createEmptyBacklinks();
+  }
+
+  const sentenceKeys = await createTextStreamRangeSentenceKeySet(
+    document,
+    reference,
+  );
+  const [chunks, mentions, links] = await Promise.all([
+    createChunkBacklinkHits(document, sentenceKeys),
+    createEntityBacklinkHits(document, sentenceKeys),
+    createTripleBacklinkHits(document, reference.chapterId, sentenceKeys),
+  ]);
+
+  return {
+    chunks: createBacklinkBucket(chunks),
+    entities: createBacklinkBucket(mentions),
+    triples: createBacklinkBucket(links),
+  };
+}
+
+function createEmptyBacklinks(): ArchiveBacklinks {
+  return {
+    chunks: createBacklinkBucket([]),
+    entities: createBacklinkBucket([]),
+    triples: createBacklinkBucket([]),
+  };
+}
+
+function createBacklinkBucket(
+  hits: readonly ArchiveFindHit[],
+): ArchiveBacklinkBucket {
+  const sorted = [...hits].sort((left, right) =>
+    compareListHits(left, right, "doc-asc"),
+  );
+
+  return {
+    items: sorted,
+    limit: sorted.length,
+    nextCursor: null,
+  };
+}
+
+async function createTextStreamRangeSentenceKeySet(
+  document: ReadonlyDocument,
+  reference: Extract<WikiGraphReference, { readonly type: "text-stream" }>,
+): Promise<ReadonlySet<string>> {
+  const index = await createTextStreamIndex(
+    document,
+    reference.chapterId,
+    reference.stream,
+  );
+  const lastSentenceIndex = Math.max(0, index.sentences.length - 1);
+  const start = clampInteger(
+    reference.startSentenceIndex,
+    0,
+    lastSentenceIndex,
+  );
+  const end = clampInteger(
+    reference.endSentenceIndex,
+    start,
+    lastSentenceIndex,
+  );
+  const keys = new Set<string>();
+
+  for (const sentence of index.sentences.slice(start, end + 1)) {
+    keys.add(
+      formatSentenceKey(
+        reference.chapterId,
+        sentence.fragmentId,
+        sentence.localIndex,
+      ),
+    );
+  }
+
+  return keys;
+}
+
+async function createChunkBacklinkHits(
+  document: ReadonlyDocument,
+  sentenceKeys: ReadonlySet<string>,
+): Promise<readonly ArchiveFindHit[]> {
+  return (await document.chunks.listAll())
+    .filter((chunk) =>
+      chunk.sentenceIds.some((sentenceId) =>
+        sentenceKeys.has(formatSentenceIdKey(sentenceId)),
+      ),
+    )
+    .map((chunk) => {
+      const position = createNodePosition(chunk.sentenceIds);
+
+      return {
+        chapter: chunk.sentenceId[0],
+        field: "content" as const,
+        id: formatNodeId(chunk.id),
+        ...(position === undefined ? {} : { position }),
+        snippet: createSnippet(chunk.content),
+        title: chunk.label,
+        type: "node" as const,
+      };
+    });
+}
+
+async function createEntityBacklinkHits(
+  document: ReadonlyDocument,
+  sentenceKeys: ReadonlySet<string>,
+): Promise<readonly ArchiveFindHit[]> {
+  return listEntityCollection(
+    (await listAllMentions(document)).filter((mention) =>
+      sentenceKeys.has(
+        formatSentenceKey(
+          mention.chapterId,
+          mention.fragmentId,
+          mention.sentenceIndex ?? 0,
+        ),
+      ),
+    ),
+  );
+}
+
+async function createTripleBacklinkHits(
+  document: ReadonlyDocument,
+  chapterId: number,
+  sentenceKeys: ReadonlySet<string>,
+): Promise<readonly ArchiveFindHit[]> {
+  const hitsById = new Map<string, ArchiveFindHit>();
+
+  for (const link of await document.mentionLinks.listByChapter(chapterId)) {
+    const evidenceSentenceIds = link.evidenceSentenceIds.filter((sentenceId) =>
+      sentenceKeys.has(formatSentenceIdKey(sentenceId)),
+    );
+
+    if (evidenceSentenceIds.length === 0) {
+      continue;
+    }
+
+    const [source, target] = await Promise.all([
+      document.mentions.getById(link.sourceMentionId),
+      document.mentions.getById(link.targetMentionId),
+    ]);
+
+    if (source === undefined || target === undefined) {
+      continue;
+    }
+
+    const id = formatTripleUri(source.qid, link.predicate, target.qid);
+    const existing = hitsById.get(id);
+    const evidenceLink = { ...link, evidenceSentenceIds };
+
+    if (existing !== undefined) {
+      hitsById.set(id, {
+        ...existing,
+        evidenceLinks: [...(existing.evidenceLinks ?? []), evidenceLink],
+        score: (existing.evidenceLinks?.length ?? 0) + 1,
+      });
+      continue;
+    }
+
+    hitsById.set(id, {
+      chapter: source.chapterId,
+      evidenceLinks: [evidenceLink],
+      field: "title",
+      id,
+      position: createSentencePosition(
+        [...evidenceSentenceIds].sort(compareSentenceIds)[0] ?? [
+          source.chapterId,
+          source.fragmentId,
+          source.sentenceIndex ?? 0,
+        ],
+      ),
+      score: 1,
+      snippet: `${source.surface} ${link.predicate} ${target.surface}`,
+      title: `${source.qid} ${link.predicate} ${target.qid}`,
+      triple: {
+        objectLabel: target.surface,
+        predicate: link.predicate,
+        subjectLabel: source.surface,
+      },
+      type: "triple",
+    });
+  }
+
+  return [...hitsById.values()];
+}
+
+function formatSentenceIdKey(sentenceId: SentenceId): string {
+  return formatSentenceKey(sentenceId[0], sentenceId[1], sentenceId[2]);
+}
+
+function formatSentenceKey(
+  chapterId: number,
+  fragmentId: number,
+  sentenceIndex: number,
+): string {
+  return `${chapterId}:${fragmentId}:${sentenceIndex}`;
 }
 
 function createUnscoredEntityEvidenceMention(
@@ -3302,8 +3796,13 @@ async function createSourceEvidencePage(
   const context = createEvidenceReadContext();
   const limit = options.limit ?? DEFAULT_FIND_LIMIT;
   const start = decodeFindCursor(options.cursor);
-  const mergedRanges = mergeSourceEvidenceRanges(ranges);
-  const pageRanges = mergedRanges.slice(start, start + limit);
+  const evidenceRanges = await filterAndSortSourceEvidenceRangesByQuery(
+    document,
+    ranges,
+    options.query,
+    context,
+  );
+  const pageRanges = evidenceRanges.slice(start, start + limit);
   const nextOffset = start + pageRanges.length;
   const items = await Promise.all(
     pageRanges.map(
@@ -3315,6 +3814,7 @@ async function createSourceEvidencePage(
           range.endSentenceIndex,
           range.fragmentId,
           context,
+          range.score,
         ),
     ),
   );
@@ -3323,8 +3823,134 @@ async function createSourceEvidencePage(
     items,
     limit,
     nextCursor:
-      nextOffset < mergedRanges.length ? encodeFindCursor(nextOffset) : null,
+      nextOffset < evidenceRanges.length ? encodeFindCursor(nextOffset) : null,
   };
+}
+
+async function filterAndSortSourceEvidenceRangesByQuery(
+  document: ReadonlyDocument,
+  ranges: readonly {
+    readonly chapterId: number;
+    readonly endSentenceIndex: number;
+    readonly fragmentId: number;
+    readonly startSentenceIndex: number;
+  }[],
+  queryText: string | undefined,
+  context: EvidenceReadContext,
+): Promise<
+  readonly {
+    readonly chapterId: number;
+    readonly endSentenceIndex: number;
+    readonly fragmentId: number;
+    readonly score?: number;
+    readonly startSentenceIndex: number;
+  }[]
+> {
+  const query =
+    queryText === undefined ? undefined : createLexicalQuery(queryText);
+
+  if (query === undefined) {
+    return mergeSourceEvidenceRanges(ranges);
+  }
+
+  const scored = await Promise.all(
+    ranges.map(async (range) => {
+      const text = await readEvidenceRangeText(document, range, context);
+      const match = scoreLexicalText(text, query);
+
+      return match === undefined
+        ? undefined
+        : { match, range: { ...range, score: match.score } };
+    }),
+  );
+
+  return scored
+    .filter(isDefined)
+    .filter(
+      ({ range }, index, values) =>
+        values.findIndex((item) =>
+          areSourceEvidenceRangesEqual(item.range, range),
+        ) === index,
+    )
+    .sort((left, right) => {
+      const scoreComparison = right.match.score - left.match.score;
+
+      if (scoreComparison !== 0) {
+        return scoreComparison;
+      }
+
+      return compareSourceEvidenceRanges(left.range, right.range);
+    })
+    .map(({ range }) => range);
+}
+
+function areSourceEvidenceRangesEqual(
+  left: {
+    readonly chapterId: number;
+    readonly endSentenceIndex: number;
+    readonly fragmentId: number;
+    readonly score?: number;
+    readonly startSentenceIndex: number;
+  },
+  right: {
+    readonly chapterId: number;
+    readonly endSentenceIndex: number;
+    readonly fragmentId: number;
+    readonly score?: number;
+    readonly startSentenceIndex: number;
+  },
+): boolean {
+  return (
+    left.chapterId === right.chapterId &&
+    left.fragmentId === right.fragmentId &&
+    left.startSentenceIndex === right.startSentenceIndex &&
+    left.endSentenceIndex === right.endSentenceIndex
+  );
+}
+
+async function readEvidenceRangeText(
+  document: ReadonlyDocument,
+  range: {
+    readonly chapterId: number;
+    readonly endSentenceIndex: number;
+    readonly fragmentId: number;
+    readonly startSentenceIndex: number;
+  },
+  context: EvidenceReadContext,
+): Promise<string> {
+  const fragment = await getEvidenceFragment(
+    document,
+    range.chapterId,
+    range.fragmentId,
+    context,
+  );
+
+  return fragment.sentences
+    .slice(range.startSentenceIndex, range.endSentenceIndex + 1)
+    .map((sentence) => sentence.text)
+    .join("\n");
+}
+
+function compareSourceEvidenceRanges(
+  left: {
+    readonly chapterId: number;
+    readonly endSentenceIndex: number;
+    readonly fragmentId: number;
+    readonly startSentenceIndex: number;
+  },
+  right: {
+    readonly chapterId: number;
+    readonly endSentenceIndex: number;
+    readonly fragmentId: number;
+    readonly startSentenceIndex: number;
+  },
+): number {
+  return (
+    compareNumbers(left.chapterId, right.chapterId) ||
+    compareNumbers(left.fragmentId, right.fragmentId) ||
+    compareNumbers(left.startSentenceIndex, right.startSentenceIndex) ||
+    compareNumbers(left.endSentenceIndex, right.endSentenceIndex)
+  );
 }
 
 async function createSourceEvidencePreview(
@@ -3411,6 +4037,7 @@ async function createSourceEvidenceItem(
   endSentenceIndex: number,
   fragmentId?: number,
   context: EvidenceReadContext = createEvidenceReadContext(),
+  score?: number,
 ): Promise<ArchiveEvidenceItem> {
   const chapter = await getEvidenceChapter(document, chapterId, context);
   const resolvedFragmentId =
@@ -3453,6 +4080,7 @@ async function createSourceEvidenceItem(
       streamRange.startSentenceIndex,
       streamRange.endSentenceIndex,
     ),
+    ...(score === undefined ? {} : { score }),
     source,
     startSentenceIndex: streamRange.startSentenceIndex,
     title: chapter.title ?? `[chapter ${chapterId}]`,
@@ -3656,6 +4284,10 @@ type WikiGraphReference =
       readonly type: "entity";
     }
   | {
+      readonly qid: string;
+      readonly type: "entity-wikipage";
+    }
+  | {
       readonly chapterId?: number;
       readonly objectQid: string;
       readonly predicate: string;
@@ -3798,6 +4430,12 @@ function parseWikiGraphReference(uri: string): WikiGraphReference {
         return {
           qid: parseQid(pathParts[1], uri),
           type: "entity",
+        };
+      }
+      if (pathParts.length === 3 && pathParts[2] === "wikipage") {
+        return {
+          qid: parseQid(pathParts[1], uri),
+          type: "entity-wikipage",
         };
       }
       break;
@@ -4100,6 +4738,7 @@ function createRankedFindResult(
     .filter((hit) => matchesFindId(hit, ids))
     .filter((hit) => matchesFindChapter(hit, chapters))
     .filter((hit) => matchesFindType(hit, types))
+    .filter((hit) => matchesTriplePattern(hit, options.triplePattern))
     .sort((left, right) => compareSearchHits(left, right, order));
 
   return {
@@ -4176,6 +4815,7 @@ function createCollectionResult(
     .filter((hit) => matchesFindId(hit, ids))
     .filter((hit) => matchesFindChapter(hit, chapters))
     .filter((hit) => matchesCollectionType(hit, types))
+    .filter((hit) => matchesTriplePattern(hit, options.triplePattern))
     .sort((left, right) => compareListHits(left, right, order));
   const items = filtered.slice(start, start + limit);
   const nextOffset = start + items.length;
@@ -4228,6 +4868,54 @@ function matchesCollectionType(
   return (
     types === null || (isCollectionType(hit.type) && types.includes(hit.type))
   );
+}
+
+function matchesTriplePattern(
+  hit: ArchiveFindHit,
+  pattern: ArchiveTriplePattern | undefined,
+): boolean {
+  if (pattern === undefined || hit.type !== "triple") {
+    return true;
+  }
+
+  const triple = parseTripleHitUri(hit.id);
+
+  if (triple === undefined) {
+    return false;
+  }
+
+  return (
+    (pattern.subjectQid === undefined ||
+      pattern.subjectQid === triple.subjectQid) &&
+    (pattern.predicate === undefined ||
+      pattern.predicate === triple.predicate) &&
+    (pattern.objectQid === undefined || pattern.objectQid === triple.objectQid)
+  );
+}
+
+function parseTripleHitUri(uri: string):
+  | {
+      readonly objectQid: string;
+      readonly predicate: string;
+      readonly subjectQid: string;
+    }
+  | undefined {
+  const match =
+    /^wkg:\/\/triple\/(Q[1-9][0-9]*)\/([^/]+)\/(Q[1-9][0-9]*)$/u.exec(uri);
+
+  if (
+    match?.[1] === undefined ||
+    match[2] === undefined ||
+    match[3] === undefined
+  ) {
+    return undefined;
+  }
+
+  return {
+    objectQid: match[3],
+    predicate: decodeURIComponent(match[2]),
+    subjectQid: match[1],
+  };
 }
 
 function compareSearchHits(

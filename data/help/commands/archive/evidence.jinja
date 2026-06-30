@@ -11,13 +11,14 @@ Use when:
   - You need support before quoting, verifying, or answering from a claim.
 
 Usage:
-  wikigraph <object-uri> evidence [--limit <n>] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <object-uri> evidence [query] [--limit <n>] [--cursor <token>] [--json|--jsonl] [--help|-h]
 
 Returns:
   - Evidence items anchored to source text.
 
 Notes:
   - `evidence` is for verification, not broad context assembly.
+  - Optional `query` filters and re-sorts only the evidence items that would otherwise be returned.
   - Use `wikigraph next <cursor>` for any returned `nextCursor`.
   - Source, chapter, and chapter-tree objects are evidence endpoints or structure objects; `evidence` is not available for them.
   - Use `pack` when the goal is bounded context around a selected object.
@@ -28,4 +29,5 @@ Next steps:
 
 Examples:
   wikigraph wkg:///books/book.sdpub/entity/Q162593 evidence
+  wikigraph wkg:///books/book.sdpub/entity/Q162593 evidence "baptism"
   wikigraph wkg:///books/book.sdpub/chapter/3/triple/Q162593/discusses/Q9476 evidence

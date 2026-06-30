@@ -158,6 +158,57 @@ describe("wikipage/resolver", () => {
       }
     });
   });
+
+  it("keeps qid cache entries isolated by language", async () => {
+    await withTempDir("spinedigest-wikipage-", async (path) => {
+      const calls: string[] = [];
+      const fetch = createMockFetch(calls);
+      const cacheDatabasePath = `${path}/cache.sqlite`;
+      const enResolver = await WikipageResolver.open({
+        cacheDatabasePath,
+        fetch,
+        language: "en",
+        minRequestIntervalMs: 0,
+        retryBaseDelayMs: 0,
+      });
+
+      try {
+        await expect(enResolver.resolveQids(["Q1"])).resolves.toMatchObject([
+          {
+            description: "totality of space and time",
+            label: "Universe",
+            qid: "Q1",
+          },
+        ]);
+      } finally {
+        await enResolver.close();
+      }
+
+      const zhResolver = await WikipageResolver.open({
+        cacheDatabasePath,
+        fetch,
+        language: "zh",
+        minRequestIntervalMs: 0,
+        retryBaseDelayMs: 0,
+      });
+
+      try {
+        await expect(zhResolver.resolveQids(["Q1"])).resolves.toMatchObject([
+          {
+            description: "宇宙的全部时空",
+            label: "宇宙",
+            qid: "Q1",
+          },
+        ]);
+      } finally {
+        await zhResolver.close();
+      }
+
+      expect(
+        calls.filter((call) => call.includes("wbgetentities")),
+      ).toHaveLength(2);
+    });
+  });
 });
 
 function createMockFetch(calls: string[]): typeof fetch {
@@ -167,10 +218,13 @@ function createMockFetch(calls: string[]): typeof fetch {
 
     if (url.hostname === "www.wikidata.org") {
       const ids = url.searchParams.get("ids")?.split("|") ?? [];
+      const languages = url.searchParams.get("languages")?.split("|") ?? ["en"];
 
       return Promise.resolve(
         jsonResponse({
-          entities: Object.fromEntries(ids.map((qid) => [qid, entity(qid)])),
+          entities: Object.fromEntries(
+            ids.map((qid) => [qid, entity(qid, languages)]),
+          ),
         }),
       );
     }
@@ -208,40 +262,72 @@ function createMockFetch(calls: string[]): typeof fetch {
   }) as typeof fetch;
 }
 
-function entity(qid: string): Record<string, unknown> {
-  const data: Record<string, Record<string, string | undefined>> = {
+function entity(
+  qid: string,
+  languages: readonly string[],
+): Record<string, unknown> {
+  const data: Record<
+    string,
+    Record<string, Record<string, string | undefined>>
+  > = {
     Q1: {
-      description: "totality of space and time",
-      label: "Universe",
-      title: "Universe",
+      en: {
+        description: "totality of space and time",
+        label: "Universe",
+        title: "Universe",
+      },
+      zh: {
+        description: "宇宙的全部时空",
+        label: "宇宙",
+        title: "宇宙",
+      },
     },
     Q308: {
-      description: "first planet from the Sun",
-      label: "Mercury",
-      title: "Mercury (planet)",
+      en: {
+        description: "first planet from the Sun",
+        label: "Mercury",
+        title: "Mercury (planet)",
+      },
     },
     Q925: {
-      description: "chemical element",
-      label: "Mercury",
-      title: "Mercury (element)",
+      en: {
+        description: "chemical element",
+        label: "Mercury",
+        title: "Mercury (element)",
+      },
     },
     Q48397: {
-      description: "Wikimedia disambiguation page",
-      label: "Mercury",
-      title: "Mercury",
+      en: {
+        description: "Wikimedia disambiguation page",
+        label: "Mercury",
+        title: "Mercury",
+      },
     },
   };
   const item = data[qid] ?? {};
 
   return {
-    descriptions: {
-      en: { value: item.description },
-    },
-    labels: {
-      en: { value: item.label },
-    },
+    descriptions: Object.fromEntries(
+      languages.flatMap((language) =>
+        item[language]?.description === undefined
+          ? []
+          : [[language, { value: item[language].description }]],
+      ),
+    ),
+    labels: Object.fromEntries(
+      languages.flatMap((language) =>
+        item[language]?.label === undefined
+          ? []
+          : [[language, { value: item[language].label }]],
+      ),
+    ),
     sitelinks: {
-      enwiki: { title: item.title },
+      ...(item.en?.title === undefined
+        ? {}
+        : { enwiki: { title: item.en.title } }),
+      ...(item.zh?.title === undefined
+        ? {}
+        : { zhwiki: { title: item.zh.title } }),
     },
   };
 }

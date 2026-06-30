@@ -118,6 +118,8 @@ export {
 } from "./graph.js";
 export type {
   ArchiveEstimate,
+  ArchiveBacklinkBucket,
+  ArchiveBacklinks,
   ArchiveEvidence,
   ArchiveEvidenceItem,
   ArchiveFindEvidencePreview,
@@ -140,6 +142,7 @@ export type {
   ArchiveObjectType,
   ArchivePack,
   ArchivePage,
+  ArchiveTriplePattern,
 } from "./archive-view.js";
 export type {
   AddChapterOptions,

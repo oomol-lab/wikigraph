@@ -11,14 +11,15 @@ Use when:
   - You have a selected entity and need Knowledge Graph triples involving it.
 
 Usage:
-  wikigraph <chunk-uri> related [--evidence [n]] [--json|--jsonl] [--help|-h]
-  wikigraph <entity-uri> related [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl] [--help|-h]
+  wikigraph <chunk-uri> related [query] [--evidence [n]] [--json|--jsonl] [--help|-h]
+  wikigraph <entity-uri> related [query] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl] [--help|-h]
 
 Returns:
   - Related full `wkg://...` URIs with labels or summaries.
 
 Notes:
   - `related` starts from a known URI; `search` starts from query text.
+  - Optional `query` filters and re-sorts only the related objects that would otherwise be returned.
   - `--role` only applies to entity URIs. Default is `any`.
   - Add `--evidence` or `--evidence <n>` to include source evidence previews where available.
   - Returned URIs can be inspected or verified with other object commands.
@@ -31,4 +32,5 @@ Next steps:
 
 Examples:
   wikigraph wkg:///books/book.sdpub/chunk/123 related
+  wikigraph wkg:///books/book.sdpub/entity/Q162593 related "baptism"
   wikigraph wkg:///books/book.sdpub/entity/Q162593 related --role subject --evidence

@@ -13,6 +13,8 @@ import {
   createContinuationCursor,
   readContinuationCursor,
   type ArchiveEstimate,
+  type ArchiveBacklinkBucket,
+  type ArchiveBacklinks,
   type ArchiveEvidence,
   type ArchiveEvidenceItem,
   type ArchiveFindEvidencePreview,
@@ -56,18 +58,32 @@ const PLAIN_OBJECT_KEY_PRIORITY = [
 
 interface ArchiveOutputObject {
   readonly authors?: readonly string[];
+  readonly backlinks?: ArchiveOutputBacklinks;
   readonly description?: string;
   readonly evidence?: ArchiveOutputEvidencePreview;
   readonly label?: string;
   readonly objectLabel?: string;
   readonly predicate?: string;
   readonly publisher?: string;
+  readonly score?: number;
   readonly stage?: string;
   readonly subjectLabel?: string;
   readonly text?: string;
   readonly title?: string;
   readonly type?: string;
   readonly uri: string;
+}
+
+interface ArchiveOutputBacklinks {
+  readonly chunks: ArchiveOutputResultPage;
+  readonly entities: ArchiveOutputResultPage;
+  readonly triples: ArchiveOutputResultPage;
+}
+
+interface ArchiveOutputResultPage {
+  readonly limit: number;
+  readonly nextCursor: string | null;
+  readonly objects: readonly ArchiveOutputObject[];
 }
 
 interface ArchiveOutputEvidencePreview {
@@ -78,6 +94,7 @@ interface ArchiveOutputEvidencePreview {
 }
 
 interface ArchiveOutputSource {
+  readonly score?: number;
   readonly text: string;
   readonly uri: string;
 }
@@ -85,6 +102,7 @@ interface ArchiveOutputSource {
 interface ArchiveOutputContext {
   readonly archiveKey: string;
   readonly archivePath: string;
+  readonly backlinks?: boolean;
   readonly chapters?: readonly number[];
   readonly continuationKind?: "collection" | "evidence" | "search";
   readonly evidenceLimit?: number;
@@ -92,7 +110,9 @@ interface ArchiveOutputContext {
   readonly ids?: readonly string[];
   readonly limit: number;
   readonly order?: ArchiveCollectionResult["order"];
+  readonly query?: string;
   readonly targetUri?: string;
+  readonly triplePattern?: CLIArchiveArguments["triplePattern"];
   readonly types: readonly string[] | null;
 }
 
@@ -177,6 +197,9 @@ export async function runArchiveCommand(
 
           await writePage(
             await readArchivePage(document, objectUri, {
+              ...(args.backlinks === undefined
+                ? {}
+                : { backlinks: args.backlinks }),
               ...(evidenceLimit === undefined ? {} : { evidenceLimit }),
             }),
             outputContext,
@@ -195,6 +218,7 @@ export async function runArchiveCommand(
               getObjectUri(args.objectId!),
               {
                 ...createOptionalEvidenceLimit(args),
+                ...(args.query === undefined ? {} : { query: args.query }),
                 ...(args.role === undefined ? {} : { role: args.role }),
               },
             ),
@@ -212,6 +236,7 @@ export async function runArchiveCommand(
             await listArchiveEvidence(document, getObjectUri(args.objectId!), {
               ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
               ...(args.limit === undefined ? {} : { limit: args.limit }),
+              ...(args.query === undefined ? {} : { query: args.query }),
             }),
             createArchiveOutputContext(args, {
               continuationKind: "evidence",
@@ -327,6 +352,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
     switch (cursor.kind) {
       case "collection": {
         const collectionOptions: ArchiveCollectionOptions = {
+          ...(cursor.backlinks === undefined
+            ? {}
+            : { backlinks: cursor.backlinks }),
           ...(cursor.chapters === null ? {} : { chapters: cursor.chapters }),
           cursor: cursor.cursor,
           ...(cursor.evidenceLimit === undefined
@@ -335,6 +363,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
           ...(cursor.ids === null ? {} : { ids: cursor.ids }),
           limit,
           order: cursor.order,
+          ...(cursor.triplePattern === undefined
+            ? {}
+            : { triplePattern: cursor.triplePattern }),
         };
 
         if (cursor.types !== null) {
@@ -350,6 +381,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
           {
             archiveKey: cursor.archiveKey,
             archivePath: cursor.archivePath,
+            ...(cursor.backlinks === undefined
+              ? {}
+              : { backlinks: cursor.backlinks }),
             ...(cursor.chapters === null ? {} : { chapters: cursor.chapters }),
             continuationKind: "collection",
             ...(cursor.evidenceLimit === undefined
@@ -359,6 +393,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
             ...(cursor.ids === null ? {} : { ids: cursor.ids }),
             limit,
             order: cursor.order,
+            ...(cursor.triplePattern === undefined
+              ? {}
+              : { triplePattern: cursor.triplePattern }),
             types: cursor.types,
           },
           format,
@@ -368,11 +405,17 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
       case "search": {
         const findOptions: ArchiveFindOptions = {
           archiveKey: cursor.archiveKey,
+          ...(cursor.backlinks === undefined
+            ? {}
+            : { backlinks: cursor.backlinks }),
           cursor: cursor.cursor,
           ...(cursor.evidenceLimit === undefined
             ? {}
             : { evidenceLimit: cursor.evidenceLimit }),
           limit,
+          ...(cursor.triplePattern === undefined
+            ? {}
+            : { triplePattern: cursor.triplePattern }),
         };
 
         if (cursor.types !== null) {
@@ -386,11 +429,17 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
           {
             archiveKey: cursor.archiveKey,
             archivePath: cursor.archivePath,
+            ...(cursor.backlinks === undefined
+              ? {}
+              : { backlinks: cursor.backlinks }),
             ...(cursor.evidenceLimit === undefined
               ? {}
               : { evidenceLimit: cursor.evidenceLimit }),
             format,
             limit,
+            ...(cursor.triplePattern === undefined
+              ? {}
+              : { triplePattern: cursor.triplePattern }),
             types: cursor.types,
           },
           format,
@@ -402,6 +451,7 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
           await listArchiveEvidence(document, cursor.targetUri, {
             cursor: cursor.cursor,
             limit,
+            ...(cursor.query === undefined ? {} : { query: cursor.query }),
           }),
           {
             archiveKey: cursor.archiveKey,
@@ -409,6 +459,7 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
             continuationKind: "evidence",
             format,
             limit,
+            ...(cursor.query === undefined ? {} : { query: cursor.query }),
             targetUri: cursor.targetUri,
             types: null,
           },
@@ -468,10 +519,14 @@ function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
 
   return {
     archiveKey: getArchivePath(args.archivePath),
+    ...(args.backlinks === undefined ? {} : { backlinks: args.backlinks }),
     ...createScopeOptions(args.archivePath),
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
     ...createOptionalEvidenceLimit(args),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
+    ...(args.triplePattern === undefined
+      ? {}
+      : { triplePattern: args.triplePattern }),
     ...(types === undefined ? {} : { types }),
   };
 }
@@ -486,15 +541,22 @@ function createArchiveOutputContext(
   return {
     archiveKey: getArchivePath(args.archivePath),
     archivePath: getArchivePath(args.archivePath),
+    ...(args.backlinks === undefined ? {} : { backlinks: args.backlinks }),
     ...(options.continuationKind === undefined
       ? {}
       : { continuationKind: options.continuationKind }),
     ...createOptionalEvidenceLimit(args),
     format: args.format ?? "text",
     limit: args.limit ?? DEFAULT_OUTPUT_LIMIT,
+    ...(args.action !== "evidence" || args.query === undefined
+      ? {}
+      : { query: args.query }),
     ...(options.continuationKind === "collection"
       ? createScopeOptions(args.archivePath)
       : {}),
+    ...(args.triplePattern === undefined
+      ? {}
+      : { triplePattern: args.triplePattern }),
     ...(options.targetUri === undefined
       ? {}
       : { targetUri: options.targetUri }),
@@ -570,6 +632,7 @@ async function createOutputContinuationCursor(
       cursor,
       format: context.format,
       kind: "evidence",
+      ...(context.query === undefined ? {} : { query: context.query }),
       targetUri: context.targetUri,
     };
   } else if (context.continuationKind === "collection") {
@@ -578,6 +641,9 @@ async function createOutputContinuationCursor(
       archivePath: context.archivePath,
       chapters: context.chapters ?? null,
       cursor,
+      ...(context.backlinks === undefined
+        ? {}
+        : { backlinks: context.backlinks }),
       ...(context.evidenceLimit === undefined
         ? {}
         : { evidenceLimit: context.evidenceLimit }),
@@ -585,6 +651,9 @@ async function createOutputContinuationCursor(
       ids: context.ids ?? null,
       kind: "collection",
       order: context.order ?? "doc-asc",
+      ...(context.triplePattern === undefined
+        ? {}
+        : { triplePattern: context.triplePattern }),
       types: context.types,
     };
   } else {
@@ -592,11 +661,17 @@ async function createOutputContinuationCursor(
       archiveKey: context.archiveKey,
       archivePath: context.archivePath,
       cursor,
+      ...(context.backlinks === undefined
+        ? {}
+        : { backlinks: context.backlinks }),
       ...(context.evidenceLimit === undefined
         ? {}
         : { evidenceLimit: context.evidenceLimit }),
       format: context.format,
       kind: "search",
+      ...(context.triplePattern === undefined
+        ? {}
+        : { triplePattern: context.triplePattern }),
       types: context.types,
     };
   }
@@ -618,10 +693,14 @@ function createCollectionOptions(
   });
 
   return {
+    ...(args.backlinks === undefined ? {} : { backlinks: args.backlinks }),
     ...createScopeOptions(args.archivePath),
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
     ...createOptionalEvidenceLimit(args),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
+    ...(args.triplePattern === undefined
+      ? {}
+      : { triplePattern: args.triplePattern }),
     ...(types === undefined ? {} : { types }),
   };
 }
@@ -750,6 +829,7 @@ async function createListObject(
           }),
       objectLabel: item.objectLabel,
       predicate: item.predicate,
+      ...(item.score === undefined ? {} : { score: item.score }),
       subjectLabel: item.subjectLabel,
       uri: toWikiGraphUri(item.id),
     };
@@ -766,8 +846,10 @@ async function createListObject(
           }),
         }),
     label: item.label,
-    ...(isTextStreamOutputType(item.type) ? { text: item.summary } : {}),
-    type: item.type,
+    ...(item.score === undefined ? {} : { score: item.score }),
+    ...(isTextStreamOutputType(item.type)
+      ? { text: item.summary }
+      : { type: item.type }),
     uri: toWikiGraphUri(item.id),
   };
 }
@@ -832,6 +914,11 @@ function coalesceTextStreamObjects(
   const coalesced: ArchiveOutputObject[] = [];
 
   for (const object of objects) {
+    if (object.backlinks !== undefined) {
+      coalesced.push(object);
+      continue;
+    }
+
     const previous = coalesced.at(-1);
     const previousRange =
       previous === undefined ? undefined : parseTextStreamObjectRange(previous);
@@ -964,7 +1051,10 @@ function createPageCursorObject(nextCursor: string | null): {
 }
 
 function formatEvidenceItem(item: ArchiveEvidenceItem): string {
-  return formatSourceCitationBlock(item.id, item.source);
+  return formatScoredLines(
+    item.score,
+    formatSourceCitationBlock(item.id, item.source).split("\n"),
+  ).join("\n");
 }
 
 async function writePage(
@@ -1006,10 +1096,9 @@ async function writePage(
       }
       if (page.id.startsWith("wkg://chapter/")) {
         await writeTextToStdout(
-          `${formatSourceObject({
-            text: page.fragment.text,
-            uri: page.id,
-          })}\n`,
+          `${formatFindObject(
+            (await createPageObject(page, context)) as ArchiveOutputObject,
+          )}\n`,
         );
         return;
       }
@@ -1061,6 +1150,9 @@ async function writePage(
         )}\n`,
       );
       return;
+    case "entity-wikipage":
+      await writeTextToStdout(`${formatEntityWikipageText(page)}\n`);
+      return;
     case "triple":
       await writeTextToStdout(
         `${await formatEvidenceBackedPageText(
@@ -1099,6 +1191,34 @@ async function formatEvidenceBackedPageText(
   ].join("\n");
 }
 
+function formatEntityWikipageText(
+  page: Extract<ArchivePage, { readonly type: "entity-wikipage" }>,
+): string {
+  return [
+    page.id,
+    "",
+    ...formatEntityWikipageLocaleLines("zh", page.zh),
+    "",
+    ...formatEntityWikipageLocaleLines("en", page.en),
+  ].join("\n");
+}
+
+function formatEntityWikipageLocaleLines(
+  language: "en" | "zh",
+  locale: Extract<ArchivePage, { readonly type: "entity-wikipage" }>[
+    | "en"
+    | "zh"],
+): readonly string[] {
+  if (locale === null) {
+    return [`${language}: [missing]`];
+  }
+
+  return [
+    `${locale.title}  ${locale.url}`,
+    ...(locale.description === undefined ? [] : [locale.description]),
+  ];
+}
+
 async function writePack(
   pack: ArchivePack,
   context: ArchiveOutputContext,
@@ -1124,11 +1244,13 @@ async function writePack(
     await formatPackAnchor(pack.anchor, packContext),
     "",
     "# Related",
-    ...(await Promise.all(
-      pack.related.map(async (item) =>
-        formatFindObject(await createListObject(item, packContext)),
-      ),
-    )),
+    (
+      await Promise.all(
+        pack.related.map(async (item) =>
+          formatFindObject(await createListObject(item, packContext)),
+        ),
+      )
+    ).join("\n\n"),
   ];
 
   await writeTextToStdout(
@@ -1184,6 +1306,9 @@ async function createFindObject(
     const triple = hit.triple;
 
     return {
+      ...(hit.backlinks === undefined
+        ? {}
+        : { backlinks: await createBacklinksObject(hit.backlinks, context) }),
       ...(context.evidenceLimit === undefined || hit.evidence === undefined
         ? {}
         : {
@@ -1201,6 +1326,9 @@ async function createFindObject(
   }
 
   return {
+    ...(hit.backlinks === undefined
+      ? {}
+      : { backlinks: await createBacklinksObject(hit.backlinks, context) }),
     ...(context.evidenceLimit === undefined || hit.evidence === undefined
       ? {}
       : {
@@ -1211,8 +1339,9 @@ async function createFindObject(
           }),
         }),
     label: hit.title,
-    ...(isTextStreamOutputType(hit.type) ? { text: hit.snippet } : {}),
-    type: hit.type === "node" ? "chunk" : hit.type,
+    ...(isTextStreamOutputType(hit.type)
+      ? { text: hit.snippet }
+      : { type: hit.type === "node" ? "chunk" : hit.type }),
     uri,
   };
 }
@@ -1237,9 +1366,38 @@ async function createEvidencePreviewObject(
 
 function createSourceObject(item: ArchiveEvidenceItem): ArchiveOutputSource {
   return {
+    ...(item.score === undefined ? {} : { score: item.score }),
     text: item.source,
     uri: item.id,
   };
+}
+
+async function createBacklinksObject(
+  backlinks: ArchiveBacklinks,
+  context: ArchiveOutputContext,
+): Promise<ArchiveOutputBacklinks> {
+  return {
+    chunks: await createBacklinkBucketObject(backlinks.chunks, context),
+    entities: await createBacklinkBucketObject(backlinks.entities, context),
+    triples: await createBacklinkBucketObject(backlinks.triples, context),
+  };
+}
+
+async function createBacklinkBucketObject(
+  bucket: ArchiveBacklinkBucket,
+  context: ArchiveOutputContext,
+): Promise<ArchiveOutputResultPage> {
+  const objects = await Promise.all(
+    bucket.items.map(
+      async (item) =>
+        await createFindObject(item, {
+          ...context,
+          backlinks: false,
+        }),
+    ),
+  );
+
+  return createObjectResultPage(objects, bucket.nextCursor, bucket.limit);
 }
 
 async function createPageObject(
@@ -1247,6 +1405,12 @@ async function createPageObject(
   context: ArchiveOutputContext,
 ): Promise<unknown> {
   switch (page.type) {
+    case "entity-wikipage":
+      return {
+        en: page.en,
+        uri: page.id,
+        zh: page.zh,
+      };
     case "entity":
       return {
         labels: page.labels.slice(0, 7),
@@ -1289,10 +1453,30 @@ async function createPageObject(
       return { ...rest, uri: toWikiGraphUri(page.id) };
     }
     case "fragment": {
-      const { id: _id, nextFragmentId, previousFragmentId, ...rest } = page;
+      const {
+        backlinks,
+        id: _id,
+        nextFragmentId,
+        previousFragmentId,
+        ...rest
+      } = page;
+      const textStreamType = getTextStreamOutputType(page.id);
+
+      if (textStreamType !== undefined) {
+        return {
+          ...(backlinks === undefined
+            ? {}
+            : { backlinks: await createBacklinksObject(backlinks, context) }),
+          text: page.fragment.text,
+          uri: toWikiGraphUri(page.id),
+        };
+      }
 
       return {
         ...rest,
+        ...(backlinks === undefined
+          ? {}
+          : { backlinks: await createBacklinksObject(backlinks, context) }),
         ...(nextFragmentId === undefined
           ? {}
           : { nextUri: toWikiGraphUri(nextFragmentId) }),
@@ -1351,7 +1535,10 @@ async function createPackObject(
 }
 
 function formatFindObject(object: ArchiveOutputObject): string {
-  const lines = formatObjectSummaryLines(object);
+  const lines = formatScoredLines(
+    object.score,
+    formatObjectSummaryLines(object),
+  );
 
   if (object.evidence !== undefined && object.evidence.sources.length > 0) {
     lines.push(
@@ -1373,11 +1560,38 @@ function formatFindObject(object: ArchiveOutputObject): string {
     );
   }
 
+  if (object.backlinks !== undefined) {
+    lines.push("", ...formatBacklinkLines(object.backlinks));
+  }
+
   return lines.join("\n");
 }
 
+function formatScoredLines(
+  score: number | undefined,
+  lines: readonly string[],
+): string[] {
+  return score === undefined ? [...lines] : [`score: ${score}`, ...lines];
+}
+
+function formatBacklinkLines(backlinks: ArchiveOutputBacklinks): string[] {
+  const lines = [
+    ...backlinks.chunks.objects,
+    ...backlinks.entities.objects,
+    ...backlinks.triples.objects,
+  ].flatMap((object, index) => [
+    ...(index === 0 ? [] : [""]),
+    formatFindObject(object),
+  ]);
+
+  return lines.length === 0 ? [] : ["Backlinks:", "", ...lines];
+}
+
 function formatObjectSummaryLines(object: ArchiveOutputObject): string[] {
-  if (isTextStreamOutputType(object.type) && object.text !== undefined) {
+  if (
+    getTextStreamOutputType(object.uri) !== undefined &&
+    object.text !== undefined
+  ) {
     return formatSourceObject({
       text: object.text,
       uri: object.uri,
@@ -1385,10 +1599,7 @@ function formatObjectSummaryLines(object: ArchiveOutputObject): string[] {
   }
 
   if (object.predicate !== undefined) {
-    return [
-      object.uri,
-      `${object.subjectLabel ?? "[subject]"} ${object.predicate} ${object.objectLabel ?? "[object]"}`,
-    ];
+    return [object.uri, formatTripleObjectLabel(object)];
   }
 
   return [
@@ -1398,6 +1609,41 @@ function formatObjectSummaryLines(object: ArchiveOutputObject): string[] {
     object.stage === undefined ? undefined : `stage: ${object.stage}`,
     object.evidence === undefined ? object.text : undefined,
   ].filter((line): line is string => line !== undefined && line !== "");
+}
+
+function formatTripleObjectLabel(object: ArchiveOutputObject): string {
+  const triple = parseTripleOutputUri(object.uri);
+
+  if (triple === undefined) {
+    return `${object.subjectLabel ?? "[subject]"} ${object.predicate ?? "[predicate]"} ${object.objectLabel ?? "[object]"}`;
+  }
+
+  return `${object.subjectLabel ?? triple.subjectQid}(${triple.subjectQid}) ${object.predicate ?? triple.predicate} ${object.objectLabel ?? triple.objectQid}(${triple.objectQid})`;
+}
+
+function parseTripleOutputUri(uri: string):
+  | {
+      readonly objectQid: string;
+      readonly predicate: string;
+      readonly subjectQid: string;
+    }
+  | undefined {
+  const match =
+    /^wkg:\/\/triple\/(Q[1-9][0-9]*)\/([^/]+)\/(Q[1-9][0-9]*)\/?$/u.exec(uri);
+
+  if (
+    match?.[1] === undefined ||
+    match[2] === undefined ||
+    match[3] === undefined
+  ) {
+    return undefined;
+  }
+
+  return {
+    objectQid: match[3],
+    predicate: decodeURIComponent(match[2]),
+    subjectQid: match[1],
+  };
 }
 
 function formatPlainObject(value: unknown): string {
@@ -1445,6 +1691,15 @@ function formatSourceCitationBlock(uri: string, text: string): string {
 
 function isTextStreamOutputType(type: string | undefined): boolean {
   return type === "source" || type === "summary";
+}
+
+function getTextStreamOutputType(
+  uri: string,
+): "source" | "summary" | undefined {
+  const match =
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/(source|summary)(?:#.*)?$/u.exec(uri);
+
+  return match?.[1] as "source" | "summary" | undefined;
 }
 
 function formatFindLensHint(result: ArchiveFindResult): string {
@@ -1627,6 +1882,8 @@ async function formatPackAnchor(
         anchor.evidence,
         context,
       );
+    case "entity-wikipage":
+      return formatEntityWikipageText(anchor);
     case "triple":
       return await formatEvidenceBackedPageText(
         anchor.id,

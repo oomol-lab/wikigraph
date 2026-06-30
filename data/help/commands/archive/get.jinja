@@ -10,8 +10,8 @@ Use when:
   - You already have a `wkg://...` URI and need to inspect its object payload.
 
 Usage:
-  wikigraph <object-uri> get [--evidence [n]] [--json|--jsonl] [--help|-h]
-  wikigraph <object-uri> [--evidence [n]] [--json|--jsonl]
+  wikigraph <object-uri> get [--evidence [n]] [--backlinks] [--json|--jsonl] [--help|-h]
+  wikigraph <object-uri> [--evidence [n]] [--backlinks] [--json|--jsonl]
 
 Returns:
   - The selected object in human-readable text, JSON, or JSONL.
@@ -22,6 +22,7 @@ Notes:
   - Collection and lens URIs still require an explicit verb such as `list` or `search`.
   - Entity and triple `get` output includes up to 3 evidence sources by default.
   - Use `--evidence <n>` to choose a different evidence preview size, or `--evidence 0` to hide evidence.
+  - Add `--backlinks` on source sentence ranges to show chunks, entities, and triples supported by that source range.
   - Read `wikigraph help uri` before constructing object URIs.
 
 Next steps:

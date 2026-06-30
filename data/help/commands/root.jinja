@@ -20,12 +20,14 @@ Object workflow:
   - `pack` builds bounded Agent-readable context around one graph object URI.
 
 Object commands:
-  wikigraph <located-wkg-uri> search <query> [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
-  wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> search <query> [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
-  wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
-  wikigraph <object-uri> get [--evidence [n]] [--json|--jsonl]
-  wikigraph <chunk-uri|entity-uri> related [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl]
-  wikigraph <entity|triple|summary|chunk-uri> evidence [--limit <n>] [--cursor <token>] [--json|--jsonl]
+  wikigraph <located-wkg-uri> search <query> [--limit <n>] [--cursor <token>] [--evidence [n]] [--backlinks] [--json|--jsonl]
+  wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> search <query> [--limit <n>] [--cursor <token>] [--evidence [n]] [--backlinks] [--json|--jsonl]
+  wikigraph <located-wkg-uri>/triple/<subject|_>/<predicate|_>/<object|_> search <query> [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
+  wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--limit <n>] [--cursor <token>] [--evidence [n]] [--backlinks] [--json|--jsonl]
+  wikigraph <located-wkg-uri>/triple/<subject|_>/<predicate|_>/<object|_> list [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
+  wikigraph <object-uri> get [--evidence [n]] [--backlinks] [--json|--jsonl]
+  wikigraph <chunk-uri|entity-uri> related [query] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl]
+  wikigraph <entity|triple|summary|chunk-uri> evidence [query] [--limit <n>] [--cursor <token>] [--json|--jsonl]
   wikigraph next <cursor> [--limit <n>] [--json|--jsonl]
   wikigraph next <wikigraph-uri-with-sdpub-locator> <cursor> [--limit <n>] [--json|--jsonl]
   wikigraph <located-chunk-uri|located-entity-uri> pack [--budget <chars>] [--json|--jsonl]

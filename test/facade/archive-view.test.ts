@@ -753,6 +753,7 @@ describe("facade/archive-view", () => {
 
         const result = await findArchiveObjects(document, "Wiki", {
           evidenceLimit: 3,
+          triplePattern: { subjectQid: "Q1" },
           types: ["triple"],
         });
 
@@ -772,6 +773,13 @@ describe("facade/archive-view", () => {
             source: "Source-only archives should be searchable.",
           }),
         ]);
+
+        const filtered = await findArchiveObjects(document, "Wiki", {
+          triplePattern: { objectQid: "Q1" },
+          types: ["triple"],
+        });
+
+        expect(filtered.items).toStrictEqual([]);
       } finally {
         restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();
@@ -1076,6 +1084,42 @@ describe("facade/archive-view", () => {
           publisher: "Example Press",
           title: "Root Metadata",
           type: "meta",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("reads entity wikipage resources", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(
+          readArchivePage(document, "wkg://entity/Q1/wikipage", {
+            wikipageResolverOptions: {
+              cacheDatabasePath: `${path}/wikipage-cache.sqlite`,
+              fetch: createEntityWikipageMockFetch(),
+              minRequestIntervalMs: 0,
+              retryBaseDelayMs: 0,
+            },
+          }),
+        ).resolves.toStrictEqual({
+          en: {
+            description: "Ming dynasty general",
+            title: "Xu Da",
+            url: "https://en.wikipedia.org/wiki/Xu_Da",
+          },
+          id: "wkg://entity/Q1/wikipage",
+          type: "entity-wikipage",
+          zh: {
+            description: "明朝军事将领",
+            title: "徐达",
+            url: "https://zh.wikipedia.org/wiki/%E5%BE%90%E8%BE%BE",
+          },
         });
       } finally {
         await document.release();
@@ -1483,6 +1527,16 @@ describe("facade/archive-view", () => {
             .map((item) => item.id),
         ).toEqual(["wkg://triple/Q1/mentions/Q2", "wkg://triple/Q3/before/Q1"]);
 
+        const objectPattern = await listArchiveCollection(document, {
+          chapters: [2],
+          triplePattern: { objectQid: "Q1" },
+          types: ["triple"],
+        });
+
+        expect(objectPattern.items.map((item) => item.id)).toStrictEqual([
+          "wkg://triple/Q3/before/Q1",
+        ]);
+
         const scopedSecondWithEvidence = await listArchiveCollection(document, {
           chapters: [2],
           evidenceLimit: 1,
@@ -1680,6 +1734,226 @@ describe("facade/archive-view", () => {
           "wkg://triple/Q1/mentions/Q3",
           "wkg://triple/Q1/mentions/Q2",
         ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("filters and sorts entity related triples by query text", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-source-early",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-target-weak",
+              qid: "Q2",
+              rangeEnd: 20,
+              rangeStart: 10,
+              sentenceIndex: 0,
+              surface: "agent",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-source-late",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 1,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-target-strong",
+              qid: "Q3",
+              rangeEnd: 24,
+              rangeStart: 10,
+              sentenceIndex: 1,
+              surface: "agent agent",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-source-unmatched",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 2,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-target-unmatched",
+              qid: "Q4",
+              rangeEnd: 24,
+              rangeStart: 10,
+              sentenceIndex: 2,
+              surface: "fragments",
+            },
+          ]);
+          await openedDocument.mentionLinks.saveMany([
+            {
+              evidenceSentenceIds: [[1, 0, 0]],
+              id: "query-link-weak",
+              predicate: "mentions",
+              sourceMentionId: "query-source-early",
+              targetMentionId: "query-target-weak",
+            },
+            {
+              evidenceSentenceIds: [[1, 0, 1]],
+              id: "query-link-strong",
+              predicate: "mentions",
+              sourceMentionId: "query-source-late",
+              targetMentionId: "query-target-strong",
+            },
+            {
+              evidenceSentenceIds: [[1, 0, 2]],
+              id: "query-link-unmatched",
+              predicate: "mentions",
+              sourceMentionId: "query-source-unmatched",
+              targetMentionId: "query-target-unmatched",
+            },
+          ]);
+        });
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wkg://entity/Q1",
+          { query: "agent", role: "subject" },
+        );
+
+        expect(related.map((item) => item.id)).toStrictEqual([
+          "wkg://triple/Q1/mentions/Q3",
+          "wkg://triple/Q1/mentions/Q2",
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("matches entity related query against mention link evidence sentences", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "sentence-query-source",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 1,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "sentence-query-target",
+              qid: "Q2",
+              rangeEnd: 20,
+              rangeStart: 10,
+              sentenceIndex: 1,
+              surface: "archive",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 0, 1]],
+            id: "sentence-query-link",
+            predicate: "mentions",
+            sourceMentionId: "sentence-query-source",
+            targetMentionId: "sentence-query-target",
+          });
+        });
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wkg://entity/Q1",
+          { query: "朱元璋", role: "subject" },
+        );
+
+        expect(related).toMatchObject([
+          {
+            id: "wkg://triple/Q1/mentions/Q2",
+            score: expect.any(Number) as number,
+          },
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("matches entity related triples by mention-link evidence text", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "evidence-related-source",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "evidence-related-target",
+              qid: "Q2",
+              rangeEnd: 20,
+              rangeStart: 10,
+              sentenceIndex: 0,
+              surface: "agent",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 0, 1]],
+            id: "evidence-related-link",
+            predicate: "mentions",
+            sourceMentionId: "evidence-related-source",
+            targetMentionId: "evidence-related-target",
+          });
+        });
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wkg://entity/Q1",
+          { query: "朱元璋", role: "subject" },
+        );
+
+        expect(related.map((item) => item.id)).toStrictEqual([
+          "wkg://triple/Q1/mentions/Q2",
+        ]);
+        expect(related[0]?.score).toBeGreaterThan(0);
       } finally {
         await document.release();
       }
@@ -2018,6 +2292,168 @@ describe("facade/archive-view", () => {
       }
     });
   });
+
+  it("filters evidence by query text", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "evidence-query-first",
+              qid: "Q1",
+              rangeEnd: 3,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "LLM",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "evidence-query-second",
+              qid: "Q1",
+              rangeEnd: 3,
+              rangeStart: 0,
+              sentenceIndex: 1,
+              surface: "朱元璋",
+            },
+          ]);
+        });
+
+        const evidence = await listArchiveEvidence(
+          document,
+          "wkg://entity/Q1",
+          { query: "朱元璋" },
+        );
+
+        expect(evidence.items.map((item) => item.id)).toStrictEqual([
+          "wkg://chapter/1/source#1",
+        ]);
+        expect(evidence.items[0]?.score).toBeGreaterThan(0);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("returns backlinks for source sentence ranges", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "backlink-source",
+              qid: "Q1",
+              rangeEnd: 12,
+              rangeStart: 3,
+              sentenceIndex: 0,
+              surface: "LLM Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "backlink-target",
+              qid: "Q2",
+              rangeEnd: 63,
+              rangeStart: 57,
+              sentenceIndex: 0,
+              surface: "agents",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 0, 0]],
+            id: "backlink-link",
+            predicate: "mentions",
+            sourceMentionId: "backlink-source",
+            targetMentionId: "backlink-target",
+          });
+        });
+
+        await expect(
+          readArchivePage(document, "wkg://chapter/1/source#0", {
+            backlinks: true,
+          }),
+        ).resolves.toMatchObject({
+          backlinks: {
+            chunks: {
+              items: [
+                {
+                  id: "node:100",
+                  type: "node",
+                },
+              ],
+              nextCursor: null,
+            },
+            entities: {
+              items: [
+                {
+                  id: "wkg://entity/Q1",
+                  type: "entity",
+                },
+                {
+                  id: "wkg://entity/Q2",
+                  type: "entity",
+                },
+              ],
+              nextCursor: null,
+            },
+            triples: {
+              items: [
+                {
+                  id: "wkg://triple/Q1/mentions/Q2",
+                  type: "triple",
+                },
+              ],
+              nextCursor: null,
+            },
+          },
+          fragment: {
+            id: "wkg://chapter/1/source#0",
+          },
+          type: "fragment",
+        });
+
+        const result = await listArchiveCollection(document, {
+          backlinks: true,
+          limit: 1,
+          types: ["source"],
+        });
+
+        expect(result.items[0]).toMatchObject({
+          backlinks: {
+            chunks: {
+              items: [
+                {
+                  id: "node:100",
+                },
+              ],
+            },
+            triples: {
+              items: [
+                {
+                  id: "wkg://triple/Q1/mentions/Q2",
+                },
+              ],
+            },
+          },
+          id: "wkg://chapter/1/source#0",
+          type: "source",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
 });
 
 async function seedSourcedDocument(
@@ -2109,4 +2545,62 @@ function restoreEnv(name: string, value: string | undefined): void {
   }
 
   process.env[name] = value;
+}
+
+function createEntityWikipageMockFetch(): typeof fetch {
+  return ((input: string | URL | Request) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+
+    if (url.hostname === "www.wikidata.org") {
+      const language = url.searchParams.get("languages")?.split("|")[0];
+
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            entities: {
+              Q1: {
+                descriptions: {
+                  [language ?? "en"]: {
+                    value:
+                      language === "zh"
+                        ? "明朝军事将领"
+                        : "Ming dynasty general",
+                  },
+                },
+                labels: {
+                  [language ?? "en"]: {
+                    value: language === "zh" ? "徐达" : "Xu Da",
+                  },
+                },
+                sitelinks: {
+                  enwiki: { title: "Xu Da" },
+                  zhwiki: { title: "徐达" },
+                },
+              },
+            },
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      );
+    }
+
+    const titles = url.searchParams.get("titles")?.split("|") ?? [];
+
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          query: {
+            pages: titles.map((title, index) => ({
+              pageid: index + 1,
+              pageprops: {
+                wikibase_item: "Q1",
+              },
+              title,
+            })),
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+  }) as typeof fetch;
 }

@@ -15,20 +15,27 @@ import type {
 type SqlRow = Record<string, unknown>;
 
 const WIKIPAGE_CACHE_SCHEMA_SQL = `
+DROP TABLE IF EXISTS qid_cache;
+DROP TABLE IF EXISTS disambiguation_cache;
+
 CREATE TABLE IF NOT EXISTS qid_cache (
-  qid TEXT PRIMARY KEY,
+  qid TEXT NOT NULL,
+  language TEXT NOT NULL,
   label TEXT,
   description TEXT,
   pages_json TEXT NOT NULL,
   checked_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (qid, language)
 );
 
 CREATE TABLE IF NOT EXISTS disambiguation_cache (
-  qid TEXT PRIMARY KEY,
+  qid TEXT NOT NULL,
+  wiki TEXT NOT NULL,
   pages_json TEXT NOT NULL,
   profile_json TEXT,
-  checked_at TEXT NOT NULL
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (qid, wiki)
 );
 `;
 
@@ -53,6 +60,7 @@ export class WikipageCache {
 
   public async getQids(
     qids: readonly string[],
+    language: string,
   ): Promise<ReadonlyMap<string, CachedQidRecord>> {
     if (qids.length === 0) {
       return new Map();
@@ -65,9 +73,9 @@ export class WikipageCache {
         `
 SELECT *
 FROM qid_cache
-WHERE qid = ?
+WHERE qid = ? AND language = ?
 `,
-        [qid],
+        [qid, language],
         mapQidRecord,
       );
 
@@ -79,7 +87,10 @@ WHERE qid = ?
     return results;
   }
 
-  public async putQids(records: readonly CachedQidRecord[]): Promise<void> {
+  public async putQids(
+    records: readonly CachedQidRecord[],
+    language: string,
+  ): Promise<void> {
     if (records.length === 0) {
       return;
     }
@@ -89,9 +100,9 @@ WHERE qid = ?
         await this.#database.run(
           `
 INSERT INTO qid_cache (
-  qid, label, description, pages_json, checked_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT(qid) DO UPDATE SET
+  qid, language, label, description, pages_json, checked_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(qid, language) DO UPDATE SET
   label = excluded.label,
   description = excluded.description,
   pages_json = excluded.pages_json,
@@ -100,6 +111,7 @@ ON CONFLICT(qid) DO UPDATE SET
 `,
           [
             record.qid,
+            language,
             record.label ?? null,
             record.description ?? null,
             JSON.stringify(record.sitelinks),
@@ -113,6 +125,7 @@ ON CONFLICT(qid) DO UPDATE SET
 
   public async getDisambiguations(
     qids: readonly string[],
+    wiki: string,
   ): Promise<ReadonlyMap<string, CachedDisambiguationRecord>> {
     if (qids.length === 0) {
       return new Map();
@@ -125,9 +138,9 @@ ON CONFLICT(qid) DO UPDATE SET
         `
 SELECT *
 FROM disambiguation_cache
-WHERE qid = ?
+WHERE qid = ? AND wiki = ?
 `,
-        [qid],
+        [qid, wiki],
         mapDisambiguationRecord,
       );
 
@@ -141,6 +154,7 @@ WHERE qid = ?
 
   public async putDisambiguations(
     records: readonly CachedDisambiguationRecord[],
+    wiki: string,
   ): Promise<void> {
     if (records.length === 0) {
       return;
@@ -151,15 +165,16 @@ WHERE qid = ?
         await this.#database.run(
           `
 INSERT INTO disambiguation_cache (
-  qid, pages_json, profile_json, checked_at
-) VALUES (?, ?, ?, ?)
-ON CONFLICT(qid) DO UPDATE SET
+  qid, wiki, pages_json, profile_json, checked_at
+) VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(qid, wiki) DO UPDATE SET
   pages_json = excluded.pages_json,
   profile_json = excluded.profile_json,
   checked_at = excluded.checked_at
 `,
           [
             record.disambiguationQid,
+            wiki,
             JSON.stringify(record.pages),
             record.profile === undefined
               ? null

@@ -418,6 +418,58 @@ describe("cli/args", () => {
     });
 
     expect(
+      parseCLIArguments(["wkg://book.sdpub/triple/Q1/_/Q2", "list"]),
+    ).toStrictEqual({
+      args: {
+        action: "list",
+        archivePath: "wkg://book.sdpub/triple/Q1/_/Q2",
+        format: "text",
+        kinds: ["triple"],
+        triplePattern: {
+          objectQid: "Q2",
+          subjectQid: "Q1",
+        },
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments(["wkg://book.sdpub/triple/Q1", "list"]),
+    ).toMatchObject({
+      args: {
+        action: "list",
+        kinds: ["triple"],
+        triplePattern: {
+          subjectQid: "Q1",
+        },
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments([
+        "wkg://book.sdpub/chapter/12/triple/_/_/Q2",
+        "search",
+        "agent",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "search",
+        archivePath: `wkg://${archivePath}/chapter/12`,
+        format: "text",
+        kinds: ["triple"],
+        query: "agent",
+        triplePattern: {
+          objectQid: "Q2",
+        },
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
       parseCLIArguments([
         "wkg:///Users/me/book.sdpub",
         "search",
@@ -506,6 +558,7 @@ describe("cli/args", () => {
       parseCLIArguments([
         "wkg://book.sdpub/entity/Q1",
         "related",
+        "agents",
         "--role",
         "subject",
         "--evidence",
@@ -517,6 +570,7 @@ describe("cli/args", () => {
         evidenceLimit: 3,
         format: "text",
         objectId: "wkg://book.sdpub/entity/Q1",
+        query: "agents",
         role: "subject",
       },
       help: false,
@@ -527,6 +581,7 @@ describe("cli/args", () => {
       parseCLIArguments([
         "wkg://book.sdpub/triple/Q1/mentions/Q2",
         "evidence",
+        "agents",
         "--jsonl",
       ]),
     ).toStrictEqual({
@@ -535,6 +590,7 @@ describe("cli/args", () => {
         archivePath: "wkg://book.sdpub/triple/Q1/mentions/Q2",
         format: "jsonl",
         objectId: "wkg://book.sdpub/triple/Q1/mentions/Q2",
+        query: "agents",
       },
       help: false,
       kind: "archive",

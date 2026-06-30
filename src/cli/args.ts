@@ -6,7 +6,11 @@ import {
   archiveMaintenanceHelpRoute,
   withHelpRoute,
 } from "./errors.js";
-import { type BuildJobTarget, type ChapterStage } from "../facade/index.js";
+import {
+  type ArchiveTriplePattern,
+  type BuildJobTarget,
+  type ChapterStage,
+} from "../facade/index.js";
 import {
   parseHelpTopic,
   parseHelpMatrixPage,
@@ -171,6 +175,7 @@ export interface CLIArchiveArguments {
   readonly action: CLIArchiveAction;
   readonly archivePath: string;
   readonly budget?: number;
+  readonly backlinks?: boolean;
   readonly chapters?: readonly number[];
   readonly chapterId?: number;
   readonly confirm?: boolean;
@@ -191,6 +196,7 @@ export interface CLIArchiveArguments {
   readonly role?: "any" | "object" | "self" | "subject";
   readonly sourcePath?: string;
   readonly targetStage?: ChapterStage;
+  readonly triplePattern?: ArchiveTriplePattern;
 }
 
 interface ArchiveMetaFlagValues {
@@ -215,6 +221,7 @@ interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly active?: boolean;
   readonly after?: string;
   readonly all?: boolean;
+  readonly backlinks?: boolean;
   readonly before?: string;
   readonly boost?: boolean;
   readonly budget?: string;
@@ -333,6 +340,9 @@ export function parseCLIArguments(
       },
       before: {
         type: "string",
+      },
+      backlinks: {
+        type: "boolean",
       },
       budget: {
         type: "string",
@@ -840,6 +850,10 @@ function parseArchiveCoverUriArguments(
 type ChapterUriTarget =
   | { readonly kind: "collection" }
   | { readonly kind: "lens"; readonly lens: ArchiveUriLens }
+  | {
+      readonly kind: "triple-pattern-lens";
+      readonly pattern: ArchiveTriplePattern;
+    }
   | { readonly kind: "state" }
   | { readonly kind: "tree" }
   | { readonly chapterId: number; readonly kind: "chapter" }
@@ -847,6 +861,11 @@ type ChapterUriTarget =
       readonly chapterId: number;
       readonly kind: "chapter-lens";
       readonly lens: ArchiveUriLens;
+    }
+  | {
+      readonly chapterId: number;
+      readonly kind: "chapter-triple-pattern-lens";
+      readonly pattern: ArchiveTriplePattern;
     }
   | { readonly chapterId: number; readonly kind: "chapter-state" }
   | {
@@ -873,25 +892,40 @@ function parseChapterTarget(objectUri: string): ChapterUriTarget | undefined {
     return { kind: "lens", lens: archiveLens };
   }
 
-  const match =
-    /^wkg:\/\/chapter\/([1-9][0-9]*)(?:\/(source|summary|title|chunk|entity|triple|state))?\/?$/u.exec(
-      objectUri,
-    );
+  const archiveTriplePattern = parseTriplePatternObjectUri(objectUri);
+  if (archiveTriplePattern !== undefined) {
+    return {
+      kind: "triple-pattern-lens",
+      pattern: archiveTriplePattern,
+    };
+  }
+
+  const match = /^wkg:\/\/chapter\/([1-9][0-9]*)(?:\/(.*))?\/?$/u.exec(
+    objectUri,
+  );
 
   if (match?.[1] === undefined) {
     return undefined;
   }
 
   const chapterId = Number(match[1]);
-  const resource = match[2] as
-    | "chunk"
-    | "entity"
-    | "source"
-    | "state"
-    | "summary"
-    | "title"
-    | "triple"
-    | undefined;
+  const suffix = match[2] === "" ? undefined : match[2];
+  const chapterTriplePattern =
+    suffix === undefined ? undefined : parseTriplePatternSuffix(suffix);
+
+  if (chapterTriplePattern !== undefined) {
+    return {
+      chapterId,
+      kind: "chapter-triple-pattern-lens",
+      pattern: chapterTriplePattern,
+    };
+  }
+
+  const resource = parseChapterResourceSuffix(suffix);
+
+  if (suffix !== undefined && resource === undefined) {
+    return undefined;
+  }
 
   if (resource === undefined) {
     return { chapterId, kind: "chapter" };
@@ -907,6 +941,82 @@ function parseChapterTarget(objectUri: string): ChapterUriTarget | undefined {
   }
 
   return { chapterId, kind: "chapter-resource", resource };
+}
+
+function parseChapterResourceSuffix(
+  suffix: string | undefined,
+):
+  | "chunk"
+  | "entity"
+  | "source"
+  | "state"
+  | "summary"
+  | "title"
+  | "triple"
+  | undefined {
+  switch (suffix) {
+    case undefined:
+    case "chunk":
+    case "entity":
+    case "source":
+    case "state":
+    case "summary":
+    case "title":
+    case "triple":
+      return suffix;
+    default:
+      return undefined;
+  }
+}
+
+function parseTriplePatternObjectUri(
+  objectUri: string,
+): ArchiveTriplePattern | undefined {
+  if (!objectUri.startsWith("wkg://triple/")) {
+    return undefined;
+  }
+
+  return parseTriplePatternSuffix(objectUri.slice("wkg://".length));
+}
+
+function parseTriplePatternSuffix(
+  suffix: string,
+): ArchiveTriplePattern | undefined {
+  const parts = suffix.split("/");
+
+  if (parts[0] !== "triple" || parts.length < 2 || parts.length > 4) {
+    return undefined;
+  }
+
+  const [subject = "_", predicate = "_", object = "_"] = parts.slice(1);
+  const hasPlaceholder = parts.slice(1).includes("_");
+  const hasOmittedTrailingPlaceholder = parts.length < 4;
+
+  if (!hasPlaceholder && !hasOmittedTrailingPlaceholder) {
+    return undefined;
+  }
+
+  if (
+    !isTriplePatternQidSegment(subject) ||
+    !isTriplePatternPredicateSegment(predicate) ||
+    !isTriplePatternQidSegment(object)
+  ) {
+    return undefined;
+  }
+
+  return {
+    ...(object === "_" ? {} : { objectQid: object }),
+    ...(predicate === "_" ? {} : { predicate: decodeURIComponent(predicate) }),
+    ...(subject === "_" ? {} : { subjectQid: subject }),
+  };
+}
+
+function isTriplePatternQidSegment(value: string): boolean {
+  return value === "_" || /^Q[1-9][0-9]*$/u.test(value);
+}
+
+function isTriplePatternPredicateSegment(value: string): boolean {
+  return value === "_" || (value !== "" && !value.includes("/"));
 }
 
 function parseArchiveUriLensObjectUri(
@@ -959,6 +1069,15 @@ function parseArchiveChapterUriArguments(
         values,
         helpRoute,
       );
+    case "triple-pattern-lens":
+      return parseArchiveTriplePatternLensUriArguments(
+        uri,
+        target.pattern,
+        action,
+        tail,
+        values,
+        helpRoute,
+      );
     case "state":
       return parseArchiveStateUriArguments(
         uri,
@@ -989,6 +1108,16 @@ function parseArchiveChapterUriArguments(
         archivePath,
         target.chapterId,
         target.lens,
+        action,
+        tail,
+        values,
+        helpRoute,
+      );
+    case "chapter-triple-pattern-lens":
+      return parseChapterTriplePatternLensUriArguments(
+        archivePath,
+        target.chapterId,
+        target.pattern,
         action,
         tail,
         values,
@@ -1071,6 +1200,29 @@ function parseArchiveLensUriArguments(
 
   return parseArchiveArguments(action, [uri, ...tail], values, helpRoute, {
     defaultKinds: [lens],
+  });
+}
+
+function parseArchiveTriplePatternLensUriArguments(
+  uri: string,
+  pattern: ArchiveTriplePattern,
+  action: CLIArchiveUriAction,
+  tail: readonly string[],
+  values: ArchiveArgumentValues,
+  helpRoute: string,
+): ParsedCLIArguments {
+  if (action !== "list" && action !== "search") {
+    throw new Error(
+      withHelpRoute(
+        `The triple pattern collection does not support \`${action}\`. Expected list or search.`,
+        "wikigraph help object triple",
+      ),
+    );
+  }
+
+  return parseArchiveArguments(action, [uri, ...tail], values, helpRoute, {
+    defaultKinds: ["triple"],
+    triplePattern: pattern,
   });
 }
 
@@ -1195,6 +1347,33 @@ function parseChapterLensUriArguments(
     values,
     helpRoute,
     { defaultKinds: [lens] },
+  );
+}
+
+function parseChapterTriplePatternLensUriArguments(
+  archivePath: string,
+  chapterId: number,
+  pattern: ArchiveTriplePattern,
+  action: CLIArchiveUriAction,
+  tail: readonly string[],
+  values: ArchiveArgumentValues,
+  helpRoute: string,
+): ParsedCLIArguments {
+  if (action !== "list" && action !== "search") {
+    throw new Error(
+      withHelpRoute(
+        `The chapter triple pattern collection does not support \`${action}\`. Expected list or search.`,
+        "wikigraph help object triple",
+      ),
+    );
+  }
+
+  return parseArchiveArguments(
+    action,
+    [formatLocatedChapterUri(archivePath, chapterId), ...tail],
+    values,
+    helpRoute,
+    { defaultKinds: ["triple"], triplePattern: pattern },
   );
 }
 
@@ -1900,6 +2079,7 @@ function parseArchiveArguments(
   helpRoute = `wikigraph ${action} --help`,
   options: {
     readonly defaultKinds?: readonly CLIObjectKind[];
+    readonly triplePattern?: ArchiveTriplePattern;
   } = {},
 ): ParsedCLIArguments {
   const normalized = normalizeArchiveInlineOptions(positionals, values);
@@ -2057,6 +2237,9 @@ function parseArchiveArguments(
         args: {
           action,
           archivePath,
+          ...(values.backlinks === undefined
+            ? {}
+            : { backlinks: values.backlinks }),
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
@@ -2073,6 +2256,9 @@ function parseArchiveArguments(
           ...(options.defaultKinds === undefined
             ? {}
             : { kinds: options.defaultKinds }),
+          ...(options.triplePattern === undefined
+            ? {}
+            : { triplePattern: options.triplePattern }),
         },
         help: false,
         kind: "archive",
@@ -2091,6 +2277,9 @@ function parseArchiveArguments(
         args: {
           action,
           archivePath,
+          ...(values.backlinks === undefined
+            ? {}
+            : { backlinks: values.backlinks }),
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
@@ -2106,6 +2295,9 @@ function parseArchiveArguments(
           ...(options.defaultKinds === undefined
             ? {}
             : { kinds: options.defaultKinds }),
+          ...(options.triplePattern === undefined
+            ? {}
+            : { triplePattern: options.triplePattern }),
         },
         help: false,
         kind: "archive",
@@ -2126,6 +2318,9 @@ function parseArchiveArguments(
         args: {
           action,
           archivePath,
+          ...(values.backlinks === undefined
+            ? {}
+            : { backlinks: values.backlinks }),
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           objectId: archivePath,
@@ -2135,7 +2330,7 @@ function parseArchiveArguments(
       };
     }
     case "related": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
@@ -2152,6 +2347,7 @@ function parseArchiveArguments(
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           objectId: archivePath,
+          ...(positionals[1] === undefined ? {} : { query: positionals[1] }),
           ...parseRelatedRoleFlag(values.role, helpRoute),
         },
         help: false,
@@ -2159,7 +2355,7 @@ function parseArchiveArguments(
       };
     }
     case "evidence": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
@@ -2184,6 +2380,7 @@ function parseArchiveArguments(
                 ),
               }),
           objectId: archivePath,
+          ...(positionals[1] === undefined ? {} : { query: positionals[1] }),
         },
         help: false,
         kind: "archive",

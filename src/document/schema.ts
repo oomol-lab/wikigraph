@@ -168,6 +168,15 @@ export const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_mention_links_predicate_target_source
   ON mention_links(predicate, target_mention_id, source_mention_id);
 
+  CREATE INDEX IF NOT EXISTS idx_mention_links_source_predicate_target
+  ON mention_links(source_mention_id, predicate, target_mention_id);
+
+  CREATE INDEX IF NOT EXISTS idx_mention_links_target_predicate_source
+  ON mention_links(target_mention_id, predicate, source_mention_id);
+
+  CREATE INDEX IF NOT EXISTS idx_mention_links_source_target_predicate
+  ON mention_links(source_mention_id, target_mention_id, predicate);
+
   CREATE INDEX IF NOT EXISTS idx_reading_edges_target
   ON reading_edges(to_id, from_id);
 

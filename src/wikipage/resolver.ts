@@ -32,6 +32,7 @@ export class WikipageResolver {
   readonly #cache: WikipageCache;
   readonly #client: WikimediaClient;
   readonly #maxBatchSize: number;
+  readonly #language: string;
   readonly #normalizer: DisambiguationProfileNormalizer | undefined;
   readonly #ownsCache: boolean;
   readonly #progress: WikipageResolveProgressReporter | undefined;
@@ -40,6 +41,7 @@ export class WikipageResolver {
   public constructor(input: {
     readonly cache: WikipageCache;
     readonly client: WikimediaClient;
+    readonly language: string;
     readonly maxBatchSize: number;
     readonly normalizer: DisambiguationProfileNormalizer | undefined;
     readonly ownsCache: boolean;
@@ -48,6 +50,7 @@ export class WikipageResolver {
   }) {
     this.#cache = input.cache;
     this.#client = input.client;
+    this.#language = input.language;
     this.#maxBatchSize = input.maxBatchSize;
     this.#normalizer = input.normalizer;
     this.#ownsCache = input.ownsCache;
@@ -76,6 +79,7 @@ export class WikipageResolver {
         wiki,
         ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
       }),
+      language,
       maxBatchSize: normalizeBatchSize(options.maxBatchSize),
       normalizer: options.normalizer,
       ownsCache: true,
@@ -135,7 +139,7 @@ export class WikipageResolver {
   async #resolveQidRecords(
     qids: readonly string[],
   ): Promise<ReadonlyMap<string, CachedQidRecord>> {
-    const cached = new Map(await this.#cache.getQids(qids));
+    const cached = new Map(await this.#cache.getQids(qids, this.#language));
     const missing = qids.filter((qid) => !cached.has(qid));
     let resolvedQids = cached.size;
     let resolvedEntities = 0;
@@ -152,7 +156,7 @@ export class WikipageResolver {
         createQidRecord(qid, entityInfos.get(qid), pageInfos, now),
       );
 
-      await this.#cache.putQids(records);
+      await this.#cache.putQids(records, this.#language);
       for (const record of records) {
         cached.set(record.qid, record);
       }
@@ -201,7 +205,9 @@ export class WikipageResolver {
     records: readonly CachedQidRecord[],
   ): Promise<ReadonlyMap<string, CachedDisambiguationRecord>> {
     const qids = records.map((record) => record.qid);
-    const cached = new Map(await this.#cache.getDisambiguations(qids));
+    const cached = new Map(
+      await this.#cache.getDisambiguations(qids, this.#wiki),
+    );
     const missing = records.filter((record) => !cached.has(record.qid));
     let resolvedPages = cached.size;
 
@@ -214,7 +220,7 @@ export class WikipageResolver {
     for (const record of missing) {
       const expansion = await this.#expandDisambiguation(record);
 
-      await this.#cache.putDisambiguations([expansion]);
+      await this.#cache.putDisambiguations([expansion], this.#wiki);
       cached.set(record.qid, expansion);
       resolvedPages += 1;
       await this.#reportProgress(

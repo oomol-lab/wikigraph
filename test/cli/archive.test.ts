@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ArchiveBacklinks,
   ArchiveCollectionResult,
   ArchiveEvidence,
   ArchiveFindHit,
@@ -7,6 +8,60 @@ import type {
 } from "../../src/facade/archive-view.js";
 
 const archiveMockState = vi.hoisted(() => ({
+  backlinks: {
+    chunks: {
+      items: [
+        {
+          chapter: 2,
+          field: "content",
+          id: "node:9",
+          position: { chapter: 2, fragment: 0, sentence: 0 },
+          snippet: "RAG appears in this chunk.",
+          title: "Retrieval design",
+          type: "node",
+        },
+      ],
+      limit: 1,
+      nextCursor: null,
+    },
+    entities: {
+      items: [
+        {
+          chapter: 2,
+          field: "title",
+          id: "wkg://entity/Q1",
+          position: { chapter: 2, fragment: 0, sentence: 0 },
+          score: 1,
+          snippet: "1 mentions",
+          title: "RAG",
+          type: "entity",
+        },
+      ],
+      limit: 1,
+      nextCursor: null,
+    },
+    triples: {
+      items: [
+        {
+          chapter: 2,
+          field: "title",
+          id: "wkg://triple/Q1/mentions/Q2",
+          position: { chapter: 2, fragment: 0, sentence: 0 },
+          score: 1,
+          snippet: "RAG mentions agent",
+          title: "Q1 mentions Q2",
+          triple: {
+            objectLabel: "agent",
+            predicate: "mentions",
+            subjectLabel: "RAG",
+          },
+          type: "triple",
+        },
+      ],
+      limit: 1,
+      nextCursor: null,
+    },
+  } satisfies ArchiveBacklinks,
   entityFindHits: [
     {
       chapter: 2,
@@ -131,6 +186,7 @@ const archiveMockState = vi.hoisted(() => ({
         endSentenceIndex: 1,
         fragmentId: 0,
         id: "wkg://chapter/2/source#0..1",
+        score: 2.5,
         source:
           "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
         startSentenceIndex: 0,
@@ -181,6 +237,7 @@ const archiveMockState = vi.hoisted(() => ({
       objectLabel: "agent",
       objectQid: "Q2",
       predicate: "mentions",
+      score: 3.5,
       subjectLabel: "RAG",
       subjectQid: "Q1",
       summary: "Q1 mentions Q2",
@@ -285,6 +342,20 @@ const archiveMockState = vi.hoisted(() => ({
     mentionCount: 1,
     qid: "Q1",
     type: "entity",
+  } satisfies ArchivePage,
+  entityWikipagePage: {
+    en: {
+      description: "Ming dynasty general",
+      title: "Xu Da",
+      url: "https://en.wikipedia.org/wiki/Xu_Da",
+    },
+    id: "wkg://entity/Q1/wikipage",
+    type: "entity-wikipage",
+    zh: {
+      description: "明朝军事将领",
+      title: "徐达",
+      url: "https://zh.wikipedia.org/wiki/%E5%BE%90%E8%BE%BE",
+    },
   } satisfies ArchivePage,
   sourceRangePage: {
     fragment: {
@@ -438,17 +509,19 @@ vi.mock("../../src/facade/index.js", () => ({
     Promise.resolve(
       id === "wkg://entity/Q1"
         ? archiveMockState.entityPage
-        : id === "wkg://triple/Q1/mentions/Q2"
-          ? archiveMockState.triplePage
-          : id === "wkg://chapter/2"
-            ? archiveMockState.chapterPage
-            : id === "wkg://chapter/2/source#0..1"
-              ? archiveMockState.sourceRangePage
-              : id === "wkg://"
-                ? archiveMockState.metaPage
-                : id === "wkg://state"
-                  ? archiveMockState.statePage
-                  : archiveMockState.page,
+        : id === "wkg://entity/Q1/wikipage"
+          ? archiveMockState.entityWikipagePage
+          : id === "wkg://triple/Q1/mentions/Q2"
+            ? archiveMockState.triplePage
+            : id === "wkg://chapter/2"
+              ? archiveMockState.chapterPage
+              : id === "wkg://chapter/2/source#0..1"
+                ? archiveMockState.sourceRangePage
+                : id === "wkg://"
+                  ? archiveMockState.metaPage
+                  : id === "wkg://state"
+                    ? archiveMockState.statePage
+                    : archiveMockState.page,
     ),
   ),
 }));
@@ -627,6 +700,47 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain("RAG");
   });
 
+  it("passes backlinks to listed source objects", async () => {
+    vi.mocked(listArchiveCollection).mockResolvedValueOnce({
+      ...archiveMockState.collection,
+      items: [
+        {
+          ...archiveMockState.sourceFindHits[0]!,
+          backlinks: archiveMockState.backlinks,
+        },
+      ],
+    });
+
+    await runArchiveCommand({
+      action: "list",
+      archivePath: "wkg:///tmp/book.sdpub/source",
+      backlinks: true,
+      format: "json",
+      kinds: ["source"],
+    });
+
+    expect(listArchiveCollection).toHaveBeenCalledWith(
+      {},
+      {
+        backlinks: true,
+        types: ["source"],
+      },
+    );
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toMatchObject({
+      objects: [
+        {
+          backlinks: {
+            chunks: { objects: [{ uri: "wkg://chunk/9" }] },
+            entities: { objects: [{ uri: "wkg://entity/Q1" }] },
+            triples: { objects: [{ uri: "wkg://triple/Q1/mentions/Q2" }] },
+          },
+          uri: "wkg://chapter/2/source#0..1",
+        },
+      ],
+    });
+    expect(archiveMockState.textWrites[0]).not.toContain('"type": "source"');
+  });
+
   it("creates collection continuation cursors for listed archive pages", async () => {
     vi.mocked(listArchiveCollection).mockResolvedValueOnce({
       ...archiveMockState.collection,
@@ -652,6 +766,34 @@ describe("cli/archive", () => {
       kind: "collection",
       order: "doc-asc",
       types: ["entity"],
+    });
+  });
+
+  it("preserves backlinks on collection continuation cursors", async () => {
+    vi.mocked(listArchiveCollection).mockResolvedValueOnce({
+      ...archiveMockState.collection,
+      nextCursor: "raw-collection-cursor",
+    });
+
+    await runArchiveCommand({
+      action: "list",
+      archivePath: "wkg:///tmp/book.sdpub/source",
+      backlinks: true,
+      format: "json",
+      kinds: ["source"],
+    });
+
+    expect(createContinuationCursor).toHaveBeenCalledWith({
+      archiveKey: "/tmp/book.sdpub",
+      archivePath: "/tmp/book.sdpub",
+      backlinks: true,
+      chapters: null,
+      cursor: "raw-collection-cursor",
+      format: "json",
+      ids: null,
+      kind: "collection",
+      order: "doc-asc",
+      types: ["source"],
     });
   });
 
@@ -964,6 +1106,55 @@ describe("cli/archive", () => {
     });
   });
 
+  it("passes backlinks to searched source objects", async () => {
+    vi.mocked(findArchiveObjects).mockResolvedValueOnce({
+      chapters: null,
+      items: [
+        {
+          ...archiveMockState.sourceFindHits[0]!,
+          backlinks: archiveMockState.backlinks,
+        },
+      ],
+      lens: "typed",
+      lensHint: null,
+      limit: 20,
+      match: "any",
+      nextCursor: null,
+      order: "doc-asc",
+      query: "RAG",
+      terms: ["rag"],
+      types: null,
+    });
+
+    await runArchiveCommand({
+      action: "search",
+      archivePath: "wkg:///tmp/book.sdpub/source",
+      backlinks: true,
+      format: "json",
+      kinds: ["source"],
+      query: "RAG",
+    });
+
+    expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
+      archiveKey: "/tmp/book.sdpub",
+      backlinks: true,
+      types: ["source"],
+    });
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toMatchObject({
+      objects: [
+        {
+          backlinks: {
+            chunks: { objects: [{ uri: "wkg://chunk/9" }] },
+            entities: { objects: [{ uri: "wkg://entity/Q1" }] },
+            triples: { objects: [{ uri: "wkg://triple/Q1/mentions/Q2" }] },
+          },
+          uri: "wkg://chapter/2/source#0..1",
+        },
+      ],
+    });
+    expect(archiveMockState.textWrites[0]).not.toContain('"type": "source"');
+  });
+
   it("prints search cursor metadata as JSONL", async () => {
     await runArchiveCommand({
       action: "search",
@@ -1162,6 +1353,77 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).not.toContain("Related Nodes:");
   });
 
+  it("prints source range backlinks when requested", async () => {
+    vi.mocked(readArchivePage).mockResolvedValueOnce({
+      ...archiveMockState.sourceRangePage,
+      backlinks: archiveMockState.backlinks,
+    });
+
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wkg:///tmp/book.sdpub",
+      backlinks: true,
+      format: "json",
+      objectId: "wkg:///tmp/book.sdpub/chapter/2/source#0..1",
+    });
+
+    expect(readArchivePage).toHaveBeenCalledWith(
+      {},
+      "wkg://chapter/2/source#0..1",
+      { backlinks: true },
+    );
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toMatchObject({
+      backlinks: {
+        chunks: {
+          nextCursor: null,
+          objects: [{ uri: "wkg://chunk/9" }],
+        },
+        entities: {
+          nextCursor: null,
+          objects: [{ uri: "wkg://entity/Q1" }],
+        },
+        triples: {
+          nextCursor: null,
+          objects: [{ uri: "wkg://triple/Q1/mentions/Q2" }],
+        },
+      },
+      uri: "wkg://chapter/2/source#0..1",
+    });
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).not.toHaveProperty(
+      "type",
+    );
+  });
+
+  it("prints text source backlinks without adding backlinks to evidence sources", async () => {
+    vi.mocked(readArchivePage).mockResolvedValueOnce({
+      ...archiveMockState.sourceRangePage,
+      backlinks: archiveMockState.backlinks,
+    });
+
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wkg:///tmp/book.sdpub",
+      backlinks: true,
+      format: "text",
+      objectId: "wkg:///tmp/book.sdpub/chapter/2/source#0..1",
+    });
+
+    expect(archiveMockState.textWrites[0]).toContain("Backlinks:");
+    expect(archiveMockState.textWrites[0]).toContain("wkg://chunk/9");
+    expect(archiveMockState.textWrites[0]).toContain("wkg://entity/Q1");
+    expect(archiveMockState.textWrites[0]).toContain(
+      "wkg://triple/Q1/mentions/Q2",
+    );
+    expect(archiveMockState.textWrites[0]).toContain(
+      "RAG(Q1) mentions agent(Q2)",
+    );
+    expect(archiveMockState.textWrites[0]).not.toContain("Chunks:");
+    expect(archiveMockState.textWrites[0]).not.toContain("Entities:");
+    expect(archiveMockState.textWrites[0]).not.toContain("Triples:");
+    expect(archiveMockState.textWrites[0]).not.toContain("[none]");
+    expect(archiveMockState.textWrites[0]).not.toContain("-- evidence");
+  });
+
   it("gets archive metadata from a root object URI", async () => {
     await runArchiveCommand({
       action: "get",
@@ -1220,6 +1482,57 @@ describe("cli/archive", () => {
     });
     expect(archiveMockState.textWrites[0]).toContain(
       ['  "uri": "wkg://entity/Q1",', '  "labels": [', '    "RAG",'].join("\n"),
+    );
+  });
+
+  it("gets an entity wikipage by Wiki Graph URI", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wkg:///tmp/book.sdpub",
+      format: "json",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1/wikipage",
+    });
+
+    expect(readArchivePage).toHaveBeenCalledWith(
+      {},
+      "wkg://entity/Q1/wikipage",
+      {},
+    );
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      en: {
+        description: "Ming dynasty general",
+        title: "Xu Da",
+        url: "https://en.wikipedia.org/wiki/Xu_Da",
+      },
+      uri: "wkg://entity/Q1/wikipage",
+      zh: {
+        description: "明朝军事将领",
+        title: "徐达",
+        url: "https://zh.wikipedia.org/wiki/%E5%BE%90%E8%BE%BE",
+      },
+    });
+    expect(archiveMockState.textWrites[0]).not.toContain('"qid"');
+  });
+
+  it("prints text entity wikipage pages with the URI first", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wkg:///tmp/book.sdpub",
+      format: "text",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1/wikipage",
+    });
+
+    expect(archiveMockState.textWrites[0]).toBe(
+      [
+        "wkg://entity/Q1/wikipage",
+        "",
+        "徐达  https://zh.wikipedia.org/wiki/%E5%BE%90%E8%BE%BE",
+        "明朝军事将领",
+        "",
+        "Xu Da  https://en.wikipedia.org/wiki/Xu_Da",
+        "Ming dynasty general",
+        "",
+      ].join("\n"),
     );
   });
 
@@ -1338,12 +1651,13 @@ describe("cli/archive", () => {
       archivePath: "wkg:///tmp/book.sdpub",
       format: "text",
       objectId: "wkg:///tmp/book.sdpub/chunk/9",
+      query: "agent",
     });
 
     expect(listRelatedArchiveObjects).toHaveBeenCalledWith(
       {},
       "wkg://chunk/9",
-      {},
+      { query: "agent" },
     );
     expect(archiveMockState.textWrites[0]).toContain("wkg://chunk/11");
     expect(archiveMockState.textWrites[0]).toContain("Related");
@@ -1352,8 +1666,9 @@ describe("cli/archive", () => {
         "wkg://chunk/11",
         "Related",
         "",
+        "score: 3.5",
         "wkg://triple/Q1/mentions/Q2",
-        "RAG mentions agent",
+        "RAG(Q1) mentions agent(Q2)",
       ].join("\n"),
     );
     expect(archiveMockState.textWrites[0]).not.toContain("Related chunk");
@@ -1380,6 +1695,7 @@ describe("cli/archive", () => {
         {
           uri: "wkg://triple/Q1/mentions/Q2",
           predicate: "mentions",
+          score: 3.5,
           subjectLabel: "RAG",
           objectLabel: "agent",
         },
@@ -1472,6 +1788,9 @@ describe("cli/archive", () => {
         "Follow-up source fragment.",
       ].join("\n"),
     );
+    expect(archiveMockState.textWrites[0]).toContain(
+      "score: 2.5\n@@ wkg://chapter/2/source#0..1 @@",
+    );
   });
 
   it("separates get evidence blocks with blank lines", async () => {
@@ -1505,12 +1824,15 @@ describe("cli/archive", () => {
       format: "json",
       limit: 3,
       objectId: "wkg:///tmp/book.sdpub/entity/Q1",
+      query: "paragraph",
     });
 
     expect(listArchiveEvidence).toHaveBeenCalledWith({}, "wkg://entity/Q1", {
       cursor: "cursor-1",
       limit: 3,
+      query: "paragraph",
     });
+    expect(archiveMockState.textWrites[0]).toContain('"score": 2.5');
   });
 
   it("creates evidence continuation cursors with the target URI", async () => {
@@ -1524,6 +1846,7 @@ describe("cli/archive", () => {
       archivePath: "wkg:///tmp/book.sdpub",
       format: "json",
       objectId: "wkg:///tmp/book.sdpub/entity/Q1",
+      query: "paragraph",
     });
 
     expect(createContinuationCursor).toHaveBeenCalledWith({
@@ -1532,6 +1855,7 @@ describe("cli/archive", () => {
       cursor: "raw-next-evidence-cursor",
       format: "json",
       kind: "evidence",
+      query: "paragraph",
       targetUri: "wkg://entity/Q1",
     });
   });
@@ -1568,6 +1892,17 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).toContain("# Anchor");
     expect(archiveMockState.textWrites[0]).toContain("# Related");
     expect(archiveMockState.textWrites[0]).toContain("Source Fragments:");
+    expect(archiveMockState.textWrites[0]).toContain(
+      ["# Related", "wkg://chunk/11", "Related", "", "score: 3.5"].join("\n"),
+    );
+    expect(archiveMockState.textWrites[0]).toContain(
+      [
+        "wkg://triple/Q1/mentions/Q2",
+        "RAG(Q1) mentions agent(Q2)",
+        "",
+        "-- evidence 1/1",
+      ].join("\n"),
+    );
     expect(archiveMockState.textWrites[0]).not.toContain("# Links");
   });
 

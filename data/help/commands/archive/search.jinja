@@ -10,10 +10,10 @@ Use when:
   - You have words, names, phrases, or concepts and need candidate object URIs.
 
 Usage:
-  wikigraph <archive-uri> search <query> [--limit <n>] [--evidence [n]] [--cursor <token>] [--json|--jsonl] [--help|-h]
-  wikigraph <chapter-uri> search <query> [--limit <n>] [--evidence [n]] [--cursor <token>] [--json|--jsonl] [--help|-h]
-  wikigraph <archive-uri>/<entity|triple|source|summary|chunk> search <query> [--limit <n>] [--evidence [n]] [--cursor <token>] [--json|--jsonl] [--help|-h]
-  wikigraph <chapter-uri>/<entity|triple|source|summary|chunk> search <query> [--limit <n>] [--evidence [n]] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <archive-uri> search <query> [--limit <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <chapter-uri> search <query> [--limit <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <archive-uri>/<entity|triple|source|summary|chunk> search <query> [--limit <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <chapter-uri>/<entity|triple|source|summary|chunk> search <query> [--limit <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
 
 Returns:
   - In text output, a ranked list of full `wkg://...` URIs.
@@ -23,8 +23,11 @@ Notes:
   - Search results are leads, not source evidence.
   - Search the archive URI for broad discovery.
   - Search a lens URI such as `<archive-uri>/source`, `<archive-uri>/summary`, `<archive-uri>/chunk`, `<archive-uri>/entity`, or `<archive-uri>/triple` to choose one object kind.
+  - Use `_` as an any-value placeholder in triple pattern lenses such as `<archive-uri>/triple/Q1/_/Q2`.
+  - Trailing triple placeholders may be omitted: `<archive-uri>/triple/Q1` means `<archive-uri>/triple/Q1/_/_`.
   - Put the lens after a chapter URI, such as `<chapter-uri>/entity`, to keep retrieval local to one chapter.
   - Add `--evidence` or `--evidence <n>` to include source evidence previews on entity and triple results.
+  - Add `--backlinks` to include reverse references on top-level source results; nested evidence sources are not expanded.
   - Use `wikigraph next <cursor>` for any returned `nextCursor`.
   - Use a located chapter URI to keep retrieval local.
   - Read `wikigraph help uri` before constructing Wiki Graph URIs; bare filesystem paths are not valid object command inputs.
@@ -37,3 +40,4 @@ Next steps:
 Examples:
   wikigraph wkg:///books/book.sdpub search "恩典 婴儿洗礼"
   wikigraph wkg:///books/book.sdpub/chapter/3/entity search "infant baptism" --json
+  wikigraph wkg:///books/book.sdpub/triple/_/_/Q178561 search "battle"

@@ -10,6 +10,7 @@ export type ContinuationCursor =
   | {
       readonly archiveKey: string;
       readonly archivePath: string;
+      readonly backlinks?: boolean;
       readonly chapters: readonly number[] | null;
       readonly cursor: string;
       readonly evidenceLimit?: number;
@@ -17,15 +18,26 @@ export type ContinuationCursor =
       readonly ids: readonly string[] | null;
       readonly kind: "collection";
       readonly order: "doc-asc" | "doc-desc";
+      readonly triplePattern?: {
+        readonly objectQid?: string;
+        readonly predicate?: string;
+        readonly subjectQid?: string;
+      };
       readonly types: readonly string[] | null;
     }
   | {
       readonly archiveKey: string;
       readonly archivePath: string;
+      readonly backlinks?: boolean;
       readonly cursor: string;
       readonly evidenceLimit?: number;
       readonly format: "json" | "jsonl" | "text";
       readonly kind: "search";
+      readonly triplePattern?: {
+        readonly objectQid?: string;
+        readonly predicate?: string;
+        readonly subjectQid?: string;
+      };
       readonly types: readonly string[] | null;
     }
   | {
@@ -34,6 +46,7 @@ export type ContinuationCursor =
       readonly cursor: string;
       readonly format: "json" | "jsonl" | "text";
       readonly kind: "evidence";
+      readonly query?: string;
       readonly targetUri: string;
     };
 
@@ -141,6 +154,9 @@ function createCursorPayload(input: ContinuationCursor): object {
   switch (input.kind) {
     case "collection":
       return {
+        ...(input.backlinks === undefined
+          ? {}
+          : { backlinks: input.backlinks }),
         chapters: input.chapters,
         cursor: input.cursor,
         ...(input.evidenceLimit === undefined
@@ -148,19 +164,29 @@ function createCursorPayload(input: ContinuationCursor): object {
           : { evidenceLimit: input.evidenceLimit }),
         ids: input.ids,
         order: input.order,
+        ...(input.triplePattern === undefined
+          ? {}
+          : { triplePattern: input.triplePattern }),
         types: input.types,
       };
     case "search":
       return {
+        ...(input.backlinks === undefined
+          ? {}
+          : { backlinks: input.backlinks }),
         cursor: input.cursor,
         ...(input.evidenceLimit === undefined
           ? {}
           : { evidenceLimit: input.evidenceLimit }),
+        ...(input.triplePattern === undefined
+          ? {}
+          : { triplePattern: input.triplePattern }),
         types: input.types,
       };
     case "evidence":
       return {
         cursor: input.cursor,
+        ...(input.query === undefined ? {} : { query: input.query }),
         targetUri: input.targetUri,
       };
   }
@@ -179,6 +205,7 @@ function parseContinuationCursorRecord(record: {
     return {
       archiveKey: record.archiveKey,
       archivePath: record.archivePath,
+      ...getPayloadOptionalBoolean(payload, "backlinks"),
       chapters: getPayloadNumberArrayOrNull(payload, "chapters"),
       cursor: getPayloadString(payload, "cursor"),
       ...getPayloadOptionalPositiveInteger(payload, "evidenceLimit"),
@@ -186,6 +213,7 @@ function parseContinuationCursorRecord(record: {
       ids: getPayloadStringArrayOrNull(payload, "ids"),
       kind: "collection",
       order: getPayloadOrder(payload),
+      ...getPayloadOptionalTriplePattern(payload),
       types: getPayloadStringArrayOrNull(payload, "types"),
     };
   }
@@ -194,10 +222,12 @@ function parseContinuationCursorRecord(record: {
     return {
       archiveKey: record.archiveKey,
       archivePath: record.archivePath,
+      ...getPayloadOptionalBoolean(payload, "backlinks"),
       cursor: getPayloadString(payload, "cursor"),
       ...getPayloadOptionalPositiveInteger(payload, "evidenceLimit"),
       format: record.format,
       kind: "search",
+      ...getPayloadOptionalTriplePattern(payload),
       types: getPayloadStringArrayOrNull(payload, "types"),
     };
   }
@@ -209,6 +239,7 @@ function parseContinuationCursorRecord(record: {
       cursor: getPayloadString(payload, "cursor"),
       format: record.format,
       kind: "evidence",
+      ...getPayloadOptionalString(payload, "query"),
       targetUri: getPayloadString(payload, "targetUri"),
     };
   }
@@ -250,6 +281,22 @@ function getPayloadStringArrayOrNull(
   }
   if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
     return value;
+  }
+
+  throw new Error("Invalid continuation cursor payload.");
+}
+
+function getPayloadOptionalString(
+  payload: Readonly<Record<string, unknown>>,
+  key: string,
+): { readonly query?: string } {
+  const value = payload[key];
+
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value === "string") {
+    return { query: value };
   }
 
   throw new Error("Invalid continuation cursor payload.");
@@ -303,6 +350,70 @@ function getPayloadOptionalPositiveInteger(
   }
   if (typeof value === "number" && Number.isInteger(value) && value > 0) {
     return { evidenceLimit: value };
+  }
+
+  throw new Error("Invalid continuation cursor payload.");
+}
+
+function getPayloadOptionalBoolean(
+  payload: Readonly<Record<string, unknown>>,
+  key: string,
+): { readonly backlinks?: boolean } {
+  const value = payload[key];
+
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value === "boolean") {
+    return { backlinks: value };
+  }
+
+  throw new Error("Invalid continuation cursor payload.");
+}
+
+function getPayloadOptionalTriplePattern(
+  payload: Readonly<Record<string, unknown>>,
+): {
+  readonly triplePattern?: {
+    readonly objectQid?: string;
+    readonly predicate?: string;
+    readonly subjectQid?: string;
+  };
+} {
+  const value = payload.triplePattern;
+
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Invalid continuation cursor payload.");
+  }
+
+  const pattern = value as Record<string, unknown>;
+  const subjectQid = getOptionalPayloadStringProperty(pattern, "subjectQid");
+  const predicate = getOptionalPayloadStringProperty(pattern, "predicate");
+  const objectQid = getOptionalPayloadStringProperty(pattern, "objectQid");
+
+  return {
+    triplePattern: {
+      ...(objectQid === undefined ? {} : { objectQid }),
+      ...(predicate === undefined ? {} : { predicate }),
+      ...(subjectQid === undefined ? {} : { subjectQid }),
+    },
+  };
+}
+
+function getOptionalPayloadStringProperty(
+  payload: Readonly<Record<string, unknown>>,
+  key: string,
+): string | undefined {
+  const value = payload[key];
+
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value === "string") {
+    return value;
   }
 
   throw new Error("Invalid continuation cursor payload.");
