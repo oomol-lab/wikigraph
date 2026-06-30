@@ -215,14 +215,17 @@ export type ArchiveListKind =
 
 export type ArchiveListItem =
   | {
+      readonly evidence?: ArchiveFindEvidencePreview;
       readonly id: string;
       readonly label: string;
       readonly summary: string;
       readonly type: Exclude<ArchiveObjectType, "triple">;
     }
   | {
+      readonly evidence?: ArchiveFindEvidencePreview;
       readonly id: string;
       readonly label: string;
+      readonly evidenceLinks?: readonly MentionLinkRecord[];
       readonly objectLabel: string;
       readonly objectQid: string;
       readonly predicate: string;
@@ -335,7 +338,14 @@ export interface ArchiveEstimate {
 export interface ArchivePack {
   readonly anchor: ArchivePage;
   readonly budget: number;
-  readonly links: readonly GraphNeighbor[];
+  readonly related: readonly ArchiveListItem[];
+}
+
+export type ArchiveRelatedRole = "any" | "object" | "self" | "subject";
+
+export interface ArchiveRelatedOptions {
+  readonly evidenceLimit?: number;
+  readonly role?: ArchiveRelatedRole;
 }
 
 export interface ArchiveEvidence {
@@ -1240,31 +1250,39 @@ export async function listAllArchiveLinks(
 export async function listRelatedArchiveObjects(
   document: ReadonlyDocument,
   id: string,
+  options: ArchiveRelatedOptions = {},
 ): Promise<readonly ArchiveListItem[]> {
   if (id.startsWith("wkg://")) {
-    return await listRelatedWikiGraphObjects(document, id);
+    return await listRelatedWikiGraphObjects(document, id, options);
   }
 
   const reference = parseArchiveReference(id);
   if (reference.type !== "node") {
+    rejectRelatedRole(options.role, id);
     return [];
   }
+  rejectRelatedRole(options.role, id);
 
   const { chapterId } = await requireNode(document, reference.id);
 
-  return (await listGraphNeighbors(document, chapterId, reference.id)).map(
-    (neighbor) => ({
-      id: formatNodeId(neighbor.node.id),
-      label: neighbor.node.label,
-      summary: neighbor.node.content,
-      type: "node",
-    }),
+  return await hydrateRelatedItemsEvidence(
+    document,
+    (await listGraphNeighbors(document, chapterId, reference.id)).map(
+      (neighbor) => ({
+        id: formatNodeId(neighbor.node.id),
+        label: neighbor.node.label,
+        summary: neighbor.node.content,
+        type: "node" as const,
+      }),
+    ),
+    options,
   );
 }
 
 async function listRelatedWikiGraphObjects(
   document: ReadonlyDocument,
   uri: string,
+  options: ArchiveRelatedOptions,
 ): Promise<readonly ArchiveListItem[]> {
   const reference = parseWikiGraphReference(uri);
 
@@ -1290,9 +1308,11 @@ async function listRelatedWikiGraphObjects(
         });
       }
 
-      return items;
+      rejectRelatedRole(options.role, uri);
+      return await hydrateRelatedItemsEvidence(document, items, options);
     }
     case "chunk": {
+      rejectRelatedRole(options.role, uri);
       const { chapterId } = await requireNode(document, reference.id);
 
       if (
@@ -1302,36 +1322,48 @@ async function listRelatedWikiGraphObjects(
         throw new Error(`Chunk ${uri} was not found in this archive.`);
       }
 
-      return (await listGraphNeighbors(document, chapterId, reference.id)).map(
-        (neighbor) => ({
-          id: formatNodeId(neighbor.node.id),
-          label: neighbor.node.label,
-          summary: neighbor.node.content,
-          type: "node",
-        }),
+      return await hydrateRelatedItemsEvidence(
+        document,
+        (await listGraphNeighbors(document, chapterId, reference.id)).map(
+          (neighbor) => ({
+            id: formatNodeId(neighbor.node.id),
+            label: neighbor.node.label,
+            summary: neighbor.node.content,
+            type: "node" as const,
+          }),
+        ),
+        options,
       );
     }
     case "source":
     case "summary": {
+      rejectRelatedRole(options.role, uri);
       const chapter = await requireChapter(document, reference.chapterId);
 
-      return [
-        {
-          id: formatChapterId(reference.chapterId),
-          label: chapter.title ?? `[chapter ${reference.chapterId}]`,
-          summary: `${chapter.stage}; ${chapter.fragmentCount} fragments`,
-          type: "chapter",
-        },
-      ];
+      return await hydrateRelatedItemsEvidence(
+        document,
+        [
+          {
+            id: formatChapterId(reference.chapterId),
+            label: chapter.title ?? `[chapter ${reference.chapterId}]`,
+            summary: `${chapter.stage}; ${chapter.fragmentCount} fragments`,
+            type: "chapter",
+          },
+        ],
+        options,
+      );
     }
     case "entity":
-      return await listRelatedEntityObjects(document, reference);
+      return await listRelatedEntityObjects(document, reference, options);
     case "triple":
-      return await listRelatedTripleObjects(document, reference);
+      throw new Error(
+        `Related is only available for chunk and entity objects: ${uri}`,
+      );
     case "chapter-tree":
     case "meta":
     case "state":
     case "chapter-state":
+      rejectRelatedRole(options.role, uri);
       return [];
   }
 }
@@ -1339,6 +1371,7 @@ async function listRelatedWikiGraphObjects(
 async function listRelatedEntityObjects(
   document: ReadonlyDocument,
   reference: Extract<WikiGraphReference, { readonly type: "entity" }>,
+  options: ArchiveRelatedOptions,
 ): Promise<readonly ArchiveListItem[]> {
   const mentions = filterMentionsByChapter(
     await document.mentions.listByQid(reference.qid),
@@ -1354,7 +1387,11 @@ async function listRelatedEntityObjects(
   const chapters = [
     ...new Set(mentions.map((mention) => mention.chapterId)),
   ].sort(compareNumbers);
-  const triplesById = new Map<string, ArchiveListItem>();
+  const role = options.role ?? "any";
+  const triplesById = new Map<
+    string,
+    Extract<ArchiveListItem, { readonly type: "triple" }>
+  >();
 
   for (const chapterId of chapters) {
     for (const link of await document.mentionLinks.listByChapter(chapterId)) {
@@ -1366,17 +1403,24 @@ async function listRelatedEntityObjects(
       if (source === undefined || target === undefined) {
         continue;
       }
-      if (source.qid !== reference.qid && target.qid !== reference.qid) {
+      if (!matchesRelatedEntityRole(source.qid, target.qid, reference.qid, role)) {
         continue;
       }
 
       const id = formatTripleUri(source.qid, link.predicate, target.qid);
 
-      if (triplesById.has(id)) {
+      const existing = triplesById.get(id);
+
+      if (existing !== undefined) {
+        triplesById.set(id, {
+          ...existing,
+          evidenceLinks: [...(existing.evidenceLinks ?? []), link],
+        });
         continue;
       }
 
       triplesById.set(id, {
+        evidenceLinks: [link],
         id,
         label: `${source.surface} ${link.predicate} ${target.surface}`,
         objectLabel: target.surface,
@@ -1390,47 +1434,99 @@ async function listRelatedEntityObjects(
     }
   }
 
-  return [...triplesById.values()];
+  return await hydrateRelatedItemsEvidence(
+    document,
+    [...triplesById.values()],
+    options,
+  );
 }
 
-async function listRelatedTripleObjects(
-  document: ReadonlyDocument,
-  reference: Extract<WikiGraphReference, { readonly type: "triple" }>,
-): Promise<readonly ArchiveListItem[]> {
-  const links = await filterMentionLinksByChapter(
-    document,
-    await document.mentionLinks.listByTriple({
-      objectQid: reference.objectQid,
-      predicate: reference.predicate,
-      subjectQid: reference.subjectQid,
-    }),
-    reference.chapterId,
-  );
+function matchesRelatedEntityRole(
+  subjectQid: string,
+  objectQid: string,
+  qid: string,
+  role: ArchiveRelatedRole,
+): boolean {
+  const isSubject = subjectQid === qid;
+  const isObject = objectQid === qid;
+  const isSelf = isSubject && isObject;
 
-  if (links.length === 0) {
-    throw new Error(
-      `Triple ${formatTripleUri(reference.subjectQid, reference.predicate, reference.objectQid)} was not found in this archive.`,
-    );
+  switch (role) {
+    case "any":
+      return isSubject || isObject;
+    case "subject":
+      return isSubject && !isSelf;
+    case "object":
+      return isObject && !isSelf;
+    case "self":
+      return isSelf;
+  }
+}
+
+function rejectRelatedRole(
+  role: ArchiveRelatedRole | undefined,
+  id: string,
+): void {
+  if (role !== undefined && role !== "any") {
+    throw new Error(`--role is only available for entity related: ${id}`);
+  }
+}
+
+async function hydrateRelatedItemsEvidence(
+  document: ReadonlyDocument,
+  items: readonly ArchiveListItem[],
+  options: ArchiveRelatedOptions,
+): Promise<readonly ArchiveListItem[]> {
+  if (options.evidenceLimit === undefined) {
+    return items.map((item) => {
+      if (item.type !== "triple") {
+        return item;
+      }
+      const { evidenceLinks: _evidenceLinks, ...publicItem } = item;
+      return publicItem;
+    });
   }
 
-  return await Promise.all([
-    createRelatedEntityItem(document, reference.subjectQid),
-    createRelatedEntityItem(document, reference.objectQid),
-  ]);
-}
+  const context = createEvidenceReadContext();
+  const evidenceLimit = options.evidenceLimit;
 
-async function createRelatedEntityItem(
-  document: ReadonlyDocument,
-  qid: string,
-): Promise<ArchiveListItem> {
-  const mentions = await document.mentions.listByQid(qid);
+  return await Promise.all(
+    items.map(async (item) => {
+      if (item.evidence !== undefined) {
+        return item;
+      }
+      if (item.type === "triple") {
+        const evidence = await createMentionLinkEvidencePreview(
+          document,
+          item.evidenceLinks ?? [],
+          evidenceLimit,
+          context,
+        );
+        const { evidenceLinks: _evidenceLinks, ...publicItem } = item;
 
-  return {
-    id: formatEntityUri(qid),
-    label: mentions.length === 0 ? qid : selectEntityLabel(mentions),
-    summary: `${mentions.length} mentions`,
-    type: "entity",
-  };
+        return { ...publicItem, evidence };
+      }
+      if (item.type === "node") {
+        const reference = parseArchiveReference(item.id);
+
+        if (reference.type !== "node") {
+          return item;
+        }
+
+        const { node } = await requireNode(document, reference.id);
+        return {
+          ...item,
+          evidence: await createSourceEvidencePreview(
+            document,
+            createNodeEvidenceRanges(node),
+            evidenceLimit,
+            context,
+          ),
+        };
+      }
+      return item;
+    }),
+  );
 }
 
 export async function listArchiveEvidence(
@@ -1516,13 +1612,15 @@ export async function packArchiveContext(
 ): Promise<ArchivePack> {
   validatePackReference(id);
 
-  const anchor = await readArchivePage(document, id);
-  const links = await listAllArchiveLinks(document, id);
+  const [anchor, related] = await Promise.all([
+    readArchivePage(document, id, { evidenceLimit: 3 }),
+    listRelatedArchiveObjects(document, id, { evidenceLimit: 3 }),
+  ]);
 
   return {
     anchor,
     budget,
-    links,
+    related,
   };
 }
 
@@ -1532,7 +1630,6 @@ function validatePackReference(id: string): void {
   switch (reference.type) {
     case "chunk":
     case "entity":
-    case "triple":
       return;
     case "chapter":
     case "chapter-state":
@@ -1542,7 +1639,7 @@ function validatePackReference(id: string): void {
     case "state":
     case "summary":
       throw new Error(
-        `Pack is only available for chunk, entity, and triple objects: ${id}`,
+        `Pack is only available for chunk and entity objects: ${id}`,
       );
   }
 }

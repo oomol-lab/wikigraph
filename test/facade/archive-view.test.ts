@@ -1675,12 +1675,17 @@ describe("facade/archive-view", () => {
             type: "entity",
           },
           budget: 1000,
-          links: [],
+          related: [
+            {
+              id: "wkg://triple/Q1/mentions/Q2",
+              type: "triple",
+            },
+          ],
         });
         await expect(
           packArchiveContext(document, "wkg://chapter/1/source/0#0..0", 1000),
         ).rejects.toThrow(
-          "Pack is only available for chunk, entity, and triple objects",
+          "Pack is only available for chunk and entity objects",
         );
         await expect(
           listRelatedArchiveObjects(document, "wkg://entity/Q1"),
@@ -1698,21 +1703,35 @@ describe("facade/archive-view", () => {
           },
         ]);
         await expect(
-          listRelatedArchiveObjects(document, "wkg://triple/Q1/mentions/Q2"),
-        ).resolves.toStrictEqual([
+          listRelatedArchiveObjects(document, "wkg://entity/Q1", {
+            evidenceLimit: 1,
+            role: "subject",
+          }),
+        ).resolves.toMatchObject([
           {
-            id: "wkg://entity/Q1",
-            label: "LLM Wiki",
-            summary: "1 mentions",
-            type: "entity",
-          },
-          {
-            id: "wkg://entity/Q2",
-            label: "agents",
-            summary: "1 mentions",
-            type: "entity",
+            evidence: {
+              shown: 1,
+              sources: [
+                {
+                  id: "wkg://chapter/1/source/0#0..0",
+                },
+              ],
+              total: 1,
+            },
+            id: "wkg://triple/Q1/mentions/Q2",
+            type: "triple",
           },
         ]);
+        await expect(
+          listRelatedArchiveObjects(document, "wkg://entity/Q1", {
+            role: "object",
+          }),
+        ).resolves.toStrictEqual([]);
+        await expect(
+          listRelatedArchiveObjects(document, "wkg://triple/Q1/mentions/Q2"),
+        ).rejects.toThrow(
+          "Related is only available for chunk and entity objects",
+        );
         await expect(
           listArchiveEvidence(document, "wkg://entity/Q3"),
         ).resolves.toMatchObject({

@@ -56,7 +56,7 @@ Use the library API only when the surrounding system explicitly needs in-process
 4. Use `wikigraph <uri> get` to inspect one object.
 5. Use `wikigraph <uri> evidence` when an object should be grounded back to source text.
 6. Use `wikigraph <uri> related` to move to nearby peer objects.
-7. Use `wikigraph <graph-object-uri> pack` when the user needs deterministic context around a known chunk, entity, or triple.
+7. Use `wikigraph <graph-object-uri> pack` when the user needs deterministic context around a known chunk or entity.
 8. Use `export` only when the user needs a projection.
 9. Use `<archive-uri>/state get` when archive readiness, metadata, or build state is part of the task.
 10. Before `queue add`, run `estimate`; if the estimate is too large for the session, ask the user.

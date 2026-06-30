@@ -145,6 +145,23 @@ const archiveMockState = vi.hoisted(() => ({
       type: "node",
     },
     {
+      evidence: {
+        nextCursor: null,
+        shown: 1,
+        sources: [
+          {
+            chapterId: 2,
+            endSentenceIndex: 1,
+            fragmentId: 0,
+            id: "wkg://chapter/2/source/0#0..1",
+            source: "RAG original source fragment.",
+            startSentenceIndex: 0,
+            title: "Chapter 2",
+            type: "source",
+          },
+        ],
+        total: 1,
+      },
       id: "wkg://triple/Q1/mentions/Q2",
       label: "RAG mentions agent",
       objectLabel: "agent",
@@ -372,7 +389,7 @@ vi.mock("../../src/facade/index.js", () => ({
     Promise.resolve({
       anchor: archiveMockState.page,
       budget: 1000,
-      links: [],
+      related: archiveMockState.listItems,
     }),
   ),
   readContinuationCursor: vi.fn(() =>
@@ -807,6 +824,60 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).not.toContain('"evidence"');
   });
 
+  it("prints searched triple evidence when requested", async () => {
+    vi.mocked(findArchiveObjects).mockResolvedValueOnce({
+      chapters: null,
+      items: archiveMockState.tripleFindHits,
+      lens: "typed",
+      lensHint: null,
+      limit: 20,
+      match: "any",
+      nextCursor: null,
+      order: "doc-asc",
+      query: "RAG",
+      terms: ["rag"],
+      types: null,
+    });
+
+    await runArchiveCommand({
+      action: "search",
+      archivePath: "wkg:///tmp/book.sdpub",
+      evidenceLimit: 3,
+      format: "json",
+      kinds: ["triple"],
+      query: "RAG",
+    });
+
+    expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
+      archiveKey: "/tmp/book.sdpub",
+      evidenceLimit: 3,
+      types: ["triple"],
+    });
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      limit: 20,
+      nextCursor: null,
+      objects: [
+        {
+          evidence: {
+            nextCursor: null,
+            shown: 1,
+            sources: [
+              {
+                text: "RAG original source fragment.",
+                uri: "wkg://chapter/2/source/0#0..1",
+              },
+            ],
+            total: 1,
+          },
+          objectLabel: "agent",
+          predicate: "mentions",
+          subjectLabel: "RAG",
+          uri: "wkg://triple/Q1/mentions/Q2",
+        },
+      ],
+    });
+  });
+
   it("prints search cursor metadata as JSONL", async () => {
     await runArchiveCommand({
       action: "search",
@@ -1117,7 +1188,11 @@ describe("cli/archive", () => {
       objectId: "wkg:///tmp/book.sdpub/chunk/9",
     });
 
-    expect(listRelatedArchiveObjects).toHaveBeenCalledWith({}, "wkg://chunk/9");
+    expect(listRelatedArchiveObjects).toHaveBeenCalledWith(
+      {},
+      "wkg://chunk/9",
+      {},
+    );
     expect(archiveMockState.textWrites[0]).toContain("wkg://chunk/11");
     expect(archiveMockState.textWrites[0]).toContain("Related");
     expect(archiveMockState.textWrites[0]).toContain(
@@ -1127,7 +1202,7 @@ describe("cli/archive", () => {
         "Related chunk",
         "",
         "wkg://triple/Q1/mentions/Q2",
-        "RAG(Q1) mentions agent(Q2)",
+        "RAG mentions agent",
       ].join("\n"),
     );
     expect(archiveMockState.textWrites[0]).not.toContain("Q1 mentions Q2");
@@ -1172,6 +1247,45 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).not.toContain(
       '"label":"RAG mentions agent"',
     );
+  });
+
+  it("passes related role and prints related triple evidence", async () => {
+    await runArchiveCommand({
+      action: "related",
+      archivePath: "wkg:///tmp/book.sdpub",
+      evidenceLimit: 3,
+      format: "json",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1",
+      role: "subject",
+    });
+
+    expect(listRelatedArchiveObjects).toHaveBeenCalledWith(
+      {},
+      "wkg://entity/Q1",
+      {
+        evidenceLimit: 3,
+        role: "subject",
+      },
+    );
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toMatchObject({
+      objects: [
+        {
+          uri: "wkg://chunk/11",
+        },
+        {
+          evidence: {
+            shown: 1,
+            sources: [
+              {
+                uri: "wkg://chapter/2/source/0#0..1",
+              },
+            ],
+            total: 1,
+          },
+          uri: "wkg://triple/Q1/mentions/Q2",
+        },
+      ],
+    });
   });
 
   it("prints evidence source ranges", async () => {
@@ -1301,7 +1415,47 @@ describe("cli/archive", () => {
 
     expect(archiveMockState.textWrites[0]).toContain("Pack Budget: 1000");
     expect(archiveMockState.textWrites[0]).toContain("# Anchor");
+    expect(archiveMockState.textWrites[0]).toContain("# Related");
     expect(archiveMockState.textWrites[0]).toContain("Source Fragments:");
+    expect(archiveMockState.textWrites[0]).not.toContain("# Links");
+  });
+
+  it("prints a context pack as anchor plus related JSON", async () => {
+    await runArchiveCommand({
+      action: "pack",
+      archivePath: "wkg:///tmp/book.sdpub",
+      budget: 1000,
+      format: "json",
+      objectId: "wkg:///tmp/book.sdpub/chunk/9",
+    });
+
+    const output = JSON.parse(archiveMockState.textWrites[0] ?? "") as Record<
+      string,
+      unknown
+    >;
+
+    expect(output).toMatchObject({
+      anchor: {
+        uri: "wkg://chunk/9",
+      },
+      related: {
+        limit: 2,
+        nextCursor: null,
+        objects: [
+          {
+            uri: "wkg://chunk/11",
+          },
+          {
+            evidence: {
+              shown: 1,
+            },
+            uri: "wkg://triple/Q1/mentions/Q2",
+          },
+        ],
+      },
+    });
+    expect(output).not.toHaveProperty("links");
+    expect(output).not.toHaveProperty("budget");
   });
 
   it("guides bare archive paths to Wiki Graph URI help", async () => {

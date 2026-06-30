@@ -188,6 +188,7 @@ export interface CLIArchiveArguments {
   readonly outputPath?: string;
   readonly prompt?: string;
   readonly query?: string;
+  readonly role?: "any" | "object" | "self" | "subject";
   readonly sourcePath?: string;
   readonly targetStage?: ChapterStage;
 }
@@ -238,6 +239,7 @@ interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly parent?: string;
   readonly predicate?: string;
   readonly prompt?: string;
+  readonly role?: string;
   readonly root?: boolean;
   readonly stage?: string;
   readonly last?: boolean;
@@ -452,6 +454,9 @@ export function parseCLIArguments(
       },
       recursive: {
         type: "boolean",
+      },
+      role: {
+        type: "string",
       },
       root: {
         type: "boolean",
@@ -2046,6 +2051,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
 
@@ -2080,6 +2086,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
@@ -2114,6 +2121,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
@@ -2136,6 +2144,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      validateRelatedTargetUri(archivePath, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
@@ -2145,6 +2154,7 @@ function parseArchiveArguments(
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           objectId: archivePath,
+          ...parseRelatedRoleFlag(values.role, helpRoute),
         },
         help: false,
         kind: "archive",
@@ -2156,6 +2166,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
@@ -2188,6 +2199,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       validatePackTargetUri(archivePath, helpRoute);
       return {
@@ -2289,16 +2301,47 @@ function validatePackTargetUri(uri: string, helpRoute: string): void {
   }
 }
 
+function validateRelatedTargetUri(uri: string, helpRoute: string): void {
+  const parsed = parseLocatedWikiGraphUri(uri);
+
+  if (parsed.archivePath === undefined) {
+    throw new Error(
+      withHelpRoute(formatMissingArchiveLocatorMessage(uri), helpRoute),
+    );
+  }
+  if (parsed.objectUri === undefined) {
+    throw new Error(
+      withHelpRoute(
+        `Related requires a chunk or entity URI: ${uri}`,
+        "wikigraph help object",
+      ),
+    );
+  }
+  if (!isRelatedObjectUri(parsed.objectUri)) {
+    throw new Error(
+      withHelpRoute(
+        `Related is only available for chunk and entity objects: ${uri}`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
 function isPackableObjectUri(objectUri: string): boolean {
   return (
     /^wkg:\/\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
     /^wkg:\/\/chapter\/[1-9][0-9]*\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
     /^wkg:\/\/entity\/[^/]+$/u.test(objectUri) ||
-    /^wkg:\/\/chapter\/[1-9][0-9]*\/entity\/[^/]+$/u.test(objectUri) ||
-    /^wkg:\/\/triple\/[^/]+\/[^/]+\/[^/]+$/u.test(objectUri) ||
-    /^wkg:\/\/chapter\/[1-9][0-9]*\/triple\/[^/]+\/[^/]+\/[^/]+$/u.test(
-      objectUri,
-    )
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/entity\/[^/]+$/u.test(objectUri)
+  );
+}
+
+function isRelatedObjectUri(objectUri: string): boolean {
+  return (
+    /^wkg:\/\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
+    /^wkg:\/\/entity\/[^/]+$/u.test(objectUri) ||
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/entity\/[^/]+$/u.test(objectUri)
   );
 }
 
@@ -2349,7 +2392,7 @@ function formatMissingArchiveLocatorMessage(uri: string): string {
 function formatPackObjectMismatchMessage(uri: string): string {
   return [
     `Pack requires a graph object URI: ${uri}`,
-    "Supported pack targets are chunk, entity, and triple objects.",
+    "Supported pack targets are chunk and entity objects.",
     "Use `wikigraph help object` to inspect valid object/verb pairs.",
   ].join("\n");
 }
@@ -2391,9 +2434,9 @@ function normalizeArchiveChapterArguments(
     readonly json?: boolean;
     readonly llm?: string;
     readonly parent?: string;
-    readonly prompt?: string;
-    readonly recursive?: boolean;
-    readonly root?: boolean;
+  readonly prompt?: string;
+  readonly recursive?: boolean;
+  readonly root?: boolean;
     readonly last?: boolean;
     readonly stage?: string;
     readonly title?: string;
@@ -3702,6 +3745,30 @@ function parseEvidenceFlag(
   return {
     evidenceLimit: parsePositiveIntegerFlag(value, "--evidence", helpRoute),
   };
+}
+
+function parseRelatedRoleFlag(
+  value: string | undefined,
+  helpRoute: string,
+): { readonly role?: "any" | "object" | "self" | "subject" } {
+  if (value === undefined) {
+    return {};
+  }
+  if (
+    value !== "any" &&
+    value !== "object" &&
+    value !== "self" &&
+    value !== "subject"
+  ) {
+    throw new Error(
+      withHelpRoute(
+        "--role must be one of: any, subject, object, self.",
+        helpRoute,
+      ),
+    );
+  }
+
+  return { role: value };
 }
 
 function parsePositiveIntegerFlag(

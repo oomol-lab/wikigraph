@@ -188,6 +188,12 @@ export async function runArchiveCommand(
             await listRelatedArchiveObjects(
               document,
               getObjectUri(args.objectId!),
+              {
+                ...(args.evidenceLimit === undefined
+                  ? {}
+                  : { evidenceLimit: args.evidenceLimit }),
+                ...(args.role === undefined ? {} : { role: args.role }),
+              },
             ),
             createArchiveOutputContext(args),
             args.format ?? "text",
@@ -667,7 +673,9 @@ async function writeList(
   context: ArchiveOutputContext,
   format: ResultFormat,
 ): Promise<void> {
-  const objects = items.map(createListObject);
+  const objects = await Promise.all(
+    items.map(async (item) => await createListObject(item, context)),
+  );
 
   if (format === "json") {
     await writeTextToStdout(
@@ -685,31 +693,26 @@ async function writeList(
     return;
   }
 
-  await writeTextToStdout(`${items.map(formatListItem).join("\n\n")}\n`);
+  await writeTextToStdout(
+    `${objects.map(formatFindObject).join("\n\n")}\n`,
+  );
 }
 
-function formatListItem(item: ArchiveListItem): string {
-  if (item.type === "triple") {
-    return [
-      toWikiGraphUri(item.id),
-      `${item.subjectLabel}(${item.subjectQid}) ${item.predicate} ${item.objectLabel}(${item.objectQid})`,
-    ].join("\n");
-  }
-
-  return [toWikiGraphUri(item.id), item.label, item.summary].join("\n");
-}
-
-function createListObject(item: ArchiveListItem): {
-  readonly label?: string;
-  readonly objectLabel?: string;
-  readonly predicate?: string;
-  readonly subjectLabel?: string;
-  readonly summary?: string;
-  readonly type?: ArchiveListItem["type"];
-  readonly uri: string;
-} {
+async function createListObject(
+  item: ArchiveListItem,
+  context: ArchiveOutputContext,
+): Promise<ArchiveOutputObject> {
   if (item.type === "triple") {
     return {
+      ...(context.evidenceLimit === undefined || item.evidence === undefined
+        ? {}
+        : {
+            evidence: await createEvidencePreviewObject(item.evidence, {
+              ...context,
+              continuationKind: "evidence",
+              targetUri: toWikiGraphUri(item.id),
+            }),
+          }),
       objectLabel: item.objectLabel,
       predicate: item.predicate,
       subjectLabel: item.subjectLabel,
@@ -718,21 +721,30 @@ function createListObject(item: ArchiveListItem): {
   }
 
   return {
+    ...(context.evidenceLimit === undefined || item.evidence === undefined
+      ? {}
+      : {
+          evidence: await createEvidencePreviewObject(item.evidence, {
+            ...context,
+            continuationKind: "evidence",
+            targetUri: toWikiGraphUri(item.id),
+          }),
+        }),
     label: item.label,
-    summary: item.summary,
+    ...(item.evidence === undefined ? { summary: item.summary } : {}),
     type: item.type,
     uri: toWikiGraphUri(item.id),
   };
 }
 
 function createObjectResultPage(
-  objects: readonly unknown[],
+  objects: readonly ArchiveOutputObject[],
   nextCursor: string | null,
   limit: number,
 ): {
   readonly limit: number;
   readonly nextCursor: string | null;
-  readonly objects: readonly unknown[];
+  readonly objects: readonly ArchiveOutputObject[];
 } {
   return {
     limit,
@@ -947,14 +959,16 @@ async function writePack(
   context: ArchiveOutputContext,
   format: ResultFormat,
 ): Promise<void> {
+  const packContext = { ...context, evidenceLimit: context.evidenceLimit ?? 3 };
+
   if (format === "json") {
     await writeTextToStdout(
-      formatCLIJSON(await createPackObject(pack, context)),
+      formatCLIJSON(await createPackObject(pack, packContext)),
     );
     return;
   }
   if (format === "jsonl") {
-    await writeJSONL([await createPackObject(pack, context)]);
+    await writeJSONL([await createPackObject(pack, packContext)]);
     return;
   }
 
@@ -962,10 +976,14 @@ async function writePack(
     `Pack Budget: ${pack.budget}`,
     "",
     "# Anchor",
-    await formatPackAnchor(pack.anchor, context),
+    await formatPackAnchor(pack.anchor, packContext),
     "",
-    "# Links",
-    ...formatNeighborLines(pack.links),
+    "# Related",
+    ...(await Promise.all(
+      pack.related.map(async (item) =>
+        formatFindObject(await createListObject(item, packContext)),
+      ),
+    )),
   ];
 
   await writeTextToStdout(
@@ -1173,13 +1191,19 @@ async function createPackObject(
   context: ArchiveOutputContext,
 ): Promise<{
   readonly anchor: unknown;
-  readonly budget: number;
-  readonly links: ArchivePack["links"];
+  readonly related: {
+    readonly limit: number;
+    readonly nextCursor: string | null;
+    readonly objects: readonly ArchiveOutputObject[];
+  };
 }> {
+  const relatedObjects = await Promise.all(
+    pack.related.map(async (item) => await createListObject(item, context)),
+  );
+
   return {
     anchor: await createPageObject(pack.anchor, context),
-    budget: pack.budget,
-    links: pack.links,
+    related: createObjectResultPage(relatedObjects, null, relatedObjects.length),
   };
 }
 

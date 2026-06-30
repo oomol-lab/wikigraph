@@ -407,7 +407,7 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
       },
       {
         command: "wikigraph wkg://book.sdpub/chunk/123 related",
-        note: "Expand to nearby graph objects.",
+        note: "Expand to nearby Reading Graph chunks.",
         verb: "related",
       },
       {
@@ -444,7 +444,7 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
         verb: "get",
       },
       {
-        command: "wikigraph wkg://book.sdpub/entity/Q9957 related",
+        command: "wikigraph wkg://book.sdpub/entity/Q9957 related --role subject",
         note: "List triples related to the entity.",
         verb: "related",
       },
@@ -487,21 +487,9 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
       },
       {
         command:
-          "wikigraph wkg://book.sdpub/triple/Q9957/participant_in/Q178561 related",
-        note: "Expand from the triple.",
-        verb: "related",
-      },
-      {
-        command:
           "wikigraph wkg://book.sdpub/triple/Q9957/participant_in/Q178561 evidence",
         note: "Trace relation evidence back to source.",
         verb: "evidence",
-      },
-      {
-        command:
-          "wikigraph wkg://book.sdpub/triple/Q9957/participant_in/Q178561 pack --budget 5000",
-        note: "Pack bounded source-backed context.",
-        verb: "pack",
       },
     ],
   },

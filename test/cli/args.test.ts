@@ -482,6 +482,26 @@ describe("cli/args", () => {
       help: false,
       kind: "archive",
     });
+    expect(
+      parseCLIArguments([
+        "wkg://book.sdpub/entity/Q1",
+        "related",
+        "--role",
+        "subject",
+        "--evidence",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "related",
+        archivePath: "wkg://book.sdpub/entity/Q1",
+        evidenceLimit: 3,
+        format: "text",
+        objectId: "wkg://book.sdpub/entity/Q1",
+        role: "subject",
+      },
+      help: false,
+      kind: "archive",
+    });
 
     expect(
       parseCLIArguments([
@@ -593,6 +613,32 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments(["wkg://book.sdpub/chapter/1/summary", "pack"]),
     ).toThrow("The chapter summary resource does not support `pack`.");
+    expect(() =>
+      parseCLIArguments([
+        "wkg://book.sdpub/entity/Q1",
+        "related",
+        "--role",
+        "left",
+      ]),
+    ).toThrow("--role must be one of: any, subject, object, self.");
+    expect(() =>
+      parseCLIArguments([
+        "wkg://book.sdpub",
+        "search",
+        "RAG",
+        "--role",
+        "any",
+      ]),
+    ).toThrow("The `search` command does not support --role.");
+    expect(() =>
+      parseCLIArguments([
+        "wkg://book.sdpub/triple/Q1/mentions/Q2",
+        "related",
+      ]),
+    ).toThrow("Related is only available for chunk and entity objects");
+    expect(() =>
+      parseCLIArguments(["wkg://book.sdpub/triple/Q1/mentions/Q2", "pack"]),
+    ).toThrow("Supported pack targets are chunk and entity objects.");
   });
 
   it("keeps explicit negative evidence values for validation", () => {

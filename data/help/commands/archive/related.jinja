@@ -4,19 +4,22 @@ Command: wikigraph related
 related
 
 Purpose:
-  Expand from one readable Wiki Graph URI to nearby objects.
+  Expand from one chunk or entity Wiki Graph URI to related objects.
 
 Use when:
-  - You have a selected readable object and need adjacent graph context.
+  - You have a selected chunk and need nearby Reading Graph chunks.
+  - You have a selected entity and need Knowledge Graph triples involving it.
 
 Usage:
-  wikigraph <object-uri> related [--evidence [n]] [--json|--jsonl] [--help|-h]
+  wikigraph <chunk-uri> related [--evidence [n]] [--json|--jsonl] [--help|-h]
+  wikigraph <entity-uri> related [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl] [--help|-h]
 
 Returns:
   - Related full `wkg://...` URIs with labels or summaries.
 
 Notes:
   - `related` starts from a known URI; `search` starts from query text.
+  - `--role` only applies to entity URIs. Default is `any`.
   - Add `--evidence` or `--evidence <n>` to include source evidence previews where available.
   - Returned URIs can be inspected or verified with other object commands.
   - Read `wikigraph help uri` before constructing object URIs.
@@ -28,3 +31,4 @@ Next steps:
 
 Examples:
   wikigraph wkg:///books/book.sdpub/chunk/123 related
+  wikigraph wkg:///books/book.sdpub/entity/Q162593 related --role subject --evidence
