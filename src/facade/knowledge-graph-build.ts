@@ -82,7 +82,11 @@ const mentionRecordSchema = z.object({
 });
 
 const sentenceIdSchema = z
-  .tuple([z.number().int(), z.number().int(), z.number().int().nonnegative()])
+  .tuple([
+    z.number().int().nonnegative(),
+    z.number().int().nonnegative(),
+    z.number().int().nonnegative(),
+  ])
   .readonly();
 
 const mentionLinkRecordSchema = z.object({

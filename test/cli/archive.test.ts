@@ -498,11 +498,14 @@ describe("cli/archive", () => {
     expect(createContinuationCursor).toHaveBeenCalledWith({
       archiveKey: "/tmp/book.sdpub",
       archivePath: "/tmp/book.sdpub",
+      chapters: [2],
       cursor: "raw-collection-cursor",
       evidenceLimit: 3,
       format: "json",
+      ids: null,
       kind: "collection",
       limit: 20,
+      order: "doc-asc",
       types: ["entity"],
     });
   });
@@ -511,10 +514,13 @@ describe("cli/archive", () => {
     vi.mocked(readContinuationCursor).mockResolvedValueOnce({
       archiveKey: "/tmp/book.sdpub",
       archivePath: "/tmp/book.sdpub",
+      chapters: [2],
       cursor: "raw-collection-cursor",
       format: "json",
+      ids: null,
       kind: "collection",
       limit: 20,
+      order: "doc-asc",
       types: ["entity"],
     });
 
@@ -527,8 +533,10 @@ describe("cli/archive", () => {
     expect(listArchiveCollection).toHaveBeenCalledWith(
       {},
       {
+        chapters: [2],
         cursor: "raw-collection-cursor",
         limit: 20,
+        order: "doc-asc",
         types: ["entity"],
       },
     );

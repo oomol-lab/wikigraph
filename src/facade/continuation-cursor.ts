@@ -14,11 +14,14 @@ export type ContinuationCursor =
   | {
       readonly archiveKey: string;
       readonly archivePath: string;
+      readonly chapters: readonly number[] | null;
       readonly cursor: string;
       readonly evidenceLimit?: number;
       readonly format: "json" | "jsonl" | "text";
+      readonly ids: readonly string[] | null;
       readonly kind: "collection";
       readonly limit: number;
+      readonly order: "doc-asc" | "doc-desc";
       readonly types: readonly string[] | null;
     }
   | {
@@ -145,6 +148,16 @@ export async function readContinuationCursor(
 function createCursorPayload(input: ContinuationCursor): object {
   switch (input.kind) {
     case "collection":
+      return {
+        chapters: input.chapters,
+        cursor: input.cursor,
+        ...(input.evidenceLimit === undefined
+          ? {}
+          : { evidenceLimit: input.evidenceLimit }),
+        ids: input.ids,
+        order: input.order,
+        types: input.types,
+      };
     case "search":
       return {
         cursor: input.cursor,
@@ -171,14 +184,30 @@ function parseContinuationCursorRecord(record: {
 }): ContinuationCursor {
   const payload = parsePayload(record.payloadJSON);
 
-  if (record.kind === "collection" || record.kind === "search") {
+  if (record.kind === "collection") {
+    return {
+      archiveKey: record.archiveKey,
+      archivePath: record.archivePath,
+      chapters: getPayloadNumberArrayOrNull(payload, "chapters"),
+      cursor: getPayloadString(payload, "cursor"),
+      ...getPayloadOptionalPositiveInteger(payload, "evidenceLimit"),
+      format: record.format,
+      ids: getPayloadStringArrayOrNull(payload, "ids"),
+      kind: "collection",
+      limit: record.limit,
+      order: getPayloadOrder(payload),
+      types: getPayloadStringArrayOrNull(payload, "types"),
+    };
+  }
+
+  if (record.kind === "search") {
     return {
       archiveKey: record.archiveKey,
       archivePath: record.archivePath,
       cursor: getPayloadString(payload, "cursor"),
       ...getPayloadOptionalPositiveInteger(payload, "evidenceLimit"),
       format: record.format,
-      kind: record.kind,
+      kind: "search",
       limit: record.limit,
       types: getPayloadStringArrayOrNull(payload, "types"),
     };
@@ -232,6 +261,43 @@ function getPayloadStringArrayOrNull(
     return null;
   }
   if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return value;
+  }
+
+  throw new Error("Invalid continuation cursor payload.");
+}
+
+function getPayloadNumberArrayOrNull(
+  payload: Readonly<Record<string, unknown>>,
+  key: string,
+): readonly number[] | null {
+  const value = payload[key];
+
+  if (value === null) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    const numbers: number[] = [];
+
+    for (const item of value) {
+      if (typeof item !== "number" || !Number.isInteger(item)) {
+        throw new Error("Invalid continuation cursor payload.");
+      }
+      numbers.push(item);
+    }
+
+    return numbers;
+  }
+
+  throw new Error("Invalid continuation cursor payload.");
+}
+
+function getPayloadOrder(
+  payload: Readonly<Record<string, unknown>>,
+): "doc-asc" | "doc-desc" {
+  const value = payload.order;
+
+  if (value === "doc-asc" || value === "doc-desc") {
     return value;
   }
 

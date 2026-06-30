@@ -87,10 +87,13 @@ interface ArchiveOutputSource {
 interface ArchiveOutputContext {
   readonly archiveKey: string;
   readonly archivePath: string;
+  readonly chapters?: readonly number[];
   readonly continuationKind?: "collection" | "evidence" | "search";
   readonly evidenceLimit?: number;
   readonly format: ResultFormat;
+  readonly ids?: readonly string[];
   readonly limit: number;
+  readonly order?: ArchiveCollectionResult["order"];
   readonly targetUri?: string;
   readonly types: readonly string[] | null;
 }
@@ -165,10 +168,9 @@ export async function runArchiveCommand(
                 createCollectionOptions(args),
               ),
             ),
-            {
-              ...createArchiveOutputContext(args),
+            createArchiveOutputContext(args, {
               continuationKind: "collection",
-            },
+            }),
             args.format ?? "text",
           );
         },
@@ -323,11 +325,14 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
     switch (cursor.kind) {
       case "collection": {
         const collectionOptions: ArchiveCollectionOptions = {
+          ...(cursor.chapters === null ? {} : { chapters: cursor.chapters }),
           cursor: cursor.cursor,
           ...(cursor.evidenceLimit === undefined
             ? {}
             : { evidenceLimit: cursor.evidenceLimit }),
+          ...(cursor.ids === null ? {} : { ids: cursor.ids }),
           limit,
+          order: cursor.order,
         };
 
         if (cursor.types !== null) {
@@ -343,12 +348,15 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
           {
             archiveKey: cursor.archiveKey,
             archivePath: cursor.archivePath,
+            ...(cursor.chapters === null ? {} : { chapters: cursor.chapters }),
             continuationKind: "collection",
             ...(cursor.evidenceLimit === undefined
               ? {}
               : { evidenceLimit: cursor.evidenceLimit }),
             format,
+            ...(cursor.ids === null ? {} : { ids: cursor.ids }),
             limit,
+            order: cursor.order,
             types: cursor.types,
           },
           format,
@@ -471,7 +479,7 @@ function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
 function createArchiveOutputContext(
   args: CLIArchiveArguments,
   options: {
-    readonly continuationKind?: "evidence" | "search";
+    readonly continuationKind?: "collection" | "evidence" | "search";
     readonly targetUri?: string;
   } = {},
 ): ArchiveOutputContext {
@@ -486,6 +494,9 @@ function createArchiveOutputContext(
       : { evidenceLimit: args.evidenceLimit }),
     format: args.format ?? "text",
     limit: args.limit ?? DEFAULT_OUTPUT_LIMIT,
+    ...(options.continuationKind === "collection"
+      ? createScopeOptions(args.archivePath)
+      : {}),
     ...(options.targetUri === undefined
       ? {}
       : { targetUri: options.targetUri }),
@@ -508,30 +519,48 @@ async function createOutputContinuationCursor(
     return null;
   }
 
-  const input: ContinuationCursor =
-    context.continuationKind === "evidence"
-      ? {
-          archiveKey: context.archiveKey,
-          archivePath: context.archivePath,
-          cursor,
-          format: context.format,
-          kind: "evidence",
-          limit: context.evidenceLimit ?? context.limit,
-          targetUri: context.targetUri ?? "",
-        }
-      : {
-          archiveKey: context.archiveKey,
-          archivePath: context.archivePath,
-          cursor,
-          ...(context.evidenceLimit === undefined
-            ? {}
-            : { evidenceLimit: context.evidenceLimit }),
-          format: context.format,
-          kind:
-            context.continuationKind === "collection" ? "collection" : "search",
-          limit: context.limit,
-          types: context.types,
-        };
+  let input: ContinuationCursor;
+
+  if (context.continuationKind === "evidence") {
+    input = {
+      archiveKey: context.archiveKey,
+      archivePath: context.archivePath,
+      cursor,
+      format: context.format,
+      kind: "evidence",
+      limit: context.evidenceLimit ?? context.limit,
+      targetUri: context.targetUri ?? "",
+    };
+  } else if (context.continuationKind === "collection") {
+    input = {
+      archiveKey: context.archiveKey,
+      archivePath: context.archivePath,
+      chapters: context.chapters ?? null,
+      cursor,
+      ...(context.evidenceLimit === undefined
+        ? {}
+        : { evidenceLimit: context.evidenceLimit }),
+      format: context.format,
+      ids: context.ids ?? null,
+      kind: "collection",
+      limit: context.limit,
+      order: context.order ?? "doc-asc",
+      types: context.types,
+    };
+  } else {
+    input = {
+      archiveKey: context.archiveKey,
+      archivePath: context.archivePath,
+      cursor,
+      ...(context.evidenceLimit === undefined
+        ? {}
+        : { evidenceLimit: context.evidenceLimit }),
+      format: context.format,
+      kind: "search",
+      limit: context.limit,
+      types: context.types,
+    };
+  }
 
   return await createContinuationCursor(input);
 }

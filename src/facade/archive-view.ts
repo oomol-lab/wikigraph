@@ -878,6 +878,7 @@ async function findArchiveObjectsUncached(
     requestedTypes.every((type) => type === "entity" || type === "triple");
   const hasTextTypeRequest =
     requestedTypes === null ||
+    requestedTypes.includes("chapter") ||
     requestedTypes.includes("meta") ||
     requestedTypes.includes("fragment") ||
     requestedTypes.includes("node") ||
