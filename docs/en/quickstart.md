@@ -40,8 +40,8 @@ Create creates or replaces a `.sdpub` archive at source stage. The archive now c
 ## 4. Inspect And Estimate
 
 ```bash
-wikigraph wkg://book.sdpub status
-wikigraph wkg://book.sdpub index
+wikigraph wkg://book.sdpub/state get
+wikigraph wkg://book.sdpub/chapter/tree get
 wikigraph wkg://book.sdpub estimate --stage reading-summary
 ```
 
@@ -65,7 +65,7 @@ wikigraph wkg-job:// list --input wkg://book.sdpub
 
 ```bash
 wikigraph wkg://book.sdpub/chapter/tree get --json
-wikigraph wkg://book.sdpub search "central argument" --type chunk
+wikigraph wkg://book.sdpub/chunk search "central argument"
 wikigraph wkg://book.sdpub/chapter/3 get
 wikigraph wkg://book.sdpub/chunk/84 get
 wikigraph wkg://book.sdpub/chunk/84 related
@@ -73,7 +73,7 @@ wikigraph wkg://book.sdpub/chunk/84 evidence
 wikigraph wkg://book.sdpub/chunk/84 pack --budget 5000
 ```
 
-Use `--type` to choose a search lens: `--type chunk` for Reading Graph structure, `--type summary` for quick overview, `--type source` for original source wording, or `--type entity,triple` for Knowledge Graph objects.
+Use URI lenses to choose a search target: `<archive-uri>/chunk` for Reading Graph structure, `<archive-uri>/summary` for quick overview, `<archive-uri>/source` for original source wording, or `<archive-uri>/entity` and `<archive-uri>/triple` for Knowledge Graph objects.
 
 Object commands use Wiki Graph URIs. Read `wikigraph help uri` when constructing URIs manually.
 

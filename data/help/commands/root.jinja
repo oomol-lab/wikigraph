@@ -13,15 +13,16 @@ Object model:
 
 Object workflow:
   - `search` returns candidate Wiki Graph URIs from query text.
-  - `list` is search without query text: it enumerates objects from a located Wiki Graph URI and optional `--type` filter.
+  - `list` is search without query text: it enumerates objects from a located Wiki Graph URI or lens URI.
   - `get` opens one readable URI.
   - `related` expands from one URI to nearby URIs.
   - `evidence` traces a URI to source-backed evidence.
   - `pack` builds bounded Agent-readable context around one readable URI.
 
 Object commands:
-  wikigraph <wikigraph-uri-with-sdpub-locator> search <query> [--type <meta|chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
-  wikigraph <wikigraph-uri-with-sdpub-locator> list [--type <meta|chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
+  wikigraph <located-wkg-uri> search <query> [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
+  wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> search <query> [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
+  wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
   wikigraph <object-uri> get [--evidence [n]] [--json|--jsonl]
   wikigraph <object-uri> related [--evidence [n]] [--json|--jsonl]
   wikigraph <entity|triple|summary|chunk-uri> evidence [--limit <n>] [--cursor <token>] [--json|--jsonl]
@@ -37,8 +38,7 @@ Archive commands:
   wikigraph <archive-uri> create [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
   wikigraph <archive-uri> export --output-format <format> [--output <path>]
   wikigraph <archive-uri> estimate [--stage <source|reading-graph|reading-summary>] [--json]
-  wikigraph <archive-uri> status [--json]
-  wikigraph <archive-uri> index [--json]
+  wikigraph <archive-uri>/state get [--json|--jsonl]
   wikigraph transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <stage>] [--verbose|-v]
 
 Generation queue:
@@ -53,7 +53,8 @@ Maintenance:
   wikigraph <archive-uri> set [metadata options] [--llm <json>]
   wikigraph <cover-uri> get
   wikigraph <chapter-collection-uri> add|list [options]
-  wikigraph <chapter-uri> status|move|remove|reset [options]
+  wikigraph <chapter-uri>/state get [--json|--jsonl]
+  wikigraph <chapter-uri> move|remove|reset [options]
   wikigraph <chapter-uri>/source set [--input <path>] --input-format <format>
   wikigraph <chapter-uri>/summary set [--input <path>]
   wikigraph <chapter-uri>/title set (--title <title>|--clear)

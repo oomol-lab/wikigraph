@@ -7,7 +7,6 @@ import {
   addChapter,
   applyChapterTree,
   assertNoActiveBuildJobs,
-  getChapterDetails,
   getChapterTree,
   listChapters,
   moveChapter,
@@ -161,13 +160,6 @@ export async function runArchiveChapterCommand(
         );
 
         await writeChapterDetails(details);
-      });
-      return;
-    case "status":
-      await new SpineDigestFile(args.path).readDocument(async (document) => {
-        await writeChapterDetails(
-          await getChapterDetails(document, args.chapterId!),
-        );
       });
       return;
     case "tree":

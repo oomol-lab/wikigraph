@@ -49,6 +49,7 @@ export type ArchiveObjectType =
   | "fragment"
   | "meta"
   | "node"
+  | "state"
   | "summary"
   | "triple";
 
@@ -295,6 +296,20 @@ export type ArchivePage =
       readonly publisher?: string;
       readonly title: string;
       readonly type: "meta";
+    }
+  | {
+      readonly id: string;
+      readonly state:
+        | {
+            readonly archive: ArchiveIndex;
+            readonly kind: "archive";
+          }
+        | {
+            readonly chapter: ChapterEntry;
+            readonly kind: "chapter";
+          };
+      readonly title: string;
+      readonly type: "state";
     };
 
 export interface ArchiveEstimate {
@@ -1061,12 +1076,29 @@ async function readWikiGraphPage(
   switch (reference.type) {
     case "meta":
       return await readArchivePage(document, ARCHIVE_ROOT_ID, options);
+    case "state":
+      return {
+        id: "wkg://state",
+        state: { archive: await getArchiveIndex(document), kind: "archive" },
+        title: "Archive state",
+        type: "state",
+      };
     case "chapter":
       return await readArchivePage(
         document,
         formatChapterId(reference.chapterId),
         options,
       );
+    case "chapter-state": {
+      const details = await requireChapter(document, reference.chapterId);
+
+      return {
+        id: `wkg://chapter/${reference.chapterId}/state`,
+        state: { chapter: details, kind: "chapter" },
+        title: details.title ?? `[chapter ${reference.chapterId}] state`,
+        type: "state",
+      };
+    }
     case "chapter-tree":
       return {
         id: "chapter-tree",
@@ -1279,6 +1311,8 @@ async function listRelatedWikiGraphObjects(
       return await listRelatedTripleObjects(document, reference);
     case "chapter-tree":
     case "meta":
+    case "state":
+    case "chapter-state":
       return [];
   }
 }
@@ -1389,8 +1423,10 @@ export async function listArchiveEvidence(
 
   switch (reference.type) {
     case "chapter":
+    case "chapter-state":
     case "chapter-tree":
     case "meta":
+    case "state":
     case "source":
       throw new Error(`Evidence is not available for ${uri}.`);
     case "chunk": {
@@ -3125,8 +3161,15 @@ type WikiGraphReference =
       readonly type: "meta";
     }
   | {
+      readonly type: "state";
+    }
+  | {
       readonly chapterId: number;
       readonly type: "chapter";
+    }
+  | {
+      readonly chapterId: number;
+      readonly type: "chapter-state";
     }
   | {
       readonly type: "chapter-tree";
@@ -3195,6 +3238,10 @@ function parseWikiGraphReference(uri: string): WikiGraphReference {
     return { type: "meta" };
   }
 
+  if (pathParts[0] === "state" && pathParts.length === 1) {
+    return { type: "state" };
+  }
+
   if (pathParts[0] === "chapter-tree" && pathParts.length === 1) {
     return { type: "chapter-tree" };
   }
@@ -3211,6 +3258,11 @@ function parseWikiGraphReference(uri: string): WikiGraphReference {
         const chapterId = parsePositiveInteger(pathParts[1], uri);
 
         switch (pathParts[2]) {
+          case "state":
+            if (pathParts.length === 3) {
+              return { chapterId, type: "chapter-state" };
+            }
+            break;
           case "chunk":
             if (pathParts.length === 4) {
               return {

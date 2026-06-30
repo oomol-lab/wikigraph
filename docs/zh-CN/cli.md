@@ -14,10 +14,10 @@ wikigraph wkg-job://<job-id> <action> ...
 ```bash
 wikigraph <archive-uri> create [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
 wikigraph <archive-uri> estimate [--stage <source|reading-graph|reading-summary>] [--json]
-wikigraph <archive-uri> status [--json]
-wikigraph <archive-uri> index [--json]
-wikigraph <wikigraph-uri-with-sdpub-locator> search <query> [--type <chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
-wikigraph <wikigraph-uri-with-sdpub-locator> list [--type <chapter|entity|triple|source|summary|chunk[,kind...]>] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph <archive-uri>/state get [--json|--jsonl]
+wikigraph <located-wkg-uri> search <query> [--limit <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> search <query> [--limit <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--limit <n>] [--cursor <token>] [--json|--jsonl]
 wikigraph <object-uri> get [--json|--jsonl]
 wikigraph <object-uri> related [--evidence [n]] [--json|--jsonl]
 wikigraph <entity|triple|summary|chunk-uri> evidence [--limit <n>] [--cursor <token>] [--json|--jsonl]
@@ -43,7 +43,7 @@ wikigraph queue clean
 - `search` 根据 query text 查找可 URI 寻址的对象。Search result 是线索，不等于 source evidence。
 - `list` 在没有 query text 时枚举可 URI 寻址的对象。
 - Object command 使用 Wiki Graph URI。`search` 和 `list` 使用 archive 或 scope URI，例如 `wkg:///Users/me/book.sdpub`；`get`、`related`、`evidence` 和 `pack` 使用具体 object URI，例如 `wkg:///Users/me/book.sdpub/chapter/12`。
-- 做内容理解时，选择一个 search lens：`--type chunk` 用于 Reading Graph 结构，`--type summary` 用于快速概览，`--type source` 用于原文措辞，`--type entity,triple` 用于 Knowledge Graph 对象。
+- 做内容理解时，在 URI 中选择 search lens：`<archive-uri>/chunk` 用于 Reading Graph 结构，`<archive-uri>/summary` 用于快速概览，`<archive-uri>/source` 用于原文措辞，`<archive-uri>/entity` 和 `<archive-uri>/triple` 用于 Knowledge Graph 对象。
 - 使用 chapter scope URI，例如 `wkg:///Users/me/book.sdpub/chapter/12`，把 search 或 list 限定在一个章节内。
 - `--limit` 默认 `20`；下一页把返回的 `nextCursor` 传给 `--cursor`。
 - Search 不做语义扩展、词干匹配或向量搜索。
@@ -87,7 +87,7 @@ Queue 行为：
 读取、搜索和导航命令支持 `--json`：
 
 ```bash
-wikigraph wkg:///Users/me/book.sdpub search "RAG" --type chunk --json
+wikigraph wkg:///Users/me/book.sdpub/chunk search "RAG" --json
 wikigraph wkg:///Users/me/book.sdpub/chapter/3 get --json
 ```
 
@@ -111,7 +111,8 @@ wikigraph transform [--input <path>] [--output <path>] [--input-format <format>]
 wikigraph <archive-uri> get|set [metadata options]
 wikigraph <cover-uri> get
 wikigraph <archive-uri>/chapter list|add [options]
-wikigraph <chapter-uri> status|move|remove|reset [options]
+wikigraph <chapter-uri>/state get [--json|--jsonl]
+wikigraph <chapter-uri> move|remove|reset [options]
 wikigraph <chapter-uri>/source set [--input <path>] --input-format <format>
 wikigraph <chapter-uri>/summary set [--input <path>]
 wikigraph <chapter-uri>/title set (--title <title>|--clear)
@@ -120,7 +121,7 @@ wikigraph <archive-uri>/chapter/tree get|set [options]
 
 常规探索请使用 URI-first commands。`<archive-uri>/chapter/tree get` 是只读结构检查，会输出稳定 JSON tree，未命名章节显示为 `title: null`。`<archive-uri>/chapter/tree set` 可以重排章节，并在节点包含 `title` 时修改标题。
 
-`wikigraph config status` 输出配置状态。`wikigraph <archive-uri> status` 输出归档状态。
+`wikigraph config status` 输出配置状态。`wikigraph <archive-uri>/state get` 输出归档状态。
 
 ## 标准流规则
 

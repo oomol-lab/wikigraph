@@ -37,6 +37,8 @@ export type HelpObjectName =
   | "chapter-summary"
   | "chapter-title"
   | "chapter-tree"
+  | "archive-state"
+  | "chapter-state"
   | "chunk"
   | "cover"
   | "cursor"
@@ -56,7 +58,6 @@ export type HelpVerbName =
   | "evidence"
   | "export"
   | "get"
-  | "index"
   | "list"
   | "move"
   | "next"
@@ -69,7 +70,6 @@ export type HelpVerbName =
   | "resume"
   | "search"
   | "set"
-  | "status"
   | "watch";
 
 interface HelpObjectVerb {
@@ -130,14 +130,9 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
         verb: "create",
       },
       {
-        command: "wikigraph wkg://book.sdpub status --json",
+        command: "wikigraph wkg://book.sdpub/state get --json",
         note: "Inspect readiness and high-level counts.",
-        verb: "status",
-      },
-      {
-        command: "wikigraph wkg://book.sdpub index --json",
-        note: "Open archive-level entry points and metadata.",
-        verb: "index",
+        verb: "get",
       },
       {
         command: "wikigraph wkg://book.sdpub estimate --stage reading-summary",
@@ -155,7 +150,7 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
         verb: "search",
       },
       {
-        command: "wikigraph wkg://book.sdpub list --type chapter",
+        command: "wikigraph wkg://book.sdpub/chapter list",
         note: "List archive-level object collections.",
         verb: "list",
       },
@@ -202,14 +197,14 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
         verb: "search",
       },
       {
-        command: "wikigraph wkg://book.sdpub/chapter/12 list --type entity",
-        note: "List objects scoped to one chapter.",
+        command: "wikigraph wkg://book.sdpub/chapter/12/entity list",
+        note: "List entity objects scoped to one chapter.",
         verb: "list",
       },
       {
-        command: "wikigraph wkg://book.sdpub/chapter/12 status",
+        command: "wikigraph wkg://book.sdpub/chapter/12/state get",
         note: "Inspect one chapter stage and artifacts.",
-        verb: "status",
+        verb: "get",
       },
       {
         command: "wikigraph wkg://book.sdpub/chapter/12 move --parent 3",
@@ -231,6 +226,32 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
           "wikigraph wkg://book.sdpub/chapter/12 queue add --task reading-graph --accept-cost",
         note: "Queue generated work for the chapter.",
         verb: "queue",
+      },
+    ],
+  },
+  {
+    description: "Archive readiness and high-level counts.",
+    name: "archive-state",
+    title: "Archive State",
+    uriForms: ["wkg://book.sdpub/state"],
+    verbs: [
+      {
+        command: "wikigraph wkg://book.sdpub/state get --json",
+        note: "Inspect archive readiness and high-level counts.",
+        verb: "get",
+      },
+    ],
+  },
+  {
+    description: "One chapter's current stage and stored artifacts.",
+    name: "chapter-state",
+    title: "Chapter State",
+    uriForms: ["wkg://book.sdpub/chapter/12/state"],
+    verbs: [
+      {
+        command: "wikigraph wkg://book.sdpub/chapter/12/state get --json",
+        note: "Inspect one chapter state.",
+        verb: "get",
       },
     ],
   },
@@ -539,11 +560,6 @@ const HELP_VERBS: readonly HelpVerbEntry[] = [
     title: "Pack",
   },
   {
-    description: "Inspect object or archive readiness.",
-    name: "status",
-    title: "Status",
-  },
-  {
     description: "Move a chapter object in the chapter tree.",
     name: "move",
     title: "Move",
@@ -574,11 +590,6 @@ const HELP_VERBS: readonly HelpVerbEntry[] = [
     name: "export",
     title: "Export",
   },
-  {
-    description: "Open archive-level entry points.",
-    name: "index",
-    title: "Index",
-  },
   { description: "Read a continuation cursor.", name: "next", title: "Next" },
 ] as const;
 
@@ -591,9 +602,7 @@ export const ARCHIVE_COMMANDS = [
   "evidence",
   "next",
   "pack",
-  "status",
   "estimate",
-  "index",
   "export",
 ] as const satisfies readonly CLIArchiveAction[];
 

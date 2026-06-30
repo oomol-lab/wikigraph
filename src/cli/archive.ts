@@ -3,7 +3,6 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 import {
-  getArchiveIndex,
   listArchiveCollection,
   listArchiveEvidence,
   listRelatedArchiveObjects,
@@ -22,7 +21,6 @@ import {
   type ArchiveFindHit,
   type ArchiveCollectionOptions,
   type ArchiveCollectionResult,
-  type ArchiveIndex,
   type ArchiveListItem,
   type ArchivePack,
   type ArchivePage,
@@ -131,26 +129,6 @@ export async function runArchiveCommand(
         );
       });
       return;
-    case "index": {
-      await readArchiveDocument(args.archivePath, async (document) => {
-        await writeIndex(
-          await getArchiveIndex(document),
-          "index",
-          args.json ?? false,
-        );
-      });
-      return;
-    }
-    case "status": {
-      await readArchiveDocument(args.archivePath, async (document) => {
-        await writeIndex(
-          await getArchiveIndex(document),
-          "status",
-          args.json ?? false,
-        );
-      });
-      return;
-    }
     case "search":
       await readArchiveDocument(
         getArchivePath(args.archivePath),
@@ -660,61 +638,6 @@ async function readArchiveDocument<T>(
   await new SpineDigestFile(path).readDocument(operation);
 }
 
-async function writeIndex(
-  index: ArchiveIndex,
-  action: "index" | "status",
-  json: boolean,
-): Promise<void> {
-  if (json) {
-    await writeTextToStdout(formatCLIJSON(index));
-    return;
-  }
-
-  const lines = [
-    `Archive Type: LLM Wiki`,
-    `Title: ${index.meta?.title ?? "[untitled]"}`,
-    `Source Format: ${index.meta?.sourceFormat ?? "[unknown]"}`,
-    `Chapters: ${index.chapters.length}`,
-    `Summaries: ${index.summaryCount}`,
-    `Nodes: ${index.nodeCount}`,
-    `Edges: ${index.edgeCount}`,
-  ];
-
-  if (index.nodeCount === 0) {
-    lines.push(
-      "",
-      "Reading Graph:",
-      "  No reading chunks are currently available. If a reading-graph queue task already ran, the source may be too short or sparse.",
-      "  Next: inspect source with `wikigraph wkg://<archive.sdpub>/chapter/<id>/source/ get` or queue `--task reading-graph`.",
-    );
-  } else if (index.edgeCount === 0) {
-    lines.push(
-      "",
-      "Reading Graph:",
-      "  Reading chunks exist, but no chunk edges are currently available. This can be valid when extracted chunks have no stable relationships.",
-      "  Next: inspect chunks with `wikigraph wkg://<archive.sdpub> search <query> --type chunk`.",
-    );
-  }
-
-  if (action === "index") {
-    lines.push("", "Entry Points:");
-    for (const chapter of index.chapters.slice(0, 12)) {
-      lines.push(
-        `  chapter:${chapter.chapterId}  ${chapter.title ?? "[untitled]"} (${formatStage(chapter.stage)})`,
-      );
-    }
-    lines.push(
-      "",
-      "Next:",
-      "  wikigraph wkg://<archive.sdpub> search <term>",
-      "  wikigraph wkg://<archive.sdpub>/chapter/<id>/source/ get",
-      "  wikigraph <object-uri> related",
-    );
-  }
-
-  await writeTextToStdout(`${lines.join("\n")}\n`);
-}
-
 async function writeEstimate(
   estimate: ArchiveEstimate,
   json: boolean,
@@ -937,6 +860,11 @@ async function writePage(
         `${formatPlainObject(await createPageObject(page, context))}\n`,
       );
       return;
+    case "state":
+      await writeTextToStdout(
+        `${formatPlainObject(await createPageObject(page, context))}\n`,
+      );
+      return;
     case "fragment":
       await writeTextToStdout(
         [
@@ -1055,12 +983,12 @@ function formatNextCursor(nextCursor: string | null): string {
 
 function formatNoMatches(result: ArchiveFindResult): string {
   if (result.match === "all" && result.terms.length > 1) {
-    return `No matches. Try: wikigraph <archive-uri> search "${result.query}" --type ${formatFindTypes(result)}${formatFindLensHint(result)}\n`;
+    return `No matches. Try a more specific lens URI, for example: wikigraph <archive-uri>/source search "${result.query}"${formatFindLensHint(result)}\n`;
   }
 
   const lines = [
     "No matches.",
-    "Try fewer or broader keywords, or filter with `--type source|summary|chunk`.",
+    "Try fewer or broader keywords, or search a lens URI such as `<archive-uri>/source`, `<archive-uri>/summary`, or `<archive-uri>/chunk`.",
   ];
 
   if (result.lensHint !== null) {
@@ -1222,6 +1150,11 @@ async function createPageObject(
 
       return { ...rest, uri: toWikiGraphUri(page.id) };
     }
+    case "state": {
+      const { id: _id, ...rest } = page;
+
+      return { ...rest, uri: toWikiGraphUri(page.id) };
+    }
     case "node": {
       const { id: _id, ...rest } = page;
 
@@ -1344,16 +1277,6 @@ function formatFindLensHint(result: ArchiveFindResult): string {
   }
 
   return `\n\nLens hint: ${result.lensHint.message}`;
-}
-
-function formatFindTypes(result: ArchiveFindResult): string {
-  return result.types === null || result.types.length === 0
-    ? "chunk"
-    : result.types
-        .map((type) =>
-          type === "node" ? "chunk" : type === "fragment" ? "source" : type,
-        )
-        .join(",");
 }
 
 function formatNeighborLines(
@@ -1506,6 +1429,8 @@ async function formatPackAnchor(
     case "fragment":
       return `${anchor.id}\n${anchor.fragment.text}`;
     case "meta":
+      return formatPlainObject(await createPageObject(anchor, context));
+    case "state":
       return formatPlainObject(await createPageObject(anchor, context));
     case "node":
       return [

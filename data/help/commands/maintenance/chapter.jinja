@@ -5,7 +5,7 @@ Edit chapters inside an existing `.sdpub` archive.
 
 Usage:
   wikigraph <archive-uri>/chapter list [--llm <json>] [--help|-h]
-  wikigraph <chapter-uri> status [--llm <json>] [--help|-h]
+  wikigraph <chapter-uri>/state get [--json|--jsonl] [--help|-h]
   wikigraph <archive-uri>/chapter add --stage <planned|source> [--title <title>] [--parent <id>] [--input <path>] [--input-format <format>] [--llm <json>] [--help|-h]
   wikigraph <chapter-uri> move (--parent <id>|--root|--before <id>|--after <id>|--first|--last) [--llm <json>] [--help|-h]
   wikigraph <chapter-uri> remove [--recursive] [--llm <json>] [--help|-h]
@@ -40,6 +40,7 @@ Input rules:
 
 See also:
   - wikigraph wkg://book.sdpub/chapter list
+  - wikigraph wkg://book.sdpub/chapter/3/state get --json
   - wikigraph wkg://book.sdpub/chapter/tree get --json
   - wikigraph wkg://book.sdpub/chapter/3/title set --title "New Title"
   - wikigraph wkg://book.sdpub/chapter/3/source set --input chapter.md --input-format markdown
