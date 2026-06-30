@@ -18,7 +18,7 @@ Prefer archive commands for archive state and URI-first object commands for expl
 wikigraph wkg://book.sdpub/chapter/tree get --json
 wikigraph wkg://book.sdpub/source search "keyword"
 wikigraph wkg://book.sdpub/entity search "keyword"
-wikigraph wkg://book.sdpub/chapter/3/source/0#0..8 get
+wikigraph wkg://book.sdpub/chapter/3/source#0..8 get
 wikigraph <uri> related
 wikigraph <uri> evidence
 wikigraph wkg://book.sdpub/entity/Q9957 pack --budget 5000
@@ -42,7 +42,7 @@ Use the library API only when the surrounding system explicitly needs in-process
 
 - Primary object: `.sdpub`
 - Creation sources: EPUB, Markdown, TXT, and text pipelines
-- Read objects: Wiki Graph URIs such as `wkg://source/chapter/1#0..3`, `wkg://chunk/42`, `wkg://entity/Q9957`, and `wkg://triple/...`
+- Read objects: Wiki Graph URIs such as `wkg://chapter/1/source#0..3`, `wkg://chunk/42`, `wkg://entity/Q9957`, and `wkg://triple/...`
 - Cheap operations: `state get`, `search`, `get`, `related`, `evidence`, `pack`, `export`
 - Expensive operations: Reading Graph, Reading Summary, or Knowledge Graph `queue add`
 - Estimate first: `wikigraph <archive-uri> estimate --stage reading-summary`
@@ -56,7 +56,7 @@ Use the library API only when the surrounding system explicitly needs in-process
 4. Use `wikigraph <uri> get` to inspect one object.
 5. Use `wikigraph <uri> evidence` when an object should be grounded back to source text.
 6. Use `wikigraph <uri> related` to move to nearby peer objects.
-7. Use `wikigraph <graph-object-uri> pack` when the user needs deterministic context around a known chunk, entity, or triple.
+7. Use `wikigraph <graph-object-uri> pack` when the user needs deterministic context around a known chunk or entity.
 8. Use `export` only when the user needs a projection.
 9. Use `<archive-uri>/state get` when archive readiness, metadata, or build state is part of the task.
 10. Before `queue add`, run `estimate`; if the estimate is too large for the session, ask the user.

@@ -7,18 +7,18 @@ Purpose:
   Build bounded Agent-readable context around one graph object.
 
 Use when:
-  - You already selected a useful chunk, entity, or triple URI and need compact context for an answer.
+  - You already selected a useful chunk or entity URI and need compact context for an answer.
 
 Usage:
-  wikigraph <located-chunk-uri|located-entity-uri|located-triple-uri> pack [--budget <chars>] [--json|--jsonl] [--help|-h]
+  wikigraph <located-chunk-uri|located-entity-uri> pack [--budget <chars>] [--json|--jsonl] [--help|-h]
 
 Returns:
-  - A context package constrained by `--budget`.
+  - A context package constrained by `--budget`, shaped as anchor plus related objects.
 
 Notes:
   - Default budget is 5000 characters.
-  - `pack` assembles context after object selection; it is not a search command.
-  - `pack` is only available for graph objects: chunk, entity, and triple.
+  - `pack` assembles context after object selection; conceptually it is `get` plus `related` plus source evidence.
+  - `pack` is only available for chunk and entity objects.
   - Use `evidence` first when source verification is the main requirement.
   - Read `wikigraph help uri` before constructing object URIs.
 
@@ -28,4 +28,3 @@ Next steps:
 Examples:
   wikigraph wkg:///books/book.sdpub/chunk/123 pack
   wikigraph wkg:///books/book.sdpub/entity/Q162593 pack --budget 5000
-  wikigraph wkg:///books/book.sdpub/triple/Q162593/discusses/Q9476 pack

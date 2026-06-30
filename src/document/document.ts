@@ -115,6 +115,7 @@ export interface ReadonlyDocument {
 
   getSentence(sentenceId: SentenceId): Promise<string>;
   getSerialFragments(serialId: number): ReadonlySerialFragments;
+  getSummaryFragments(serialId: number): ReadonlySerialFragments;
   openSession<T>(
     operation: (document: ReadonlyDocument) => Promise<T> | T,
   ): Promise<T>;
@@ -145,6 +146,7 @@ export interface Document extends ReadonlyDocument {
 
   createContext(): DocumentContext;
   getSerialFragments(serialId: number): SerialFragments;
+  getSummaryFragments(serialId: number): SerialFragments;
   createSerial(): Promise<number>;
   clearSerialGraph(serialId: number): Promise<void>;
   clearSerialSource(serialId: number): Promise<void>;
@@ -265,6 +267,10 @@ export class DirectoryDocument implements Document {
     return this.#fragments.getSerial(serialId);
   }
 
+  public getSummaryFragments(serialId: number): SerialFragments {
+    return this.#fragments.getSummarySerial(serialId);
+  }
+
   public createContext(): DocumentContext {
     return new DirectoryDocumentContext(this);
   }
@@ -292,15 +298,9 @@ export class DirectoryDocument implements Document {
   }
 
   public async deleteSummary(serialId: number): Promise<void> {
-    try {
-      await this.#fileStore.deleteFile(this.#getSummaryPath(serialId));
-    } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
-        return;
-      }
-
-      throw error;
-    }
+    await this.#fileStore.deleteTree(
+      this.#fragments.getSummarySerial(serialId).path,
+    );
   }
 
   public async getSentence(sentenceId: SentenceId): Promise<string> {
@@ -364,7 +364,24 @@ export class DirectoryDocument implements Document {
   }
 
   public async readSummary(serialId: number): Promise<string | undefined> {
-    return await this.#readOptionalTextFile(this.#getSummaryPath(serialId));
+    const fragments = this.#fragments.getSummarySerial(serialId);
+    const fragmentIds = await fragments.listFragmentIds();
+
+    if (fragmentIds.length === 0) {
+      return undefined;
+    }
+
+    const records = await Promise.all(
+      fragmentIds.map(
+        async (fragmentId) => await fragments.getFragment(fragmentId),
+      ),
+    );
+
+    return records
+      .flatMap((fragment) =>
+        fragment.sentences.map((sentence) => sentence.text),
+      )
+      .join("\n");
   }
 
   public async readToc(): Promise<TocFile | undefined> {
@@ -393,8 +410,8 @@ export class DirectoryDocument implements Document {
   }
 
   public async writeSummary(serialId: number, summary: string): Promise<void> {
-    await this.#fileStore.ensureDirectory(this.#getSummariesPath());
-    await this.#writeNewFile(this.#getSummaryPath(serialId), summary);
+    await this.deleteSummary(serialId);
+    await this.#fragments.getSummarySerial(serialId).writeTextStream(summary);
   }
 
   public async writeToc(toc: TocFile): Promise<void> {
@@ -644,10 +661,6 @@ export class DirectoryDocument implements Document {
     }
   }
 
-  #getSummariesPath(): string {
-    return join(this.path, "summaries");
-  }
-
   #getBookMetaPath(): string {
     return join(this.path, "book-meta.json");
   }
@@ -662,10 +675,6 @@ export class DirectoryDocument implements Document {
 
   #getCoverInfoPath(): string {
     return join(this.#getCoverDirectoryPath(), "info.json");
-  }
-
-  #getSummaryPath(serialId: number): string {
-    return join(this.#getSummariesPath(), `serial-${serialId}.txt`);
   }
 
   #getTocPath(): string {

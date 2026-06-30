@@ -29,7 +29,7 @@ projection state, and metadata that SpineDigest can reopen later.
 At a high level, the archive contains three layers of data:
 
 - document metadata and navigation
-- source fragments and readable summary/projection text
+- source and summary text stream fragments
 - internal relational state for chunks, topology, and graph navigation
 
 Archive-level compatibility is expressed by `manifest.json`.
@@ -37,7 +37,7 @@ Archive-level compatibility is expressed by `manifest.json`.
 In this document, a _serial_ means one persisted document unit referenced
 from `toc.json` by `serialId`. A serial usually corresponds to one
 chapter-like readable section. Depending on the archive stage, it may carry
-source fragments, graph data, and a serial summary text file.
+source fragments, summary fragments, and graph data.
 
 ## Container Model
 
@@ -52,7 +52,7 @@ paths and contain entries from this path set:
 - `toc.json`
 - `cover/info.json`
 - `cover/data.bin`
-- `summaries/serial-<serialId>.txt`
+- `summaries/serial-<serialId>/fragment_<fragmentId>.json`
 - `fragments/serial-<serialId>/fragment_<fragmentId>.json`
 
 Current writer behavior:
@@ -87,7 +87,7 @@ For archives written by SpineDigest today:
 | `book-meta.json`                                         | always written                                   | Written for TXT, Markdown, and EPUB imports   |
 | `toc.json`                                               | always written                                   | Written for TXT, Markdown, and EPUB imports   |
 | `cover/info.json` + `cover/data.bin`                     | written together only when a source cover exists | Treat as a pair                               |
-| `summaries/serial-<serialId>.txt`                        | written for summarized serials                   | Staged archives may omit summary files        |
+| `summaries/serial-<serialId>/fragment_<fragmentId>.json` | written for summarized serials                   | Staged archives may omit summary fragments    |
 | `fragments/serial-<serialId>/fragment_<fragmentId>.json` | written only for non-empty fragments             | Do not assume every serial has fragment files |
 
 Source-specific notes:
@@ -131,8 +131,8 @@ For readers and validators:
   reading order
 - `cover/info.json`: UTF-8 JSON with cover metadata
 - `cover/data.bin`: binary cover payload
-- `summaries/serial-<serialId>.txt`: UTF-8 text with the readable summary
-  projection for one serial
+- `summaries/serial-<serialId>/fragment_<fragmentId>.json`: UTF-8 JSON
+  with summary sentence payloads for one serial
 - `fragments/serial-<serialId>/fragment_<fragmentId>.json`: UTF-8 JSON
   with fragment-level summaries and sentence payloads for one serial
 
@@ -239,8 +239,8 @@ Ordering is significant. Readers should preserve item order exactly as written.
 
 A node may omit `serialId` and act as a pure grouping node. When
 `serialId` is present, it points to
-`summaries/serial-<serialId>.txt` when summary projection data exists and may
-also have a matching fragment directory.
+`summaries/serial-<serialId>/` when summary projection data exists and may also
+have a matching source fragment directory.
 
 A node may omit `title` or set it to `null`. Text renderers may omit the
 heading for such nodes. EPUB renderers should use a display fallback such
@@ -272,13 +272,13 @@ be resolved inside the `.sdpub` container. SpineDigest currently uses
 it mainly to preserve a useful filename extension when exporting EPUB
 again.
 
-### `summaries/serial-<serialId>.txt`
+### `summaries/serial-<serialId>/fragment_<fragmentId>.json`
 
-Each completed serial summary is stored as a standalone UTF-8 text file.
+Each completed serial summary is stored as a stream of fragment JSON files.
 
-The text is the serial-level readable summary/projection content used by
-plain-text and EPUB export. The file may be empty. Readers should not depend on
-a trailing newline.
+The payload uses the same object form as source fragments. `sentences` contains
+the readable summary/projection content used by plain-text and EPUB export.
+The `summary` field is present for shape consistency and may be empty.
 
 ### `fragments/serial-<serialId>/fragment_<fragmentId>.json`
 
@@ -352,7 +352,7 @@ For a lightweight projection reader:
 
 1. read `book-meta.json` if metadata is needed
 2. read `toc.json`
-3. follow each summarized `serialId` into `summaries/serial-<serialId>.txt`
+3. follow each summarized `serialId` into `summaries/serial-<serialId>/fragment_<fragmentId>.json` in fragment id order
 4. read `cover/info.json` and `cover/data.bin` only if a cover is needed
 
 For a source-aware reader:

@@ -6,6 +6,7 @@ import type { FragmentRecord, SentenceId, SentenceRecord } from "./types.js";
 
 const SERIAL_DIRECTORY_PREFIX = "serial-";
 const FRAGMENT_FILE_PATTERN = /^fragment_(\d+)\.json$/;
+const DEFAULT_FRAGMENT_WORDS_COUNT = 600;
 
 interface FragmentFileContent {
   readonly summary: string;
@@ -51,10 +52,15 @@ const DEFAULT_FRAGMENT_FILE_ACCESS: FragmentFileAccess = {
 
 export interface ReadonlyFragments {
   getSerial(serialId: number): ReadonlySerialFragments;
+  getSummarySerial(serialId: number): ReadonlySerialFragments;
   getSentence(sentenceId: SentenceId): Promise<string>;
   getSummary(serialId: number, fragmentId: number): Promise<string>;
   getWordsCount(serialId: number, fragmentId: number): Promise<number>;
   readonly path: string;
+}
+
+export interface TextStreamWriteOptions {
+  readonly maxWordsCount?: number;
 }
 
 export interface ReadonlySerialFragments {
@@ -87,6 +93,17 @@ export class Fragments implements ReadonlyFragments {
     return new SerialFragments(
       this.#documentPath,
       serialId,
+      "fragments",
+      this.#writer,
+      this.#fileAccess,
+    );
+  }
+
+  public getSummarySerial(serialId: number): SerialFragments {
+    return new SerialFragments(
+      this.#documentPath,
+      serialId,
+      "summaries",
       this.#writer,
       this.#fileAccess,
     );
@@ -133,18 +150,21 @@ export class SerialFragments implements ReadonlySerialFragments {
   #draftOpen = false;
   readonly #documentPath: string;
   readonly #fileAccess: FragmentFileAccess;
+  readonly #rootDirectoryName: string;
   #nextFragmentId: number | undefined;
   readonly #writer: FragmentWriter;
 
   public constructor(
     documentPath: string,
     serialId: number,
+    rootDirectoryName = "fragments",
     writer?: FragmentWriter,
     fileAccess?: FragmentFileAccess,
   ) {
     this.#documentPath = resolve(documentPath);
     this.#serialId = serialId;
     this.#fileAccess = fileAccess ?? DEFAULT_FRAGMENT_FILE_ACCESS;
+    this.#rootDirectoryName = rootDirectoryName;
     this.#writer = writer ?? DEFAULT_FRAGMENT_WRITER;
   }
 
@@ -197,6 +217,52 @@ export class SerialFragments implements ReadonlySerialFragments {
     }
   }
 
+  public async writeTextStream(
+    text: string,
+    options: TextStreamWriteOptions = {},
+  ): Promise<void> {
+    await this.#fileAccess.ensureDirectory(this.path);
+    const sentences = splitTextIntoSentences(text);
+
+    if (sentences.length === 0) {
+      const fragmentId = await this.#peekNextFragmentId();
+
+      await this.#writer.write(
+        this.#getFragmentPath(fragmentId),
+        JSON.stringify(
+          {
+            sentences: [],
+            summary: "",
+          },
+          undefined,
+          2,
+        ),
+      );
+      this.#nextFragmentId = fragmentId + 1;
+      return;
+    }
+
+    const maxWordsCount = options.maxWordsCount ?? DEFAULT_FRAGMENT_WORDS_COUNT;
+    let draft = await this.createDraft();
+    let draftWordsCount = 0;
+
+    for (const sentence of sentences) {
+      if (
+        draftWordsCount > 0 &&
+        draftWordsCount + sentence.wordsCount > maxWordsCount
+      ) {
+        await draft.commit();
+        draft = await this.createDraft();
+        draftWordsCount = 0;
+      }
+
+      draft.addSentence(sentence.text, sentence.wordsCount);
+      draftWordsCount += sentence.wordsCount;
+    }
+
+    await draft.commit();
+  }
+
   public get serialId(): number {
     return this.#serialId;
   }
@@ -204,7 +270,7 @@ export class SerialFragments implements ReadonlySerialFragments {
   public get path(): string {
     return join(
       this.#documentPath,
-      "fragments",
+      this.#rootDirectoryName,
       `${SERIAL_DIRECTORY_PREFIX}${this.#serialId}`,
     );
   }
@@ -264,6 +330,23 @@ export class SerialFragments implements ReadonlySerialFragments {
   #getFragmentPath(fragmentId: number): string {
     return join(this.path, `fragment_${fragmentId}.json`);
   }
+}
+
+function splitTextIntoSentences(text: string): readonly SentenceRecord[] {
+  return text
+    .split(/\n+/u)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence !== "")
+    .map((sentence) => ({
+      text: sentence,
+      wordsCount: countWords(sentence),
+    }));
+}
+
+function countWords(text: string): number {
+  const trimmed = text.trim();
+
+  return trimmed === "" ? 0 : trimmed.split(/\s+/u).length;
 }
 
 export class FragmentDraft {

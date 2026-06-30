@@ -14,22 +14,34 @@ import type {
 
 type SqlRow = Record<string, unknown>;
 
-const WIKIPAGE_CACHE_SCHEMA_SQL = `
+const CREATE_QID_CACHE_SQL = `
 CREATE TABLE IF NOT EXISTS qid_cache (
-  qid TEXT PRIMARY KEY,
+  qid TEXT NOT NULL,
+  language TEXT NOT NULL,
   label TEXT,
   description TEXT,
   pages_json TEXT NOT NULL,
   checked_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (qid, language)
 );
+`;
 
+const CREATE_DISAMBIGUATION_CACHE_SQL = `
 CREATE TABLE IF NOT EXISTS disambiguation_cache (
-  qid TEXT PRIMARY KEY,
+  qid TEXT NOT NULL,
+  wiki TEXT NOT NULL,
   pages_json TEXT NOT NULL,
   profile_json TEXT,
-  checked_at TEXT NOT NULL
+  checked_at TEXT NOT NULL,
+  PRIMARY KEY (qid, wiki)
 );
+`;
+
+const WIKIPAGE_CACHE_SCHEMA_SQL = `
+${CREATE_QID_CACHE_SQL}
+
+${CREATE_DISAMBIGUATION_CACHE_SQL}
 `;
 
 export class WikipageCache {
@@ -41,10 +53,19 @@ export class WikipageCache {
 
   public static async open(path?: string): Promise<WikipageCache> {
     const databasePath = path ?? resolveWikiGraphCacheDatabasePath();
-
-    return new WikipageCache(
-      await openSharedStateDatabase(databasePath, WIKIPAGE_CACHE_SCHEMA_SQL),
+    const database = await openSharedStateDatabase(
+      databasePath,
+      WIKIPAGE_CACHE_SCHEMA_SQL,
     );
+
+    try {
+      await migrateWikipageCacheSchema(database);
+    } catch (error) {
+      await database.close().catch(() => undefined);
+      throw error;
+    }
+
+    return new WikipageCache(database);
   }
 
   public async close(): Promise<void> {
@@ -53,6 +74,7 @@ export class WikipageCache {
 
   public async getQids(
     qids: readonly string[],
+    language: string,
   ): Promise<ReadonlyMap<string, CachedQidRecord>> {
     if (qids.length === 0) {
       return new Map();
@@ -65,9 +87,9 @@ export class WikipageCache {
         `
 SELECT *
 FROM qid_cache
-WHERE qid = ?
+WHERE qid = ? AND language = ?
 `,
-        [qid],
+        [qid, language],
         mapQidRecord,
       );
 
@@ -79,7 +101,10 @@ WHERE qid = ?
     return results;
   }
 
-  public async putQids(records: readonly CachedQidRecord[]): Promise<void> {
+  public async putQids(
+    records: readonly CachedQidRecord[],
+    language: string,
+  ): Promise<void> {
     if (records.length === 0) {
       return;
     }
@@ -89,9 +114,9 @@ WHERE qid = ?
         await this.#database.run(
           `
 INSERT INTO qid_cache (
-  qid, label, description, pages_json, checked_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT(qid) DO UPDATE SET
+  qid, language, label, description, pages_json, checked_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(qid, language) DO UPDATE SET
   label = excluded.label,
   description = excluded.description,
   pages_json = excluded.pages_json,
@@ -100,6 +125,7 @@ ON CONFLICT(qid) DO UPDATE SET
 `,
           [
             record.qid,
+            language,
             record.label ?? null,
             record.description ?? null,
             JSON.stringify(record.sitelinks),
@@ -113,6 +139,7 @@ ON CONFLICT(qid) DO UPDATE SET
 
   public async getDisambiguations(
     qids: readonly string[],
+    wiki: string,
   ): Promise<ReadonlyMap<string, CachedDisambiguationRecord>> {
     if (qids.length === 0) {
       return new Map();
@@ -125,9 +152,9 @@ ON CONFLICT(qid) DO UPDATE SET
         `
 SELECT *
 FROM disambiguation_cache
-WHERE qid = ?
+WHERE qid = ? AND wiki = ?
 `,
-        [qid],
+        [qid, wiki],
         mapDisambiguationRecord,
       );
 
@@ -141,6 +168,7 @@ WHERE qid = ?
 
   public async putDisambiguations(
     records: readonly CachedDisambiguationRecord[],
+    wiki: string,
   ): Promise<void> {
     if (records.length === 0) {
       return;
@@ -151,15 +179,16 @@ WHERE qid = ?
         await this.#database.run(
           `
 INSERT INTO disambiguation_cache (
-  qid, pages_json, profile_json, checked_at
-) VALUES (?, ?, ?, ?)
-ON CONFLICT(qid) DO UPDATE SET
+  qid, wiki, pages_json, profile_json, checked_at
+) VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(qid, wiki) DO UPDATE SET
   pages_json = excluded.pages_json,
   profile_json = excluded.profile_json,
   checked_at = excluded.checked_at
 `,
           [
             record.disambiguationQid,
+            wiki,
             JSON.stringify(record.pages),
             record.profile === undefined
               ? null
@@ -170,6 +199,85 @@ ON CONFLICT(qid) DO UPDATE SET
       }
     });
   }
+}
+
+async function migrateWikipageCacheSchema(database: Database): Promise<void> {
+  await migrateQidCacheSchema(database);
+  await migrateDisambiguationCacheSchema(database);
+}
+
+async function migrateQidCacheSchema(database: Database): Promise<void> {
+  const columns = await listTableColumns(database, "qid_cache");
+
+  if (columns.has("language")) {
+    return;
+  }
+
+  await database.transaction(async () => {
+    const transactionColumns = await listTableColumns(database, "qid_cache");
+
+    if (transactionColumns.has("language")) {
+      return;
+    }
+
+    await database.run("ALTER TABLE qid_cache RENAME TO qid_cache_legacy");
+    await database.run(CREATE_QID_CACHE_SQL);
+    await database.run(`
+INSERT OR IGNORE INTO qid_cache (
+  qid, language, label, description, pages_json, checked_at, updated_at
+)
+SELECT qid, 'en', label, description, pages_json, checked_at, updated_at
+FROM qid_cache_legacy
+`);
+    await database.run("DROP TABLE qid_cache_legacy");
+  });
+}
+
+async function migrateDisambiguationCacheSchema(
+  database: Database,
+): Promise<void> {
+  const columns = await listTableColumns(database, "disambiguation_cache");
+
+  if (columns.has("wiki")) {
+    return;
+  }
+
+  await database.transaction(async () => {
+    const transactionColumns = await listTableColumns(
+      database,
+      "disambiguation_cache",
+    );
+
+    if (transactionColumns.has("wiki")) {
+      return;
+    }
+
+    await database.run(
+      "ALTER TABLE disambiguation_cache RENAME TO disambiguation_cache_legacy",
+    );
+    await database.run(CREATE_DISAMBIGUATION_CACHE_SQL);
+    await database.run(`
+INSERT OR IGNORE INTO disambiguation_cache (
+  qid, wiki, pages_json, profile_json, checked_at
+)
+SELECT qid, 'enwiki', pages_json, profile_json, checked_at
+FROM disambiguation_cache_legacy
+`);
+    await database.run("DROP TABLE disambiguation_cache_legacy");
+  });
+}
+
+async function listTableColumns(
+  database: Database,
+  table: string,
+): Promise<ReadonlySet<string>> {
+  const columns = await database.queryAll(
+    `PRAGMA table_info(${table})`,
+    undefined,
+    (row) => getString(row.name, "name"),
+  );
+
+  return new Set(columns);
 }
 
 function mapQidRecord(row: SqlRow): CachedQidRecord {

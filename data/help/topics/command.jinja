@@ -8,10 +8,10 @@ Object commands:
   wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> search <query>
   wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list
   wikigraph <object-uri> get
-  wikigraph <object-uri> related
+  wikigraph <chunk-uri|entity-uri> related
   wikigraph <entity|triple|summary|chunk-uri> evidence
   wikigraph next <cursor>
-  wikigraph <located-chunk-uri|located-entity-uri|located-triple-uri> pack
+  wikigraph <located-chunk-uri|located-entity-uri> pack
 
 URI routing:
   `search`, `list`, `get`, `related`, `evidence`, and `pack` use Wiki Graph URIs, not bare filesystem paths.

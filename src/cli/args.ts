@@ -6,7 +6,11 @@ import {
   archiveMaintenanceHelpRoute,
   withHelpRoute,
 } from "./errors.js";
-import { type BuildJobTarget, type ChapterStage } from "../facade/index.js";
+import {
+  type ArchiveTriplePattern,
+  type BuildJobTarget,
+  type ChapterStage,
+} from "../facade/index.js";
 import {
   parseHelpTopic,
   parseHelpMatrixPage,
@@ -171,6 +175,7 @@ export interface CLIArchiveArguments {
   readonly action: CLIArchiveAction;
   readonly archivePath: string;
   readonly budget?: number;
+  readonly backlinks?: boolean;
   readonly chapters?: readonly number[];
   readonly chapterId?: number;
   readonly confirm?: boolean;
@@ -188,8 +193,10 @@ export interface CLIArchiveArguments {
   readonly outputPath?: string;
   readonly prompt?: string;
   readonly query?: string;
+  readonly role?: "any" | "object" | "self" | "subject";
   readonly sourcePath?: string;
   readonly targetStage?: ChapterStage;
+  readonly triplePattern?: ArchiveTriplePattern;
 }
 
 interface ArchiveMetaFlagValues {
@@ -214,6 +221,7 @@ interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly active?: boolean;
   readonly after?: string;
   readonly all?: boolean;
+  readonly backlinks?: boolean;
   readonly before?: string;
   readonly boost?: boolean;
   readonly budget?: string;
@@ -238,6 +246,7 @@ interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly parent?: string;
   readonly predicate?: string;
   readonly prompt?: string;
+  readonly role?: string;
   readonly root?: boolean;
   readonly stage?: string;
   readonly last?: boolean;
@@ -331,6 +340,9 @@ export function parseCLIArguments(
       },
       before: {
         type: "string",
+      },
+      backlinks: {
+        type: "boolean",
       },
       budget: {
         type: "string",
@@ -453,6 +465,9 @@ export function parseCLIArguments(
       recursive: {
         type: "boolean",
       },
+      role: {
+        type: "string",
+      },
       root: {
         type: "boolean",
       },
@@ -567,7 +582,7 @@ function parseArchiveUriFirstArguments(
   values: ArchiveArgumentValues,
 ): ParsedCLIArguments {
   const uri = positionals[0];
-  const action = positionals[1];
+  const action = positionals[1] ?? "get";
 
   if (uri === undefined) {
     throw new Error("Internal error: missing URI-first archive URI.");
@@ -576,9 +591,7 @@ function parseArchiveUriFirstArguments(
   if (!isArchiveUriAction(action)) {
     throw new Error(
       withHelpRoute(
-        action === undefined
-          ? `Missing action after ${uri}.`
-          : `The URI-first form does not support \`${action}\`. Use \`wikigraph help object\` to inspect valid object/verb pairs.`,
+        `The URI-first form does not support \`${action}\`. Use \`wikigraph help object\` to inspect valid object/verb pairs.`,
         "wikigraph help object",
       ),
     );
@@ -587,7 +600,7 @@ function parseArchiveUriFirstArguments(
   return parseArchiveUriTargetArguments(
     uri,
     action,
-    positionals.slice(2),
+    positionals[1] === undefined ? [] : positionals.slice(2),
     values,
   );
 }
@@ -837,6 +850,10 @@ function parseArchiveCoverUriArguments(
 type ChapterUriTarget =
   | { readonly kind: "collection" }
   | { readonly kind: "lens"; readonly lens: ArchiveUriLens }
+  | {
+      readonly kind: "triple-pattern-lens";
+      readonly pattern: ArchiveTriplePattern;
+    }
   | { readonly kind: "state" }
   | { readonly kind: "tree" }
   | { readonly chapterId: number; readonly kind: "chapter" }
@@ -844,6 +861,11 @@ type ChapterUriTarget =
       readonly chapterId: number;
       readonly kind: "chapter-lens";
       readonly lens: ArchiveUriLens;
+    }
+  | {
+      readonly chapterId: number;
+      readonly kind: "chapter-triple-pattern-lens";
+      readonly pattern: ArchiveTriplePattern;
     }
   | { readonly chapterId: number; readonly kind: "chapter-state" }
   | {
@@ -870,25 +892,40 @@ function parseChapterTarget(objectUri: string): ChapterUriTarget | undefined {
     return { kind: "lens", lens: archiveLens };
   }
 
-  const match =
-    /^wkg:\/\/chapter\/([1-9][0-9]*)(?:\/(source|summary|title|chunk|entity|triple|state))?\/?$/u.exec(
-      objectUri,
-    );
+  const archiveTriplePattern = parseTriplePatternObjectUri(objectUri);
+  if (archiveTriplePattern !== undefined) {
+    return {
+      kind: "triple-pattern-lens",
+      pattern: archiveTriplePattern,
+    };
+  }
+
+  const match = /^wkg:\/\/chapter\/([1-9][0-9]*)(?:\/(.*))?\/?$/u.exec(
+    objectUri,
+  );
 
   if (match?.[1] === undefined) {
     return undefined;
   }
 
   const chapterId = Number(match[1]);
-  const resource = match[2] as
-    | "chunk"
-    | "entity"
-    | "source"
-    | "state"
-    | "summary"
-    | "title"
-    | "triple"
-    | undefined;
+  const suffix = match[2] === "" ? undefined : match[2];
+  const chapterTriplePattern =
+    suffix === undefined ? undefined : parseTriplePatternSuffix(suffix);
+
+  if (chapterTriplePattern !== undefined) {
+    return {
+      chapterId,
+      kind: "chapter-triple-pattern-lens",
+      pattern: chapterTriplePattern,
+    };
+  }
+
+  const resource = parseChapterResourceSuffix(suffix);
+
+  if (suffix !== undefined && resource === undefined) {
+    return undefined;
+  }
 
   if (resource === undefined) {
     return { chapterId, kind: "chapter" };
@@ -904,6 +941,82 @@ function parseChapterTarget(objectUri: string): ChapterUriTarget | undefined {
   }
 
   return { chapterId, kind: "chapter-resource", resource };
+}
+
+function parseChapterResourceSuffix(
+  suffix: string | undefined,
+):
+  | "chunk"
+  | "entity"
+  | "source"
+  | "state"
+  | "summary"
+  | "title"
+  | "triple"
+  | undefined {
+  switch (suffix) {
+    case undefined:
+    case "chunk":
+    case "entity":
+    case "source":
+    case "state":
+    case "summary":
+    case "title":
+    case "triple":
+      return suffix;
+    default:
+      return undefined;
+  }
+}
+
+function parseTriplePatternObjectUri(
+  objectUri: string,
+): ArchiveTriplePattern | undefined {
+  if (!objectUri.startsWith("wkg://triple/")) {
+    return undefined;
+  }
+
+  return parseTriplePatternSuffix(objectUri.slice("wkg://".length));
+}
+
+function parseTriplePatternSuffix(
+  suffix: string,
+): ArchiveTriplePattern | undefined {
+  const parts = suffix.split("/");
+
+  if (parts[0] !== "triple" || parts.length < 2 || parts.length > 4) {
+    return undefined;
+  }
+
+  const [subject = "_", predicate = "_", object = "_"] = parts.slice(1);
+  const hasPlaceholder = parts.slice(1).includes("_");
+  const hasOmittedTrailingPlaceholder = parts.length < 4;
+
+  if (!hasPlaceholder && !hasOmittedTrailingPlaceholder) {
+    return undefined;
+  }
+
+  if (
+    !isTriplePatternQidSegment(subject) ||
+    !isTriplePatternPredicateSegment(predicate) ||
+    !isTriplePatternQidSegment(object)
+  ) {
+    return undefined;
+  }
+
+  return {
+    ...(object === "_" ? {} : { objectQid: object }),
+    ...(predicate === "_" ? {} : { predicate: decodeURIComponent(predicate) }),
+    ...(subject === "_" ? {} : { subjectQid: subject }),
+  };
+}
+
+function isTriplePatternQidSegment(value: string): boolean {
+  return value === "_" || /^Q[1-9][0-9]*$/u.test(value);
+}
+
+function isTriplePatternPredicateSegment(value: string): boolean {
+  return value === "_" || (value !== "" && !value.includes("/"));
 }
 
 function parseArchiveUriLensObjectUri(
@@ -956,6 +1069,15 @@ function parseArchiveChapterUriArguments(
         values,
         helpRoute,
       );
+    case "triple-pattern-lens":
+      return parseArchiveTriplePatternLensUriArguments(
+        uri,
+        target.pattern,
+        action,
+        tail,
+        values,
+        helpRoute,
+      );
     case "state":
       return parseArchiveStateUriArguments(
         uri,
@@ -986,6 +1108,16 @@ function parseArchiveChapterUriArguments(
         archivePath,
         target.chapterId,
         target.lens,
+        action,
+        tail,
+        values,
+        helpRoute,
+      );
+    case "chapter-triple-pattern-lens":
+      return parseChapterTriplePatternLensUriArguments(
+        archivePath,
+        target.chapterId,
+        target.pattern,
         action,
         tail,
         values,
@@ -1068,6 +1200,29 @@ function parseArchiveLensUriArguments(
 
   return parseArchiveArguments(action, [uri, ...tail], values, helpRoute, {
     defaultKinds: [lens],
+  });
+}
+
+function parseArchiveTriplePatternLensUriArguments(
+  uri: string,
+  pattern: ArchiveTriplePattern,
+  action: CLIArchiveUriAction,
+  tail: readonly string[],
+  values: ArchiveArgumentValues,
+  helpRoute: string,
+): ParsedCLIArguments {
+  if (action !== "list" && action !== "search") {
+    throw new Error(
+      withHelpRoute(
+        `The triple pattern collection does not support \`${action}\`. Expected list or search.`,
+        "wikigraph help object triple",
+      ),
+    );
+  }
+
+  return parseArchiveArguments(action, [uri, ...tail], values, helpRoute, {
+    defaultKinds: ["triple"],
+    triplePattern: pattern,
   });
 }
 
@@ -1192,6 +1347,33 @@ function parseChapterLensUriArguments(
     values,
     helpRoute,
     { defaultKinds: [lens] },
+  );
+}
+
+function parseChapterTriplePatternLensUriArguments(
+  archivePath: string,
+  chapterId: number,
+  pattern: ArchiveTriplePattern,
+  action: CLIArchiveUriAction,
+  tail: readonly string[],
+  values: ArchiveArgumentValues,
+  helpRoute: string,
+): ParsedCLIArguments {
+  if (action !== "list" && action !== "search") {
+    throw new Error(
+      withHelpRoute(
+        `The chapter triple pattern collection does not support \`${action}\`. Expected list or search.`,
+        "wikigraph help object triple",
+      ),
+    );
+  }
+
+  return parseArchiveArguments(
+    action,
+    [formatLocatedChapterUri(archivePath, chapterId), ...tail],
+    values,
+    helpRoute,
+    { defaultKinds: ["triple"], triplePattern: pattern },
   );
 }
 
@@ -1897,6 +2079,7 @@ function parseArchiveArguments(
   helpRoute = `wikigraph ${action} --help`,
   options: {
     readonly defaultKinds?: readonly CLIObjectKind[];
+    readonly triplePattern?: ArchiveTriplePattern;
   } = {},
 ): ParsedCLIArguments {
   const normalized = normalizeArchiveInlineOptions(positionals, values);
@@ -1967,6 +2150,13 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
       return {
@@ -1998,6 +2188,13 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
       return {
@@ -2046,6 +2243,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
 
@@ -2053,6 +2251,9 @@ function parseArchiveArguments(
         args: {
           action,
           archivePath,
+          ...(values.backlinks === undefined
+            ? {}
+            : { backlinks: values.backlinks }),
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
@@ -2069,6 +2270,9 @@ function parseArchiveArguments(
           ...(options.defaultKinds === undefined
             ? {}
             : { kinds: options.defaultKinds }),
+          ...(options.triplePattern === undefined
+            ? {}
+            : { triplePattern: options.triplePattern }),
         },
         help: false,
         kind: "archive",
@@ -2080,12 +2284,16 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
           action,
           archivePath,
+          ...(values.backlinks === undefined
+            ? {}
+            : { backlinks: values.backlinks }),
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
@@ -2101,6 +2309,9 @@ function parseArchiveArguments(
           ...(options.defaultKinds === undefined
             ? {}
             : { kinds: options.defaultKinds }),
+          ...(options.triplePattern === undefined
+            ? {}
+            : { triplePattern: options.triplePattern }),
         },
         help: false,
         kind: "archive",
@@ -2114,12 +2325,16 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
           action,
           archivePath,
+          ...(values.backlinks === undefined
+            ? {}
+            : { backlinks: values.backlinks }),
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           objectId: archivePath,
@@ -2129,13 +2344,23 @@ function parseArchiveArguments(
       };
     }
     case "related": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      const relatedTarget = validateRelatedTargetUri(archivePath, helpRoute);
+      if (relatedTarget === "chunk") {
+        rejectArchiveFlag(action, "--role", values.role, helpRoute);
+      }
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
@@ -2145,17 +2370,28 @@ function parseArchiveArguments(
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           objectId: archivePath,
+          ...(positionals[1] === undefined ? {} : { query: positionals[1] }),
+          ...(relatedTarget === "entity"
+            ? parseRelatedRoleFlag(values.role, helpRoute)
+            : {}),
         },
         help: false,
         kind: "archive",
       };
     }
     case "evidence": {
-      rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
+      rejectArchiveExtraPositionals(action, positionals, 2, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
@@ -2175,6 +2411,7 @@ function parseArchiveArguments(
                 ),
               }),
           objectId: archivePath,
+          ...(positionals[1] === undefined ? {} : { query: positionals[1] }),
         },
         help: false,
         kind: "archive",
@@ -2183,11 +2420,18 @@ function parseArchiveArguments(
     case "pack": {
       rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
+      rejectArchiveBooleanFlag(
+        action,
+        "--backlinks",
+        values.backlinks,
+        helpRoute,
+      );
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+      rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       validatePackTargetUri(archivePath, helpRoute);
       return {
@@ -2289,17 +2533,65 @@ function validatePackTargetUri(uri: string, helpRoute: string): void {
   }
 }
 
+function validateRelatedTargetUri(
+  uri: string,
+  helpRoute: string,
+): "chunk" | "entity" {
+  const parsed = parseLocatedWikiGraphUri(uri);
+
+  if (parsed.archivePath === undefined) {
+    throw new Error(
+      withHelpRoute(formatMissingArchiveLocatorMessage(uri), helpRoute),
+    );
+  }
+  if (parsed.objectUri === undefined) {
+    throw new Error(
+      withHelpRoute(
+        `Related requires a chunk or entity URI: ${uri}`,
+        "wikigraph help object",
+      ),
+    );
+  }
+  const targetType = getRelatedObjectUriType(parsed.objectUri);
+
+  if (targetType === undefined) {
+    throw new Error(
+      withHelpRoute(
+        `Related is only available for chunk and entity objects: ${uri}`,
+        helpRoute,
+      ),
+    );
+  }
+
+  return targetType;
+}
+
 function isPackableObjectUri(objectUri: string): boolean {
   return (
     /^wkg:\/\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
     /^wkg:\/\/chapter\/[1-9][0-9]*\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
     /^wkg:\/\/entity\/[^/]+$/u.test(objectUri) ||
-    /^wkg:\/\/chapter\/[1-9][0-9]*\/entity\/[^/]+$/u.test(objectUri) ||
-    /^wkg:\/\/triple\/[^/]+\/[^/]+\/[^/]+$/u.test(objectUri) ||
-    /^wkg:\/\/chapter\/[1-9][0-9]*\/triple\/[^/]+\/[^/]+\/[^/]+$/u.test(
-      objectUri,
-    )
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/entity\/[^/]+$/u.test(objectUri)
   );
+}
+
+function getRelatedObjectUriType(
+  objectUri: string,
+): "chunk" | "entity" | undefined {
+  if (
+    /^wkg:\/\/chunk\/[1-9][0-9]*$/u.test(objectUri) ||
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/chunk\/[1-9][0-9]*$/u.test(objectUri)
+  ) {
+    return "chunk";
+  }
+  if (
+    /^wkg:\/\/entity\/[^/]+$/u.test(objectUri) ||
+    /^wkg:\/\/chapter\/[1-9][0-9]*\/entity\/[^/]+$/u.test(objectUri)
+  ) {
+    return "entity";
+  }
+
+  return undefined;
 }
 
 function formatUnknownCommandMessage(command: string): string {
@@ -2349,7 +2641,7 @@ function formatMissingArchiveLocatorMessage(uri: string): string {
 function formatPackObjectMismatchMessage(uri: string): string {
   return [
     `Pack requires a graph object URI: ${uri}`,
-    "Supported pack targets are chunk, entity, and triple objects.",
+    "Supported pack targets are chunk and entity objects.",
     "Use `wikigraph help object` to inspect valid object/verb pairs.",
   ].join("\n");
 }
@@ -2409,15 +2701,15 @@ function normalizeArchiveChapterArguments(
   const parentChapterId =
     values.parent === undefined
       ? undefined
-      : parseSerialId(values.parent, "--parent", helpRoute);
+      : parseChapterRef(values.parent, "--parent", path, helpRoute);
   const beforeChapterId =
     values.before === undefined
       ? undefined
-      : parseSerialId(values.before, "--before", helpRoute);
+      : parseChapterRef(values.before, "--before", path, helpRoute);
   const afterChapterId =
     values.after === undefined
       ? undefined
-      : parseSerialId(values.after, "--after", helpRoute);
+      : parseChapterRef(values.after, "--after", path, helpRoute);
   const inputFormat =
     values["input-format"] === undefined
       ? undefined
@@ -3022,6 +3314,44 @@ function parseSerialId(value: string, flag: string, helpRoute: string): number {
   }
 
   return Number(normalized);
+}
+
+function parseChapterRef(
+  value: string,
+  flag: string,
+  archivePath: string,
+  helpRoute: string,
+): number {
+  const normalized = value.trim();
+
+  if (!normalized.startsWith("wkg://")) {
+    return parseSerialId(value, flag, helpRoute);
+  }
+
+  const parsed = parseLocatedWikiGraphUri(normalized);
+
+  if (parsed.archivePath !== undefined && parsed.archivePath !== archivePath) {
+    throw new Error(
+      withHelpRoute(
+        `Invalid ${flag}: ${value}. Chapter URI belongs to a different archive.`,
+        helpRoute,
+      ),
+    );
+  }
+
+  const objectUri = parsed.objectUri ?? normalized;
+  const match = /^wkg:\/\/chapter\/([1-9][0-9]*)\/?$/u.exec(objectUri);
+
+  if (match?.[1] === undefined) {
+    throw new Error(
+      withHelpRoute(
+        `Invalid ${flag}: ${value}. Expected a chapter URI such as wkg://chapter/3.`,
+        helpRoute,
+      ),
+    );
+  }
+
+  return Number(match[1]);
 }
 
 function isArchiveChapterAction(
@@ -3700,8 +4030,48 @@ function parseEvidenceFlag(
   }
 
   return {
-    evidenceLimit: parsePositiveIntegerFlag(value, "--evidence", helpRoute),
+    evidenceLimit: parseNonNegativeIntegerFlag(value, "--evidence", helpRoute),
   };
+}
+
+function parseRelatedRoleFlag(
+  value: string | undefined,
+  helpRoute: string,
+): { readonly role?: "any" | "object" | "self" | "subject" } {
+  if (value === undefined) {
+    return {};
+  }
+  if (
+    value !== "any" &&
+    value !== "object" &&
+    value !== "self" &&
+    value !== "subject"
+  ) {
+    throw new Error(
+      withHelpRoute(
+        "--role must be one of: any, subject, object, self.",
+        helpRoute,
+      ),
+    );
+  }
+
+  return { role: value };
+}
+
+function parseNonNegativeIntegerFlag(
+  value: string,
+  flag: string,
+  helpRoute: string,
+): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(
+      withHelpRoute(`${flag} must be a non-negative integer.`, helpRoute),
+    );
+  }
+
+  return parsed;
 }
 
 function parsePositiveIntegerFlag(

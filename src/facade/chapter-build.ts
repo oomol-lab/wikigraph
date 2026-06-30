@@ -652,6 +652,10 @@ class SummaryInputSnapshotDocument implements ReadonlyDocument {
     return this.#fragments;
   }
 
+  public getSummaryFragments(serialId: number): ReadonlySerialFragments {
+    return new SnapshotSerialFragments(serialId, []);
+  }
+
   public async openSession<T>(
     operation: (document: ReadonlyDocument) => Promise<T> | T,
   ): Promise<T> {

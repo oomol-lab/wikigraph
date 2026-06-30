@@ -21,7 +21,7 @@ describe("facade/archive", () => {
 
       await mkdir(`${sourceDir}/cover`, { recursive: true });
       await mkdir(`${sourceDir}/fragments/serial-1`, { recursive: true });
-      await mkdir(`${sourceDir}/summaries`, { recursive: true });
+      await mkdir(`${sourceDir}/summaries/serial-1`, { recursive: true });
       await writeFile(`${sourceDir}/database.db`, "sqlite", "utf8");
       await writeFile(`${sourceDir}/database.db-journal`, "journal", "utf8");
       await writeFile(
@@ -46,7 +46,11 @@ describe("facade/archive", () => {
         "ignored",
         "utf8",
       );
-      await writeFile(`${sourceDir}/summaries/serial-1.txt`, "summary", "utf8");
+      await writeFile(
+        `${sourceDir}/summaries/serial-1/fragment_0.json`,
+        '{"summary":"","sentences":[{"text":"summary","wordsCount":1}]}',
+        "utf8",
+      );
       await writeFile(`${sourceDir}/alpha.txt`, "ignored", "utf8");
 
       await writeSdpubArchive(sourceDir, archivePath);
@@ -71,8 +75,11 @@ describe("facade/archive", () => {
         ),
       ).toContain('"sentences":[]');
       expect(
-        await readFile(`${extractDir}/summaries/serial-1.txt`, "utf8"),
-      ).toBe("summary");
+        await readFile(
+          `${extractDir}/summaries/serial-1/fragment_0.json`,
+          "utf8",
+        ),
+      ).toContain('"text":"summary"');
       expect(await readFile(`${extractDir}/cover/data.bin`, "utf8")).toBe(
         "cover-bytes",
       );

@@ -48,16 +48,21 @@ describe("facade/archive-view", () => {
         expect(result.lens).toBe("broad");
         expect(result.lensHint).toMatchObject({
           lenses: {
-            fragment: "original source wording",
             node: "topology / LLM Wiki structure",
+            source: "original source wording",
             summary: "quick overview",
           },
         });
         expect(result.items).toContainEqual(
           expect.objectContaining({
             field: "source",
-            id: "fragment:1:0",
-            type: "fragment",
+            id: "wkg://chapter/1/source#0",
+            position: {
+              chapter: 1,
+              fragment: 0,
+              sentence: 0,
+            },
+            type: "source",
           }),
         );
       } finally {
@@ -80,11 +85,11 @@ describe("facade/archive-view", () => {
 
         expect(result.match).toBe("any");
         const sourceHit = result.items.find(
-          (item) => item.id === "fragment:1:0",
+          (item) => item.id === "wkg://chapter/1/source#1",
         );
         expect(sourceHit).toMatchObject({
           field: "source",
-          type: "fragment",
+          type: "source",
         });
         expect(sourceHit?.matchedTerms).toContain("朱元璋");
         expect(sourceHit?.missingTerms).toContain("不存在的关键词");
@@ -202,7 +207,7 @@ describe("facade/archive-view", () => {
         const sourceOnly = await findArchiveObjects(document, "Cache Split", {
           archiveKey,
           chapters: [2],
-          types: ["fragment"],
+          types: ["source"],
         });
 
         expect(chapterOne.items.map((item) => item.id)).toStrictEqual([
@@ -212,7 +217,7 @@ describe("facade/archive-view", () => {
           "wkg://entity/Q2",
         ]);
         expect(sourceOnly.items.map((item) => item.type)).toStrictEqual([
-          "fragment",
+          "source",
         ]);
       } finally {
         restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
@@ -348,7 +353,7 @@ describe("facade/archive-view", () => {
               shown: 1,
               sources: [
                 expect.objectContaining({
-                  id: "wkg://chapter/1/source/0#0..0",
+                  id: "wkg://chapter/1/source#0",
                   source:
                     "An LLM Wiki exposes pages, links, and source fragments to agents.",
                 }),
@@ -753,6 +758,7 @@ describe("facade/archive-view", () => {
 
         const result = await findArchiveObjects(document, "Wiki", {
           evidenceLimit: 3,
+          triplePattern: { subjectQid: "Q1" },
           types: ["triple"],
         });
 
@@ -768,10 +774,17 @@ describe("facade/archive-view", () => {
         expect(triple?.evidence?.total).toBe(1);
         expect(triple?.evidence?.sources).toStrictEqual([
           expect.objectContaining({
-            id: "wkg://chapter/1/source/0#2..2",
+            id: "wkg://chapter/1/source#2",
             source: "Source-only archives should be searchable.",
           }),
         ]);
+
+        const filtered = await findArchiveObjects(document, "Wiki", {
+          triplePattern: { objectQid: "Q1" },
+          types: ["triple"],
+        });
+
+        expect(filtered.items).toStrictEqual([]);
       } finally {
         restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();
@@ -850,19 +863,19 @@ describe("facade/archive-view", () => {
 
         const firstPage = await findArchiveObjects(document, "Wiki", {
           limit: 1,
-          types: ["fragment", "node"],
+          types: ["source", "node"],
         });
         const secondPage = await findArchiveObjects(document, "ignored query", {
           ...(firstPage.nextCursor === null
             ? {}
             : { cursor: firstPage.nextCursor }),
           limit: 1,
-          types: ["fragment", "node"],
+          types: ["source", "node"],
         });
 
         expect(firstPage.items).toHaveLength(1);
         expect(firstPage.nextCursor).not.toBeNull();
-        expect(["fragment", "node"]).toContain(firstPage.items[0]?.type);
+        expect(["source", "node"]).toContain(firstPage.items[0]?.type);
         expect(secondPage.query).toBe("Wiki");
         expect(secondPage.items[0]?.id).not.toBe(firstPage.items[0]?.id);
       } finally {
@@ -894,12 +907,12 @@ describe("facade/archive-view", () => {
           expect.arrayContaining(["朱元璋", "不存在的关键词"]),
         );
         const sourceHit = result.items.find(
-          (item) => item.id === "fragment:1:0",
+          (item) => item.id === "wkg://chapter/1/source#1",
         );
         expect(sourceHit).toMatchObject({
           field: "source",
           missingTerms: [],
-          type: "fragment",
+          type: "source",
         });
         expect(sourceHit?.matchCount).toBeGreaterThanOrEqual(3);
         expect(sourceHit?.matchedTerms).toEqual(
@@ -932,8 +945,8 @@ describe("facade/archive-view", () => {
         expect(result.items).toContainEqual(
           expect.objectContaining({
             field: "source",
-            id: "fragment:1:0",
-            type: "fragment",
+            id: "wkg://chapter/1/source#1",
+            type: "source",
           }),
         );
       } finally {
@@ -951,19 +964,19 @@ describe("facade/archive-view", () => {
 
         const result = await findArchiveObjects(document, "Wiki", {
           chapters: [1],
-          types: ["fragment"],
+          types: ["source"],
         });
 
         expect(result.chapters).toStrictEqual([1]);
         expect(result.lens).toBe("typed");
         expect(result.lensHint).toBeNull();
-        expect(result.types).toStrictEqual(["fragment"]);
+        expect(result.types).toStrictEqual(["source"]);
         expect(result.items).toStrictEqual([
           expect.objectContaining({
             chapter: 1,
-            id: "fragment:1:0",
-            position: { chapter: 1, fragment: 0 },
-            type: "fragment",
+            id: "wkg://chapter/1/source#0",
+            position: { chapter: 1, fragment: 0, sentence: 0 },
+            type: "source",
           }),
         ]);
       } finally {
@@ -1083,6 +1096,42 @@ describe("facade/archive-view", () => {
     });
   });
 
+  it("reads entity wikipage resources", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(
+          readArchivePage(document, "wkg://entity/Q1/wikipage", {
+            wikipageResolverOptions: {
+              cacheDatabasePath: `${path}/wikipage-cache.sqlite`,
+              fetch: createEntityWikipageMockFetch(),
+              minRequestIntervalMs: 0,
+              retryBaseDelayMs: 0,
+            },
+          }),
+        ).resolves.toStrictEqual({
+          en: {
+            description: "Ming dynasty general",
+            title: "Xu Da",
+            url: "https://en.wikipedia.org/wiki/Xu_Da",
+          },
+          id: "wkg://entity/Q1/wikipage",
+          type: "entity-wikipage",
+          zh: {
+            description: "明朝军事将领",
+            title: "徐达",
+            url: "https://zh.wikipedia.org/wiki/%E5%BE%90%E8%BE%BE",
+          },
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("searches only whitelisted metadata fields", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
@@ -1147,7 +1196,7 @@ describe("facade/archive-view", () => {
 
         expect(result.items).toContainEqual(
           expect.objectContaining({
-            id: "summary:1",
+            id: "wkg://chapter/1/summary#0",
             type: "summary",
           }),
         );
@@ -1222,9 +1271,9 @@ describe("facade/archive-view", () => {
           listArchiveObjects(document, "fragments"),
         ).resolves.toContainEqual(
           expect.objectContaining({
-            id: "fragment:1:0",
+            id: "wkg://chapter/1/source#0",
             label: "Introduction",
-            type: "fragment",
+            type: "source",
           }),
         );
       } finally {
@@ -1233,22 +1282,81 @@ describe("facade/archive-view", () => {
     });
   });
 
-  it("shows fragment related nodes", async () => {
+  it("shows source sentence range pages", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
 
       try {
         await seedSourcedDocument(document);
 
-        const fragmentPage = await readArchivePage(document, "fragment:1:0");
+        const fragmentPage = await readArchivePage(
+          document,
+          "wkg://chapter/1/source#0",
+        );
 
         expect(fragmentPage).toMatchObject({
-          nodes: [
-            expect.objectContaining({ id: "node:100", title: "Wiki pages" }),
-            expect.objectContaining({ id: "node:101", title: "Source search" }),
-          ],
+          fragment: {
+            id: "wkg://chapter/1/source#0",
+            text: "An LLM Wiki exposes pages, links, and source fragments to agents.",
+          },
           type: "fragment",
         });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("keeps multi-digit source range indexes intact", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          for (let index = 0; index < 13; index += 1) {
+            draft.addSentence(`Sentence ${index}`, 2);
+          }
+
+          await draft.commit();
+          await openedDocument.writeToc({
+            items: [{ children: [], serialId: 1, title: "Numbered" }],
+            version: 1,
+          });
+        });
+
+        const page = await readArchivePage(
+          document,
+          "wkg://chapter/1/source#10..12",
+        );
+
+        expect(page).toMatchObject({
+          fragment: {
+            id: "wkg://chapter/1/source#10..12",
+            text: ["Sentence 10", "Sentence 11", "Sentence 12"].join("\n"),
+          },
+          type: "fragment",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("rejects malformed source sentence ranges", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(
+          readArchivePage(document, "wkg://chapter/1/source#1..2..3"),
+        ).rejects.toThrow("Invalid source sentence range: 1..2..3");
       } finally {
         await document.release();
       }
@@ -1272,7 +1380,7 @@ describe("facade/archive-view", () => {
           "Pages and links make archive navigation explicit.",
         );
         expect(page.id).toBe("node:100");
-        expect(page.sourceFragments[0]?.id).toBe("fragment:1:0");
+        expect(page.sourceFragments[0]?.id).toBe("wkg://chapter/1/source#0..2");
         expect(page.sourceFragments[0]?.text).toContain(
           "An LLM Wiki exposes pages",
         );
@@ -1340,14 +1448,40 @@ describe("facade/archive-view", () => {
               sentenceIndex: 0,
               surface: "chapter",
             },
+            {
+              chapterId: 2,
+              fragmentId: 0,
+              id: "m4",
+              qid: "Q3",
+              rangeEnd: 6,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Second",
+            },
           ]);
-          await openedDocument.mentionLinks.save({
-            evidenceSentenceIds: [[2, 0, 0]],
-            id: "l1",
-            predicate: "mentions",
-            sourceMentionId: "m2",
-            targetMentionId: "m3",
-          });
+          await openedDocument.mentionLinks.saveMany([
+            {
+              evidenceSentenceIds: [[2, 0, 0]],
+              id: "l1",
+              predicate: "mentions",
+              sourceMentionId: "m2",
+              targetMentionId: "m3",
+            },
+            {
+              evidenceSentenceIds: [[2, 0, 0]],
+              id: "l2",
+              predicate: "mentions",
+              sourceMentionId: "m2",
+              targetMentionId: "m3",
+            },
+            {
+              evidenceSentenceIds: [[2, 0, 0]],
+              id: "l3",
+              predicate: "before",
+              sourceMentionId: "m4",
+              targetMentionId: "m2",
+            },
+          ]);
           await openedDocument.replaceToc({
             items: [
               {
@@ -1367,24 +1501,24 @@ describe("facade/archive-view", () => {
 
         const result = await listArchiveCollection(document, {
           chapters: [1],
-          types: ["chapter", "entity", "fragment", "node", "summary", "triple"],
+          types: ["chapter", "entity", "source", "node", "summary", "triple"],
         });
 
         expect(result.items.map((item) => item.id)).toEqual(
           expect.arrayContaining([
             "chapter:1",
             "wkg://entity/Q1",
-            "fragment:1:0",
+            "wkg://chapter/1/source#0",
             "node:100",
             "node:101",
-            "summary:1",
+            "wkg://chapter/1/summary#0",
           ]),
         );
         expect(result.items.map((item) => item.id)).not.toEqual(
           expect.arrayContaining([
             "chapter:2",
             "node:200",
-            "summary:2",
+            "wkg://chapter/2/summary#0",
             "wkg://triple/Q1/mentions/Q2",
           ]),
         );
@@ -1408,6 +1542,21 @@ describe("facade/archive-view", () => {
             }),
           ]),
         );
+        expect(
+          scopedSecond.items
+            .filter((item) => item.type === "triple")
+            .map((item) => item.id),
+        ).toEqual(["wkg://triple/Q1/mentions/Q2", "wkg://triple/Q3/before/Q1"]);
+
+        const objectPattern = await listArchiveCollection(document, {
+          chapters: [2],
+          triplePattern: { objectQid: "Q1" },
+          types: ["triple"],
+        });
+
+        expect(objectPattern.items.map((item) => item.id)).toStrictEqual([
+          "wkg://triple/Q3/before/Q1",
+        ]);
 
         const scopedSecondWithEvidence = await listArchiveCollection(document, {
           chapters: [2],
@@ -1421,8 +1570,411 @@ describe("facade/archive-view", () => {
         expect(entityWithEvidence?.type).toBe("entity");
         expect(entityWithEvidence?.evidence?.shown).toBe(1);
         expect(entityWithEvidence?.evidence?.sources[0]?.id).toBe(
-          "wkg://chapter/2/source/0#0..0",
+          "wkg://chapter/2/source#0",
         );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("sorts entity related triples with list-mode frequency", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "related-source-low",
+              qid: "Q1",
+              rangeEnd: 11,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "LLM Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "related-target-low",
+              qid: "Q2",
+              rangeEnd: 48,
+              rangeStart: 42,
+              sentenceIndex: 0,
+              surface: "agents",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "related-source-high-one",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 1,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "related-source-high-two",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 2,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "related-target-high",
+              qid: "Q3",
+              rangeEnd: 16,
+              rangeStart: 7,
+              sentenceIndex: 1,
+              surface: "fragments",
+            },
+          ]);
+          await openedDocument.mentionLinks.saveMany([
+            {
+              evidenceSentenceIds: [[1, 0, 0]],
+              id: "a-low-frequency-link",
+              predicate: "mentions",
+              sourceMentionId: "related-source-low",
+              targetMentionId: "related-target-low",
+            },
+            {
+              evidenceSentenceIds: [[1, 0, 1]],
+              id: "z-high-frequency-link-1",
+              predicate: "mentions",
+              sourceMentionId: "related-source-high-one",
+              targetMentionId: "related-target-high",
+            },
+            {
+              evidenceSentenceIds: [[1, 0, 2]],
+              id: "z-high-frequency-link-2",
+              predicate: "mentions",
+              sourceMentionId: "related-source-high-two",
+              targetMentionId: "related-target-high",
+            },
+          ]);
+        });
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wkg://entity/Q1",
+          { role: "subject" },
+        );
+
+        expect(related.map((item) => item.id)).toStrictEqual([
+          "wkg://triple/Q1/mentions/Q3",
+          "wkg://triple/Q1/mentions/Q2",
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("breaks related triple frequency ties by sentence position", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "tie-source-later",
+              qid: "Q1",
+              rangeEnd: 11,
+              rangeStart: 0,
+              sentenceIndex: 2,
+              surface: "LLM Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "tie-target-later",
+              qid: "Q2",
+              rangeEnd: 48,
+              rangeStart: 42,
+              sentenceIndex: 2,
+              surface: "agents",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "tie-source-earlier",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 1,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "tie-target-earlier",
+              qid: "Q3",
+              rangeEnd: 16,
+              rangeStart: 7,
+              sentenceIndex: 1,
+              surface: "fragments",
+            },
+          ]);
+          await openedDocument.mentionLinks.saveMany([
+            {
+              evidenceSentenceIds: [[1, 0, 2]],
+              id: "a-later-sentence-link",
+              predicate: "mentions",
+              sourceMentionId: "tie-source-later",
+              targetMentionId: "tie-target-later",
+            },
+            {
+              evidenceSentenceIds: [[1, 0, 1]],
+              id: "z-earlier-sentence-link",
+              predicate: "mentions",
+              sourceMentionId: "tie-source-earlier",
+              targetMentionId: "tie-target-earlier",
+            },
+          ]);
+        });
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wkg://entity/Q1",
+          { role: "subject" },
+        );
+
+        expect(related.map((item) => item.id)).toStrictEqual([
+          "wkg://triple/Q1/mentions/Q3",
+          "wkg://triple/Q1/mentions/Q2",
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("filters and sorts entity related triples by query text", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-source-early",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-target-weak",
+              qid: "Q2",
+              rangeEnd: 20,
+              rangeStart: 10,
+              sentenceIndex: 0,
+              surface: "agent",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-source-late",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 1,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-target-strong",
+              qid: "Q3",
+              rangeEnd: 24,
+              rangeStart: 10,
+              sentenceIndex: 1,
+              surface: "agent agent",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-source-unmatched",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 2,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "query-target-unmatched",
+              qid: "Q4",
+              rangeEnd: 24,
+              rangeStart: 10,
+              sentenceIndex: 2,
+              surface: "fragments",
+            },
+          ]);
+          await openedDocument.mentionLinks.saveMany([
+            {
+              evidenceSentenceIds: [[1, 0, 0]],
+              id: "query-link-weak",
+              predicate: "mentions",
+              sourceMentionId: "query-source-early",
+              targetMentionId: "query-target-weak",
+            },
+            {
+              evidenceSentenceIds: [[1, 0, 1]],
+              id: "query-link-strong",
+              predicate: "mentions",
+              sourceMentionId: "query-source-late",
+              targetMentionId: "query-target-strong",
+            },
+            {
+              evidenceSentenceIds: [[1, 0, 2]],
+              id: "query-link-unmatched",
+              predicate: "mentions",
+              sourceMentionId: "query-source-unmatched",
+              targetMentionId: "query-target-unmatched",
+            },
+          ]);
+        });
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wkg://entity/Q1",
+          { query: "agent", role: "subject" },
+        );
+
+        expect(related.map((item) => item.id)).toStrictEqual([
+          "wkg://triple/Q1/mentions/Q3",
+          "wkg://triple/Q1/mentions/Q2",
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("matches entity related query against mention link evidence sentences", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "sentence-query-source",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 1,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "sentence-query-target",
+              qid: "Q2",
+              rangeEnd: 20,
+              rangeStart: 10,
+              sentenceIndex: 1,
+              surface: "archive",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 0, 1]],
+            id: "sentence-query-link",
+            predicate: "mentions",
+            sourceMentionId: "sentence-query-source",
+            targetMentionId: "sentence-query-target",
+          });
+        });
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wkg://entity/Q1",
+          { query: "朱元璋", role: "subject" },
+        );
+
+        expect(related).toMatchObject([
+          {
+            id: "wkg://triple/Q1/mentions/Q2",
+            score: expect.any(Number) as number,
+          },
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("matches entity related triples by mention-link evidence text", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "evidence-related-source",
+              qid: "Q1",
+              rangeEnd: 4,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "evidence-related-target",
+              qid: "Q2",
+              rangeEnd: 20,
+              rangeStart: 10,
+              sentenceIndex: 0,
+              surface: "agent",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 0, 1]],
+            id: "evidence-related-link",
+            predicate: "mentions",
+            sourceMentionId: "evidence-related-source",
+            targetMentionId: "evidence-related-target",
+          });
+        });
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wkg://entity/Q1",
+          { query: "朱元璋", role: "subject" },
+        );
+
+        expect(related.map((item) => item.id)).toStrictEqual([
+          "wkg://triple/Q1/mentions/Q2",
+        ]);
+        expect(related[0]?.score).toBeGreaterThan(0);
       } finally {
         await document.release();
       }
@@ -1601,7 +2153,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wkg://chapter/1/source/0#0..0",
+              id: "wkg://chapter/1/source#0",
               source:
                 "An LLM Wiki exposes pages, links, and source fragments to agents.",
               type: "source",
@@ -1613,7 +2165,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wkg://chapter/1/source/0#0..0",
+              id: "wkg://chapter/1/source#0",
               type: "source",
             },
           ],
@@ -1623,7 +2175,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wkg://chapter/1/source/0#0..0",
+              id: "wkg://chapter/1/source#0",
               type: "source",
             },
           ],
@@ -1635,7 +2187,7 @@ describe("facade/archive-view", () => {
             shown: 1,
             sources: [
               {
-                id: "wkg://chapter/1/source/0#0..0",
+                id: "wkg://chapter/1/source#0",
                 type: "source",
               },
             ],
@@ -1655,7 +2207,7 @@ describe("facade/archive-view", () => {
             shown: 1,
             sources: [
               {
-                id: "wkg://chapter/1/source/0#0..0",
+                id: "wkg://chapter/1/source#0",
                 type: "source",
               },
             ],
@@ -1675,12 +2227,17 @@ describe("facade/archive-view", () => {
             type: "entity",
           },
           budget: 1000,
-          links: [],
+          related: [
+            {
+              id: "wkg://triple/Q1/mentions/Q2",
+              type: "triple",
+            },
+          ],
         });
         await expect(
-          packArchiveContext(document, "wkg://chapter/1/source/0#0..0", 1000),
+          packArchiveContext(document, "wkg://chapter/1/source#0", 1000),
         ).rejects.toThrow(
-          "Pack is only available for chunk, entity, and triple objects",
+          "Pack is only available for chunk and entity objects",
         );
         await expect(
           listRelatedArchiveObjects(document, "wkg://entity/Q1"),
@@ -1698,44 +2255,220 @@ describe("facade/archive-view", () => {
           },
         ]);
         await expect(
-          listRelatedArchiveObjects(document, "wkg://triple/Q1/mentions/Q2"),
-        ).resolves.toStrictEqual([
+          listRelatedArchiveObjects(document, "wkg://entity/Q1", {
+            evidenceLimit: 1,
+            role: "subject",
+          }),
+        ).resolves.toMatchObject([
           {
-            id: "wkg://entity/Q1",
-            label: "LLM Wiki",
-            summary: "1 mentions",
-            type: "entity",
-          },
-          {
-            id: "wkg://entity/Q2",
-            label: "agents",
-            summary: "1 mentions",
-            type: "entity",
+            evidence: {
+              shown: 1,
+              sources: [
+                {
+                  id: "wkg://chapter/1/source#0",
+                },
+              ],
+              total: 1,
+            },
+            id: "wkg://triple/Q1/mentions/Q2",
+            type: "triple",
           },
         ]);
+        await expect(
+          listRelatedArchiveObjects(document, "wkg://entity/Q1", {
+            role: "object",
+          }),
+        ).resolves.toStrictEqual([]);
+        await expect(
+          listRelatedArchiveObjects(document, "wkg://triple/Q1/mentions/Q2"),
+        ).rejects.toThrow(
+          "Related is only available for chunk and entity objects",
+        );
         await expect(
           listArchiveEvidence(document, "wkg://entity/Q3"),
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wkg://chapter/1/source/1#1..1",
+              id: "wkg://chapter/1/source#4",
               source: "Second fragment mentions Augustine.",
               type: "source",
             },
           ],
         });
         await expect(
-          listArchiveEvidence(document, "wkg://chapter/1/source/1#1..1"),
+          listArchiveEvidence(document, "wkg://chapter/1/source#4"),
         ).rejects.toThrow("Evidence is not available");
         await expect(
           listArchiveEvidence(document, "wkg://entity/Q4"),
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wkg://chapter/1/source/0#2..2",
+              id: "wkg://chapter/1/source#2",
               type: "source",
             },
           ],
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("filters evidence by query text", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "evidence-query-first",
+              qid: "Q1",
+              rangeEnd: 3,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "LLM",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "evidence-query-second",
+              qid: "Q1",
+              rangeEnd: 3,
+              rangeStart: 0,
+              sentenceIndex: 1,
+              surface: "朱元璋",
+            },
+          ]);
+        });
+
+        const evidence = await listArchiveEvidence(
+          document,
+          "wkg://entity/Q1",
+          { query: "朱元璋" },
+        );
+
+        expect(evidence.items.map((item) => item.id)).toStrictEqual([
+          "wkg://chapter/1/source#1",
+        ]);
+        expect(evidence.items[0]?.score).toBeGreaterThan(0);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("returns backlinks for source sentence ranges", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "backlink-source",
+              qid: "Q1",
+              rangeEnd: 12,
+              rangeStart: 3,
+              sentenceIndex: 0,
+              surface: "LLM Wiki",
+            },
+            {
+              chapterId: 1,
+              fragmentId: 0,
+              id: "backlink-target",
+              qid: "Q2",
+              rangeEnd: 63,
+              rangeStart: 57,
+              sentenceIndex: 0,
+              surface: "agents",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 0, 0]],
+            id: "backlink-link",
+            predicate: "mentions",
+            sourceMentionId: "backlink-source",
+            targetMentionId: "backlink-target",
+          });
+        });
+
+        await expect(
+          readArchivePage(document, "wkg://chapter/1/source#0", {
+            backlinks: true,
+          }),
+        ).resolves.toMatchObject({
+          backlinks: {
+            chunks: {
+              items: [
+                {
+                  id: "node:100",
+                  type: "node",
+                },
+              ],
+              nextCursor: null,
+            },
+            entities: {
+              items: [
+                {
+                  id: "wkg://entity/Q1",
+                  type: "entity",
+                },
+                {
+                  id: "wkg://entity/Q2",
+                  type: "entity",
+                },
+              ],
+              nextCursor: null,
+            },
+            triples: {
+              items: [
+                {
+                  id: "wkg://triple/Q1/mentions/Q2",
+                  type: "triple",
+                },
+              ],
+              nextCursor: null,
+            },
+          },
+          fragment: {
+            id: "wkg://chapter/1/source#0",
+          },
+          type: "fragment",
+        });
+
+        const result = await listArchiveCollection(document, {
+          backlinks: true,
+          limit: 1,
+          types: ["source"],
+        });
+
+        expect(result.items[0]).toMatchObject({
+          backlinks: {
+            chunks: {
+              items: [
+                {
+                  id: "node:100",
+                },
+              ],
+            },
+            triples: {
+              items: [
+                {
+                  id: "wkg://triple/Q1/mentions/Q2",
+                },
+              ],
+            },
+          },
+          id: "wkg://chapter/1/source#0",
+          type: "source",
         });
       } finally {
         await document.release();
@@ -1833,4 +2566,62 @@ function restoreEnv(name: string, value: string | undefined): void {
   }
 
   process.env[name] = value;
+}
+
+function createEntityWikipageMockFetch(): typeof fetch {
+  return ((input: string | URL | Request) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+
+    if (url.hostname === "www.wikidata.org") {
+      const language = url.searchParams.get("languages")?.split("|")[0];
+
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            entities: {
+              Q1: {
+                descriptions: {
+                  [language ?? "en"]: {
+                    value:
+                      language === "zh"
+                        ? "明朝军事将领"
+                        : "Ming dynasty general",
+                  },
+                },
+                labels: {
+                  [language ?? "en"]: {
+                    value: language === "zh" ? "徐达" : "Xu Da",
+                  },
+                },
+                sitelinks: {
+                  enwiki: { title: "Xu Da" },
+                  zhwiki: { title: "徐达" },
+                },
+              },
+            },
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      );
+    }
+
+    const titles = url.searchParams.get("titles")?.split("|") ?? [];
+
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          query: {
+            pages: titles.map((title, index) => ({
+              pageid: index + 1,
+              pageprops: {
+                wikibase_item: "Q1",
+              },
+              title,
+            })),
+          },
+        }),
+        { headers: { "content-type": "application/json" } },
+      ),
+    );
+  }) as typeof fetch;
 }

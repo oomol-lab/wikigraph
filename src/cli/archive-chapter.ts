@@ -178,7 +178,10 @@ export async function runArchiveChapterCommand(
       }
 
       await new SpineDigestFile(args.path).readDocument(async (document) => {
-        await writeChapterTree(await getChapterTree(document));
+        await writeChapterTree(
+          await getChapterTree(document),
+          args.json ?? false,
+        );
       });
       return;
   }
@@ -281,8 +284,43 @@ async function writeChapterList(
   );
 }
 
-async function writeChapterTree(tree: ChapterTree): Promise<void> {
-  await writeTextToStdout(formatCLIJSON(tree));
+async function writeChapterTree(
+  tree: ChapterTree,
+  json: boolean,
+): Promise<void> {
+  if (json) {
+    await writeTextToStdout(formatCLIJSON(tree));
+    return;
+  }
+
+  if (tree.chapters.length === 0) {
+    await writeTextToStdout("No chapters.\n");
+    return;
+  }
+
+  await writeTextToStdout(
+    `${formatChapterTreeNodes(tree.chapters).join("\n")}\n`,
+  );
+}
+
+function formatChapterTreeNodes(
+  nodes: readonly ChapterTree["chapters"][number][],
+  prefix = "",
+): readonly string[] {
+  return nodes.flatMap((node, index) => {
+    const last = index === nodes.length - 1;
+    const branch = last ? "└─ " : "├─ ";
+    const childPrefix = `${prefix}${last ? "   " : "│  "}`;
+
+    return [
+      `${prefix}${branch}${formatChapterTreeTitle(node.title)}  wkg://chapter/${node.id}`,
+      ...formatChapterTreeNodes(node.children, childPrefix),
+    ];
+  });
+}
+
+function formatChapterTreeTitle(title: string | null): string {
+  return title ?? "[untitled]";
 }
 
 async function writeChapterTreeApplyResult(
