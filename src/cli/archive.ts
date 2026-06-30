@@ -1262,10 +1262,12 @@ function formatFindObject(object: ArchiveOutputObject): string {
 
     const hiddenEvidenceCount = object.evidence.total - object.evidence.shown;
 
-    if (hiddenEvidenceCount > 0) {
-      lines.push("", `${hiddenEvidenceCount} evidence more...`);
-    }
-    lines.push(...formatEvidencePreviewContinuation(object.evidence));
+    lines.push(
+      ...formatEvidencePreviewContinuation(
+        object.evidence,
+        hiddenEvidenceCount,
+      ),
+    );
   }
 
   return lines.join("\n");
@@ -1402,20 +1404,26 @@ function formatEvidencePreviewBlocks(
   ]);
   const hiddenEvidenceCount = evidence.total - evidence.shown;
 
-  if (hiddenEvidenceCount > 0) {
-    lines.push(`${hiddenEvidenceCount} evidence more...`);
-  }
-
-  lines.push(...formatEvidencePreviewContinuation(evidence));
+  lines.push(
+    ...formatEvidencePreviewContinuation(evidence, hiddenEvidenceCount),
+  );
   return lines;
 }
 
 function formatEvidencePreviewContinuation(
   evidence: ArchiveOutputEvidencePreview,
+  hiddenEvidenceCount: number,
 ): string[] {
-  return evidence.nextCursor === null
-    ? []
-    : ["", `More evidence: wikigraph next ${evidence.nextCursor}`];
+  if (evidence.nextCursor !== null) {
+    return [
+      "",
+      `${hiddenEvidenceCount} more evidence: wikigraph next ${evidence.nextCursor}`,
+    ];
+  }
+
+  return hiddenEvidenceCount > 0
+    ? ["", `${hiddenEvidenceCount} evidence more...`]
+    : [];
 }
 
 function normalizeSourceText(text: string): string {

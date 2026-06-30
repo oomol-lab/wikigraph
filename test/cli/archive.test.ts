@@ -506,7 +506,7 @@ describe("cli/archive", () => {
     });
 
     expect(archiveMockState.textWrites[0]).toContain(
-      "More evidence: wikigraph next c_more_evidence",
+      "2 more evidence: wikigraph next c_more_evidence",
     );
     expect(archiveMockState.textWrites[0]).toContain(
       "Next page: wikigraph next c_more_results",
@@ -1048,9 +1048,8 @@ describe("cli/archive", () => {
       objectId: "wikigraph:///tmp/book.sdpub/entity/Q1",
     });
 
-    expect(archiveMockState.textWrites[0]).toContain("2 evidence more...");
     expect(archiveMockState.textWrites[0]).toContain(
-      "More evidence: wikigraph next c_more_evidence",
+      "2 more evidence: wikigraph next c_more_evidence",
     );
     expect(archiveMockState.textWrites[0]).not.toContain("Next page:");
   });
