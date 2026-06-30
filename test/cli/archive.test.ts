@@ -17,7 +17,7 @@ const archiveMockState = vi.hoisted(() => ({
             chapterId: 2,
             endSentenceIndex: 1,
             fragmentId: 0,
-            id: "wikigraph://chapter/2/source/0#0..1",
+            id: "wkg://chapter/2/source/0#0..1",
             source: "RAG original source fragment.",
             startSentenceIndex: 0,
             title: "Chapter 2",
@@ -27,7 +27,7 @@ const archiveMockState = vi.hoisted(() => ({
         total: 3,
       },
       field: "title",
-      id: "wikigraph://entity/Q1",
+      id: "wkg://entity/Q1",
       matchedTerms: ["rag"],
       position: { chapter: 2, fragment: 0 },
       score: 1,
@@ -47,7 +47,7 @@ const archiveMockState = vi.hoisted(() => ({
             chapterId: 2,
             endSentenceIndex: 1,
             fragmentId: 0,
-            id: "wikigraph://chapter/2/source/0#0..1",
+            id: "wkg://chapter/2/source/0#0..1",
             source: "RAG original source fragment.",
             startSentenceIndex: 0,
             title: "Chapter 2",
@@ -57,7 +57,7 @@ const archiveMockState = vi.hoisted(() => ({
         total: 1,
       },
       field: "title",
-      id: "wikigraph://triple/Q1/mentions/Q2",
+      id: "wkg://triple/Q1/mentions/Q2",
       position: { chapter: 2, fragment: 0 },
       snippet: "RAG mentions agent",
       title: "Q1 mentions Q2",
@@ -115,7 +115,7 @@ const archiveMockState = vi.hoisted(() => ({
         chapterId: 2,
         endSentenceIndex: 1,
         fragmentId: 0,
-        id: "wikigraph://chapter/2/source/0#0..1",
+        id: "wkg://chapter/2/source/0#0..1",
         source:
           "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
         startSentenceIndex: 0,
@@ -126,7 +126,7 @@ const archiveMockState = vi.hoisted(() => ({
         chapterId: 2,
         endSentenceIndex: 3,
         fragmentId: 0,
-        id: "wikigraph://chapter/2/source/0#3..3",
+        id: "wkg://chapter/2/source/0#3..3",
         source: "Follow-up source fragment.",
         startSentenceIndex: 3,
         title: "Chapter 2",
@@ -144,7 +144,7 @@ const archiveMockState = vi.hoisted(() => ({
       type: "node",
     },
     {
-      id: "wikigraph://triple/Q1/mentions/Q2",
+      id: "wkg://triple/Q1/mentions/Q2",
       label: "RAG mentions agent",
       objectLabel: "agent",
       objectQid: "Q2",
@@ -162,7 +162,7 @@ const archiveMockState = vi.hoisted(() => ({
       {
         chapter: 2,
         field: "title",
-        id: "wikigraph://entity/Q1",
+        id: "wkg://entity/Q1",
         position: { chapter: 2, fragment: 0 },
         snippet: "1 mentions",
         title: "RAG",
@@ -214,7 +214,7 @@ const archiveMockState = vi.hoisted(() => ({
           chapterId: 2,
           endSentenceIndex: 1,
           fragmentId: 0,
-          id: "wikigraph://chapter/2/source/0#0..1",
+          id: "wkg://chapter/2/source/0#0..1",
           source: "RAG original source fragment.",
           startSentenceIndex: 0,
           title: "Chapter 2",
@@ -223,7 +223,7 @@ const archiveMockState = vi.hoisted(() => ({
       ],
       total: 1,
     },
-    id: "wikigraph://entity/Q1",
+    id: "wkg://entity/Q1",
     label: "RAG",
     labels: [
       "RAG",
@@ -248,7 +248,7 @@ const archiveMockState = vi.hoisted(() => ({
           chapterId: 2,
           endSentenceIndex: 1,
           fragmentId: 0,
-          id: "wikigraph://chapter/2/source/0#0..1",
+          id: "wkg://chapter/2/source/0#0..1",
           source:
             "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
           startSentenceIndex: 0,
@@ -259,7 +259,7 @@ const archiveMockState = vi.hoisted(() => ({
           chapterId: 2,
           endSentenceIndex: 3,
           fragmentId: 0,
-          id: "wikigraph://chapter/2/source/0#3..3",
+          id: "wkg://chapter/2/source/0#3..3",
           source: "Follow-up source fragment.",
           startSentenceIndex: 3,
           title: "Chapter 2",
@@ -268,7 +268,7 @@ const archiveMockState = vi.hoisted(() => ({
       ],
       total: 2,
     },
-    id: "wikigraph://triple/Q1/mentions/Q2",
+    id: "wkg://triple/Q1/mentions/Q2",
     label: "RAG(Q1) mentions agent(Q2)",
     objectQid: "Q2",
     predicate: "mentions",
@@ -371,13 +371,13 @@ vi.mock("../../src/facade/index.js", () => ({
   ),
   readArchivePage: vi.fn((_document: unknown, id: string) =>
     Promise.resolve(
-      id === "wikigraph://entity/Q1"
+      id === "wkg://entity/Q1"
         ? archiveMockState.entityPage
-        : id === "wikigraph://triple/Q1/mentions/Q2"
+        : id === "wkg://triple/Q1/mentions/Q2"
           ? archiveMockState.triplePage
-          : id === "wikigraph://chapter/2"
+          : id === "wkg://chapter/2"
             ? archiveMockState.chapterPage
-            : id === "wikigraph://"
+            : id === "wkg://"
               ? archiveMockState.metaPage
               : archiveMockState.page,
     ),
@@ -427,13 +427,13 @@ describe("cli/archive", () => {
   it("prints search hits as Wiki Graph URI objects", async () => {
     await runArchiveCommand({
       action: "search",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "text",
       kinds: ["chunk"],
       query: "RAG",
     });
 
-    expect(archiveMockState.textWrites[0]).toContain("wikigraph://chunk/9");
+    expect(archiveMockState.textWrites[0]).toContain("wkg://chunk/9");
     expect(archiveMockState.textWrites[0]).toContain("Retrieval design");
     expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
       archiveKey: "/tmp/book.sdpub",
@@ -444,7 +444,7 @@ describe("cli/archive", () => {
   it("passes entity search kinds to archive search", async () => {
     await runArchiveCommand({
       action: "search",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       evidenceLimit: 3,
       format: "text",
       kinds: ["entity"],
@@ -456,10 +456,10 @@ describe("cli/archive", () => {
       evidenceLimit: 3,
       types: ["entity"],
     });
-    expect(archiveMockState.textWrites[0]).toContain("1 wikigraph://entity/Q1");
+    expect(archiveMockState.textWrites[0]).toContain("1 wkg://entity/Q1");
     expect(archiveMockState.textWrites[0]).toContain("-- evidence 1/1");
     expect(archiveMockState.textWrites[0]).toContain(
-      "@@ wikigraph://chapter/2/source/0#0..1 @@",
+      "@@ wkg://chapter/2/source/0#0..1 @@",
     );
     expect(archiveMockState.textWrites[0]).toContain("2 evidence more...");
   });
@@ -498,7 +498,7 @@ describe("cli/archive", () => {
 
     await runArchiveCommand({
       action: "search",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       evidenceLimit: 1,
       format: "text",
       kinds: ["entity"],
@@ -516,7 +516,7 @@ describe("cli/archive", () => {
   it("prints listed archive objects as Wiki Graph URI objects", async () => {
     await runArchiveCommand({
       action: "list",
-      archivePath: "wikigraph:///tmp/book.sdpub/chapter/2",
+      archivePath: "wkg:///tmp/book.sdpub/chapter/2",
       format: "text",
       kinds: ["entity"],
     });
@@ -528,7 +528,7 @@ describe("cli/archive", () => {
         types: ["entity"],
       },
     );
-    expect(archiveMockState.textWrites[0]).toContain("wikigraph://entity/Q1");
+    expect(archiveMockState.textWrites[0]).toContain("wkg://entity/Q1");
     expect(archiveMockState.textWrites[0]).toContain("RAG");
   });
 
@@ -540,7 +540,7 @@ describe("cli/archive", () => {
 
     await runArchiveCommand({
       action: "list",
-      archivePath: "wikigraph:///tmp/book.sdpub/chapter/2",
+      archivePath: "wkg:///tmp/book.sdpub/chapter/2",
       evidenceLimit: 3,
       format: "json",
       kinds: ["entity"],
@@ -595,7 +595,7 @@ describe("cli/archive", () => {
       nextCursor: null,
       objects: [
         {
-          uri: "wikigraph://entity/Q1",
+          uri: "wkg://entity/Q1",
         },
       ],
     });
@@ -609,7 +609,7 @@ describe("cli/archive", () => {
 
     await runArchiveCommand({
       action: "list",
-      archivePath: "wikigraph:///tmp/book.sdpub/chapter/2",
+      archivePath: "wkg:///tmp/book.sdpub/chapter/2",
       evidenceLimit: 3,
       format: "json",
       kinds: ["entity"],
@@ -634,7 +634,7 @@ describe("cli/archive", () => {
             sources: [
               {
                 text: "RAG original source fragment.",
-                uri: "wikigraph://chapter/2/source/0#0..1",
+                uri: "wkg://chapter/2/source/0#0..1",
               },
             ],
             total: 3,
@@ -642,7 +642,7 @@ describe("cli/archive", () => {
           label: "RAG",
           score: 1,
           type: "entity",
-          uri: "wikigraph://entity/Q1",
+          uri: "wkg://entity/Q1",
         },
       ],
     });
@@ -670,7 +670,7 @@ describe("cli/archive", () => {
 
     await runArchiveCommand({
       action: "list",
-      archivePath: "wikigraph:///tmp/book.sdpub/chapter/2",
+      archivePath: "wkg:///tmp/book.sdpub/chapter/2",
       evidenceLimit: 1,
       format: "json",
       kinds: ["entity"],
@@ -681,7 +681,7 @@ describe("cli/archive", () => {
       expect.objectContaining({
         cursor: "raw-evidence-cursor",
         kind: "evidence",
-        targetUri: "wikigraph://entity/Q1",
+        targetUri: "wkg://entity/Q1",
       }),
     );
     expect(createContinuationCursor).toHaveBeenNthCalledWith(
@@ -712,7 +712,7 @@ describe("cli/archive", () => {
 
     await runArchiveCommand({
       action: "list",
-      archivePath: "wikigraph:///tmp/book.sdpub/chapter/2",
+      archivePath: "wkg:///tmp/book.sdpub/chapter/2",
       evidenceLimit: 3,
       format: "json",
       kinds: ["triple"],
@@ -737,7 +737,7 @@ describe("cli/archive", () => {
             sources: [
               {
                 text: "RAG original source fragment.",
-                uri: "wikigraph://chapter/2/source/0#0..1",
+                uri: "wkg://chapter/2/source/0#0..1",
               },
             ],
             total: 1,
@@ -745,7 +745,7 @@ describe("cli/archive", () => {
           objectLabel: "agent",
           predicate: "mentions",
           subjectLabel: "RAG",
-          uri: "wikigraph://triple/Q1/mentions/Q2",
+          uri: "wkg://triple/Q1/mentions/Q2",
         },
       ],
     });
@@ -757,7 +757,7 @@ describe("cli/archive", () => {
   it("prints search objects as JSON", async () => {
     await runArchiveCommand({
       action: "search",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "json",
       kinds: ["entity"],
       query: "RAG",
@@ -772,13 +772,13 @@ describe("cli/archive", () => {
           score: 1,
           summary: "RAG original source fragment.",
           type: "entity",
-          uri: "wikigraph://entity/Q1",
+          uri: "wkg://entity/Q1",
         },
       ],
     });
     expect(archiveMockState.textWrites[0]).toContain(
       [
-        '      "uri": "wikigraph://entity/Q1"',
+        '      "uri": "wkg://entity/Q1"',
         '      "type": "entity"',
         '      "label": "RAG"',
         '      "score": 1',
@@ -791,15 +791,13 @@ describe("cli/archive", () => {
   it("prints search cursor metadata as JSONL", async () => {
     await runArchiveCommand({
       action: "search",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "jsonl",
       kinds: ["entity"],
       query: "RAG",
     });
 
-    expect(archiveMockState.textWrites[0]).toContain(
-      '"uri":"wikigraph://entity/Q1"',
-    );
+    expect(archiveMockState.textWrites[0]).toContain('"uri":"wkg://entity/Q1"');
     expect(parseJSONLLastLine(archiveMockState.textWrites[0])).toStrictEqual({
       nextCursor: null,
       type: "page",
@@ -826,7 +824,7 @@ describe("cli/archive", () => {
       nextCursor: null,
       objects: [
         {
-          uri: "wikigraph://entity/Q1",
+          uri: "wkg://entity/Q1",
         },
       ],
     });
@@ -865,7 +863,7 @@ describe("cli/archive", () => {
 
     await runArchiveCommand({
       action: "search",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       evidenceLimit: 4,
       format: "json",
       kinds: ["entity"],
@@ -914,7 +912,7 @@ describe("cli/archive", () => {
 
     await runArchiveCommand({
       action: "search",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       evidenceLimit: 4,
       format: "json",
       kinds: ["entity"],
@@ -927,19 +925,19 @@ describe("cli/archive", () => {
       cursor: "raw-next-evidence-cursor",
       format: "json",
       kind: "evidence",
-      targetUri: "wikigraph://entity/Q1",
+      targetUri: "wkg://entity/Q1",
     });
   });
 
   it("gets an object by Wiki Graph URI", async () => {
     await runArchiveCommand({
       action: "get",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "text",
-      objectId: "wikigraph:///tmp/book.sdpub/chunk/9",
+      objectId: "wkg:///tmp/book.sdpub/chunk/9",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://chunk/9", {});
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wkg://chunk/9", {});
     expect(archiveMockState.textWrites[0]).toContain("node:9");
     expect(archiveMockState.textWrites[0]).toContain("Source Fragments:");
   });
@@ -947,18 +945,14 @@ describe("cli/archive", () => {
   it("gets a chapter as a minimal object", async () => {
     await runArchiveCommand({
       action: "get",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "json",
-      objectId: "wikigraph:///tmp/book.sdpub/chapter/2",
+      objectId: "wkg:///tmp/book.sdpub/chapter/2",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith(
-      {},
-      "wikigraph://chapter/2",
-      {},
-    );
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wkg://chapter/2", {});
     expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
-      uri: "wikigraph://chapter/2",
+      uri: "wkg://chapter/2",
       title: "Chapter 2",
       stage: "reading-graph",
     });
@@ -967,15 +961,15 @@ describe("cli/archive", () => {
   it("gets archive metadata from a root object URI", async () => {
     await runArchiveCommand({
       action: "get",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "text",
-      objectId: "wikigraph:///tmp/book.sdpub/",
+      objectId: "wkg:///tmp/book.sdpub/",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://", {});
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wkg://", {});
     expect(archiveMockState.textWrites[0]).toBe(
       [
-        "uri: wikigraph://",
+        "uri: wkg://",
         "title: Archive Fixture",
         "authors: Archive Author",
         "publisher: Archive Press",
@@ -988,17 +982,17 @@ describe("cli/archive", () => {
   it("gets an entity by Wiki Graph URI", async () => {
     await runArchiveCommand({
       action: "get",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       evidenceLimit: 3,
       format: "json",
-      objectId: "wikigraph:///tmp/book.sdpub/entity/Q1",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith({}, "wikigraph://entity/Q1", {
+    expect(readArchivePage).toHaveBeenCalledWith({}, "wkg://entity/Q1", {
       evidenceLimit: 3,
     });
     expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
-      uri: "wikigraph://entity/Q1",
+      uri: "wkg://entity/Q1",
       labels: [
         "RAG",
         "retrieval-augmented generation",
@@ -1014,7 +1008,7 @@ describe("cli/archive", () => {
         shown: 1,
         sources: [
           {
-            uri: "wikigraph://chapter/2/source/0#0..1",
+            uri: "wkg://chapter/2/source/0#0..1",
             text: "RAG original source fragment.",
           },
         ],
@@ -1022,9 +1016,7 @@ describe("cli/archive", () => {
       },
     });
     expect(archiveMockState.textWrites[0]).toContain(
-      ['  "uri": "wikigraph://entity/Q1",', '  "labels": [', '    "RAG",'].join(
-        "\n",
-      ),
+      ['  "uri": "wkg://entity/Q1",', '  "labels": [', '    "RAG",'].join("\n"),
     );
   });
 
@@ -1042,10 +1034,10 @@ describe("cli/archive", () => {
 
     await runArchiveCommand({
       action: "get",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       evidenceLimit: 1,
       format: "text",
-      objectId: "wikigraph:///tmp/book.sdpub/entity/Q1",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1",
     });
 
     expect(archiveMockState.textWrites[0]).toContain(
@@ -1057,10 +1049,10 @@ describe("cli/archive", () => {
   it("gets a triple as concise JSON", async () => {
     await runArchiveCommand({
       action: "get",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       evidenceLimit: 3,
       format: "json",
-      objectId: "wikigraph:///tmp/book.sdpub/triple/Q1/mentions/Q2",
+      objectId: "wkg:///tmp/book.sdpub/triple/Q1/mentions/Q2",
     });
 
     const output = JSON.parse(archiveMockState.textWrites[0] ?? "") as Record<
@@ -1070,7 +1062,7 @@ describe("cli/archive", () => {
 
     expect(readArchivePage).toHaveBeenCalledWith(
       {},
-      "wikigraph://triple/Q1/mentions/Q2",
+      "wkg://triple/Q1/mentions/Q2",
       { evidenceLimit: 3 },
     );
     expect(output).toStrictEqual({
@@ -1080,17 +1072,17 @@ describe("cli/archive", () => {
         sources: [
           {
             text: "\n\t\nRAG original source fragment.\n   \n\t\nSecond paragraph.\n\n",
-            uri: "wikigraph://chapter/2/source/0#0..1",
+            uri: "wkg://chapter/2/source/0#0..1",
           },
           {
             text: "Follow-up source fragment.",
-            uri: "wikigraph://chapter/2/source/0#3..3",
+            uri: "wkg://chapter/2/source/0#3..3",
           },
         ],
         total: 2,
       },
       label: "RAG(Q1) mentions agent(Q2)",
-      uri: "wikigraph://triple/Q1/mentions/Q2",
+      uri: "wkg://triple/Q1/mentions/Q2",
     });
     expect(output).not.toHaveProperty("id");
     expect(output).not.toHaveProperty("subjectQid");
@@ -1101,24 +1093,21 @@ describe("cli/archive", () => {
   it("prints related objects", async () => {
     await runArchiveCommand({
       action: "related",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "text",
-      objectId: "wikigraph:///tmp/book.sdpub/chunk/9",
+      objectId: "wkg:///tmp/book.sdpub/chunk/9",
     });
 
-    expect(listRelatedArchiveObjects).toHaveBeenCalledWith(
-      {},
-      "wikigraph://chunk/9",
-    );
-    expect(archiveMockState.textWrites[0]).toContain("wikigraph://chunk/11");
+    expect(listRelatedArchiveObjects).toHaveBeenCalledWith({}, "wkg://chunk/9");
+    expect(archiveMockState.textWrites[0]).toContain("wkg://chunk/11");
     expect(archiveMockState.textWrites[0]).toContain("Related");
     expect(archiveMockState.textWrites[0]).toContain(
       [
-        "wikigraph://chunk/11",
+        "wkg://chunk/11",
         "Related",
         "Related chunk",
         "",
-        "wikigraph://triple/Q1/mentions/Q2",
+        "wkg://triple/Q1/mentions/Q2",
         "RAG(Q1) mentions agent(Q2)",
       ].join("\n"),
     );
@@ -1128,9 +1117,9 @@ describe("cli/archive", () => {
   it("prints related triples as structured JSON", async () => {
     await runArchiveCommand({
       action: "related",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "json",
-      objectId: "wikigraph:///tmp/book.sdpub/entity/Q1",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1",
     });
 
     expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
@@ -1141,10 +1130,10 @@ describe("cli/archive", () => {
           label: "Related",
           summary: "Related chunk",
           type: "node",
-          uri: "wikigraph://chunk/11",
+          uri: "wkg://chunk/11",
         },
         {
-          uri: "wikigraph://triple/Q1/mentions/Q2",
+          uri: "wkg://triple/Q1/mentions/Q2",
           predicate: "mentions",
           subjectLabel: "RAG",
           objectLabel: "agent",
@@ -1153,7 +1142,7 @@ describe("cli/archive", () => {
     });
     expect(archiveMockState.textWrites[0]).toContain(
       [
-        '      "uri": "wikigraph://triple/Q1/mentions/Q2",',
+        '      "uri": "wkg://triple/Q1/mentions/Q2",',
         '      "predicate": "mentions",',
         '      "subjectLabel": "RAG",',
         '      "objectLabel": "agent"',
@@ -1169,33 +1158,33 @@ describe("cli/archive", () => {
   it("prints evidence source ranges", async () => {
     await runArchiveCommand({
       action: "evidence",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "text",
-      objectId: "wikigraph:///tmp/book.sdpub/triple/Q1/mentions/Q2",
+      objectId: "wkg:///tmp/book.sdpub/triple/Q1/mentions/Q2",
     });
 
     expect(listArchiveEvidence).toHaveBeenCalledWith(
       {},
-      "wikigraph://triple/Q1/mentions/Q2",
+      "wkg://triple/Q1/mentions/Q2",
       {},
     );
     expect(archiveMockState.textWrites[0]).toContain(
-      "wikigraph://chapter/2/source/0#0..1",
+      "wkg://chapter/2/source/0#0..1",
     );
     expect(archiveMockState.textWrites[0]).toContain(
-      "@@ wikigraph://chapter/2/source/0#0..1 @@",
+      "@@ wkg://chapter/2/source/0#0..1 @@",
     );
     expect(archiveMockState.textWrites[0]).toContain(
       "RAG original source fragment.",
     );
     expect(archiveMockState.textWrites[0]).toContain(
       [
-        "@@ wikigraph://chapter/2/source/0#0..1 @@",
+        "@@ wkg://chapter/2/source/0#0..1 @@",
         "RAG original source fragment.",
         "",
         "Second paragraph.",
         "",
-        "@@ wikigraph://chapter/2/source/0#3..3 @@",
+        "@@ wkg://chapter/2/source/0#3..3 @@",
         "Follow-up source fragment.",
       ].join("\n"),
     );
@@ -1204,21 +1193,21 @@ describe("cli/archive", () => {
   it("separates get evidence blocks with blank lines", async () => {
     await runArchiveCommand({
       action: "get",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "text",
-      objectId: "wikigraph:///tmp/book.sdpub/triple/Q1/mentions/Q2",
+      objectId: "wkg:///tmp/book.sdpub/triple/Q1/mentions/Q2",
     });
 
     expect(archiveMockState.textWrites[0]).toContain(
       [
         "-- evidence 1/2",
-        "@@ wikigraph://chapter/2/source/0#0..1 @@",
+        "@@ wkg://chapter/2/source/0#0..1 @@",
         "RAG original source fragment.",
         "",
         "Second paragraph.",
         "",
         "-- evidence 2/2",
-        "@@ wikigraph://chapter/2/source/0#3..3 @@",
+        "@@ wkg://chapter/2/source/0#3..3 @@",
         "Follow-up source fragment.",
       ].join("\n"),
     );
@@ -1227,33 +1216,29 @@ describe("cli/archive", () => {
   it("passes evidence pagination options", async () => {
     await runArchiveCommand({
       action: "evidence",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       cursor: "cursor-1",
       format: "json",
       limit: 3,
-      objectId: "wikigraph:///tmp/book.sdpub/entity/Q1",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1",
     });
 
-    expect(listArchiveEvidence).toHaveBeenCalledWith(
-      {},
-      "wikigraph://entity/Q1",
-      {
-        cursor: "cursor-1",
-        limit: 3,
-      },
-    );
+    expect(listArchiveEvidence).toHaveBeenCalledWith({}, "wkg://entity/Q1", {
+      cursor: "cursor-1",
+      limit: 3,
+    });
   });
 
   it("prints evidence as JSONL", async () => {
     await runArchiveCommand({
       action: "evidence",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       format: "jsonl",
-      objectId: "wikigraph:///tmp/book.sdpub/entity/Q1",
+      objectId: "wkg:///tmp/book.sdpub/entity/Q1",
     });
 
     expect(archiveMockState.textWrites[0]).toContain(
-      '"uri":"wikigraph://chapter/2/source/0#0..1"',
+      '"uri":"wkg://chapter/2/source/0#0..1"',
     );
     expect(archiveMockState.textWrites[0]).not.toContain('"fragmentId"');
     expect(archiveMockState.textWrites[0]).not.toContain('"chapterId"');
@@ -1266,10 +1251,10 @@ describe("cli/archive", () => {
   it("prints a context pack", async () => {
     await runArchiveCommand({
       action: "pack",
-      archivePath: "wikigraph:///tmp/book.sdpub",
+      archivePath: "wkg:///tmp/book.sdpub",
       budget: 1000,
       format: "text",
-      objectId: "wikigraph:///tmp/book.sdpub/chunk/9",
+      objectId: "wkg:///tmp/book.sdpub/chunk/9",
     });
 
     expect(archiveMockState.textWrites[0]).toContain("Pack Budget: 1000");
@@ -1286,7 +1271,7 @@ describe("cli/archive", () => {
         query: "RAG",
       }),
     ).rejects.toThrow(
-      "Example: wikigraph:///tmp/book.sdpub\nSee: wikigraph help uri",
+      "Example: wkg:///tmp/book.sdpub\nSee: wikigraph help uri",
     );
   });
 });

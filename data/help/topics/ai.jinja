@@ -9,21 +9,21 @@ Primary contract:
 Object command inputs:
   Never pass a bare filesystem path to `search`, `list`, `get`, `related`, `evidence`, or `pack`.
   Convert archive paths into Wiki Graph URIs first:
-    /Users/me/book.sdpub -> wikigraph:///Users/me/book.sdpub
-    ./book.sdpub -> wikigraph://book.sdpub
+    /Users/me/book.sdpub -> wkg:///Users/me/book.sdpub
+    ./book.sdpub -> wkg://book.sdpub
 
 Treat every search result as a Wiki Graph URI.
 
 Default exploration loop:
   1. `wikigraph help uri`
-  2. `wikigraph search wikigraph:///absolute/path/book.sdpub <query>`
-  3. `wikigraph get <object-uri>`
-  4. `wikigraph related <object-uri>`
-  5. `wikigraph evidence <object-uri>`
-  6. `wikigraph pack <object-uri> --budget <chars>`
+  2. `wikigraph wkg:///absolute/path/book.sdpub search <query>`
+  3. `wikigraph <object-uri> get`
+  4. `wikigraph <object-uri> related`
+  5. `wikigraph <object-uri> evidence`
+  6. `wikigraph <object-uri> pack --budget <chars>`
 
 Example:
-  wikigraph search wikigraph:///Users/me/book.sdpub "朱元璋" --type entity,triple --limit 20 --json
+  wikigraph wkg:///Users/me/book.sdpub search "朱元璋" --type entity,triple --limit 20 --json
 
 Use `--type` on search to filter currently searchable object kinds:
   meta, chapter, source, summary, chunk, entity, triple

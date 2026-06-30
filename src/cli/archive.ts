@@ -635,7 +635,7 @@ function requireLocatedObjectOrArchiveUri(uri: string): {
     throw new Error(
       [
         `Expected a Wiki Graph URI with a .sdpub archive locator: ${uri}`,
-        `Example: ${uri.endsWith(".sdpub") && uri.startsWith("/") ? `wikigraph://${uri}` : "wikigraph:///absolute/path/book.sdpub"}`,
+        `Example: ${uri.endsWith(".sdpub") && uri.startsWith("/") ? `wkg://${uri}` : "wkg:///absolute/path/book.sdpub"}`,
         "See: wikigraph help uri",
       ].join("\n"),
     );
@@ -645,7 +645,7 @@ function requireLocatedObjectOrArchiveUri(uri: string): {
 }
 
 function parseChapterScope(uri: string): number | undefined {
-  const match = /^wikigraph:\/\/chapter\/([1-9][0-9]*)(?:\/|$)/u.exec(uri);
+  const match = /^wkg:\/\/chapter\/([1-9][0-9]*)(?:\/|$)/u.exec(uri);
 
   return match?.[1] === undefined ? undefined : Number(match[1]);
 }
@@ -682,14 +682,14 @@ async function writeIndex(
       "",
       "Reading Graph:",
       "  No reading chunks are currently available. If a reading-graph queue task already ran, the source may be too short or sparse.",
-      "  Next: inspect source with `wikigraph get wikigraph://<archive.sdpub>/chapter/<id>/source/` or queue `--task reading-graph`.",
+      "  Next: inspect source with `wikigraph wkg://<archive.sdpub>/chapter/<id>/source/ get` or queue `--task reading-graph`.",
     );
   } else if (index.edgeCount === 0) {
     lines.push(
       "",
       "Reading Graph:",
       "  Reading chunks exist, but no chunk edges are currently available. This can be valid when extracted chunks have no stable relationships.",
-      "  Next: inspect chunks with `wikigraph search wikigraph://<archive.sdpub> <query> --type chunk`.",
+      "  Next: inspect chunks with `wikigraph wkg://<archive.sdpub> search <query> --type chunk`.",
     );
   }
 
@@ -703,9 +703,9 @@ async function writeIndex(
     lines.push(
       "",
       "Next:",
-      "  wikigraph search wikigraph://<archive.sdpub> <term>",
-      "  wikigraph get wikigraph://<archive.sdpub>/chapter/<id>/source/",
-      "  wikigraph related <object-uri>",
+      "  wikigraph wkg://<archive.sdpub> search <term>",
+      "  wikigraph wkg://<archive.sdpub>/chapter/<id>/source/ get",
+      "  wikigraph <object-uri> related",
     );
   }
 
@@ -1052,7 +1052,7 @@ function formatNextCursor(nextCursor: string | null): string {
 
 function formatNoMatches(result: ArchiveFindResult): string {
   if (result.match === "all" && result.terms.length > 1) {
-    return `No matches. Try: wikigraph search <archive-uri> "${result.query}" --type ${formatFindTypes(result)}${formatFindLensHint(result)}\n`;
+    return `No matches. Try: wikigraph <archive-uri> search "${result.query}" --type ${formatFindTypes(result)}${formatFindLensHint(result)}\n`;
   }
 
   const lines = [
@@ -1568,15 +1568,15 @@ function toWikiGraphUri(id: string): string {
 
   switch (type) {
     case "chapter":
-      return `wikigraph://chapter/${first ?? ""}`;
+      return `wkg://chapter/${first ?? ""}`;
     case "fragment":
-      return `wikigraph://chapter/${first ?? ""}/source/${second ?? "0"}`;
+      return `wkg://chapter/${first ?? ""}/source/${second ?? "0"}`;
     case "meta":
-      return "wikigraph://";
+      return "wkg://";
     case "node":
-      return `wikigraph://chunk/${first ?? ""}`;
+      return `wkg://chunk/${first ?? ""}`;
     case "summary":
-      return `wikigraph://chapter/${first ?? ""}/summary/`;
+      return `wkg://chapter/${first ?? ""}/summary/`;
     default:
       return id;
   }
