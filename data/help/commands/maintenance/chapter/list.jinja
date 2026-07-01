@@ -7,7 +7,7 @@ Purpose:
   List every chapter and its stored artifact readiness.
 
 Usage:
-  wikigraph <archive-uri>/chapter list [--limit <n>] [--cursor <token>] [--json|--jsonl] [--llm <json>] [--help|-h]
+  wikigraph <archive-uri>/chapter list [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl] [--llm <json>] [--help|-h]
 
 Output shape:
   wkg://chapter/<id>  <title-or-[untitled]>  source:<ready|missing> reading-graph:<ready|missing> reading-summary:<ready|missing> knowledge-graph:<ready|missing>
@@ -16,15 +16,16 @@ Output shape:
 
 Behavior:
   - Includes sourced, generated, and unfinished chapters.
-  - Use `--jsonl` for grep/jq-style readiness checks across many chapters.
+  - Use `--all --jsonl` for grep/jq-style readiness checks across every chapter.
+  - With `--all`, `--limit` controls page size. Avoid `--all` without `--jsonl` for large results.
   - Chapter ids are encoded in the returned `wkg://chapter/<id>` URIs.
   - Does not call an LLM provider.
   - Does not mutate chapter content or summaries.
 
 Use this before mutation:
   Discover ids and missing generated artifacts with:
-    wikigraph <archive-uri>/chapter list --jsonl
-    wikigraph <archive-uri>/chapter list --jsonl | jq 'select(.state["knowledge-graph"] == "missing")'
+    wikigraph <archive-uri>/chapter list --all --jsonl
+    wikigraph <archive-uri>/chapter list --all --jsonl | jq 'select(.state["knowledge-graph"] == "missing")'
 
 See also:
   - wikigraph wkg://book.wikg/chapter/3/state get --help

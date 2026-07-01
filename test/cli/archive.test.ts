@@ -801,6 +801,82 @@ describe("cli/archive", () => {
     });
   });
 
+  it("streams every listed archive page with --all jsonl", async () => {
+    vi.mocked(listArchiveCollection)
+      .mockResolvedValueOnce({
+        ...archiveMockState.collection,
+        items: [
+          {
+            field: "title",
+            id: "chapter:1",
+            position: { chapter: 1 },
+            state: {
+              "knowledge-graph": "missing",
+              "reading-graph": "ready",
+              "reading-summary": "ready",
+              source: "ready",
+            },
+            snippet: "Chapter 1",
+            title: "Chapter 1",
+            type: "chapter",
+          },
+        ],
+        nextCursor: "raw-collection-cursor",
+      })
+      .mockResolvedValueOnce({
+        ...archiveMockState.collection,
+        items: [
+          {
+            field: "title",
+            id: "chapter:2",
+            position: { chapter: 2 },
+            state: {
+              "knowledge-graph": "missing",
+              "reading-graph": "ready",
+              "reading-summary": "missing",
+              source: "ready",
+            },
+            snippet: "Chapter 2",
+            title: "Chapter 2",
+            type: "chapter",
+          },
+        ],
+        nextCursor: null,
+      });
+
+    await runArchiveCommand({
+      action: "list",
+      all: true,
+      archivePath: "wkg:///tmp/book.wikg/chapter",
+      format: "jsonl",
+      kinds: ["chapter"],
+      limit: 1,
+    });
+
+    expect(listArchiveCollection).toHaveBeenNthCalledWith(
+      1,
+      {},
+      {
+        limit: 1,
+        types: ["chapter"],
+      },
+    );
+    expect(listArchiveCollection).toHaveBeenNthCalledWith(
+      2,
+      {},
+      {
+        cursor: "raw-collection-cursor",
+        limit: 1,
+        types: ["chapter"],
+      },
+    );
+    expect(createContinuationCursor).not.toHaveBeenCalled();
+    expect(archiveMockState.textWrites[0]).toContain('"uri":"wkg://chapter/1"');
+    expect(archiveMockState.textWrites[1]).toContain('"uri":"wkg://chapter/2"');
+    expect(archiveMockState.textWrites[0]).not.toContain('"type":"page"');
+    expect(archiveMockState.textWrites[1]).not.toContain('"type":"page"');
+  });
+
   it("continues a listed archive page from a short cursor", async () => {
     vi.mocked(readContinuationCursor).mockResolvedValueOnce({
       archiveKey: "/tmp/book.wikg",

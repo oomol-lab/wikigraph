@@ -431,6 +431,7 @@ describe("cli/args", () => {
         "wkg://book.wikg/chapter/11/source",
         "search",
         "exact phrase",
+        "--all",
         "--limit",
         "10",
         "--cursor",
@@ -440,6 +441,7 @@ describe("cli/args", () => {
     ).toStrictEqual({
       args: {
         action: "search",
+        all: true,
         archivePath: `wkg://${archivePath}/chapter/11`,
         cursor: "cursor-token",
         format: "jsonl",

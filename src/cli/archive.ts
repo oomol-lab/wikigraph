@@ -155,13 +155,28 @@ export async function runArchiveCommand(
       await readArchiveDocument(
         getArchivePath(args.archivePath),
         async (document) => {
+          const context = createArchiveOutputContext(args);
+
+          if (args.all === true) {
+            await writeAllFindHits(
+              async (cursor) =>
+                await findArchiveObjects(document, args.query!, {
+                  ...createFindOptions(args),
+                  ...(cursor === undefined ? {} : { cursor }),
+                }),
+              context,
+              args.format ?? "text",
+            );
+            return;
+          }
+
           await writeFindHits(
             await findArchiveObjects(
               document,
               args.query!,
               createFindOptions(args),
             ),
-            createArchiveOutputContext(args),
+            context,
             args.format ?? "text",
           );
         },
@@ -171,6 +186,25 @@ export async function runArchiveCommand(
       await readArchiveDocument(
         getArchivePath(args.archivePath),
         async (document) => {
+          const context = createArchiveOutputContext(args, {
+            continuationKind: "collection",
+          });
+
+          if (args.all === true) {
+            await writeAllFindHits(
+              async (cursor) =>
+                createCollectionFindResult(
+                  await listArchiveCollection(document, {
+                    ...createCollectionOptions(args),
+                    ...(cursor === undefined ? {} : { cursor }),
+                  }),
+                ),
+              context,
+              args.format ?? "text",
+            );
+            return;
+          }
+
           await writeFindHits(
             createCollectionFindResult(
               await listArchiveCollection(
@@ -178,9 +212,7 @@ export async function runArchiveCommand(
                 createCollectionOptions(args),
               ),
             ),
-            createArchiveOutputContext(args, {
-              continuationKind: "collection",
-            }),
+            context,
             args.format ?? "text",
           );
         },
@@ -915,6 +947,91 @@ async function writeFindHits(
         getListObjectSeparator(outputObjects),
       )}${formatNextCursor(nextCursor)}${formatFindLensHint(result)}\n`,
   );
+}
+
+async function writeAllFindHits(
+  readPage: (cursor: string | undefined) => Promise<ArchiveFindResult>,
+  context: ArchiveOutputContext,
+  format: ResultFormat,
+): Promise<void> {
+  const pages: ArchiveFindResult[] = [];
+  let cursor: string | undefined;
+
+  while (true) {
+    const page = await readPage(cursor);
+
+    if (format === "jsonl") {
+      await writeFindHitsWithoutContinuation(page, context, format);
+    } else {
+      pages.push(page);
+    }
+
+    if (page.nextCursor === null) {
+      break;
+    }
+
+    cursor = page.nextCursor;
+  }
+
+  if (format === "jsonl") {
+    return;
+  }
+
+  const merged = mergeFindResultPages(pages);
+  await writeFindHitsWithoutContinuation(merged, context, format);
+}
+
+async function writeFindHitsWithoutContinuation(
+  result: ArchiveFindResult,
+  context: ArchiveOutputContext,
+  format: ResultFormat,
+): Promise<void> {
+  const objects = await Promise.all(
+    result.items.map(async (item) => await createFindObject(item, context)),
+  );
+
+  if (format === "json") {
+    await writeTextToStdout(
+      formatCLIJSON(createObjectResultPage(objects, null, result.limit)),
+    );
+    return;
+  }
+  if (format === "jsonl") {
+    await writeJSONL(objects);
+    return;
+  }
+
+  if (objects.length === 0) {
+    await writeTextToStdout(formatNoMatches(result));
+    return;
+  }
+
+  const outputObjects = coalesceTextStreamObjects(objects);
+
+  await writeTextToStdout(
+    `${outputObjects
+      .map((object) => formatFindObject(object))
+      .join(
+        getListObjectSeparator(outputObjects),
+      )}${formatFindLensHint(result)}\n`,
+  );
+}
+
+function mergeFindResultPages(
+  pages: readonly ArchiveFindResult[],
+): ArchiveFindResult {
+  const [first] = pages;
+
+  if (first === undefined) {
+    throw new Error("Internal error: no result pages were loaded.");
+  }
+
+  return {
+    ...first,
+    items: pages.flatMap((page) => page.items),
+    limit: pages.reduce((total, page) => total + page.items.length, 0),
+    nextCursor: null,
+  };
 }
 
 function coalesceTextStreamObjects(

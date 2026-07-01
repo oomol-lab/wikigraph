@@ -185,6 +185,7 @@ type ChapterStateUriTarget =
 
 export interface CLIArchiveArguments {
   readonly action: CLIArchiveAction;
+  readonly all?: boolean;
   readonly archivePath: string;
   readonly budget?: number;
   readonly backlinks?: boolean;
@@ -2268,6 +2269,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(
         action,
         "--backlinks",
@@ -2306,6 +2308,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(
         action,
         "--backlinks",
@@ -2334,6 +2337,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
@@ -2368,6 +2372,7 @@ function parseArchiveArguments(
       return {
         args: {
           action,
+          ...(values.all === undefined ? {} : { all: values.all }),
           archivePath,
           ...(values.backlinks === undefined
             ? {}
@@ -2408,6 +2413,7 @@ function parseArchiveArguments(
       return {
         args: {
           action,
+          ...(values.all === undefined ? {} : { all: values.all }),
           archivePath,
           ...(values.backlinks === undefined
             ? {}
@@ -2445,6 +2451,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
@@ -2480,6 +2487,7 @@ function parseArchiveArguments(
         rejectArchiveFlag(action, "--role", values.role, helpRoute);
       }
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
@@ -2512,6 +2520,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
@@ -2551,6 +2560,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       validatePackTargetUri(archivePath, helpRoute);
       return {
         args: {
@@ -2576,6 +2586,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
 
       return {
