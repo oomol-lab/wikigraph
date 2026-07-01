@@ -36,30 +36,11 @@ export class SpineDigestFile {
       readonly documentDirPath?: string;
     } = {},
   ): Promise<T> {
-    if (options.documentDirPath === undefined) {
-      return await this.#coordinator.withArchiveSession(
-        this.#path,
-        async (session) => {
-          const document = await DirectoryDocument.open(this.#path, {
-            fileStore: session.createFileStore({
-              readonlyDatabase: true,
-            }),
-          });
-
-          try {
-            return await operation(document, this.#path);
-          } finally {
-            await document.release();
-          }
-        },
-      );
-    }
-
     return await this.#coordinator.withArchiveSession(
       this.#path,
       async (session) =>
         await session.materializeReadWorkspace(
-          options.documentDirPath!,
+          options.documentDirPath,
           async (directoryPath) => {
             const document = await DirectoryDocument.open(directoryPath);
 
@@ -86,9 +67,11 @@ export class SpineDigestFile {
         try {
           return await operation(document);
         } finally {
-          await document.flush();
-          await document.release();
-          await deleteArchiveSearchSessions(this.#path);
+          try {
+            await document.release();
+          } finally {
+            await deleteArchiveSearchSessions(this.#path);
+          }
         }
       },
     );

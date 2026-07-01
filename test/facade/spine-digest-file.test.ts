@@ -757,13 +757,7 @@ INSERT INTO archive_owners (
   archive_key, owner_id, owner_pid, heartbeat_at, created_at
 ) VALUES (?, ?, ?, ?, ?)
 `,
-      [
-        createArchiveKey(input.archivePath),
-        input.ownerId,
-        1,
-        Date.now() - 120_000,
-        Date.now() - 120_000,
-      ],
+      [createArchiveKey(input.archivePath), input.ownerId, 1, 0, 0],
     );
   } finally {
     await database.close();

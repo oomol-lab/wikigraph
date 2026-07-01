@@ -1,7 +1,23 @@
 import { createHash, randomUUID } from "crypto";
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  writeFile,
+} from "fs/promises";
 import { tmpdir } from "os";
-import { basename, dirname, join, posix, resolve } from "path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  posix,
+  relative,
+  resolve,
+} from "path";
 
 import { resolveWikiGraphStateDirectoryPath } from "../common/wiki-graph-dir.js";
 import { openSharedStateDatabase } from "../document/index.js";
@@ -170,11 +186,16 @@ export class WikgArchiveSession {
       ARCHIVE_SESSION_CONSTRUCTOR_TOKEN,
     );
 
-    await registerArchiveOwner({
-      archiveKey: session.#archiveKey,
-      ownerId: session.#ownerId,
-    });
-    return session;
+    try {
+      await registerArchiveOwner({
+        archiveKey: session.#archiveKey,
+        ownerId: session.#ownerId,
+      });
+      return session;
+    } catch (error) {
+      clearInterval(session.#heartbeat);
+      throw error;
+    }
   }
 
   public get archiveKey(): string {
@@ -207,13 +228,17 @@ export class WikgArchiveSession {
   }
 
   public async materializeReadWorkspace<T>(
-    directoryPath: string,
+    directoryPath: string | undefined,
     operation: (documentDirectoryPath: string) => Promise<T> | T,
   ): Promise<T> {
-    const resolvedDirectoryPath = resolve(directoryPath);
+    const ownsDirectoryPath = directoryPath === undefined;
+    const resolvedDirectoryPath = ownsDirectoryPath
+      ? await mkdtemp(join(tmpdir(), "wikigraph-open-"))
+      : resolve(directoryPath);
 
-    await rm(resolvedDirectoryPath, { force: true, recursive: true });
-    await mkdir(resolvedDirectoryPath, { recursive: true });
+    if (!ownsDirectoryPath) {
+      await ensureEmptyDirectory(resolvedDirectoryPath);
+    }
 
     const fileStore = this.createFileStore({ readonlyDatabase: true });
     const entries = await listVisibleEntryPaths(
@@ -232,7 +257,15 @@ export class WikgArchiveSession {
           continue;
         }
 
-        const targetPath = join(resolvedDirectoryPath, entryPath);
+        const targetPath = resolve(resolvedDirectoryPath, entryPath);
+        const relativeTargetPath = relative(resolvedDirectoryPath, targetPath);
+
+        if (
+          relativeTargetPath.startsWith("..") ||
+          isAbsolute(relativeTargetPath)
+        ) {
+          throw new Error(`Archive entry escapes read workspace: ${entryPath}`);
+        }
 
         await mkdir(dirname(targetPath), { recursive: true });
         await writeFile(targetPath, content);
@@ -241,6 +274,9 @@ export class WikgArchiveSession {
       return await operation(resolvedDirectoryPath);
     } finally {
       await fileStore.close();
+      if (ownsDirectoryPath) {
+        await rm(resolvedDirectoryPath, { force: true, recursive: true });
+      }
     }
   }
 
@@ -527,7 +563,7 @@ class WikgDocumentFileStore implements DocumentFileStore {
           kind: "file",
           workspacePath,
         });
-        if (source.kind === "workspace") {
+        if (source.kind === "workspace" && source.path !== workspacePath) {
           await rm(source.path, { force: true }).catch(() => undefined);
         }
         this.#session?.modifyEntry(entryPath);
@@ -1210,6 +1246,16 @@ async function createWorkspaceFilePath(
 
   await mkdir(directoryPath, { recursive: true });
   return join(directoryPath, `${basename(entryPath)}.${randomUUID()}`);
+}
+
+async function ensureEmptyDirectory(directoryPath: string): Promise<void> {
+  await mkdir(directoryPath, { recursive: true });
+
+  const entries = await readdir(directoryPath);
+
+  if (entries.length > 0) {
+    throw new Error(`Read workspace directory is not empty: ${directoryPath}`);
+  }
 }
 
 function toArchiveOverlay(overlay: EntryOverlay): WikgArchiveOverlay {
