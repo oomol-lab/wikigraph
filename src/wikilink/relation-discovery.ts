@@ -387,6 +387,7 @@ function formatRelationSystemPrompt(): string {
     '- Every relation must connect two mention IDs from the <mention id="..." qid="..."> tags.',
     "- sourceMentionId and targetMentionId must be different mention IDs; never link a mention to itself.",
     "- Do not create a relation just because two mentions are nearby.",
+    "- If the text explicitly states both a positive relation and a negated/distinction relation between mentions, return both relations when both are directly supported.",
     "- Prefer the suggested predicates when one fits.",
     "- If none fits, create one short snake_case predicate.",
     "- Never use mentions as a predicate.",

@@ -294,6 +294,7 @@ describe("wikilink/relation-discovery", () => {
     expect(systemPrompt).toContain("do not copy the tags into quote");
     expect(systemPrompt).toContain("ignore the tags when copying evidence");
     expect(systemPrompt).toContain("never link a mention to itself");
+    expect(systemPrompt).toContain("negated/distinction relation");
     expect(userPrompt).toContain("Source sentences with mention tags:");
     expect(userPrompt).not.toContain("Tagged source context:");
     expect(userPrompt).not.toContain(
