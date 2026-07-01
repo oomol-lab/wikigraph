@@ -7,6 +7,7 @@ import { extractWikgArchive } from "../../src/facade/archive.js";
 import { findArchiveObjects } from "../../src/facade/archive-view.js";
 import { SpineDigest } from "../../src/facade/spine-digest.js";
 import { SpineDigestFile } from "../../src/facade/spine-digest-file.js";
+import { WikgCoordinator } from "../../src/facade/wikg-coordinator.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
@@ -94,7 +95,51 @@ describe("facade/spine-digest-file", () => {
     });
   });
 
-  it("materializes sqlite state for plain archive reads", async () => {
+  it("materializes custom read directories from coordinator state", async () => {
+    await withTempDir("spinedigest-facade-file-", async (path) => {
+      const restoreStateDir = useCoordinatorStateDir(`${path}/state`);
+      try {
+        const archivePath = await createSeedArchive(path);
+        const coordinator = new WikgCoordinator();
+        const fileStore = coordinator.createFileStore(archivePath);
+
+        try {
+          await fileStore.writeFile(
+            `${archivePath}/book-meta.json`,
+            `${JSON.stringify({
+              authors: [],
+              description: null,
+              identifier: "urn:test:overlay",
+              language: "en",
+              publishedAt: null,
+              publisher: null,
+              sourceFormat: "txt",
+              title: "Overlay Directory Title",
+              version: 1,
+            })}\n`,
+            { overwrite: true },
+          );
+        } finally {
+          await fileStore.close();
+        }
+
+        await new SpineDigestFile(archivePath).read(
+          async (digest) => {
+            expect(await digest.readMeta()).toMatchObject({
+              title: "Overlay Directory Title",
+            });
+          },
+          {
+            documentDirPath: `${path}/opened-read`,
+          },
+        );
+      } finally {
+        restoreStateDir();
+      }
+    });
+  });
+
+  it("settles materialized sqlite state after plain archive reads", async () => {
     await withTempDir("spinedigest-facade-file-", async (path) => {
       const restoreStateDir = useCoordinatorStateDir(`${path}/state`);
       try {
@@ -106,12 +151,7 @@ describe("facade/spine-digest-file", () => {
           });
         });
 
-        await expect(readCoordinatorOverlays(path)).resolves.toMatchObject([
-          {
-            entryPath: "database.db",
-            kind: "file",
-          },
-        ]);
+        await expect(readCoordinatorOverlays(path)).resolves.toStrictEqual([]);
       } finally {
         restoreStateDir();
       }
@@ -253,7 +293,7 @@ describe("facade/spine-digest-file", () => {
     });
   });
 
-  it("keeps failed archive writes materialized without flushing", async () => {
+  it("settles failed archive writes when leaving the archive session", async () => {
     await withTempDir("spinedigest-facade-file-", async (path) => {
       const restoreStateDir = useCoordinatorStateDir(`${path}/state`);
       try {
@@ -275,13 +315,9 @@ describe("facade/spine-digest-file", () => {
           }),
         ).rejects.toThrow("stop before flush");
 
-        const overlays = await readCoordinatorOverlays(path);
-
-        expect(
-          overlays.map((overlay) => overlay.entryPath).sort(),
-        ).toStrictEqual(["book-meta.json", "database.db"]);
+        await expect(readCoordinatorOverlays(path)).resolves.toStrictEqual([]);
         await expect(readArchivedTitle(path, archivePath)).resolves.toBe(
-          "Session Fixture",
+          "Unflushed Title",
         );
       } finally {
         restoreStateDir();
