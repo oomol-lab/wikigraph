@@ -71,8 +71,8 @@ Scopes:
   - `wkg:///book.wikg` addresses the whole archive.
   - `wkg:///book.wikg/` is the same archive target; a trailing slash does not create a separate object.
   - `wkg:///book.wikg/chapter/3` scopes search and list to chapter 3.
-  - `wkg:///book.wikg/entity` searches or lists archive-level entities.
-  - `wkg:///book.wikg/chapter/3/entity` searches or lists entities scoped to chapter 3.
+  - `wkg:///book.wikg/entity` searches or lists archive-wide entities. Use `list --all --jsonl` for a full entity inventory.
+  - `wkg:///book.wikg/chapter/3/entity` searches or lists entities scoped to chapter 3 only.
   - `wkg://chapter/3/entity/Q8018` is the entity view whose evidence must appear in chapter 3.
 
 Object boundaries:

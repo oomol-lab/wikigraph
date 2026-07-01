@@ -40,7 +40,7 @@ Create creates or replaces a `.wikg` archive at source stage. The archive now co
 ## 4. Inspect And Estimate
 
 ```bash
-wikigraph wkg://book.wikg/state get
+wikigraph wkg://book.wikg/chapter list --all --jsonl
 wikigraph wkg://book.wikg/chapter/tree get
 wikigraph wkg://book.wikg estimate --stage reading-summary
 ```

@@ -467,6 +467,53 @@ describe("cli/args", () => {
     );
 
     expect(
+      parseCLIArguments([
+        "wkg://book.wikg/entity/Q1",
+        "evidence",
+        "--all",
+        "--limit",
+        "2",
+        "--jsonl",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "evidence",
+        all: true,
+        archivePath: "wkg://book.wikg/entity/Q1",
+        format: "jsonl",
+        limit: 2,
+        objectId: "wkg://book.wikg/entity/Q1",
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments([
+        "wkg://book.wikg/entity/Q1",
+        "related",
+        "--all",
+        "--limit",
+        "2",
+        "--cursor",
+        "4",
+        "--jsonl",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "related",
+        all: true,
+        archivePath: "wkg://book.wikg/entity/Q1",
+        cursor: "4",
+        format: "jsonl",
+        limit: 2,
+        objectId: "wkg://book.wikg/entity/Q1",
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
       parseCLIArguments(["wkg://book.wikg/triple/Q1/_/Q2", "list"]),
     ).toStrictEqual({
       args: {

@@ -26,6 +26,7 @@ import {
   type ArchiveListItem,
   type ArchivePack,
   type ArchivePage,
+  type ArchiveRelatedResult,
   type ContinuationCursor,
 } from "../facade/index.js";
 import {
@@ -105,7 +106,7 @@ interface ArchiveOutputContext {
   readonly archivePath: string;
   readonly backlinks?: boolean;
   readonly chapters?: readonly number[];
-  readonly continuationKind?: "collection" | "evidence" | "search";
+  readonly continuationKind?: "collection" | "evidence" | "related" | "search";
   readonly evidenceDisabled?: boolean;
   readonly evidenceLimit?: number;
   readonly format: ResultFormat;
@@ -113,6 +114,7 @@ interface ArchiveOutputContext {
   readonly limit: number;
   readonly order?: ArchiveCollectionResult["order"];
   readonly query?: string;
+  readonly role?: CLIArchiveArguments["role"];
   readonly targetUri?: string;
   readonly triplePattern?: CLIArchiveArguments["triplePattern"];
   readonly types: readonly string[] | null;
@@ -246,17 +248,38 @@ export async function runArchiveCommand(
       await readArchiveDocument(
         getArchivePath(args.archivePath),
         async (document) => {
-          await writeList(
+          const context = createArchiveOutputContext(args, {
+            continuationKind: "related",
+            targetUri: getObjectUri(args.objectId!),
+          });
+          const readPage = async (
+            cursor: string | undefined,
+          ): Promise<ArchiveRelatedResult> =>
             await listRelatedArchiveObjects(
               document,
               getObjectUri(args.objectId!),
               {
+                ...(cursor === undefined ? {} : { cursor }),
                 ...createOptionalEvidenceLimit(args),
+                ...(args.limit === undefined ? {} : { limit: args.limit }),
                 ...(args.query === undefined ? {} : { query: args.query }),
                 ...(args.role === undefined ? {} : { role: args.role }),
               },
-            ),
-            createArchiveOutputContext(args),
+            );
+
+          if (args.all === true) {
+            await writeAllRelatedItems(
+              readPage,
+              args.cursor,
+              context,
+              args.format ?? "text",
+            );
+            return;
+          }
+
+          await writeList(
+            await readPage(args.cursor),
+            context,
             args.format ?? "text",
           );
         },
@@ -266,16 +289,36 @@ export async function runArchiveCommand(
       await readArchiveDocument(
         getArchivePath(args.archivePath),
         async (document) => {
+          const context = createArchiveOutputContext(args, {
+            continuationKind: "evidence",
+            targetUri: getObjectUri(args.objectId!),
+          });
+
+          if (args.all === true) {
+            await writeAllEvidence(
+              async (cursor) =>
+                await listArchiveEvidence(
+                  document,
+                  getObjectUri(args.objectId!),
+                  {
+                    ...(cursor === undefined ? {} : { cursor }),
+                    ...(args.limit === undefined ? {} : { limit: args.limit }),
+                    ...(args.query === undefined ? {} : { query: args.query }),
+                  },
+                ),
+              args.cursor,
+              args.format ?? "text",
+            );
+            return;
+          }
+
           await writeEvidence(
             await listArchiveEvidence(document, getObjectUri(args.objectId!), {
               ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
               ...(args.limit === undefined ? {} : { limit: args.limit }),
               ...(args.query === undefined ? {} : { query: args.query }),
             }),
-            createArchiveOutputContext(args, {
-              continuationKind: "evidence",
-              targetUri: getObjectUri(args.objectId!),
-            }),
+            context,
             args.format ?? "text",
           );
         },
@@ -500,6 +543,34 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
           format,
         );
         return;
+      case "related":
+        await writeList(
+          await listRelatedArchiveObjects(document, cursor.targetUri, {
+            cursor: cursor.cursor,
+            ...(cursor.evidenceLimit === undefined
+              ? {}
+              : { evidenceLimit: cursor.evidenceLimit }),
+            limit,
+            ...(cursor.query === undefined ? {} : { query: cursor.query }),
+            ...(cursor.role === undefined ? {} : { role: cursor.role }),
+          }),
+          {
+            archiveKey: cursor.archiveKey,
+            archivePath: cursor.archivePath,
+            continuationKind: "related",
+            ...(cursor.evidenceLimit === undefined
+              ? {}
+              : { evidenceLimit: cursor.evidenceLimit }),
+            format,
+            limit,
+            ...(cursor.query === undefined ? {} : { query: cursor.query }),
+            ...(cursor.role === undefined ? {} : { role: cursor.role }),
+            targetUri: cursor.targetUri,
+            types: null,
+          },
+          format,
+        );
+        return;
     }
   });
 }
@@ -568,7 +639,11 @@ function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
 function createArchiveOutputContext(
   args: CLIArchiveArguments,
   options: {
-    readonly continuationKind?: "collection" | "evidence" | "search";
+    readonly continuationKind?:
+      | "collection"
+      | "evidence"
+      | "related"
+      | "search";
     readonly targetUri?: string;
   } = {},
 ): ArchiveOutputContext {
@@ -588,6 +663,10 @@ function createArchiveOutputContext(
     ...(args.action !== "evidence" || args.query === undefined
       ? {}
       : { query: args.query }),
+    ...(args.action !== "related" || args.query === undefined
+      ? {}
+      : { query: args.query }),
+    ...(args.role === undefined ? {} : { role: args.role }),
     ...(options.continuationKind === "collection"
       ? createScopeOptions(args.archivePath)
       : {}),
@@ -670,6 +749,24 @@ async function createOutputContinuationCursor(
       format: context.format,
       kind: "evidence",
       ...(context.query === undefined ? {} : { query: context.query }),
+      targetUri: context.targetUri,
+    };
+  } else if (context.continuationKind === "related") {
+    if (context.targetUri === undefined) {
+      throw new Error("Related continuation cursors require a target URI.");
+    }
+
+    input = {
+      archiveKey: context.archiveKey,
+      archivePath: context.archivePath,
+      cursor,
+      ...(context.evidenceLimit === undefined
+        ? {}
+        : { evidenceLimit: context.evidenceLimit }),
+      format: context.format,
+      kind: "related",
+      ...(context.query === undefined ? {} : { query: context.query }),
+      ...(context.role === undefined ? {} : { role: context.role }),
       targetUri: context.targetUri,
     };
   } else if (context.continuationKind === "collection") {
@@ -822,17 +919,83 @@ async function writeEstimate(
 }
 
 async function writeList(
-  items: readonly ArchiveListItem[],
+  result: ArchiveRelatedResult,
   context: ArchiveOutputContext,
   format: ResultFormat,
 ): Promise<void> {
   const objects = await Promise.all(
-    items.map(async (item) => await createListObject(item, context)),
+    result.items.map(async (item) => await createListObject(item, context)),
+  );
+  const nextCursor = await createOutputContinuationCursor(
+    context,
+    result.nextCursor,
   );
 
   if (format === "json") {
     await writeTextToStdout(
-      formatCLIJSON(createObjectResultPage(objects, null, items.length)),
+      formatCLIJSON(createObjectResultPage(objects, nextCursor, result.limit)),
+    );
+    return;
+  }
+  if (format === "jsonl") {
+    await writeJSONL([...objects, createPageCursorObject(nextCursor)]);
+    return;
+  }
+
+  if (objects.length === 0) {
+    await writeTextToStdout("No objects.\n");
+    return;
+  }
+
+  await writeTextToStdout(
+    `${objects.map(formatFindObject).join(getListObjectSeparator(objects))}${formatNextCursor(nextCursor)}\n`,
+  );
+}
+
+async function writeAllRelatedItems(
+  readPage: (cursor: string | undefined) => Promise<ArchiveRelatedResult>,
+  initialCursor: string | undefined,
+  context: ArchiveOutputContext,
+  format: ResultFormat,
+): Promise<void> {
+  const pages: ArchiveRelatedResult[] = [];
+  let cursor = initialCursor;
+
+  while (true) {
+    const page = await readPage(cursor);
+
+    if (format === "jsonl") {
+      await writeListWithoutContinuation(page, context, format);
+    } else {
+      pages.push(page);
+    }
+
+    if (page.nextCursor === null) {
+      break;
+    }
+
+    cursor = page.nextCursor;
+  }
+
+  if (format === "jsonl") {
+    return;
+  }
+
+  await writeListWithoutContinuation(mergeRelatedPages(pages), context, format);
+}
+
+async function writeListWithoutContinuation(
+  result: ArchiveRelatedResult,
+  context: ArchiveOutputContext,
+  format: ResultFormat,
+): Promise<void> {
+  const objects = await Promise.all(
+    result.items.map(async (item) => await createListObject(item, context)),
+  );
+
+  if (format === "json") {
+    await writeTextToStdout(
+      formatCLIJSON(createObjectResultPage(objects, null, result.limit)),
     );
     return;
   }
@@ -849,6 +1012,23 @@ async function writeList(
   await writeTextToStdout(
     `${objects.map(formatFindObject).join(getListObjectSeparator(objects))}\n`,
   );
+}
+
+function mergeRelatedPages(
+  pages: readonly ArchiveRelatedResult[],
+): ArchiveRelatedResult {
+  const [first] = pages;
+
+  if (first === undefined) {
+    throw new Error("Internal error: no related pages were loaded.");
+  }
+
+  return {
+    ...first,
+    items: pages.flatMap((page) => page.items),
+    limit: pages.reduce((total, page) => total + page.items.length, 0),
+    nextCursor: null,
+  };
 }
 
 async function createListObject(
@@ -1160,6 +1340,81 @@ async function writeEvidence(
   );
 }
 
+async function writeAllEvidence(
+  readPage: (cursor: string | undefined) => Promise<ArchiveEvidence>,
+  initialCursor: string | undefined,
+  format: ResultFormat,
+): Promise<void> {
+  const pages: ArchiveEvidence[] = [];
+  let cursor = initialCursor;
+
+  while (true) {
+    const page = await readPage(cursor);
+
+    if (format === "jsonl") {
+      await writeEvidenceWithoutContinuation(page, format);
+    } else {
+      pages.push(page);
+    }
+
+    if (page.nextCursor === null) {
+      break;
+    }
+
+    cursor = page.nextCursor;
+  }
+
+  if (format === "jsonl") {
+    return;
+  }
+
+  await writeEvidenceWithoutContinuation(mergeEvidencePages(pages), format);
+}
+
+async function writeEvidenceWithoutContinuation(
+  evidence: ArchiveEvidence,
+  format: ResultFormat,
+): Promise<void> {
+  const objects = evidence.items.map(createSourceObject);
+
+  if (format === "json") {
+    await writeTextToStdout(
+      formatCLIJSON(createObjectResultPage(objects, null, evidence.limit)),
+    );
+    return;
+  }
+  if (format === "jsonl") {
+    await writeJSONL(objects);
+    return;
+  }
+
+  if (evidence.items.length === 0) {
+    await writeTextToStdout("No evidence.\n");
+    return;
+  }
+
+  await writeTextToStdout(
+    `${evidence.items.map(formatEvidenceItem).join("\n\n")}\n`,
+  );
+}
+
+function mergeEvidencePages(
+  pages: readonly ArchiveEvidence[],
+): ArchiveEvidence {
+  const [first] = pages;
+
+  if (first === undefined) {
+    throw new Error("Internal error: no evidence pages were loaded.");
+  }
+
+  return {
+    ...first,
+    items: pages.flatMap((page) => page.items),
+    limit: pages.reduce((total, page) => total + page.items.length, 0),
+    nextCursor: null,
+  };
+}
+
 function formatEvidenceNextCursor(nextCursor: string | null): string {
   return nextCursor === null
     ? ""
@@ -1274,11 +1529,14 @@ async function writePage(
       return;
     case "entity":
       await writeTextToStdout(
-        `${await formatEvidenceBackedPageText(
+        `${appendEntityEvidenceNextStep(
+          await formatEvidenceBackedPageText(
+            page.id,
+            page.label,
+            page.evidence,
+            context,
+          ),
           page.id,
-          page.label,
-          page.evidence,
-          context,
         )}\n`,
       );
       return;
@@ -1321,6 +1579,20 @@ async function formatEvidenceBackedPageText(
       }),
     ),
   ].join("\n");
+}
+
+function appendEntityEvidenceNextStep(text: string, uri: string): string {
+  if (!isEntityOutputUri(uri)) {
+    return text;
+  }
+
+  return [text, "", `Next: ${uri} evidence --all --jsonl`].join("\n");
+}
+
+function isEntityOutputUri(uri: string): boolean {
+  return /^wkg:\/\/(?:chapter\/[1-9][0-9]*\/)?entity\/Q[1-9][0-9]*\/?$/u.test(
+    uri,
+  );
 }
 
 function formatEntityWikipageText(

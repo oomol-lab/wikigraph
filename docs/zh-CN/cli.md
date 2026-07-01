@@ -18,9 +18,9 @@ wikigraph <located-wkg-uri> search <query> [--all] [--limit <n>] [--cursor <toke
 wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> search <query> [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
 wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
 wikigraph <object-uri> get [--json|--jsonl]
-wikigraph <chunk-uri> related [query] [--evidence [n]] [--json|--jsonl]
-wikigraph <entity-uri> related [query] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl]
-wikigraph <entity-uri|triple-uri|summary-uri|chunk-uri> evidence [query] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph <chunk-uri> related [query] [--all] [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
+wikigraph <entity-uri> related [query] [--all] [--limit <n>] [--cursor <token>] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl]
+wikigraph <entity-uri|triple-uri|summary-uri|chunk-uri> evidence [query] [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
 wikigraph <located-chunk-uri|located-entity-uri> pack [--budget <chars>] [--json|--jsonl]
 wikigraph <archive-uri> export --output-format <format> [--output <path>]
 wikigraph <chapter-uri> queue add --task reading-graph|reading-summary|knowledge-graph --accept-cost [--boost] [--llm <json>] [--prompt <text>]
@@ -44,9 +44,11 @@ wikigraph queue clean
 - `list` 在没有 query text 时枚举可 URI 寻址的对象。
 - Object command 使用 Wiki Graph URI。`search` 和 `list` 使用 archive 或 scope URI，例如 `wkg:///Users/me/book.wikg`；`get`、`related`、`evidence` 和 `pack` 使用具体 object URI，例如 `wkg:///Users/me/book.wikg/chapter/12`。
 - 做内容理解时，在 URI 中选择 search lens：`<archive-uri>/chunk` 用于 Reading Graph 结构，`<archive-uri>/summary` 用于快速概览，`<archive-uri>/source` 用于原文措辞，`<archive-uri>/entity` 和 `<archive-uri>/triple` 用于 Knowledge Graph 对象。
+- Lens 位置决定 scope：用 `<archive-uri>/entity list --all --jsonl` 枚举整本归档的 entity；只有需要单章 entity 时，才用 `<chapter-uri>/entity list --all --jsonl`。
+- 要找已知 entity 的原文提及或 grounding，先用 `<archive-uri>/entity/<qid> evidence --all --jsonl`，再考虑按 label 做字面 source search。
 - 使用 chapter scope URI，例如 `wkg:///Users/me/book.wikg/chapter/12`，把 search 或 list 限定在一个章节内。
 - `--limit` 默认 `20`；下一页把返回的 `nextCursor` 传给 `--cursor`。
-- 用 `--all --jsonl` 流式输出 `search` 或 `list` 的所有分页。使用 `--all` 时，`--limit` 控制每页大小。
+- 用 `--all --jsonl` 流式输出 `search`、`list`、`related` 或 `evidence` 的所有分页。使用 `--all` 时，`--limit` 控制每页大小。
 - 大结果避免使用不带 `--jsonl` 的 `--all`，因为它会先缓存所有 result object 再输出。
 - Search 不做语义扩展、词干匹配或向量搜索。
 - URI 语法和 object boundary 规则见 `wikigraph help uri`。

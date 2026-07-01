@@ -18,9 +18,9 @@ wikigraph <located-wkg-uri> search <query> [--all] [--limit <n>] [--cursor <toke
 wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> search <query> [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
 wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
 wikigraph <object-uri> get [--json|--jsonl]
-wikigraph <chunk-uri> related [query] [--evidence [n]] [--json|--jsonl]
-wikigraph <entity-uri> related [query] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl]
-wikigraph <entity-uri|triple-uri|summary-uri|chunk-uri> evidence [query] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph <chunk-uri> related [query] [--all] [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
+wikigraph <entity-uri> related [query] [--all] [--limit <n>] [--cursor <token>] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl]
+wikigraph <entity-uri|triple-uri|summary-uri|chunk-uri> evidence [query] [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
 wikigraph <located-chunk-uri|located-entity-uri> pack [--budget <chars>] [--json|--jsonl]
 wikigraph <archive-uri> export --output-format <format> [--output <path>]
 wikigraph <chapter-uri> queue add --task reading-graph|reading-summary|knowledge-graph --accept-cost [--boost] [--llm <json>] [--prompt <text>]
@@ -44,9 +44,11 @@ Search and collection behavior:
 - `list` enumerates URI-addressable objects without query text.
 - Object commands use Wiki Graph URIs. Use an archive or scope URI such as `wkg:///Users/me/book.wikg` for `search` and `list`; use a concrete object URI such as `wkg:///Users/me/book.wikg/chapter/12` for `get` or `evidence`. `related` and `pack` are limited to chunk and entity objects.
 - For content understanding, choose a search lens in the URI: `<archive-uri>/chunk` for Reading Graph structure, `<archive-uri>/summary` for quick overview, `<archive-uri>/source` for original source wording, or `<archive-uri>/entity` and `<archive-uri>/triple` for Knowledge Graph objects.
+- Lens position controls scope: use `<archive-uri>/entity list --all --jsonl` for an archive-wide entity inventory, and use `<chapter-uri>/entity list --all --jsonl` only when you need one chapter.
+- For source passages mentioning or grounding a known entity, use `<archive-uri>/entity/<qid> evidence --all --jsonl` before literal source search by label.
 - Use a chapter scope URI such as `wkg:///Users/me/book.wikg/chapter/12` to keep search or list local to one chapter.
 - `--limit` defaults to `20`; pass returned `nextCursor` back through `--cursor` for the next page.
-- Use `--all --jsonl` to stream every `search` or `list` page. With `--all`, `--limit` controls page size.
+- Use `--all --jsonl` to stream every `search`, `list`, `related`, or `evidence` page. With `--all`, `--limit` controls page size.
 - Avoid `--all` without `--jsonl` for large results because it buffers all result objects before printing.
 - Search does not do semantic expansion, stemming, or vector search.
 - Read `wikigraph help uri` for the URI grammar and object boundary rules.

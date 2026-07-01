@@ -428,8 +428,8 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
         verb: "search",
       },
       {
-        command: "wikigraph wkg://book.wikg/chapter/12/entity list",
-        note: "List entities, optionally scoped to a chapter.",
+        command: "wikigraph wkg://book.wikg/entity list --all --jsonl",
+        note: "List archive-wide entities; use a chapter lens only for one chapter.",
         verb: "list",
       },
       {
@@ -439,13 +439,14 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
       },
       {
         command:
-          "wikigraph wkg://book.wikg/entity/Q9957 related --role subject",
-        note: "List triples related to the entity.",
+          "wikigraph wkg://book.wikg/entity/Q9957 related --role subject --all --jsonl",
+        note: "Stream triples related to the entity.",
         verb: "related",
       },
       {
-        command: "wikigraph wkg://book.wikg/entity/Q9957 evidence",
-        note: "Trace entity mentions back to source.",
+        command:
+          "wikigraph wkg://book.wikg/entity/Q9957 evidence --all --jsonl",
+        note: "Trace known entity mentions back to source before literal source search by label.",
         verb: "evidence",
       },
       {

@@ -12,7 +12,7 @@ Do not treat `.wikg` as a ZIP payload for routine retrieval. Treat it as a manag
 
 ## Preferred Interface
 
-Prefer archive commands for archive state and URI-first object commands for exploration:
+Prefer archive commands for metadata and URI-first object commands for exploration:
 
 ```bash
 wikigraph wkg://book.wikg/chapter/tree get --json
@@ -22,7 +22,7 @@ wikigraph wkg://book.wikg/chapter/3/source#0..8 get
 wikigraph <uri> related
 wikigraph <uri> evidence
 wikigraph wkg://book.wikg/entity/Q9957 pack --budget 5000
-wikigraph wkg://book.wikg/state get --json
+wikigraph wkg://book.wikg/chapter list --all --jsonl
 ```
 
 When an agent has a URI and needs to know which operations are valid, use `wikigraph help object` or `wikigraph help object <object>`. When the operation is known but the valid targets are unclear, use `wikigraph help verb <verb>`. `wikigraph help matrix` provides the full object/verb cross-reference.
@@ -30,11 +30,13 @@ When an agent has a URI and needs to know which operations are valid, use `wikig
 Use three exploration modes. For synthesis, timelines, relationship analysis, process reconstruction, or concept-structure tasks, start with Structure mode: `wkg://.../chapter/tree get --json` for a compact table-of-contents map, then choose likely chapter ids and expand them with scoped URI search or `wkg://... get`. Search mode uses lens URIs such as `wkg://.../source search <query>`, `wkg://.../chunk search <query>`, or `wkg://.../entity search <query>` for candidate discovery. Reading mode uses `wkg://... get` after the relevant source URI has been selected.
 Search results may display short object URIs such as `wkg://entity/Q9957`; prepend the archive locator before reusing them in object commands, for example `wkg://book.wikg/entity/Q9957`.
 
-Choose a search lens explicitly in the URI: `/chunk` for Reading Graph structure, `/summary` for quick overview, `/source` for original wording, or `/entity` and `/triple` for Knowledge Graph objects. Use scoped chapter lens URIs such as `wkg://book.wikg/chapter/3/entity`, `--limit`, and `--cursor` to keep retrieval bounded.
+Choose a search lens explicitly in the URI: `/chunk` for Reading Graph structure, `/summary` for quick overview, `/source` for original wording, or `/entity` and `/triple` for Knowledge Graph objects. Lens position controls scope: use `<archive-uri>/entity list --all --jsonl` for an archive-wide entity inventory, and use `<chapter-uri>/entity list --all --jsonl` only when you need entities from one chapter. Use scoped chapter lens URIs such as `wkg://book.wikg/chapter/3/entity`, `--limit`, and `--cursor` to keep retrieval bounded.
+
+When the user asks for source passages mentioning, grounding, or supporting a known entity, start from the entity URI: `<archive-uri>/entity/<qid> evidence --all --jsonl`. Do not use source search by the entity label as the primary method; labels may have aliases, translations, variants, and grounded mentions that do not match the label text. Use source search only as a secondary literal-text check.
 
 For evidence tracing, logic-chain reconstruction, or relationship analysis that starts from source text, use `wikigraph <uri> evidence` to return source ranges for a known object, then use `wikigraph <uri> related` or `wikigraph <graph-object-uri> pack` to move back into nearby graph objects. Use source URIs when continuous prose is the goal.
 
-`<archive-uri>/state get` is useful when archive-level readiness or metadata matters. For content exploration after `chapter tree`, selecting a small set of chapter ids and using scoped chapter URIs usually spends less context than returning to archive-level entry points.
+Use `<archive-uri>/chapter list --all --jsonl` when chapter readiness matters. For content exploration after `chapter tree`, selecting a small set of chapter ids and using scoped chapter URIs usually spends less context than returning to archive-level entry points.
 
 Use the library API only when the surrounding system explicitly needs in-process integration.
 
@@ -43,10 +45,10 @@ Use the library API only when the surrounding system explicitly needs in-process
 - Primary object: `.wikg`
 - Creation sources: EPUB, Markdown, TXT, and text pipelines
 - Read objects: Wiki Graph URIs such as `wkg://chapter/1/source#0..3`, `wkg://chunk/42`, `wkg://entity/Q9957`, and `wkg://triple/...`
-- Cheap operations: `state get`, `search`, `get`, `related`, `evidence`, `pack`, `export`
+- Cheap operations: `chapter list`, `<chapter-uri>/state get`, `search`, `get`, `related`, `evidence`, `pack`, `export`
 - Expensive operations: Reading Graph, Reading Summary, or Knowledge Graph `queue add`
 - Estimate first: `wikigraph <archive-uri> estimate --stage reading-summary`
-- JSON: pass `--json` when composing with tools
+- JSON: pass `--json` when composing with tools; use `--all --jsonl` for full streamed search, list, related, or evidence exports
 
 ## Recommended Execution Strategy
 
@@ -54,18 +56,18 @@ Use the library API only when the surrounding system explicitly needs in-process
 2. Select likely chapter ids from the tree, then search scoped chapter URIs before broad archive search.
 3. Use `wikigraph <uri> search` to locate source, summary, chunk, entity, or triple objects.
 4. Use `wikigraph <uri> get` to inspect one object.
-5. Use `wikigraph <uri> evidence` when an object should be grounded back to source text.
+5. Use `<archive-uri>/entity/<qid> evidence --all --jsonl` when a known entity should be grounded back to source text.
 6. Use `wikigraph <uri> related` to move to nearby peer objects.
 7. Use `wikigraph <graph-object-uri> pack` when the user needs deterministic context around a known chunk or entity.
 8. Use `export` only when the user needs a projection.
-9. Use `<archive-uri>/state get` when archive readiness, metadata, or build state is part of the task.
+9. Use `<archive-uri>/chapter list --all --jsonl` when chapter readiness or build state is part of the task.
 10. Before `queue add`, run `estimate`; if the estimate is too large for the session, ask the user.
 
 ## Queue Workflow
 
 ```bash
 wikigraph wkg://book.wikg create ./book.epub
-wikigraph wkg://book.wikg/state get
+wikigraph wkg://book.wikg/chapter list --all --jsonl
 wikigraph wkg://book.wikg estimate --stage reading-summary
 wikigraph wkg://book.wikg/chapter/3 queue add --task reading-graph --accept-cost
 wikigraph wkg-job://<job-id> watch --jsonl

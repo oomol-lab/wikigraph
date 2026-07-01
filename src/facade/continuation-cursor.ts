@@ -48,6 +48,17 @@ export type ContinuationCursor =
       readonly kind: "evidence";
       readonly query?: string;
       readonly targetUri: string;
+    }
+  | {
+      readonly archiveKey: string;
+      readonly archivePath: string;
+      readonly cursor: string;
+      readonly evidenceLimit?: number;
+      readonly format: "json" | "jsonl" | "text";
+      readonly kind: "related";
+      readonly query?: string;
+      readonly role?: "any" | "object" | "self" | "subject";
+      readonly targetUri: string;
     };
 
 const CONTINUATION_CURSOR_SCHEMA_SQL = `
@@ -189,6 +200,16 @@ function createCursorPayload(input: ContinuationCursor): object {
         ...(input.query === undefined ? {} : { query: input.query }),
         targetUri: input.targetUri,
       };
+    case "related":
+      return {
+        cursor: input.cursor,
+        ...(input.evidenceLimit === undefined
+          ? {}
+          : { evidenceLimit: input.evidenceLimit }),
+        ...(input.query === undefined ? {} : { query: input.query }),
+        ...(input.role === undefined ? {} : { role: input.role }),
+        targetUri: input.targetUri,
+      };
   }
 }
 
@@ -240,6 +261,20 @@ function parseContinuationCursorRecord(record: {
       format: record.format,
       kind: "evidence",
       ...getPayloadOptionalString(payload, "query"),
+      targetUri: getPayloadString(payload, "targetUri"),
+    };
+  }
+
+  if (record.kind === "related") {
+    return {
+      archiveKey: record.archiveKey,
+      archivePath: record.archivePath,
+      cursor: getPayloadString(payload, "cursor"),
+      ...getPayloadOptionalPositiveInteger(payload, "evidenceLimit"),
+      format: record.format,
+      kind: "related",
+      ...getPayloadOptionalString(payload, "query"),
+      ...getPayloadOptionalRelatedRole(payload),
       targetUri: getPayloadString(payload, "targetUri"),
     };
   }
@@ -366,6 +401,26 @@ function getPayloadOptionalBoolean(
   }
   if (typeof value === "boolean") {
     return { backlinks: value };
+  }
+
+  throw new Error("Invalid continuation cursor payload.");
+}
+
+function getPayloadOptionalRelatedRole(
+  payload: Readonly<Record<string, unknown>>,
+): { readonly role?: "any" | "object" | "self" | "subject" } {
+  const value = payload.role;
+
+  if (value === undefined) {
+    return {};
+  }
+  if (
+    value === "any" ||
+    value === "object" ||
+    value === "self" ||
+    value === "subject"
+  ) {
+    return { role: value };
   }
 
   throw new Error("Invalid continuation cursor payload.");

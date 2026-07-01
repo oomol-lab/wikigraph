@@ -398,9 +398,17 @@ export interface ArchivePack {
 export type ArchiveRelatedRole = "any" | "object" | "self" | "subject";
 
 export interface ArchiveRelatedOptions {
+  readonly cursor?: string;
   readonly evidenceLimit?: number;
+  readonly limit?: number;
   readonly query?: string;
   readonly role?: ArchiveRelatedRole;
+}
+
+export interface ArchiveRelatedResult {
+  readonly items: readonly ArchiveListItem[];
+  readonly limit: number;
+  readonly nextCursor: string | null;
 }
 
 export interface ArchiveEvidence {
@@ -1353,7 +1361,7 @@ export async function listRelatedArchiveObjects(
   document: ReadonlyDocument,
   id: string,
   options: ArchiveRelatedOptions = {},
-): Promise<readonly ArchiveListItem[]> {
+): Promise<ArchiveRelatedResult> {
   if (id.startsWith("wkg://")) {
     return await listRelatedWikiGraphObjects(document, id, options);
   }
@@ -1361,7 +1369,7 @@ export async function listRelatedArchiveObjects(
   const reference = parseArchiveReference(id);
   if (reference.type !== "node") {
     rejectRelatedRole(options.role, id);
-    return [];
+    return paginateRelatedItems([], options);
   }
   rejectRelatedRole(options.role, id);
 
@@ -1385,7 +1393,7 @@ async function listRelatedWikiGraphObjects(
   document: ReadonlyDocument,
   uri: string,
   options: ArchiveRelatedOptions,
-): Promise<readonly ArchiveListItem[]> {
+): Promise<ArchiveRelatedResult> {
   const reference = parseWikiGraphReference(uri);
 
   switch (reference.type) {
@@ -1465,7 +1473,7 @@ async function listRelatedWikiGraphObjects(
     case "meta":
     case "chapter-state":
       rejectRelatedRole(options.role, uri);
-      return [];
+      return paginateRelatedItems([], options);
   }
 }
 
@@ -1542,7 +1550,7 @@ async function listRelatedEntityObjects(
   document: ReadonlyDocument,
   reference: Extract<WikiGraphReference, { readonly type: "entity" }>,
   options: ArchiveRelatedOptions,
-): Promise<readonly ArchiveListItem[]> {
+): Promise<ArchiveRelatedResult> {
   const mentions = filterMentionsByChapter(
     await document.mentions.listByQid(reference.qid),
     reference.chapterId,
@@ -1728,63 +1736,98 @@ async function hydrateRelatedItemsEvidence(
   document: ReadonlyDocument,
   items: readonly ArchiveListItem[],
   options: ArchiveRelatedOptions,
-): Promise<readonly ArchiveListItem[]> {
+): Promise<ArchiveRelatedResult> {
   const filteredItems = await filterAndSortRelatedItemsByQuery(
     document,
     items,
     options.query,
   );
+  const page = paginateRelatedItems(filteredItems, options);
 
   if (options.evidenceLimit === undefined) {
-    return filteredItems.map((item) => {
-      if (item.type !== "triple") {
-        return item;
-      }
-      const { evidenceLinks: _evidenceLinks, ...publicItem } = item;
-      return publicItem;
-    });
+    return {
+      ...page,
+      items: page.items.map((item) => {
+        if (item.type !== "triple") {
+          return item;
+        }
+        const { evidenceLinks: _evidenceLinks, ...publicItem } = item;
+        return publicItem;
+      }),
+    };
   }
 
   const context = createEvidenceReadContext();
   const evidenceLimit = options.evidenceLimit;
 
-  return await Promise.all(
-    filteredItems.map(async (item) => {
-      if (item.evidence !== undefined) {
-        return item;
-      }
-      if (item.type === "triple") {
-        const evidence = await createMentionLinkEvidencePreview(
-          document,
-          item.evidenceLinks ?? [],
-          evidenceLimit,
-          context,
-        );
-        const { evidenceLinks: _evidenceLinks, ...publicItem } = item;
-
-        return { ...publicItem, evidence };
-      }
-      if (item.type === "node") {
-        const reference = parseArchiveReference(item.id);
-
-        if (reference.type !== "node") {
+  return {
+    ...page,
+    items: await Promise.all(
+      page.items.map(async (item) => {
+        if (item.evidence !== undefined) {
           return item;
         }
-
-        const { node } = await requireNode(document, reference.id);
-        return {
-          ...item,
-          evidence: await createSourceEvidencePreview(
+        if (item.type === "triple") {
+          const evidence = await createMentionLinkEvidencePreview(
             document,
-            createNodeEvidenceRanges(node),
+            item.evidenceLinks ?? [],
             evidenceLimit,
             context,
-          ),
-        };
-      }
-      return item;
-    }),
-  );
+          );
+          const { evidenceLinks: _evidenceLinks, ...publicItem } = item;
+
+          return { ...publicItem, evidence };
+        }
+        if (item.type === "node") {
+          const reference = parseArchiveReference(item.id);
+
+          if (reference.type !== "node") {
+            return item;
+          }
+
+          const { node } = await requireNode(document, reference.id);
+          return {
+            ...item,
+            evidence: await createSourceEvidencePreview(
+              document,
+              createNodeEvidenceRanges(node),
+              evidenceLimit,
+              context,
+            ),
+          };
+        }
+        return item;
+      }),
+    ),
+  };
+}
+
+function paginateRelatedItems(
+  items: readonly ArchiveListItem[],
+  options: ArchiveRelatedOptions,
+): ArchiveRelatedResult {
+  const limit = options.limit ?? 20;
+  const offset = parseRelatedCursor(options.cursor);
+  const pageItems = items.slice(offset, offset + limit);
+  const nextOffset = offset + pageItems.length;
+
+  return {
+    items: pageItems,
+    limit,
+    nextCursor: nextOffset >= items.length ? null : String(nextOffset),
+  };
+}
+
+function parseRelatedCursor(cursor: string | undefined): number {
+  if (cursor === undefined) {
+    return 0;
+  }
+
+  if (!/^(0|[1-9][0-9]*)$/u.test(cursor)) {
+    throw new Error(`Invalid related cursor: ${cursor}`);
+  }
+
+  return Number(cursor);
 }
 
 async function filterAndSortRelatedItemsByQuery(
@@ -1945,7 +1988,7 @@ export async function packArchiveContext(
   return {
     anchor,
     budget,
-    related,
+    related: related.items,
   };
 }
 

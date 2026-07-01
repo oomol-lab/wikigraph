@@ -46,4 +46,11 @@ Use URI lenses to select searchable object kinds:
   wkg://book.wikg/triple
   wkg://book.wikg/chapter/3/entity
 
-Use `--json` or `--jsonl` when a stable machine-readable result is needed. Use `--all --jsonl` for full streamed list/search exports.
+Lens position controls scope: use `<archive-uri>/entity list --all --jsonl` for an archive-wide entity inventory, and use `<chapter-uri>/entity list --all --jsonl` only for one chapter.
+
+When a user asks for source passages mentioning, grounding, or supporting a known entity, start from the entity URI:
+  wikigraph <archive-uri>/entity/<qid> evidence --all --jsonl
+
+Do not use source search by the entity label as the primary method. Entity labels may have aliases, translations, variants, and grounded mentions that do not match the label text. Use source search only as a secondary literal-text check.
+
+Use `--json` or `--jsonl` when a stable machine-readable result is needed. Use `--all --jsonl` for full streamed search/list/related/evidence exports.

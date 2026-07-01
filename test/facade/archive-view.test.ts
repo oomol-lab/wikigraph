@@ -1673,7 +1673,7 @@ describe("facade/archive-view", () => {
           { role: "subject" },
         );
 
-        expect(related.map((item) => item.id)).toStrictEqual([
+        expect(related.items.map((item) => item.id)).toStrictEqual([
           "wkg://triple/Q1/mentions/Q3",
           "wkg://triple/Q1/mentions/Q2",
         ]);
@@ -1756,7 +1756,7 @@ describe("facade/archive-view", () => {
           { role: "subject" },
         );
 
-        expect(related.map((item) => item.id)).toStrictEqual([
+        expect(related.items.map((item) => item.id)).toStrictEqual([
           "wkg://triple/Q1/mentions/Q3",
           "wkg://triple/Q1/mentions/Q2",
         ]);
@@ -1866,7 +1866,7 @@ describe("facade/archive-view", () => {
           { query: "agent", role: "subject" },
         );
 
-        expect(related.map((item) => item.id)).toStrictEqual([
+        expect(related.items.map((item) => item.id)).toStrictEqual([
           "wkg://triple/Q1/mentions/Q3",
           "wkg://triple/Q1/mentions/Q2",
         ]);
@@ -1920,7 +1920,7 @@ describe("facade/archive-view", () => {
           { query: "朱元璋", role: "subject" },
         );
 
-        expect(related).toMatchObject([
+        expect(related.items).toMatchObject([
           {
             id: "wkg://triple/Q1/mentions/Q2",
             score: expect.any(Number) as number,
@@ -1976,10 +1976,10 @@ describe("facade/archive-view", () => {
           { query: "朱元璋", role: "subject" },
         );
 
-        expect(related.map((item) => item.id)).toStrictEqual([
+        expect(related.items.map((item) => item.id)).toStrictEqual([
           "wkg://triple/Q1/mentions/Q2",
         ]);
-        expect(related[0]?.score).toBeGreaterThan(0);
+        expect(related.items[0]?.score).toBeGreaterThan(0);
       } finally {
         await document.release();
       }
@@ -2246,44 +2246,54 @@ describe("facade/archive-view", () => {
         );
         await expect(
           listRelatedArchiveObjects(document, "wkg://entity/Q1"),
-        ).resolves.toStrictEqual([
-          {
-            id: "wkg://triple/Q1/mentions/Q2",
-            label: "LLM Wiki mentions agents",
-            objectLabel: "agents",
-            objectQid: "Q2",
-            predicate: "mentions",
-            subjectLabel: "LLM Wiki",
-            subjectQid: "Q1",
-            summary: "Q1 mentions Q2",
-            type: "triple",
-          },
-        ]);
+        ).resolves.toStrictEqual({
+          items: [
+            {
+              id: "wkg://triple/Q1/mentions/Q2",
+              label: "LLM Wiki mentions agents",
+              objectLabel: "agents",
+              objectQid: "Q2",
+              predicate: "mentions",
+              subjectLabel: "LLM Wiki",
+              subjectQid: "Q1",
+              summary: "Q1 mentions Q2",
+              type: "triple",
+            },
+          ],
+          limit: 20,
+          nextCursor: null,
+        });
         await expect(
           listRelatedArchiveObjects(document, "wkg://entity/Q1", {
             evidenceLimit: 1,
             role: "subject",
           }),
-        ).resolves.toMatchObject([
-          {
-            evidence: {
-              shown: 1,
-              sources: [
-                {
-                  id: "wkg://chapter/1/source#0",
-                },
-              ],
-              total: 1,
+        ).resolves.toMatchObject({
+          items: [
+            {
+              evidence: {
+                shown: 1,
+                sources: [
+                  {
+                    id: "wkg://chapter/1/source#0",
+                  },
+                ],
+                total: 1,
+              },
+              id: "wkg://triple/Q1/mentions/Q2",
+              type: "triple",
             },
-            id: "wkg://triple/Q1/mentions/Q2",
-            type: "triple",
-          },
-        ]);
+          ],
+        });
         await expect(
           listRelatedArchiveObjects(document, "wkg://entity/Q1", {
             role: "object",
           }),
-        ).resolves.toStrictEqual([]);
+        ).resolves.toStrictEqual({
+          items: [],
+          limit: 20,
+          nextCursor: null,
+        });
         await expect(
           listRelatedArchiveObjects(document, "wkg://triple/Q1/mentions/Q2"),
         ).rejects.toThrow(

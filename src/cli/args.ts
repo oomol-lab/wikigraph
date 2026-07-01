@@ -2479,22 +2479,30 @@ function parseArchiveArguments(
       );
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
-      rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
-      rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       const relatedTarget = validateRelatedTargetUri(archivePath, helpRoute);
       if (relatedTarget === "chunk") {
         rejectArchiveFlag(action, "--role", values.role, helpRoute);
       }
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
-      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
           action,
+          ...(values.all === undefined ? {} : { all: values.all }),
           archivePath,
+          ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
+          ...(values.limit === undefined
+            ? {}
+            : {
+                limit: parsePositiveIntegerFlag(
+                  values.limit,
+                  "--limit",
+                  helpRoute,
+                ),
+              }),
           objectId: archivePath,
           ...(positionals[1] === undefined ? {} : { query: positionals[1] }),
           ...(relatedTarget === "entity"
@@ -2520,11 +2528,11 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
-      rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
         args: {
           action,
+          ...(values.all === undefined ? {} : { all: values.all }),
           archivePath,
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
           format: parseResultFormat(values),

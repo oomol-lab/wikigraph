@@ -11,8 +11,8 @@ Use when:
   - You have a selected entity and need Knowledge Graph triples involving it.
 
 Usage:
-  wikigraph <chunk-uri> related [query] [--evidence [n]] [--json|--jsonl] [--help|-h]
-  wikigraph <entity-uri> related [query] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl] [--help|-h]
+  wikigraph <chunk-uri> related [query] [--all] [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl] [--help|-h]
+  wikigraph <entity-uri> related [query] [--all] [--limit <n>] [--cursor <token>] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl] [--help|-h]
 
 Returns:
   - Related full `wkg://...` URIs with labels or summaries.
@@ -22,6 +22,9 @@ Notes:
   - Optional `query` filters and re-sorts only the related objects that would otherwise be returned.
   - `--role` only applies to entity URIs. Default is `any`.
   - Add `--evidence` or `--evidence <n>` to include source evidence previews where available.
+  - Add `--all --jsonl` to stream every related page. With `--all`, `--limit` controls page size.
+  - Avoid `--all` without `--jsonl` for large related sets; it buffers all related objects before printing.
+  - Use `wikigraph next <cursor>` for any returned `nextCursor`.
   - Returned URIs can be inspected or verified with other object commands.
   - Read `wikigraph help uri` before constructing object URIs.
 
@@ -33,4 +36,5 @@ Next steps:
 Examples:
   wikigraph wkg:///books/book.wikg/chunk/123 related
   wikigraph wkg:///books/book.wikg/entity/Q162593 related "baptism"
+  wikigraph wkg:///books/book.wikg/entity/Q162593 related --all --jsonl
   wikigraph wkg:///books/book.wikg/entity/Q162593 related --role subject --evidence

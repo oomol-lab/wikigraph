@@ -18,6 +18,8 @@ Returns:
 Notes:
   - Conceptually, `list` is `search` without query text, scoped by a URI lens.
   - Use `<located-wkg-uri>/chapter`, `<located-wkg-uri>/entity`, `<located-wkg-uri>/triple`, `<located-wkg-uri>/source`, `<located-wkg-uri>/summary`, or `<located-wkg-uri>/chunk` to choose the collection.
+  - Lens position controls scope: `<archive-uri>/entity` lists archive-wide entities, while `<chapter-uri>/entity` lists entities scoped to one chapter.
+  - Use `<archive-uri>/entity list --all --jsonl` for a full archive entity inventory. Use `<chapter-uri>/entity list --all --jsonl` only when you need one chapter.
   - Use `_` as an any-value placeholder in triple pattern lenses such as `<archive-uri>/triple/Q1/_/Q2`.
   - Trailing triple placeholders may be omitted: `<archive-uri>/triple/Q1` means `<archive-uri>/triple/Q1/_/_`.
   - Put the lens after a chapter URI, such as `<chapter-uri>/entity`, to list within one chapter.
@@ -32,5 +34,6 @@ Notes:
 Examples:
   wikigraph wkg:///books/book.wikg/chapter list
   wikigraph wkg:///books/book.wikg/chapter list --all --jsonl
+  wikigraph wkg:///books/book.wikg/entity list --all --jsonl
   wikigraph wkg:///books/book.wikg/chapter/3/entity list --json
   wikigraph wkg:///books/book.wikg/triple/_/_/Q178561 list
