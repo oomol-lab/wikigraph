@@ -1,3 +1,5 @@
+import type { Database } from "./database.js";
+
 export const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS serials (
     id INTEGER PRIMARY KEY
@@ -6,6 +8,7 @@ export const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS serial_states (
     serial_id INTEGER PRIMARY KEY,
     topology_ready INTEGER NOT NULL DEFAULT 0,
+    knowledge_graph_ready INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (serial_id) REFERENCES serials(id)
   );
 
@@ -226,3 +229,48 @@ export const SCHEMA_SQL = `
   FROM chapter_entity_relations
   GROUP BY subject_qid, predicate, object_qid;
 `;
+
+export async function initializeDocumentSchema(
+  database: Database,
+): Promise<void> {
+  await migrateSerialStateKnowledgeGraphReady(database);
+}
+
+async function migrateSerialStateKnowledgeGraphReady(
+  database: Database,
+): Promise<void> {
+  const columns = await listTableColumns(database, "serial_states");
+
+  if (columns.has("knowledge_graph_ready")) {
+    return;
+  }
+
+  await database.transaction(async () => {
+    const transactionColumns = await listTableColumns(
+      database,
+      "serial_states",
+    );
+
+    if (transactionColumns.has("knowledge_graph_ready")) {
+      return;
+    }
+
+    await database.run(`
+      ALTER TABLE serial_states
+      ADD COLUMN knowledge_graph_ready INTEGER NOT NULL DEFAULT 0
+    `);
+  });
+}
+
+async function listTableColumns(
+  database: Database,
+  table: string,
+): Promise<ReadonlySet<string>> {
+  const columns = await database.queryAll(
+    `PRAGMA table_info(${table})`,
+    undefined,
+    (row) => String(row.name),
+  );
+
+  return new Set(columns);
+}

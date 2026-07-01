@@ -58,6 +58,12 @@ export type ArchiveObjectType =
   | "state"
   | "summary"
   | "triple";
+type ChapterStateTarget =
+  | "knowledge-graph"
+  | "reading-graph"
+  | "reading-summary"
+  | "source";
+type ChapterStateValue = "missing" | "ready";
 
 export type ArchiveCollectionType =
   | "chapter"
@@ -353,6 +359,13 @@ export type ArchivePage =
         | {
             readonly chapter: ChapterEntry;
             readonly kind: "chapter";
+            readonly targets: Record<ChapterStateTarget, ChapterStateValue>;
+          }
+        | {
+            readonly chapter: ChapterEntry;
+            readonly kind: "chapter-target";
+            readonly target: ChapterStateTarget;
+            readonly value: ChapterStateValue;
           };
       readonly title: string;
       readonly type: "state";
@@ -1190,11 +1203,26 @@ async function readWikiGraphPage(
       );
     case "chapter-state": {
       const details = await requireChapter(document, reference.chapterId);
+      const targets = await createChapterStateTargets(document, details);
 
       return {
-        id: `wkg://chapter/${reference.chapterId}/state`,
-        state: { chapter: details, kind: "chapter" },
-        title: details.title ?? `[chapter ${reference.chapterId}] state`,
+        id:
+          reference.target === undefined
+            ? `wkg://chapter/${reference.chapterId}/state`
+            : `wkg://chapter/${reference.chapterId}/state/${reference.target}`,
+        state:
+          reference.target === undefined
+            ? { chapter: details, kind: "chapter", targets }
+            : {
+                chapter: details,
+                kind: "chapter-target",
+                target: reference.target,
+                value: targets[reference.target],
+              },
+        title:
+          reference.target === undefined
+            ? (details.title ?? `[chapter ${reference.chapterId}] state`)
+            : `${details.title ?? `[chapter ${reference.chapterId}]`} ${reference.target} state`,
         type: "state",
       };
     }
@@ -3547,6 +3575,24 @@ async function requireChapter(
   return chapter;
 }
 
+async function createChapterStateTargets(
+  document: ReadonlyDocument,
+  chapter: ChapterEntry,
+): Promise<Record<ChapterStateTarget, ChapterStateValue>> {
+  const serial = await document.serials.getById(chapter.chapterId);
+
+  return {
+    source: chapter.stage === "planned" ? "missing" : "ready",
+    "reading-graph":
+      chapter.stage === "graphed" || chapter.stage === "summarized"
+        ? "ready"
+        : "missing",
+    "reading-summary": chapter.stage === "summarized" ? "ready" : "missing",
+    "knowledge-graph":
+      serial?.knowledgeGraphReady === true ? "ready" : "missing",
+  };
+}
+
 async function requireNode(
   document: ReadonlyDocument,
   nodeId: number,
@@ -4264,6 +4310,7 @@ type WikiGraphReference =
     }
   | {
       readonly chapterId: number;
+      readonly target?: ChapterStateTarget;
       readonly type: "chapter-state";
     }
   | {
@@ -4355,6 +4402,13 @@ function parseWikiGraphReference(uri: string): WikiGraphReference {
           case "state":
             if (pathParts.length === 3) {
               return { chapterId, type: "chapter-state" };
+            }
+            if (pathParts.length === 4) {
+              return {
+                chapterId,
+                target: parseChapterStateTarget(pathParts[3], uri),
+                type: "chapter-state",
+              };
             }
             break;
           case "chunk":
@@ -4459,6 +4513,22 @@ function parseWikiGraphReference(uri: string): WikiGraphReference {
 
 function parseQid(value: string | undefined, uri: string): string {
   if (value !== undefined && /^Q[1-9][0-9]*$/u.test(value)) {
+    return value;
+  }
+
+  throw new Error(`Invalid Wiki Graph URI: ${uri}`);
+}
+
+function parseChapterStateTarget(
+  value: string | undefined,
+  uri: string,
+): ChapterStateTarget {
+  if (
+    value === "source" ||
+    value === "reading-graph" ||
+    value === "reading-summary" ||
+    value === "knowledge-graph"
+  ) {
     return value;
   }
 

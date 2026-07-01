@@ -170,6 +170,11 @@ type CLIArchiveRootAction = CLIArchiveAction | "set" | "queue";
 type CLIArchiveUriAction = CLIArchiveRootAction | CLIArchiveChapterAction;
 type CLIJobAction = CLIQueueAction | "get" | "set";
 type ArchiveUriLens = Exclude<CLIObjectKind, "meta">;
+type ChapterStateUriTarget =
+  | "knowledge-graph"
+  | "reading-graph"
+  | "reading-summary"
+  | "source";
 
 export interface CLIArchiveArguments {
   readonly action: CLIArchiveAction;
@@ -867,7 +872,11 @@ type ChapterUriTarget =
       readonly kind: "chapter-triple-pattern-lens";
       readonly pattern: ArchiveTriplePattern;
     }
-  | { readonly chapterId: number; readonly kind: "chapter-state" }
+  | {
+      readonly chapterId: number;
+      readonly kind: "chapter-state";
+      readonly target?: ChapterStateUriTarget;
+    }
   | {
       readonly chapterId: number;
       readonly kind: "chapter-resource";
@@ -921,6 +930,16 @@ function parseChapterTarget(objectUri: string): ChapterUriTarget | undefined {
     };
   }
 
+  const chapterStateTarget = parseChapterStateSuffix(suffix);
+
+  if (chapterStateTarget !== undefined) {
+    return {
+      chapterId,
+      kind: "chapter-state",
+      ...(chapterStateTarget === "all" ? {} : { target: chapterStateTarget }),
+    };
+  }
+
   const resource = parseChapterResourceSuffix(suffix);
 
   if (suffix !== undefined && resource === undefined) {
@@ -941,6 +960,27 @@ function parseChapterTarget(objectUri: string): ChapterUriTarget | undefined {
   }
 
   return { chapterId, kind: "chapter-resource", resource };
+}
+
+function parseChapterStateSuffix(
+  suffix: string | undefined,
+): ChapterStateUriTarget | "all" | undefined {
+  if (suffix === "state") {
+    return "all";
+  }
+
+  switch (suffix) {
+    case "state/source":
+      return "source";
+    case "state/reading-graph":
+      return "reading-graph";
+    case "state/reading-summary":
+      return "reading-summary";
+    case "state/knowledge-graph":
+      return "knowledge-graph";
+    default:
+      return undefined;
+  }
 }
 
 function parseChapterResourceSuffix(
@@ -1769,7 +1809,7 @@ function parseQueueArguments(
     case "add":
       throw new Error(
         withHelpRoute(
-          "`queue add` requires a chapter URI target. Use `wikigraph wkg://<archive.sdpub>/chapter/<id> queue add --task <task> --accept-cost`.",
+          "`queue add` requires a chapter URI target. Use `wikigraph wkg://<archive.wikg>/chapter/<id> queue add --task <task> --accept-cost`.",
           helpRoute,
         ),
       );
@@ -2503,7 +2543,7 @@ function validateArchiveCommandUriInput(
     return;
   }
 
-  if (!looksLikeSdpubPath(value)) {
+  if (!looksLikeWikgPath(value)) {
     return;
   }
 
@@ -2595,23 +2635,26 @@ function getRelatedObjectUriType(
 }
 
 function formatUnknownCommandMessage(command: string): string {
-  if (looksLikeSdpubPath(command)) {
+  if (looksLikeWikgPath(command)) {
     return formatPathAsUriMessage(command);
   }
 
   return withHelpRoute(`Unknown command: ${command}.`, CLI_HELP_ROUTES.command);
 }
 
-function looksLikeSdpubPath(value: string): boolean {
+function looksLikeWikgPath(value: string): boolean {
+  const normalized = normalizeWikgPathSeparators(value);
+
   return (
-    value.endsWith(".sdpub") ||
-    value.includes(".sdpub/") ||
-    value.includes(".sdpub#")
+    normalized.endsWith(".wikg") ||
+    normalized.includes(".wikg/") ||
+    normalized.includes(".wikg#")
   );
 }
 
 function formatPathAsUriMessage(path: string): string {
-  const [archivePath = path, suffix = ""] = splitSdpubPath(path);
+  const normalized = normalizeWikgPathSeparators(path);
+  const [archivePath = normalized, suffix = ""] = splitWikgPath(normalized);
   const uri = archivePath.startsWith("/")
     ? `wkg://${archivePath}${suffix}`
     : `wkg://${archivePath.replace(/^\.\/+/u, "")}${suffix}`;
@@ -2623,17 +2666,21 @@ function formatPathAsUriMessage(path: string): string {
   ].join("\n");
 }
 
-function splitSdpubPath(path: string): readonly [string, string] {
-  const archiveEnd = path.indexOf(".sdpub") + ".sdpub".length;
+function splitWikgPath(path: string): readonly [string, string] {
+  const archiveEnd = path.indexOf(".wikg") + ".wikg".length;
 
   return [path.slice(0, archiveEnd), path.slice(archiveEnd)];
 }
 
+function normalizeWikgPathSeparators(path: string): string {
+  return path.replace(/\\/gu, "/");
+}
+
 function formatMissingArchiveLocatorMessage(uri: string): string {
   return [
-    `Expected a located Wiki Graph URI with a .sdpub archive locator: ${uri}`,
+    `Expected a located Wiki Graph URI with a .wikg archive locator: ${uri}`,
     "Short object URIs from output are archive-relative handles.",
-    "Example: wkg://book.sdpub/entity/Q9957",
+    "Example: wkg://book.wikg/entity/Q9957",
     "See: wikigraph help uri",
   ].join("\n");
 }
@@ -2649,20 +2696,20 @@ function formatPackObjectMismatchMessage(uri: string): string {
 function formatMissingArchiveInputMessage(action: CLIArchiveAction): string {
   switch (action) {
     case "create":
-      return "Missing archive URI. Use `wikigraph wkg://<archive.sdpub> create [source]`.";
+      return "Missing archive URI. Use `wikigraph wkg://<archive.wikg> create [source]`.";
     case "export":
-      return "Missing archive URI. Use `wikigraph wkg://<archive.sdpub> export --output-format <format>`.";
+      return "Missing archive URI. Use `wikigraph wkg://<archive.wikg> export --output-format <format>`.";
     case "estimate":
-      return "Missing archive URI. Use `wikigraph wkg://<archive.sdpub> estimate`.";
+      return "Missing archive URI. Use `wikigraph wkg://<archive.wikg> estimate`.";
     case "search":
-      return "Missing Wiki Graph URI with .sdpub locator. Use `wikigraph wkg://<archive.sdpub> search <query>`.";
+      return "Missing Wiki Graph URI with .wikg locator. Use `wikigraph wkg://<archive.wikg> search <query>`.";
     case "list":
-      return "Missing Wiki Graph URI with .sdpub locator. Use `wikigraph wkg://<archive.sdpub> list`.";
+      return "Missing Wiki Graph URI with .wikg locator. Use `wikigraph wkg://<archive.wikg> list`.";
     case "get":
     case "related":
     case "evidence":
     case "pack":
-      return `Missing object URI. Use \`wikigraph wkg://<archive.sdpub>/<object> ${action}\`.`;
+      return `Missing object URI. Use \`wikigraph wkg://<archive.wikg>/<object> ${action}\`.`;
     case "next":
       return "Missing continuation cursor. Use `wikigraph next <cursor>`.";
   }

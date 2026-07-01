@@ -193,9 +193,17 @@ CREATE TABLE IF NOT EXISTS build_jobs (
   error_json TEXT
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_build_jobs_active_chapter
+DROP INDEX IF EXISTS idx_build_jobs_active_chapter;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_build_jobs_active_knowledge_chapter
 ON build_jobs(archive_key, chapter_id)
-WHERE state IN ('queued', 'running', 'canceling', 'paused');
+WHERE target = 'knowledge-graph'
+  AND state IN ('queued', 'running', 'canceling', 'paused');
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_build_jobs_active_reading_chapter
+ON build_jobs(archive_key, chapter_id)
+WHERE target IN ('reading-graph', 'reading-summary')
+  AND state IN ('queued', 'running', 'canceling', 'paused');
 
 CREATE INDEX IF NOT EXISTS idx_build_jobs_queue
 ON build_jobs(state, queue_rank, updated_at);
@@ -230,6 +238,16 @@ export async function addBuildJob(
       const archivePath = resolve(options.archivePath);
       const archiveKey = createArchiveKey(archivePath);
       const now = Date.now();
+      const existing = await findActiveBuildJobInLane(state, {
+        archiveKey,
+        chapterId: options.chapterId,
+        target: options.target,
+      });
+
+      if (existing !== undefined) {
+        return await mergeActiveBuildJob(state, existing, options, now);
+      }
+
       const jobId = options.jobId ?? randomUUID();
       const workspacePath = await createJobWorkspacePath(archiveKey, jobId);
       const eventsPath = await createJobEventsPath(jobId);
@@ -317,6 +335,88 @@ ORDER BY
   } finally {
     await state.close();
   }
+}
+
+async function findActiveBuildJobInLane(
+  state: Database,
+  input: {
+    readonly archiveKey: string;
+    readonly chapterId: number;
+    readonly target: BuildJobTarget;
+  },
+): Promise<BuildJob | undefined> {
+  const laneFilter =
+    input.target === "knowledge-graph"
+      ? "target = 'knowledge-graph'"
+      : "target IN ('reading-graph', 'reading-summary')";
+
+  return await state.queryOne(
+    `
+SELECT *
+FROM build_jobs
+WHERE archive_key = ?
+  AND chapter_id = ?
+  AND state IN ('queued', 'running', 'canceling', 'paused')
+  AND ${laneFilter}
+ORDER BY updated_at DESC
+LIMIT 1
+`,
+    [input.archiveKey, input.chapterId],
+    mapBuildJob,
+  );
+}
+
+async function mergeActiveBuildJob(
+  state: Database,
+  job: BuildJob,
+  options: AddBuildJobOptions,
+  now: number,
+): Promise<BuildJob> {
+  const nextTarget =
+    job.target === "reading-graph" && options.target === "reading-summary"
+      ? "reading-summary"
+      : job.target;
+  const nextQueueRank =
+    options.boost === true && job.state === "queued"
+      ? (await readMinQueueRank(state)) - 1
+      : job.queueRank;
+
+  if (nextTarget === job.target && nextQueueRank === job.queueRank) {
+    return job;
+  }
+
+  await state.run(
+    `
+UPDATE build_jobs
+SET target = ?, queue_rank = ?, updated_at = ?
+WHERE job_id = ?
+`,
+    [nextTarget, nextQueueRank, now, job.jobId],
+  );
+
+  const updated = await requireBuildJobById(state, job.jobId);
+
+  if (nextTarget !== job.target) {
+    await appendBuildJobEvent(updated, {
+      at: now,
+      from: job.target,
+      jobId: job.jobId,
+      seq: 0,
+      to: nextTarget,
+      type: "target_changed",
+    });
+  }
+  if (nextQueueRank !== job.queueRank) {
+    await appendBuildJobEvent(updated, {
+      at: now,
+      jobId: job.jobId,
+      seq: 0,
+      state: updated.state,
+      type: "boosted",
+    });
+  }
+
+  return updated;
 }
 
 export async function getBuildJob(jobId: string): Promise<BuildJob> {
@@ -441,6 +541,17 @@ export async function updateBuildJobTarget(
       }
       if (job.target === target) {
         return job;
+      }
+      const existing = await findActiveBuildJobInLane(state, {
+        archiveKey: job.archiveKey,
+        chapterId: job.chapterId,
+        target,
+      });
+
+      if (existing !== undefined && existing.jobId !== job.jobId) {
+        throw new Error(
+          `Chapter ${job.chapterId} already has active ${formatBuildJobLane(target)} job ${existing.jobId}.`,
+        );
       }
       if (job.target === "reading-summary" && target === "reading-graph") {
         if (
@@ -795,6 +906,34 @@ WHERE job_id = ?
   return updated;
 }
 
+async function markBuildJobFailedInState(
+  state: Database,
+  job: BuildJob,
+  error: unknown,
+): Promise<void> {
+  const now = Date.now();
+  const formattedError = formatErrorEvent(error);
+  const errorJSON = JSON.stringify(formattedError);
+
+  await state.run(
+    `
+UPDATE build_jobs
+SET state = 'failed', owner_id = NULL, owner_pid = NULL,
+    current_step = NULL, finished_at = ?, updated_at = ?, error_json = ?
+WHERE job_id = ?
+`,
+    [now, now, errorJSON, job.jobId],
+  );
+  await appendBuildJobEvent(job, {
+    at: now,
+    error: formattedError,
+    jobId: job.jobId,
+    seq: 0,
+    state: "failed",
+    type: "failed",
+  });
+}
+
 async function markBuildJobSucceeded(
   jobId: string,
   ownerId: string,
@@ -848,26 +987,7 @@ async function markBuildJobFailed(
         return;
       }
 
-      const now = Date.now();
-      const errorJSON = JSON.stringify(formatErrorEvent(error));
-
-      await state.run(
-        `
-UPDATE build_jobs
-SET state = 'failed', owner_id = NULL, owner_pid = NULL,
-    finished_at = ?, updated_at = ?, error_json = ?
-WHERE job_id = ?
-`,
-        [now, now, errorJSON, jobId],
-      );
-      await appendBuildJobEvent(job, {
-        at: now,
-        error: formatErrorEvent(error),
-        jobId,
-        seq: 0,
-        state: "failed",
-        type: "failed",
-      });
+      await markBuildJobFailedInState(state, job, error);
     });
   } finally {
     await state.close();
@@ -931,6 +1051,8 @@ WHERE job_id = ? AND state = 'queued'
 }
 
 async function recoverStaleBuildJobs(state: Database): Promise<void> {
+  const workspacePathsToDelete: string[] = [];
+
   await state.transaction(async () => {
     const jobs = await state.queryAll(
       `
@@ -948,30 +1070,22 @@ WHERE state IN ('running', 'canceling')
         continue;
       }
 
-      const now = Date.now();
       if (job.state === "canceling") {
         await markBuildJobCanceled(state, job);
         continue;
       }
 
-      await state.run(
-        `
-UPDATE build_jobs
-SET state = 'queued', owner_id = NULL, owner_pid = NULL,
-    current_step = NULL, updated_at = ?
-WHERE job_id = ?
-`,
-        [now, job.jobId],
-      );
-      await appendBuildJobEvent(job, {
-        at: now,
-        jobId: job.jobId,
-        seq: 0,
-        state: "queued",
-        type: "requeued",
+      await markBuildJobFailedInState(state, job, {
+        message: "Build worker process disappeared before finishing the job.",
+        name: "BuildJobWorkerLost",
       });
+      workspacePathsToDelete.push(job.workspacePath);
     }
   });
+
+  for (const workspacePath of workspacePathsToDelete) {
+    await rm(workspacePath, { force: true, recursive: true });
+  }
 }
 
 async function acquireBuildWorkerLease(
@@ -1286,6 +1400,10 @@ function parseOptionalBuildJobTarget(
   field: string,
 ): BuildJobTarget | undefined {
   return value === undefined ? undefined : parseBuildJobTarget(value, field);
+}
+
+function formatBuildJobLane(target: BuildJobTarget): string {
+  return target === "knowledge-graph" ? "knowledge-graph" : "reading";
 }
 
 function getString(row: Record<string, unknown>, key: string): string {
