@@ -1529,7 +1529,7 @@ async function writePage(
       return;
     case "entity":
       await writeTextToStdout(
-        `${appendEntityEvidenceNextStep(
+        `${appendEntityNextSteps(
           await formatEvidenceBackedPageText(
             page.id,
             page.label,
@@ -1581,12 +1581,20 @@ async function formatEvidenceBackedPageText(
   ].join("\n");
 }
 
-function appendEntityEvidenceNextStep(text: string, uri: string): string {
+function appendEntityNextSteps(text: string, uri: string): string {
   if (!isEntityOutputUri(uri)) {
     return text;
   }
+  const entityUri = uri.replace(/\/$/u, "");
 
-  return [text, "", `Next: ${uri} evidence --all --jsonl`].join("\n");
+  return [
+    text,
+    "",
+    "Next:",
+    `  ${entityUri} evidence --all --jsonl`,
+    `  ${entityUri} related --all --jsonl`,
+    `  ${entityUri}/wikipage get`,
+  ].join("\n");
 }
 
 function isEntityOutputUri(uri: string): boolean {

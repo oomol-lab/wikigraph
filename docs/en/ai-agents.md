@@ -34,6 +34,8 @@ Choose a search lens explicitly in the URI: `/chunk` for Reading Graph structure
 
 When the user asks for source passages mentioning, grounding, or supporting a known entity, start from the entity URI: `<archive-uri>/entity/<qid> evidence --all --jsonl`. Do not use source search by the entity label as the primary method; labels may have aliases, translations, variants, and grounded mentions that do not match the label text. Use source search only as a secondary literal-text check.
 
+When investigating an entity, use this order: `<entity-uri> get`, `<entity-uri> evidence --all --jsonl`, `<entity-uri> related --all --jsonl --evidence <n>`, then `<entity-uri>/wikipage get`. Do not infer Wikipedia URLs from labels or Wikidata QIDs; use `/entity/<qid>/wikipage get` for canonical mapped pages. Use external web search only if the mapped wikipage is missing or insufficient.
+
 For evidence tracing, logic-chain reconstruction, or relationship analysis that starts from source text, use `wikigraph <uri> evidence` to return source ranges for a known object, then use `wikigraph <uri> related` or `wikigraph <graph-object-uri> pack` to move back into nearby graph objects. Use source URIs when continuous prose is the goal.
 
 Use `<archive-uri>/chapter list --all --jsonl` when chapter readiness matters. For content exploration after `chapter tree`, selecting a small set of chapter ids and using scoped chapter URIs usually spends less context than returning to archive-level entry points.
@@ -58,10 +60,11 @@ Use the library API only when the surrounding system explicitly needs in-process
 4. Use `wikigraph <uri> get` to inspect one object.
 5. Use `<archive-uri>/entity/<qid> evidence --all --jsonl` when a known entity should be grounded back to source text.
 6. Use `wikigraph <uri> related` to move to nearby peer objects.
-7. Use `wikigraph <graph-object-uri> pack` when the user needs deterministic context around a known chunk or entity.
-8. Use `export` only when the user needs a projection.
-9. Use `<archive-uri>/chapter list --all --jsonl` when chapter readiness or build state is part of the task.
-10. Before `queue add`, run `estimate`; if the estimate is too large for the session, ask the user.
+7. Use `<archive-uri>/entity/<qid>/wikipage get` before external web search when investigating a known entity.
+8. Use `wikigraph <graph-object-uri> pack` when the user needs deterministic context around a known chunk or entity.
+9. Use `export` only when the user needs a projection.
+10. Use `<archive-uri>/chapter list --all --jsonl` when chapter readiness or build state is part of the task.
+11. Before `queue add`, run `estimate`; if the estimate is too large for the session, ask the user.
 
 ## Queue Workflow
 

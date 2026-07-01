@@ -46,6 +46,7 @@ wikigraph queue clean
 - 做内容理解时，在 URI 中选择 search lens：`<archive-uri>/chunk` 用于 Reading Graph 结构，`<archive-uri>/summary` 用于快速概览，`<archive-uri>/source` 用于原文措辞，`<archive-uri>/entity` 和 `<archive-uri>/triple` 用于 Knowledge Graph 对象。
 - Lens 位置决定 scope：用 `<archive-uri>/entity list --all --jsonl` 枚举整本归档的 entity；只有需要单章 entity 时，才用 `<chapter-uri>/entity list --all --jsonl`。
 - 要找已知 entity 的原文提及或 grounding，先用 `<archive-uri>/entity/<qid> evidence --all --jsonl`，再考虑按 label 做字面 source search。
+- 要读取映射的 Wikipedia 页面，使用 `<archive-uri>/entity/<qid>/wikipage get`；不要根据 label 或 QID 推断 Wikipedia URL。
 - 使用 chapter scope URI，例如 `wkg:///Users/me/book.wikg/chapter/12`，把 search 或 list 限定在一个章节内。
 - `--limit` 默认 `20`；下一页把返回的 `nextCursor` 传给 `--cursor`。
 - 用 `--all --jsonl` 流式输出 `search`、`list`、`related` 或 `evidence` 的所有分页。使用 `--all` 时，`--limit` 控制每页大小。

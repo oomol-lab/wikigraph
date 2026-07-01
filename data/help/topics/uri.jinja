@@ -54,6 +54,8 @@ Object command examples:
     wikigraph wkg:///Users/me/book.wikg/entity search "keyword" --limit 20 --json
   Open an object inside an absolute local archive:
     wikigraph wkg:///Users/me/book.wikg/entity/Q8018 get
+  Open mapped Wikipedia pages for an entity:
+    wikigraph wkg:///Users/me/book.wikg/entity/Q8018/wikipage get
 
 Archive command examples:
   Create or inspect an archive:
@@ -73,6 +75,7 @@ Scopes:
   - `wkg:///book.wikg/chapter/3` scopes search and list to chapter 3.
   - `wkg:///book.wikg/entity` searches or lists archive-wide entities. Use `list --all --jsonl` for a full entity inventory.
   - `wkg:///book.wikg/chapter/3/entity` searches or lists entities scoped to chapter 3 only.
+  - `wkg:///book.wikg/entity/Q8018/wikipage` returns mapped Wikipedia pages for the entity.
   - `wkg://chapter/3/entity/Q8018` is the entity view whose evidence must appear in chapter 3.
 
 Object boundaries:

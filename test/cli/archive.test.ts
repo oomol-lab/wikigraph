@@ -1682,7 +1682,10 @@ describe("cli/archive", () => {
         "wkg://entity/Q1",
         "RAG",
         "",
-        "Next: wkg://entity/Q1 evidence --all --jsonl",
+        "Next:",
+        "  wkg://entity/Q1 evidence --all --jsonl",
+        "  wkg://entity/Q1 related --all --jsonl",
+        "  wkg://entity/Q1/wikipage get",
         "",
       ].join("\n"),
     );
@@ -1730,7 +1733,7 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).not.toContain("Next page:");
   });
 
-  it("prints an entity evidence next step in text get output", async () => {
+  it("prints entity investigation next steps in text get output", async () => {
     await runArchiveCommand({
       action: "get",
       archivePath: "wkg:///tmp/book.wikg",
@@ -1739,7 +1742,12 @@ describe("cli/archive", () => {
     });
 
     expect(archiveMockState.textWrites[0]).toContain(
-      "Next: wkg://entity/Q1 evidence --all --jsonl",
+      [
+        "Next:",
+        "  wkg://entity/Q1 evidence --all --jsonl",
+        "  wkg://entity/Q1 related --all --jsonl",
+        "  wkg://entity/Q1/wikipage get",
+      ].join("\n"),
     );
   });
 

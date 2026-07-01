@@ -46,6 +46,7 @@ Search and collection behavior:
 - For content understanding, choose a search lens in the URI: `<archive-uri>/chunk` for Reading Graph structure, `<archive-uri>/summary` for quick overview, `<archive-uri>/source` for original source wording, or `<archive-uri>/entity` and `<archive-uri>/triple` for Knowledge Graph objects.
 - Lens position controls scope: use `<archive-uri>/entity list --all --jsonl` for an archive-wide entity inventory, and use `<chapter-uri>/entity list --all --jsonl` only when you need one chapter.
 - For source passages mentioning or grounding a known entity, use `<archive-uri>/entity/<qid> evidence --all --jsonl` before literal source search by label.
+- For mapped Wikipedia pages, use `<archive-uri>/entity/<qid>/wikipage get`; do not infer Wikipedia URLs from labels or QIDs.
 - Use a chapter scope URI such as `wkg:///Users/me/book.wikg/chapter/12` to keep search or list local to one chapter.
 - `--limit` defaults to `20`; pass returned `nextCursor` back through `--cursor` for the next page.
 - Use `--all --jsonl` to stream every `search`, `list`, `related`, or `evidence` page. With `--all`, `--limit` controls page size.

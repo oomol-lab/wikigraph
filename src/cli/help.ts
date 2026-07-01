@@ -420,7 +420,11 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
     description: "A Knowledge Graph entity grouped from mentions.",
     name: "entity",
     title: "Entity",
-    uriForms: ["wkg://book.wikg/entity", "wkg://book.wikg/entity/Q9957"],
+    uriForms: [
+      "wkg://book.wikg/entity",
+      "wkg://book.wikg/entity/Q9957",
+      "wkg://book.wikg/entity/Q9957/wikipage",
+    ],
     verbs: [
       {
         command: 'wikigraph wkg://book.wikg/entity search "keyword"',
@@ -435,6 +439,11 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
       {
         command: "wikigraph wkg://book.wikg/entity/Q9957 get",
         note: "Read one entity.",
+        verb: "get",
+      },
+      {
+        command: "wikigraph wkg://book.wikg/entity/Q9957/wikipage get",
+        note: "Read mapped Wikipedia pages for the entity.",
         verb: "get",
       },
       {
