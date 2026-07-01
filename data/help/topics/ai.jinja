@@ -63,3 +63,5 @@ When investigating an entity:
 Do not infer Wikipedia URLs from entity labels or Wikidata QIDs. Use `/entity/<qid>/wikipage get` to retrieve canonical mapped pages.
 
 Use `--json` or `--jsonl` when a stable machine-readable result is needed. Use `--all --jsonl` for full streamed search/list/related/evidence exports.
+
+Source search hits and evidence previews include nearby source context by default. Use `--context 0` when the user needs exact cited ranges, and adjust `--context <n>` instead of switching to full source output when a small window is enough.

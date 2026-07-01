@@ -14,13 +14,13 @@ wikigraph wkg-job://<job-id> <action> ...
 ```bash
 wikigraph <archive-uri> create [source] [--input-format <format>] [--llm <json>] [--prompt <text>]
 wikigraph <archive-uri> estimate [--stage <source|reading-graph|reading-summary>] [--json]
-wikigraph <located-wkg-uri> search <query> [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
-wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> search <query> [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
-wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
-wikigraph <object-uri> get [--json|--jsonl]
-wikigraph <chunk-uri> related [query] [--all] [--limit <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
-wikigraph <entity-uri> related [query] [--all] [--limit <n>] [--cursor <token>] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl]
-wikigraph <entity-uri|triple-uri|summary-uri|chunk-uri> evidence [query] [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph <located-wkg-uri> search <query> [--all] [--limit <n>] [--context <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> search <query> [--all] [--limit <n>] [--context <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--all] [--limit <n>] [--context <n>] [--cursor <token>] [--json|--jsonl]
+wikigraph <object-uri> get [--evidence [n]] [--context <n>] [--json|--jsonl]
+wikigraph <chunk-uri> related [query] [--all] [--limit <n>] [--context <n>] [--cursor <token>] [--evidence [n]] [--json|--jsonl]
+wikigraph <entity-uri> related [query] [--all] [--limit <n>] [--context <n>] [--cursor <token>] [--role <any|subject|object|self>] [--evidence [n]] [--json|--jsonl]
+wikigraph <entity-uri|triple-uri|summary-uri|chunk-uri> evidence [query] [--all] [--limit <n>] [--context <n>] [--cursor <token>] [--json|--jsonl]
 wikigraph <located-chunk-uri|located-entity-uri> pack [--budget <chars>] [--json|--jsonl]
 wikigraph <archive-uri> export --output-format <format> [--output <path>]
 wikigraph <chapter-uri> queue add --task reading-graph|reading-summary|knowledge-graph --accept-cost [--boost] [--llm <json>] [--prompt <text>]
@@ -48,6 +48,8 @@ Search and collection behavior:
 - For source passages mentioning or grounding a known entity, use `<archive-uri>/entity/<qid> evidence --all --jsonl` before literal source search by label.
 - For mapped Wikipedia pages, use `<archive-uri>/entity/<qid>/wikipage get`; do not infer Wikipedia URLs from labels or QIDs.
 - Use a chapter scope URI such as `wkg:///Users/me/book.wikg/chapter/12` to keep search or list local to one chapter.
+- Source search hits and evidence previews include 2 nearby sentences before and after by default. Use `--context 0` for exact matched or cited ranges, or `--context <n>` for a different nearby source window.
+- Direct source reads such as `<chapter-uri>/source#23..25 get` remain exact.
 - `--limit` defaults to `20`; pass returned `nextCursor` back through `--cursor` for the next page.
 - Use `--all --jsonl` to stream every `search`, `list`, `related`, or `evidence` page. With `--all`, `--limit` controls page size.
 - Avoid `--all` without `--jsonl` for large results because it buffers all result objects before printing.

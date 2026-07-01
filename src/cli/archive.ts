@@ -115,6 +115,7 @@ interface ArchiveOutputContext {
   readonly order?: ArchiveCollectionResult["order"];
   readonly query?: string;
   readonly role?: CLIArchiveArguments["role"];
+  readonly sourceContext?: number;
   readonly targetUri?: string;
   readonly triplePattern?: CLIArchiveArguments["triplePattern"];
   readonly types: readonly string[] | null;
@@ -237,6 +238,7 @@ export async function runArchiveCommand(
                 ? {}
                 : { backlinks: args.backlinks }),
               ...(evidenceLimit === undefined ? {} : { evidenceLimit }),
+              ...createOptionalSourceContext(args),
             }),
             outputContext,
             args.format ?? "text",
@@ -264,6 +266,7 @@ export async function runArchiveCommand(
                 ...(args.limit === undefined ? {} : { limit: args.limit }),
                 ...(args.query === undefined ? {} : { query: args.query }),
                 ...(args.role === undefined ? {} : { role: args.role }),
+                ...createOptionalSourceContext(args),
               },
             );
 
@@ -304,6 +307,7 @@ export async function runArchiveCommand(
                     ...(cursor === undefined ? {} : { cursor }),
                     ...(args.limit === undefined ? {} : { limit: args.limit }),
                     ...(args.query === undefined ? {} : { query: args.query }),
+                    ...createOptionalSourceContext(args),
                   },
                 ),
               args.cursor,
@@ -317,6 +321,7 @@ export async function runArchiveCommand(
               ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
               ...(args.limit === undefined ? {} : { limit: args.limit }),
               ...(args.query === undefined ? {} : { query: args.query }),
+              ...createOptionalSourceContext(args),
             }),
             context,
             args.format ?? "text",
@@ -440,6 +445,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
           ...(cursor.ids === null ? {} : { ids: cursor.ids }),
           limit,
           order: cursor.order,
+          ...(cursor.sourceContext === undefined
+            ? {}
+            : { sourceContext: cursor.sourceContext }),
           ...(cursor.triplePattern === undefined
             ? {}
             : { triplePattern: cursor.triplePattern }),
@@ -470,6 +478,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
             ...(cursor.ids === null ? {} : { ids: cursor.ids }),
             limit,
             order: cursor.order,
+            ...(cursor.sourceContext === undefined
+              ? {}
+              : { sourceContext: cursor.sourceContext }),
             ...(cursor.triplePattern === undefined
               ? {}
               : { triplePattern: cursor.triplePattern }),
@@ -490,6 +501,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
             ? {}
             : { evidenceLimit: cursor.evidenceLimit }),
           limit,
+          ...(cursor.sourceContext === undefined
+            ? {}
+            : { sourceContext: cursor.sourceContext }),
           ...(cursor.triplePattern === undefined
             ? {}
             : { triplePattern: cursor.triplePattern }),
@@ -514,6 +528,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
               : { evidenceLimit: cursor.evidenceLimit }),
             format,
             limit,
+            ...(cursor.sourceContext === undefined
+              ? {}
+              : { sourceContext: cursor.sourceContext }),
             ...(cursor.triplePattern === undefined
               ? {}
               : { triplePattern: cursor.triplePattern }),
@@ -529,6 +546,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
             cursor: cursor.cursor,
             limit,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
+            ...(cursor.sourceContext === undefined
+              ? {}
+              : { sourceContext: cursor.sourceContext }),
           }),
           {
             archiveKey: cursor.archiveKey,
@@ -537,6 +557,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
             format,
             limit,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
+            ...(cursor.sourceContext === undefined
+              ? {}
+              : { sourceContext: cursor.sourceContext }),
             targetUri: cursor.targetUri,
             types: null,
           },
@@ -553,6 +576,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
             limit,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
             ...(cursor.role === undefined ? {} : { role: cursor.role }),
+            ...(cursor.sourceContext === undefined
+              ? {}
+              : { sourceContext: cursor.sourceContext }),
           }),
           {
             archiveKey: cursor.archiveKey,
@@ -565,6 +591,9 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
             limit,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
             ...(cursor.role === undefined ? {} : { role: cursor.role }),
+            ...(cursor.sourceContext === undefined
+              ? {}
+              : { sourceContext: cursor.sourceContext }),
             targetUri: cursor.targetUri,
             types: null,
           },
@@ -629,6 +658,7 @@ function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
     ...createOptionalEvidenceLimit(args),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
+    ...createOptionalSourceContext(args),
     ...(args.triplePattern === undefined
       ? {}
       : { triplePattern: args.triplePattern }),
@@ -658,6 +688,7 @@ function createArchiveOutputContext(
       ? {}
       : { continuationKind: options.continuationKind }),
     ...createOptionalEvidenceLimit(args),
+    ...createOptionalSourceContext(args),
     format: args.format ?? "text",
     limit: args.limit ?? DEFAULT_OUTPUT_LIMIT,
     ...(args.action !== "evidence" || args.query === undefined
@@ -721,6 +752,12 @@ function createOptionalEvidenceLimit(args: CLIArchiveArguments): {
   return { evidenceLimit: args.evidenceLimit };
 }
 
+function createOptionalSourceContext(args: CLIArchiveArguments): {
+  readonly sourceContext?: number;
+} {
+  return args.context === undefined ? {} : { sourceContext: args.context };
+}
+
 function isEvidenceBackedObjectUri(uri: string): boolean {
   return /^wkg:\/\/(?:(?:chapter\/[1-9][0-9]*\/)?entity\/Q[1-9][0-9]*|(?:chapter\/[1-9][0-9]*\/)?triple\/Q[1-9][0-9]*\/[^/]+\/Q[1-9][0-9]*)\/?$/u.test(
     uri,
@@ -749,6 +786,9 @@ async function createOutputContinuationCursor(
       format: context.format,
       kind: "evidence",
       ...(context.query === undefined ? {} : { query: context.query }),
+      ...(context.sourceContext === undefined
+        ? {}
+        : { sourceContext: context.sourceContext }),
       targetUri: context.targetUri,
     };
   } else if (context.continuationKind === "related") {
@@ -767,6 +807,9 @@ async function createOutputContinuationCursor(
       kind: "related",
       ...(context.query === undefined ? {} : { query: context.query }),
       ...(context.role === undefined ? {} : { role: context.role }),
+      ...(context.sourceContext === undefined
+        ? {}
+        : { sourceContext: context.sourceContext }),
       targetUri: context.targetUri,
     };
   } else if (context.continuationKind === "collection") {
@@ -785,6 +828,9 @@ async function createOutputContinuationCursor(
       ids: context.ids ?? null,
       kind: "collection",
       order: context.order ?? "doc-asc",
+      ...(context.sourceContext === undefined
+        ? {}
+        : { sourceContext: context.sourceContext }),
       ...(context.triplePattern === undefined
         ? {}
         : { triplePattern: context.triplePattern }),
@@ -803,6 +849,9 @@ async function createOutputContinuationCursor(
         : { evidenceLimit: context.evidenceLimit }),
       format: context.format,
       kind: "search",
+      ...(context.sourceContext === undefined
+        ? {}
+        : { sourceContext: context.sourceContext }),
       ...(context.triplePattern === undefined
         ? {}
         : { triplePattern: context.triplePattern }),
@@ -832,6 +881,7 @@ function createCollectionOptions(
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
     ...createOptionalEvidenceLimit(args),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
+    ...createOptionalSourceContext(args),
     ...(args.triplePattern === undefined
       ? {}
       : { triplePattern: args.triplePattern }),

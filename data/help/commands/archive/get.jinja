@@ -10,8 +10,8 @@ Use when:
   - You already have a `wkg://...` URI and need to inspect its object payload.
 
 Usage:
-  wikigraph <object-uri> get [--evidence [n]] [--backlinks] [--json|--jsonl] [--help|-h]
-  wikigraph <object-uri> [--evidence [n]] [--backlinks] [--json|--jsonl]
+  wikigraph <object-uri> get [--evidence [n]] [--context <n>] [--backlinks] [--json|--jsonl] [--help|-h]
+  wikigraph <object-uri> [--evidence [n]] [--context <n>] [--backlinks] [--json|--jsonl]
 
 Returns:
   - The selected object in human-readable text, JSON, or JSONL.
@@ -24,6 +24,7 @@ Notes:
   - For all source passages mentioning or grounding a known entity, prefer `<archive-uri>/entity/<qid> evidence --all --jsonl` over source search by label.
   - Do not infer Wikipedia URLs from entity labels or QIDs; use `<archive-uri>/entity/<qid>/wikipage get` for mapped pages.
   - Use `--evidence <n>` to choose a different evidence preview size, or `--evidence 0` to hide evidence.
+  - Evidence previews include 2 nearby sentences before and after by default. Use `--context 0` for exact cited ranges.
   - Add `--backlinks` on source sentence ranges to show chunks, entities, and triples supported by that source range.
   - Read `wikigraph help uri` before constructing object URIs.
 

@@ -10,7 +10,7 @@ Use when:
   - You need objects of a kind without a text query, such as all chapters or all entities.
 
 Usage:
-  wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--all] [--limit <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <located-wkg-uri>/<chapter|entity|triple|source|summary|chunk> list [--all] [--limit <n>] [--context <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
 
 Returns:
   - URI-addressable objects in document order.
@@ -25,6 +25,7 @@ Notes:
   - Put the lens after a chapter URI, such as `<chapter-uri>/entity`, to list within one chapter.
   - Use `search` when you have query text.
   - Add `--evidence` or `--evidence <n>` to include source evidence previews on entity and triple results.
+  - Evidence previews include 2 nearby sentences before and after by default. Use `--context 0` for exact cited ranges.
   - Add `--backlinks` to include reverse references on top-level source results; nested evidence sources are not expanded.
   - Add `--all --jsonl` to stream every result page. With `--all`, `--limit` controls page size.
   - Avoid `--all` without `--jsonl` for large results; it buffers all result objects before printing.

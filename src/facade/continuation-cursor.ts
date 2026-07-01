@@ -18,6 +18,7 @@ export type ContinuationCursor =
       readonly ids: readonly string[] | null;
       readonly kind: "collection";
       readonly order: "doc-asc" | "doc-desc";
+      readonly sourceContext?: number;
       readonly triplePattern?: {
         readonly objectQid?: string;
         readonly predicate?: string;
@@ -33,6 +34,7 @@ export type ContinuationCursor =
       readonly evidenceLimit?: number;
       readonly format: "json" | "jsonl" | "text";
       readonly kind: "search";
+      readonly sourceContext?: number;
       readonly triplePattern?: {
         readonly objectQid?: string;
         readonly predicate?: string;
@@ -47,6 +49,7 @@ export type ContinuationCursor =
       readonly format: "json" | "jsonl" | "text";
       readonly kind: "evidence";
       readonly query?: string;
+      readonly sourceContext?: number;
       readonly targetUri: string;
     }
   | {
@@ -58,6 +61,7 @@ export type ContinuationCursor =
       readonly kind: "related";
       readonly query?: string;
       readonly role?: "any" | "object" | "self" | "subject";
+      readonly sourceContext?: number;
       readonly targetUri: string;
     };
 
@@ -175,6 +179,9 @@ function createCursorPayload(input: ContinuationCursor): object {
           : { evidenceLimit: input.evidenceLimit }),
         ids: input.ids,
         order: input.order,
+        ...(input.sourceContext === undefined
+          ? {}
+          : { sourceContext: input.sourceContext }),
         ...(input.triplePattern === undefined
           ? {}
           : { triplePattern: input.triplePattern }),
@@ -189,6 +196,9 @@ function createCursorPayload(input: ContinuationCursor): object {
         ...(input.evidenceLimit === undefined
           ? {}
           : { evidenceLimit: input.evidenceLimit }),
+        ...(input.sourceContext === undefined
+          ? {}
+          : { sourceContext: input.sourceContext }),
         ...(input.triplePattern === undefined
           ? {}
           : { triplePattern: input.triplePattern }),
@@ -198,6 +208,9 @@ function createCursorPayload(input: ContinuationCursor): object {
       return {
         cursor: input.cursor,
         ...(input.query === undefined ? {} : { query: input.query }),
+        ...(input.sourceContext === undefined
+          ? {}
+          : { sourceContext: input.sourceContext }),
         targetUri: input.targetUri,
       };
     case "related":
@@ -208,6 +221,9 @@ function createCursorPayload(input: ContinuationCursor): object {
           : { evidenceLimit: input.evidenceLimit }),
         ...(input.query === undefined ? {} : { query: input.query }),
         ...(input.role === undefined ? {} : { role: input.role }),
+        ...(input.sourceContext === undefined
+          ? {}
+          : { sourceContext: input.sourceContext }),
         targetUri: input.targetUri,
       };
   }
@@ -234,6 +250,7 @@ function parseContinuationCursorRecord(record: {
       ids: getPayloadStringArrayOrNull(payload, "ids"),
       kind: "collection",
       order: getPayloadOrder(payload),
+      ...getPayloadOptionalInteger(payload, "sourceContext", "sourceContext"),
       ...getPayloadOptionalTriplePattern(payload),
       types: getPayloadStringArrayOrNull(payload, "types"),
     };
@@ -248,6 +265,7 @@ function parseContinuationCursorRecord(record: {
       ...getPayloadOptionalPositiveInteger(payload, "evidenceLimit"),
       format: record.format,
       kind: "search",
+      ...getPayloadOptionalInteger(payload, "sourceContext", "sourceContext"),
       ...getPayloadOptionalTriplePattern(payload),
       types: getPayloadStringArrayOrNull(payload, "types"),
     };
@@ -261,6 +279,7 @@ function parseContinuationCursorRecord(record: {
       format: record.format,
       kind: "evidence",
       ...getPayloadOptionalString(payload, "query"),
+      ...getPayloadOptionalInteger(payload, "sourceContext", "sourceContext"),
       targetUri: getPayloadString(payload, "targetUri"),
     };
   }
@@ -275,6 +294,7 @@ function parseContinuationCursorRecord(record: {
       kind: "related",
       ...getPayloadOptionalString(payload, "query"),
       ...getPayloadOptionalRelatedRole(payload),
+      ...getPayloadOptionalInteger(payload, "sourceContext", "sourceContext"),
       targetUri: getPayloadString(payload, "targetUri"),
     };
   }
@@ -385,6 +405,23 @@ function getPayloadOptionalPositiveInteger(
   }
   if (typeof value === "number" && Number.isInteger(value) && value > 0) {
     return { evidenceLimit: value };
+  }
+
+  throw new Error("Invalid continuation cursor payload.");
+}
+
+function getPayloadOptionalInteger<K extends string>(
+  payload: Readonly<Record<string, unknown>>,
+  key: string,
+  outputKey: K,
+): { readonly [P in K]?: number } {
+  const value = payload[key];
+
+  if (value === undefined) {
+    return {};
+  }
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
+    return { [outputKey]: value } as { readonly [P in K]?: number };
   }
 
   throw new Error("Invalid continuation cursor payload.");

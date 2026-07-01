@@ -167,6 +167,7 @@ export interface ArchiveFindOptions {
   readonly limit?: number;
   readonly match?: ArchiveFindMatch;
   readonly order?: ArchiveFindOrder;
+  readonly sourceContext?: number;
   readonly triplePattern?: ArchiveTriplePattern;
   readonly types?: readonly ArchiveFindFilterType[];
 }
@@ -214,6 +215,7 @@ export interface ArchiveCollectionOptions {
   readonly ids?: readonly string[];
   readonly limit?: number;
   readonly order?: ArchiveFindOrder;
+  readonly sourceContext?: number;
   readonly triplePattern?: ArchiveTriplePattern;
   readonly types?: readonly ArchiveCollectionType[];
 }
@@ -403,6 +405,7 @@ export interface ArchiveRelatedOptions {
   readonly limit?: number;
   readonly query?: string;
   readonly role?: ArchiveRelatedRole;
+  readonly sourceContext?: number;
 }
 
 export interface ArchiveRelatedResult {
@@ -449,6 +452,13 @@ export interface ArchiveSourceFragment {
 }
 
 type ArchiveTextStreamKind = "source" | "summary";
+type SourceEvidenceRange = {
+  readonly chapterId: number;
+  readonly endSentenceIndex: number;
+  readonly fragmentId: number;
+  readonly score?: number;
+  readonly startSentenceIndex: number;
+};
 
 interface ArchiveTextStreamSentence {
   readonly fragmentId: number;
@@ -472,11 +482,15 @@ export interface ArchiveEvidenceOptions {
   readonly cursor?: string;
   readonly limit?: number;
   readonly query?: string;
+  readonly sourceContext?: number;
 }
+
+const DEFAULT_SOURCE_CONTEXT = 2;
 
 export interface ArchivePageOptions {
   readonly backlinks?: boolean;
   readonly evidenceLimit?: number;
+  readonly sourceContext?: number;
   readonly wikipageResolverOptions?: WikipageResolverOptions;
 }
 
@@ -713,6 +727,9 @@ export async function listArchiveCollection(
     ...(options.evidenceLimit === undefined
       ? {}
       : { evidenceLimit: options.evidenceLimit }),
+    ...(options.sourceContext === undefined
+      ? {}
+      : { sourceContext: options.sourceContext }),
   });
 
   return {
@@ -1238,6 +1255,8 @@ async function readWikiGraphPage(
           document,
           mentions,
           options.evidenceLimit,
+          createEvidenceReadContext(),
+          options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
         ),
         id: uri,
         label: selectEntityLabel(mentions),
@@ -1273,6 +1292,8 @@ async function readWikiGraphPage(
           document,
           links,
           options.evidenceLimit,
+          createEvidenceReadContext(),
+          options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
         ),
         id: uri,
         label: await createTriplePageLabel(document, reference),
@@ -1773,6 +1794,7 @@ async function hydrateRelatedItemsEvidence(
             item.evidenceLinks ?? [],
             evidenceLimit,
             context,
+            options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
           );
           const { evidenceLinks: _evidenceLinks, ...publicItem } = item;
 
@@ -1793,6 +1815,7 @@ async function hydrateRelatedItemsEvidence(
               createNodeEvidenceRanges(node),
               evidenceLimit,
               context,
+              options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
             ),
           };
         }
@@ -2415,12 +2438,20 @@ async function hydrateFindHitEvidence(
   options: {
     readonly evidenceLimit?: number;
     readonly sessionId?: string;
+    readonly sourceContext?: number;
   } = {},
 ): Promise<readonly ArchiveFindHit[]> {
   const evidenceContext = createEvidenceReadContext();
 
   return await Promise.all(
-    hits.map(async (hit) => {
+    hits.map(async (rawHit) => {
+      const hit = await hydrateTextStreamHitContext(
+        document,
+        rawHit,
+        options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
+        evidenceContext,
+      );
+
       if (hit.evidence !== undefined && hit.evidence.sources.length > 0) {
         return hit;
       }
@@ -2434,6 +2465,7 @@ async function hydrateFindHitEvidence(
           hit,
           options.sessionId,
           options.evidenceLimit,
+          options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
           evidenceContext,
         );
       }
@@ -2449,6 +2481,7 @@ async function hydrateFindHitEvidence(
           hit.evidenceLinks,
           options.evidenceLimit,
           evidenceContext,
+          options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
         );
         const { evidenceLinks: _evidenceLinks, ...publicHit } = hit;
 
@@ -2471,6 +2504,7 @@ async function hydrateFindHitEvidence(
         hit.evidenceMentions.map((item) => item.mention),
         options.evidenceLimit,
         evidenceContext,
+        options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
       );
       const { evidenceMentions: _evidenceMentions, ...publicHit } = hit;
 
@@ -2480,6 +2514,57 @@ async function hydrateFindHitEvidence(
       };
     }),
   );
+}
+
+async function hydrateTextStreamHitContext(
+  document: ReadonlyDocument,
+  hit: ArchiveFindHit,
+  sourceContext: number,
+  context: EvidenceReadContext,
+): Promise<ArchiveFindHit> {
+  if (sourceContext <= 0 || (hit.type !== "source" && hit.type !== "summary")) {
+    return hit;
+  }
+  if (hit.matchCount === undefined && hit.matchedTerms === undefined) {
+    return hit;
+  }
+
+  const reference = parseTextStreamHitReference(hit.id);
+
+  if (reference === undefined) {
+    return hit;
+  }
+
+  const range = await readTextStreamRange(
+    document,
+    reference.chapterId,
+    reference.stream,
+    reference.startSentenceIndex - sourceContext,
+    reference.endSentenceIndex + sourceContext,
+    context,
+  );
+
+  return {
+    ...hit,
+    id: range.id,
+    snippet: range.text,
+  };
+}
+
+function parseTextStreamHitReference(
+  uri: string,
+): Extract<WikiGraphReference, { readonly type: "text-stream" }> | undefined {
+  if (!uri.startsWith("wkg://")) {
+    return undefined;
+  }
+
+  try {
+    const reference = parseWikiGraphReference(uri);
+
+    return reference.type === "text-stream" ? reference : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function hydrateFindResultBacklinks(
@@ -2544,12 +2629,16 @@ function createFindEvidenceHydrationOptions(
 ): {
   readonly evidenceLimit?: number;
   readonly sessionId?: string;
+  readonly sourceContext?: number;
 } {
   return {
     ...(options.evidenceLimit === undefined
       ? {}
       : { evidenceLimit: options.evidenceLimit }),
     ...(sessionId === undefined ? {} : { sessionId }),
+    ...(options.sourceContext === undefined
+      ? {}
+      : { sourceContext: options.sourceContext }),
   };
 }
 
@@ -2773,6 +2862,7 @@ async function hydrateEntitySessionHitEvidence(
   hit: ArchiveFindHit,
   sessionId: string,
   evidenceLimit: number | undefined,
+  sourceContext: number,
   context: EvidenceReadContext = createEvidenceReadContext(),
 ): Promise<ArchiveFindHit> {
   if (evidenceLimit === undefined) {
@@ -2791,7 +2881,12 @@ async function hydrateEntitySessionHitEvidence(
     await readEntitySearchEvidenceMentions(sessionId, qid, 10_000)
   ).map(toMentionRecord);
   const ranges = await createMentionEvidenceRanges(document, allMentions);
-  const mergedRanges = mergeSourceEvidenceRanges(ranges);
+  const mergedRanges = await createExpandedSourceEvidenceRanges(
+    document,
+    ranges,
+    sourceContext,
+    context,
+  );
   const sources = await Promise.all(
     mergedRanges
       .slice(0, evidenceLimit)
@@ -3741,12 +3836,14 @@ async function createMentionEvidencePreview(
   mentions: readonly MentionRecord[],
   limit = 3,
   context: EvidenceReadContext = createEvidenceReadContext(),
+  sourceContext = DEFAULT_SOURCE_CONTEXT,
 ): Promise<ArchiveFindEvidencePreview> {
   return await createSourceEvidencePreview(
     document,
     await createMentionEvidenceRanges(document, mentions),
     limit,
     context,
+    sourceContext,
   );
 }
 
@@ -3795,12 +3892,14 @@ async function createMentionLinkEvidencePreview(
   links: readonly MentionLinkRecord[],
   limit = 3,
   context: EvidenceReadContext = createEvidenceReadContext(),
+  sourceContext = DEFAULT_SOURCE_CONTEXT,
 ): Promise<ArchiveFindEvidencePreview> {
   return await createSourceEvidencePreview(
     document,
     createMentionLinkEvidenceRanges(document, links),
     limit,
     context,
+    sourceContext,
   );
 }
 
@@ -3865,12 +3964,7 @@ async function filterMentionLinksByChapter(
 
 async function createSourceEvidencePage(
   document: ReadonlyDocument,
-  ranges: readonly {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly startSentenceIndex: number;
-  }[],
+  ranges: readonly SourceEvidenceRange[],
   options: ArchiveEvidenceOptions,
 ): Promise<ArchiveEvidence> {
   const context = createEvidenceReadContext();
@@ -3882,7 +3976,13 @@ async function createSourceEvidencePage(
     options.query,
     context,
   );
-  const pageRanges = evidenceRanges.slice(start, start + limit);
+  const displayRanges = await createExpandedSourceEvidenceRanges(
+    document,
+    evidenceRanges,
+    options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
+    context,
+  );
+  const pageRanges = displayRanges.slice(start, start + limit);
   const nextOffset = start + pageRanges.length;
   const items = await Promise.all(
     pageRanges.map(
@@ -3903,29 +4003,16 @@ async function createSourceEvidencePage(
     items,
     limit,
     nextCursor:
-      nextOffset < evidenceRanges.length ? encodeFindCursor(nextOffset) : null,
+      nextOffset < displayRanges.length ? encodeFindCursor(nextOffset) : null,
   };
 }
 
 async function filterAndSortSourceEvidenceRangesByQuery(
   document: ReadonlyDocument,
-  ranges: readonly {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly startSentenceIndex: number;
-  }[],
+  ranges: readonly SourceEvidenceRange[],
   queryText: string | undefined,
   context: EvidenceReadContext,
-): Promise<
-  readonly {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly score?: number;
-    readonly startSentenceIndex: number;
-  }[]
-> {
+): Promise<readonly SourceEvidenceRange[]> {
   const query =
     queryText === undefined ? undefined : createLexicalQuery(queryText);
 
@@ -3965,20 +4052,8 @@ async function filterAndSortSourceEvidenceRangesByQuery(
 }
 
 function areSourceEvidenceRangesEqual(
-  left: {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly score?: number;
-    readonly startSentenceIndex: number;
-  },
-  right: {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly score?: number;
-    readonly startSentenceIndex: number;
-  },
+  left: SourceEvidenceRange,
+  right: SourceEvidenceRange,
 ): boolean {
   return (
     left.chapterId === right.chapterId &&
@@ -3990,12 +4065,7 @@ function areSourceEvidenceRangesEqual(
 
 async function readEvidenceRangeText(
   document: ReadonlyDocument,
-  range: {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly startSentenceIndex: number;
-  },
+  range: SourceEvidenceRange,
   context: EvidenceReadContext,
 ): Promise<string> {
   const fragment = await getEvidenceFragment(
@@ -4012,18 +4082,8 @@ async function readEvidenceRangeText(
 }
 
 function compareSourceEvidenceRanges(
-  left: {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly startSentenceIndex: number;
-  },
-  right: {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly startSentenceIndex: number;
-  },
+  left: SourceEvidenceRange,
+  right: SourceEvidenceRange,
 ): number {
   return (
     compareNumbers(left.chapterId, right.chapterId) ||
@@ -4035,36 +4095,36 @@ function compareSourceEvidenceRanges(
 
 async function createSourceEvidencePreview(
   document: ReadonlyDocument,
-  ranges: readonly {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly startSentenceIndex: number;
-  }[],
+  ranges: readonly SourceEvidenceRange[],
   limit: number,
   context: EvidenceReadContext = createEvidenceReadContext(),
+  sourceContext = DEFAULT_SOURCE_CONTEXT,
 ): Promise<ArchiveFindEvidencePreview> {
   const mergedRanges = mergeSourceEvidenceRanges(ranges);
+  const displayRanges = await createExpandedSourceEvidenceRanges(
+    document,
+    mergedRanges.slice(0, limit),
+    sourceContext,
+    context,
+  );
   const sources = await Promise.all(
-    mergedRanges
-      .slice(0, limit)
-      .map(
-        async (range) =>
-          await createSourceEvidenceItem(
-            document,
-            range.chapterId,
-            range.startSentenceIndex,
-            range.endSentenceIndex,
-            range.fragmentId,
-            context,
-          ),
-      ),
+    displayRanges.map(
+      async (range) =>
+        await createSourceEvidenceItem(
+          document,
+          range.chapterId,
+          range.startSentenceIndex,
+          range.endSentenceIndex,
+          range.fragmentId,
+          context,
+        ),
+    ),
   );
 
   return {
     nextCursor:
-      sources.length < mergedRanges.length
-        ? encodeFindCursor(sources.length)
+      Math.min(limit, mergedRanges.length) < mergedRanges.length
+        ? encodeFindCursor(Math.min(limit, mergedRanges.length))
         : null,
     shown: sources.length,
     sources,
@@ -4073,25 +4133,26 @@ async function createSourceEvidencePreview(
 }
 
 function mergeSourceEvidenceRanges(
-  ranges: readonly {
-    readonly chapterId: number;
-    readonly endSentenceIndex: number;
-    readonly fragmentId: number;
-    readonly startSentenceIndex: number;
-  }[],
-): Array<{
-  readonly chapterId: number;
-  readonly endSentenceIndex: number;
-  readonly fragmentId: number;
-  readonly startSentenceIndex: number;
-}> {
-  const rangesBySource = new Map<string, Array<[number, number]>>();
+  ranges: readonly SourceEvidenceRange[],
+): SourceEvidenceRange[] {
+  const rangesBySource = new Map<
+    string,
+    Array<{
+      readonly end: number;
+      readonly score?: number;
+      readonly start: number;
+    }>
+  >();
 
   for (const range of ranges) {
     const key = `${range.chapterId}:${range.fragmentId}`;
     const sourceRanges = rangesBySource.get(key) ?? [];
 
-    sourceRanges.push([range.startSentenceIndex, range.endSentenceIndex]);
+    sourceRanges.push({
+      end: range.endSentenceIndex,
+      ...(range.score === undefined ? {} : { score: range.score }),
+      start: range.startSentenceIndex,
+    });
     rangesBySource.set(key, sourceRanges);
   }
 
@@ -4099,15 +4160,55 @@ function mergeSourceEvidenceRanges(
     const { chapterId, fragmentId } = parseEvidenceRangeKey(key);
 
     return mergeEvidenceRanges(ranges).map(
-      ([start, end]) =>
+      ({ end, score, start }) =>
         ({
           chapterId,
           endSentenceIndex: end,
           fragmentId,
+          ...(score === undefined ? {} : { score }),
           startSentenceIndex: start,
         }) as const,
     );
   });
+}
+
+async function createExpandedSourceEvidenceRanges(
+  document: ReadonlyDocument,
+  ranges: readonly SourceEvidenceRange[],
+  sourceContext: number,
+  context: EvidenceReadContext,
+): Promise<SourceEvidenceRange[]> {
+  const expanded = await Promise.all(
+    ranges.map(async (range) => {
+      if (sourceContext <= 0) {
+        return range;
+      }
+
+      const fragment = await getEvidenceFragment(
+        document,
+        range.chapterId,
+        range.fragmentId,
+        context,
+      );
+      const lastSentenceIndex = Math.max(0, fragment.sentences.length - 1);
+
+      return {
+        ...range,
+        endSentenceIndex: clampInteger(
+          range.endSentenceIndex + sourceContext,
+          range.startSentenceIndex,
+          lastSentenceIndex,
+        ),
+        startSentenceIndex: clampInteger(
+          range.startSentenceIndex - sourceContext,
+          0,
+          lastSentenceIndex,
+        ),
+      };
+    }),
+  );
+
+  return mergeSourceEvidenceRanges(expanded);
 }
 
 async function createSourceEvidenceItem(
@@ -4287,24 +4388,47 @@ function formatTextStreamRangeUri(
 }
 
 function mergeEvidenceRanges(
-  ranges: readonly (readonly [number, number])[],
-): readonly (readonly [number, number])[] {
+  ranges: readonly {
+    readonly end: number;
+    readonly score?: number;
+    readonly start: number;
+  }[],
+): readonly {
+  readonly end: number;
+  readonly score?: number;
+  readonly start: number;
+}[] {
   const sortedRanges = [...ranges]
-    .map(
-      ([start, end]) => [Math.min(start, end), Math.max(start, end)] as const,
-    )
-    .sort(([leftStart, leftEnd], [rightStart, rightEnd]) =>
-      leftStart === rightStart ? leftEnd - rightEnd : leftStart - rightStart,
+    .map((range) => ({
+      ...(range.score === undefined ? {} : { score: range.score }),
+      end: Math.max(range.start, range.end),
+      start: Math.min(range.start, range.end),
+    }))
+    .sort((left, right) =>
+      left.start === right.start
+        ? left.end - right.end
+        : left.start - right.start,
     );
-  const mergedRanges: Array<[number, number]> = [];
+  const mergedRanges: Array<{
+    end: number;
+    score?: number;
+    start: number;
+  }> = [];
 
-  for (const [start, end] of sortedRanges) {
+  for (const { end, score, start } of sortedRanges) {
     const last = mergedRanges.at(-1);
 
-    if (last === undefined || start > last[1] + 1) {
-      mergedRanges.push([start, end]);
+    if (last === undefined || start > last.end + 1) {
+      mergedRanges.push({
+        end,
+        ...(score === undefined ? {} : { score }),
+        start,
+      });
     } else {
-      last[1] = Math.max(last[1], end);
+      last.end = Math.max(last.end, end);
+      if (score !== undefined) {
+        last.score = Math.max(last.score ?? score, score);
+      }
     }
   }
 

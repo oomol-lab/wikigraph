@@ -10,10 +10,10 @@ Use when:
   - You have words, names, phrases, or concepts and need candidate object URIs.
 
 Usage:
-  wikigraph <archive-uri> search <query> [--all] [--limit <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
-  wikigraph <chapter-uri> search <query> [--all] [--limit <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
-  wikigraph <archive-uri>/<entity|triple|source|summary|chunk> search <query> [--all] [--limit <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
-  wikigraph <chapter-uri>/<entity|triple|source|summary|chunk> search <query> [--all] [--limit <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <archive-uri> search <query> [--all] [--limit <n>] [--context <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <chapter-uri> search <query> [--all] [--limit <n>] [--context <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <archive-uri>/<entity|triple|source|summary|chunk> search <query> [--all] [--limit <n>] [--context <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <chapter-uri>/<entity|triple|source|summary|chunk> search <query> [--all] [--limit <n>] [--context <n>] [--evidence [n]] [--backlinks] [--cursor <token>] [--json|--jsonl] [--help|-h]
 
 Returns:
   - In text output, a ranked list of full `wkg://...` URIs.
@@ -28,6 +28,7 @@ Notes:
   - Trailing triple placeholders may be omitted: `<archive-uri>/triple/Q1` means `<archive-uri>/triple/Q1/_/_`.
   - Put the lens after a chapter URI, such as `<chapter-uri>/entity`, to keep retrieval local to one chapter.
   - Add `--evidence` or `--evidence <n>` to include source evidence previews on entity and triple results.
+  - Source and summary search hits, plus evidence previews, include 2 nearby sentences before and after by default. Use `--context 0` for exact matched or cited ranges.
   - Add `--backlinks` to include reverse references on top-level source results; nested evidence sources are not expanded.
   - Add `--all --jsonl` to stream every result page. With `--all`, `--limit` controls page size.
   - Avoid `--all` without `--jsonl` for large results; it buffers all result objects before printing.

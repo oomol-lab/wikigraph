@@ -56,7 +56,7 @@ describe("facade/archive-view", () => {
         expect(result.items).toContainEqual(
           expect.objectContaining({
             field: "source",
-            id: "wkg://chapter/1/source#0",
+            id: "wkg://chapter/1/source#0..2",
             position: {
               chapter: 1,
               fragment: 0,
@@ -85,7 +85,7 @@ describe("facade/archive-view", () => {
 
         expect(result.match).toBe("any");
         const sourceHit = result.items.find(
-          (item) => item.id === "wkg://chapter/1/source#1",
+          (item) => item.id === "wkg://chapter/1/source#0..2",
         );
         expect(sourceHit).toMatchObject({
           field: "source",
@@ -353,9 +353,9 @@ describe("facade/archive-view", () => {
               shown: 1,
               sources: [
                 expect.objectContaining({
-                  id: "wkg://chapter/1/source#0",
+                  id: "wkg://chapter/1/source#0..2",
                   source:
-                    "An LLM Wiki exposes pages, links, and source fragments to agents.",
+                    "An LLM Wiki exposes pages, links, and source fragments to agents.\n朱元璋知道了这个消息，随后亲自来到洪都。\nSource-only archives should be searchable.",
                 }),
               ],
               total: 1,
@@ -774,8 +774,9 @@ describe("facade/archive-view", () => {
         expect(triple?.evidence?.total).toBe(1);
         expect(triple?.evidence?.sources).toStrictEqual([
           expect.objectContaining({
-            id: "wkg://chapter/1/source#2",
-            source: "Source-only archives should be searchable.",
+            id: "wkg://chapter/1/source#0..2",
+            source:
+              "An LLM Wiki exposes pages, links, and source fragments to agents.\n朱元璋知道了这个消息，随后亲自来到洪都。\nSource-only archives should be searchable.",
           }),
         ]);
 
@@ -907,7 +908,7 @@ describe("facade/archive-view", () => {
           expect.arrayContaining(["朱元璋", "不存在的关键词"]),
         );
         const sourceHit = result.items.find(
-          (item) => item.id === "wkg://chapter/1/source#1",
+          (item) => item.id === "wkg://chapter/1/source#0..2",
         );
         expect(sourceHit).toMatchObject({
           field: "source",
@@ -974,7 +975,7 @@ describe("facade/archive-view", () => {
         expect(result.items).toStrictEqual([
           expect.objectContaining({
             chapter: 1,
-            id: "wkg://chapter/1/source#0",
+            id: "wkg://chapter/1/source#0..2",
             position: { chapter: 1, fragment: 0, sentence: 0 },
             type: "source",
           }),
@@ -2158,6 +2159,20 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
+              id: "wkg://chapter/1/source#0..2",
+              source:
+                "An LLM Wiki exposes pages, links, and source fragments to agents.\n朱元璋知道了这个消息，随后亲自来到洪都。\nSource-only archives should be searchable.",
+              type: "source",
+            },
+          ],
+        });
+        await expect(
+          listArchiveEvidence(document, "wkg://chunk/100", {
+            sourceContext: 0,
+          }),
+        ).resolves.toMatchObject({
+          items: [
+            {
               id: "wkg://chapter/1/source#0",
               source:
                 "An LLM Wiki exposes pages, links, and source fragments to agents.",
@@ -2170,7 +2185,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wkg://chapter/1/source#0",
+              id: "wkg://chapter/1/source#0..2",
               type: "source",
             },
           ],
@@ -2180,7 +2195,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wkg://chapter/1/source#0",
+              id: "wkg://chapter/1/source#0..2",
               type: "source",
             },
           ],
@@ -2192,7 +2207,7 @@ describe("facade/archive-view", () => {
             shown: 1,
             sources: [
               {
-                id: "wkg://chapter/1/source#0",
+                id: "wkg://chapter/1/source#0..2",
                 type: "source",
               },
             ],
@@ -2212,7 +2227,7 @@ describe("facade/archive-view", () => {
             shown: 1,
             sources: [
               {
-                id: "wkg://chapter/1/source#0",
+                id: "wkg://chapter/1/source#0..2",
                 type: "source",
               },
             ],
@@ -2275,7 +2290,7 @@ describe("facade/archive-view", () => {
                 shown: 1,
                 sources: [
                   {
-                    id: "wkg://chapter/1/source#0",
+                    id: "wkg://chapter/1/source#0..2",
                   },
                 ],
                 total: 1,
@@ -2304,8 +2319,9 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wkg://chapter/1/source#4",
-              source: "Second fragment mentions Augustine.",
+              id: "wkg://chapter/1/source#3..5",
+              source:
+                "First unrelated fragment sentence.\nSecond fragment mentions Augustine.\nThird unrelated fragment sentence.",
               type: "source",
             },
           ],
@@ -2318,7 +2334,7 @@ describe("facade/archive-view", () => {
         ).resolves.toMatchObject({
           items: [
             {
-              id: "wkg://chapter/1/source#2",
+              id: "wkg://chapter/1/source#0..2",
               type: "source",
             },
           ],
@@ -2367,7 +2383,7 @@ describe("facade/archive-view", () => {
         );
 
         expect(evidence.items.map((item) => item.id)).toStrictEqual([
-          "wkg://chapter/1/source#1",
+          "wkg://chapter/1/source#0..2",
         ]);
         expect(evidence.items[0]?.score).toBeGreaterThan(0);
       } finally {

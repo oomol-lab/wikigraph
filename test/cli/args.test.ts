@@ -436,6 +436,8 @@ describe("cli/args", () => {
         "10",
         "--cursor",
         "cursor-token",
+        "--context",
+        "2",
         "--jsonl",
       ]),
     ).toStrictEqual({
@@ -444,6 +446,7 @@ describe("cli/args", () => {
         all: true,
         archivePath: `wkg://${archivePath}/chapter/11`,
         cursor: "cursor-token",
+        context: 2,
         format: "jsonl",
         kinds: ["source"],
         limit: 10,
@@ -473,6 +476,8 @@ describe("cli/args", () => {
         "--all",
         "--limit",
         "2",
+        "--context",
+        "0",
         "--jsonl",
       ]),
     ).toStrictEqual({
@@ -480,6 +485,7 @@ describe("cli/args", () => {
         action: "evidence",
         all: true,
         archivePath: "wkg://book.wikg/entity/Q1",
+        context: 0,
         format: "jsonl",
         limit: 2,
         objectId: "wkg://book.wikg/entity/Q1",
@@ -497,6 +503,8 @@ describe("cli/args", () => {
         "2",
         "--cursor",
         "4",
+        "--context",
+        "1",
         "--jsonl",
       ]),
     ).toStrictEqual({
@@ -504,6 +512,7 @@ describe("cli/args", () => {
         action: "related",
         all: true,
         archivePath: "wkg://book.wikg/entity/Q1",
+        context: 1,
         cursor: "4",
         format: "jsonl",
         limit: 2,
@@ -837,6 +846,12 @@ describe("cli/args", () => {
       parseCLIArguments(["wkg://book.wikg/entity/Q1", "pack", "--backlinks"]),
     ).toThrow("The `pack` command does not support --backlinks.");
     expect(() =>
+      parseCLIArguments(["wkg://book.wikg", "create", "--context", "2"]),
+    ).toThrow("The `create` command does not support --context.");
+    expect(() =>
+      parseCLIArguments(["wkg://book.wikg/chunk/1", "pack", "--context", "2"]),
+    ).toThrow("The `pack` command does not support --context.");
+    expect(() =>
       parseCLIArguments(["wkg://book.wikg/triple/Q1/mentions/Q2", "related"]),
     ).toThrow("Related is only available for chunk and entity objects");
     expect(() =>
@@ -854,6 +869,15 @@ describe("cli/args", () => {
         "-1",
       ]),
     ).toThrow("--evidence must be a non-negative integer.");
+    expect(() =>
+      parseCLIArguments([
+        "wkg://book.wikg",
+        "search",
+        "RAG",
+        "--context",
+        "-1",
+      ]),
+    ).toThrow("--context must be a non-negative integer.");
     expect(
       parseCLIArguments([
         "wkg://book.wikg/entity/Q1",

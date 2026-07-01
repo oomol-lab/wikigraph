@@ -34,6 +34,8 @@ Choose a search lens explicitly in the URI: `/chunk` for Reading Graph structure
 
 When the user asks for source passages mentioning, grounding, or supporting a known entity, start from the entity URI: `<archive-uri>/entity/<qid> evidence --all --jsonl`. Do not use source search by the entity label as the primary method; labels may have aliases, translations, variants, and grounded mentions that do not match the label text. Use source search only as a secondary literal-text check.
 
+Source search hits and evidence previews include nearby source context by default. Use `--context 0` when exact cited ranges matter, and adjust `--context <n>` when a small source window is enough.
+
 When investigating an entity, use this order: `<entity-uri> get`, `<entity-uri> evidence --all --jsonl`, `<entity-uri> related --all --jsonl --evidence <n>`, then `<entity-uri>/wikipage get`. Do not infer Wikipedia URLs from labels or Wikidata QIDs; use `/entity/<qid>/wikipage get` for canonical mapped pages. Use external web search only if the mapped wikipage is missing or insufficient.
 
 For evidence tracing, logic-chain reconstruction, or relationship analysis that starts from source text, use `wikigraph <uri> evidence` to return source ranges for a known object, then use `wikigraph <uri> related` or `wikigraph <graph-object-uri> pack` to move back into nearby graph objects. Use source URIs when continuous prose is the goal.

@@ -597,6 +597,7 @@ describe("cli/archive", () => {
     await runArchiveCommand({
       action: "search",
       archivePath: "wkg:///tmp/book.wikg",
+      context: 0,
       format: "text",
       kinds: ["source"],
       query: "RAG",
@@ -604,6 +605,7 @@ describe("cli/archive", () => {
 
     expect(findArchiveObjects).toHaveBeenCalledWith({}, "RAG", {
       archiveKey: "/tmp/book.wikg",
+      sourceContext: 0,
       types: ["source"],
     });
     expect(archiveMockState.textWrites[0]).toContain(
@@ -2014,6 +2016,7 @@ describe("cli/archive", () => {
     await runArchiveCommand({
       action: "evidence",
       archivePath: "wkg:///tmp/book.wikg",
+      context: 1,
       cursor: "cursor-1",
       format: "json",
       limit: 3,
@@ -2025,6 +2028,7 @@ describe("cli/archive", () => {
       cursor: "cursor-1",
       limit: 3,
       query: "paragraph",
+      sourceContext: 1,
     });
     expect(archiveMockState.textWrites[0]).toContain('"score": 2.5');
   });
@@ -2038,6 +2042,7 @@ describe("cli/archive", () => {
     await runArchiveCommand({
       action: "evidence",
       archivePath: "wkg:///tmp/book.wikg",
+      context: 0,
       format: "json",
       objectId: "wkg:///tmp/book.wikg/entity/Q1",
       query: "paragraph",
@@ -2050,6 +2055,7 @@ describe("cli/archive", () => {
       format: "json",
       kind: "evidence",
       query: "paragraph",
+      sourceContext: 0,
       targetUri: "wkg://entity/Q1",
     });
   });

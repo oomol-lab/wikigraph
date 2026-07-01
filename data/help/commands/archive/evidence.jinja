@@ -11,7 +11,7 @@ Use when:
   - You need support before quoting, verifying, or answering from a claim.
 
 Usage:
-  wikigraph <object-uri> evidence [query] [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl] [--help|-h]
+  wikigraph <object-uri> evidence [query] [--all] [--limit <n>] [--context <n>] [--cursor <token>] [--json|--jsonl] [--help|-h]
 
 Returns:
   - Evidence items anchored to source text.
@@ -22,6 +22,7 @@ Notes:
   - Do not use source search by entity label as the primary method; labels may have aliases, translations, variants, and grounded mentions that do not match literal text. Use source search only as a secondary literal-text check.
   - Do not infer Wikipedia URLs from entity labels or QIDs; use `<archive-uri>/entity/<qid>/wikipage get` for mapped pages.
   - Optional `query` filters and re-sorts only the evidence items that would otherwise be returned.
+  - Evidence source ranges include 2 nearby sentences before and after by default. Use `--context 0` for exact cited ranges, or `--context <n>` for a different nearby source window.
   - Add `--all --jsonl` to stream every evidence page. With `--all`, `--limit` controls page size.
   - Avoid `--all` without `--jsonl` for large evidence sets; it buffers all evidence items before printing.
   - Use `wikigraph next <cursor>` for any returned `nextCursor`.
