@@ -878,7 +878,6 @@ type ChapterUriTarget =
       readonly kind: "triple-pattern-lens";
       readonly pattern: ArchiveTriplePattern;
     }
-  | { readonly kind: "state" }
   | { readonly kind: "tree" }
   | { readonly chapterId: number; readonly kind: "chapter" }
   | {
@@ -903,10 +902,6 @@ type ChapterUriTarget =
     };
 
 function parseChapterTarget(objectUri: string): ChapterUriTarget | undefined {
-  if (objectUri === "wkg://state") {
-    return { kind: "state" };
-  }
-
   if (objectUri === "wkg://chapter") {
     return { kind: "collection" };
   }
@@ -1137,14 +1132,6 @@ function parseArchiveChapterUriArguments(
         values,
         helpRoute,
       );
-    case "state":
-      return parseArchiveStateUriArguments(
-        uri,
-        action,
-        tail,
-        values,
-        helpRoute,
-      );
     case "tree":
       return parseChapterTreeUriArguments(
         archivePath,
@@ -1283,25 +1270,6 @@ function parseArchiveTriplePatternLensUriArguments(
     defaultKinds: ["triple"],
     triplePattern: pattern,
   });
-}
-
-function parseArchiveStateUriArguments(
-  uri: string,
-  action: CLIArchiveUriAction,
-  tail: readonly string[],
-  values: ArchiveArgumentValues,
-  helpRoute: string,
-): ParsedCLIArguments {
-  if (action !== "get") {
-    throw new Error(
-      withHelpRoute(
-        `The archive state object does not support \`${action}\`. Expected get.`,
-        "wikigraph help object archive-state",
-      ),
-    );
-  }
-
-  return parseArchiveArguments("get", [uri, ...tail], values, helpRoute);
 }
 
 function parseChapterTreeUriArguments(

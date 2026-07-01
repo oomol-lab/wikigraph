@@ -282,7 +282,12 @@ const archiveMockState = vi.hoisted(() => ({
   },
   chapterPage: {
     id: "chapter:2",
-    stage: "graphed",
+    state: {
+      "knowledge-graph": "missing",
+      "reading-graph": "ready",
+      "reading-summary": "missing",
+      source: "ready",
+    },
     title: "Chapter 2",
     type: "chapter",
   },
@@ -295,18 +300,13 @@ const archiveMockState = vi.hoisted(() => ({
     type: "meta",
   },
   statePage: {
-    id: "wkg://state",
+    id: "wkg://chapter/2/state",
     state: {
-      archive: {
-        chapters: [],
-        edgeCount: 1,
-        meta: undefined,
-        nodeCount: 2,
-        summaryCount: 0,
-      },
-      kind: "archive",
+      "knowledge-graph": "missing",
+      "reading-graph": "ready",
+      "reading-summary": "missing",
+      source: "ready",
     },
-    title: "Archive state",
     type: "state",
   },
   entityPage: {
@@ -519,7 +519,7 @@ vi.mock("../../src/facade/index.js", () => ({
                 ? archiveMockState.sourceRangePage
                 : id === "wkg://"
                   ? archiveMockState.metaPage
-                  : id === "wkg://state"
+                  : id === "wkg://chapter/2/state"
                     ? archiveMockState.statePage
                     : archiveMockState.page,
     ),
@@ -555,16 +555,20 @@ describe("cli/archive", () => {
     archiveMockState.textWrites.length = 0;
   });
 
-  it("gets archive state", async () => {
+  it("gets chapter state", async () => {
     await runArchiveCommand({
       action: "get",
-      archivePath: "wkg:///tmp/book.wikg/state",
+      archivePath: "wkg:///tmp/book.wikg/chapter/2/state",
       format: "json",
-      objectId: "wkg:///tmp/book.wikg/state",
+      objectId: "wkg:///tmp/book.wikg/chapter/2/state",
     });
 
     expect(archiveMockState.readCalls).toStrictEqual(["/tmp/book.wikg"]);
-    expect(readArchivePage).toHaveBeenCalledWith({}, "wkg://state", {});
+    expect(readArchivePage).toHaveBeenCalledWith(
+      {},
+      "wkg://chapter/2/state",
+      {},
+    );
   });
 
   it("prints search hits as Wiki Graph URI objects", async () => {
@@ -1321,8 +1325,29 @@ describe("cli/archive", () => {
     expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
       uri: "wkg://chapter/2",
       title: "Chapter 2",
-      stage: "reading-graph",
+      state: {
+        "knowledge-graph": "missing",
+        "reading-graph": "ready",
+        "reading-summary": "missing",
+        source: "ready",
+      },
     });
+    expect(archiveMockState.textWrites[0]).toContain(
+      '"title": "Chapter 2",\n  "state":',
+    );
+  });
+
+  it("gets a chapter as one text line with state", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wkg:///tmp/book.wikg",
+      format: "text",
+      objectId: "wkg:///tmp/book.wikg/chapter/2",
+    });
+
+    expect(archiveMockState.textWrites[0]).toBe(
+      "wkg://chapter/2  Chapter 2  source:ready reading-graph:ready reading-summary:missing knowledge-graph:missing\n",
+    );
   });
 
   it("gets a source range as a citation block", async () => {

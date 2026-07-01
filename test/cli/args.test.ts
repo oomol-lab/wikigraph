@@ -880,19 +880,6 @@ describe("cli/args", () => {
       kind: "cover",
     });
     expect(
-      parseCLIArguments(["wkg://book.wikg/state", "get", "--json"]),
-    ).toStrictEqual({
-      args: {
-        action: "get",
-        archivePath: "wkg://book.wikg/state",
-        format: "json",
-        objectId: "wkg://book.wikg/state",
-      },
-      help: false,
-      kind: "archive",
-    });
-
-    expect(
       parseCLIArguments(["wkg://book.wikg/", "set", "--help"]),
     ).toMatchObject({
       help: true,

@@ -29,7 +29,7 @@ Default exploration loop:
 
 Archive and job commands also use URI targets:
   wikigraph wkg://book.wikg create ./book.md
-  wikigraph wkg://book.wikg/state get --json
+  wikigraph wkg://book.wikg/chapter list --jsonl
   wikigraph wkg://book.wikg/chapter/3 queue add --task reading-graph --accept-cost
   wikigraph wkg-job:// list
   wikigraph wkg-job://<job-id> watch --jsonl
