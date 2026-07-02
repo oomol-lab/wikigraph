@@ -38,6 +38,9 @@ describe("legacy-sdpub/upgrade", () => {
         await expect(document.readSummary(1)).resolves.toBe(
           "Summary sentence one.\nSummary sentence two.",
         );
+        await expect(
+          countSearchIndexRecords(document),
+        ).resolves.toBeGreaterThan(0);
         await document.openSession(async (openedDocument) => {
           await expect(
             openedDocument.readingEdges.listAll(),
@@ -216,6 +219,24 @@ async function writeLegacyArchive(
     "summaries/serial-1.txt",
   );
   await writeZipFile(zipFile, archivePath);
+}
+
+async function countSearchIndexRecords(
+  document: DirectoryDocument,
+): Promise<number> {
+  return await document.readDatabase(async (database) => {
+    const row = await database.queryOne(
+      `
+        SELECT
+          (SELECT COUNT(*) FROM text_sentence_records) +
+          (SELECT COUNT(*) FROM search_object_records) AS count
+      `,
+      undefined,
+      (value) => Number(value.count),
+    );
+
+    return row ?? 0;
+  });
 }
 
 async function writeZipFile(zipFile: ZipFile, path: string): Promise<void> {

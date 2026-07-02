@@ -7,11 +7,17 @@ export const SCHEMA_SQL = `
 
   CREATE TABLE IF NOT EXISTS serial_states (
     serial_id INTEGER PRIMARY KEY,
+    revision INTEGER NOT NULL DEFAULT 0,
     topology_ready INTEGER NOT NULL DEFAULT 0,
     topology_parameter_hash TEXT,
     knowledge_graph_ready INTEGER NOT NULL DEFAULT 0,
     knowledge_graph_parameter_hash TEXT,
     FOREIGN KEY (serial_id) REFERENCES serials(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS archive_revisions (
+    key TEXT PRIMARY KEY,
+    value INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS graph_build_parameters (
@@ -237,18 +243,90 @@ export const SCHEMA_SQL = `
     SUM(evidence_count) AS evidence_count
   FROM chapter_entity_relations
   GROUP BY subject_qid, predicate, object_qid;
+
+  CREATE TABLE IF NOT EXISTS search_index_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS text_sentence_records (
+    id INTEGER PRIMARY KEY,
+    kind INTEGER NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    sentence_index INTEGER NOT NULL,
+    words_count INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(kind, chapter_id, sentence_index)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_text_sentence_records_chapter
+  ON text_sentence_records(kind, chapter_id, sentence_index);
+
+  CREATE VIRTUAL TABLE IF NOT EXISTS text_sentence_fts USING fts5(
+    tier1,
+    tier2,
+    tier3,
+    tokenize='ascii'
+  );
+
+  CREATE TABLE IF NOT EXISTS search_object_records (
+    id INTEGER PRIMARY KEY,
+    kind INTEGER NOT NULL,
+    ref_id INTEGER NOT NULL,
+    chapter_id INTEGER,
+    sentence_index INTEGER
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_search_object_records_ref
+  ON search_object_records(kind, ref_id);
+
+  CREATE INDEX IF NOT EXISTS idx_search_object_records_chapter
+  ON search_object_records(chapter_id, kind, ref_id);
+
+  CREATE VIRTUAL TABLE IF NOT EXISTS search_object_fts USING fts5(
+    tier1,
+    tier2,
+    tier3,
+    tokenize='ascii'
+  );
 `;
 
 export async function initializeDocumentSchema(
   database: Database,
 ): Promise<void> {
   await ensureGraphBuildParameterTable(database);
+  await migrateSerialStateRevision(database);
   await migrateSerialStateKnowledgeGraphReady(database);
   await migrateSerialStateGraphParameterHashes(database);
   await ensureGraphBuildParameterIndexes(database);
 }
 
-async function ensureGraphBuildParameterTable(database: Database): Promise<void> {
+async function migrateSerialStateRevision(database: Database): Promise<void> {
+  const columns = await listTableColumns(database, "serial_states");
+
+  if (columns.has("revision")) {
+    return;
+  }
+
+  await database.transaction(async () => {
+    const transactionColumns = await listTableColumns(
+      database,
+      "serial_states",
+    );
+
+    if (transactionColumns.has("revision")) {
+      return;
+    }
+
+    await database.run(`
+      ALTER TABLE serial_states
+      ADD COLUMN revision INTEGER NOT NULL DEFAULT 0
+    `);
+  });
+}
+
+async function ensureGraphBuildParameterTable(
+  database: Database,
+): Promise<void> {
   await database.run(`
     CREATE TABLE IF NOT EXISTS graph_build_parameters (
       hash TEXT PRIMARY KEY,

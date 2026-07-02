@@ -16,10 +16,7 @@ import type {
   ReadonlyDocument,
   SentenceId,
 } from "../document/index.js";
-import {
-  LanguageCode,
-  normalizeLanguageCode,
-} from "../common/language.js";
+import { LanguageCode, normalizeLanguageCode } from "../common/language.js";
 import type { WikipageResolveProgress } from "../wikipage/index.js";
 import {
   buildWikimatchSurfaceProtectionInput,

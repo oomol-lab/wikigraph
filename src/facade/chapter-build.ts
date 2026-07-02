@@ -87,23 +87,27 @@ const fragmentRecordSchema = z.object({
   summary: z.string(),
   sentences: z.array(sentenceRecordSchema),
 }) satisfies z.ZodType<FragmentRecord>;
-const serialRecordSchema = z.object({
-  id: z.number(),
-  knowledgeGraphReady: z.boolean(),
-  knowledgeGraphParameterHash: z.string().optional(),
-  topologyParameterHash: z.string().optional(),
-  topologyReady: z.boolean(),
-}).transform((record) => ({
-  id: record.id,
-  knowledgeGraphReady: record.knowledgeGraphReady,
-  ...(record.knowledgeGraphParameterHash === undefined
-    ? {}
-    : { knowledgeGraphParameterHash: record.knowledgeGraphParameterHash }),
-  topologyReady: record.topologyReady,
-  ...(record.topologyParameterHash === undefined
-    ? {}
-    : { topologyParameterHash: record.topologyParameterHash }),
-})) satisfies z.ZodType<SerialRecord>;
+const serialRecordSchema = z
+  .object({
+    id: z.number(),
+    knowledgeGraphReady: z.boolean(),
+    knowledgeGraphParameterHash: z.string().optional(),
+    revision: z.number().optional(),
+    topologyParameterHash: z.string().optional(),
+    topologyReady: z.boolean(),
+  })
+  .transform((record) => ({
+    id: record.id,
+    knowledgeGraphReady: record.knowledgeGraphReady,
+    ...(record.knowledgeGraphParameterHash === undefined
+      ? {}
+      : { knowledgeGraphParameterHash: record.knowledgeGraphParameterHash }),
+    revision: record.revision ?? 0,
+    topologyReady: record.topologyReady,
+    ...(record.topologyParameterHash === undefined
+      ? {}
+      : { topologyParameterHash: record.topologyParameterHash }),
+  })) satisfies z.ZodType<SerialRecord>;
 const chunkRecordSchema = z.object({
   id: z.number(),
   generation: z.number(),
@@ -408,7 +412,12 @@ export async function snapshotChapterSummaryInput(
     fragmentGroups: await document.fragmentGroups.listBySerial(chapterId),
     fragments,
     readingEdges: await document.readingEdges.listBySerial(chapterId),
-    serial: { id: chapterId, knowledgeGraphReady: false, topologyReady: true },
+    serial: {
+      id: chapterId,
+      knowledgeGraphReady: false,
+      revision: 0,
+      topologyReady: true,
+    },
     snakeChunks,
     snakeEdges: await document.snakeEdges.listBySerial(chapterId),
     snakes,
@@ -693,6 +702,12 @@ class SummaryInputSnapshotDocument implements ReadonlyDocument {
     return await operation(this);
   }
 
+  public readDatabase<T>(): Promise<T> {
+    return Promise.reject(
+      new Error("Summary input snapshots do not expose a SQLite database."),
+    );
+  }
+
   public readBookMeta(): Promise<undefined> {
     return Promise.resolve(undefined);
   }
@@ -717,6 +732,10 @@ class SummaryInputSnapshotDocument implements ReadonlyDocument {
 class EmptySnapshotMentionStore implements ReadonlyMentionStore {
   public getById(_mentionId: string): Promise<undefined> {
     return Promise.resolve(undefined);
+  }
+
+  public listAll(): Promise<MentionRecord[]> {
+    return Promise.resolve([]);
   }
 
   public listByQid(_qid: string): Promise<MentionRecord[]> {
@@ -758,9 +777,7 @@ class EmptySnapshotMentionLinkStore implements ReadonlyMentionLinkStore {
   }
 }
 
-class EmptySnapshotGraphBuildParameterStore
-  implements ReadonlyGraphBuildParameterStore
-{
+class EmptySnapshotGraphBuildParameterStore implements ReadonlyGraphBuildParameterStore {
   public getByHash(_hash: string): Promise<undefined> {
     return Promise.resolve(undefined);
   }
@@ -777,6 +794,28 @@ class SnapshotSerialStore implements ReadonlySerialStore {
     return Promise.resolve(
       serialId === this.#serial.id ? this.#serial : undefined,
     );
+  }
+
+  public getRevision(serialId: number): Promise<number> {
+    return Promise.resolve(
+      serialId === this.#serial.id ? this.#serial.revision : 0,
+    );
+  }
+
+  public getRevisions(
+    serialIds: readonly number[],
+  ): Promise<ReadonlyMap<number, number>> {
+    return Promise.resolve(
+      new Map(
+        serialIds
+          .filter((serialId) => serialId === this.#serial.id)
+          .map((serialId) => [serialId, this.#serial.revision] as const),
+      ),
+    );
+  }
+
+  public getChaptersRevision(): Promise<number> {
+    return Promise.resolve(this.#serial.revision);
   }
 
   public getMaxId(): Promise<number> {

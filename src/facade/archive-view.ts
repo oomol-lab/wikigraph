@@ -45,6 +45,16 @@ import {
   readSearchSessionPage,
   type EntitySearchMentionHit,
 } from "./search-cache.js";
+import {
+  ensureSearchIndex,
+  querySearchIndex,
+  SEARCH_OBJECT_KIND,
+  TEXT_SENTENCE_KIND,
+  type SearchIndexInput,
+  type SearchIndexObjectHit,
+  type SearchIndexQueryResult,
+  type SearchIndexTextHit,
+} from "./search-index.js";
 
 export type ArchiveObjectType =
   | "chapter"
@@ -820,6 +830,10 @@ export async function findArchiveObjects(
     return createFindResult(query, [], options);
   }
 
+  const revisionScope = await createSearchRevisionScope(
+    document,
+    options.chapters,
+  );
   const cacheInput = {
     archiveKey: options.archiveKey ?? "archive",
     chapters: options.chapters ?? null,
@@ -827,6 +841,7 @@ export async function findArchiveObjects(
     match: options.match ?? "any",
     order: options.order ?? "doc-asc",
     query,
+    revisionScope,
     terms: search.terms,
     types: options.types ?? null,
   };
@@ -895,9 +910,19 @@ export async function findArchiveObjects(
         listLexicalQueryCandidateTerms(query),
       )
     : [];
-  const hits = await findArchiveObjectsUncached(document, search, options, {
-    allMentions,
-  });
+  const indexed = await findArchiveObjectsIndexed(document, query, options);
+  const structuredHits = wantsStructuredSearch
+    ? [
+        ...findEntities(search, { mentions: allMentions }),
+        ...(await findTriples(document, search, { mentions: allMentions })),
+      ]
+    : [];
+  const hits =
+    indexed === undefined
+      ? await findArchiveObjectsUncached(document, search, options, {
+          allMentions,
+        })
+      : [...structuredHits, ...indexed];
   if (isEntityOnlySearch(options)) {
     const ranked = createRankedFindResult(
       query,
@@ -913,6 +938,7 @@ export async function findArchiveObjects(
       match: ranked.match,
       order: ranked.order,
       query,
+      revisionScope,
       terms: ranked.terms,
       types: ranked.types,
     });
@@ -947,7 +973,7 @@ export async function findArchiveObjects(
     match: ranked.match,
     order: ranked.order,
     query,
-    records: hits,
+    revisionScope,
     terms: ranked.terms,
     types: ranked.types,
   });
@@ -966,6 +992,34 @@ export async function findArchiveObjects(
     },
     options,
   );
+}
+
+async function createSearchRevisionScope(
+  document: ReadonlyDocument,
+  chapters: readonly number[] | undefined,
+): Promise<string> {
+  if (chapters === undefined || chapters.length === 0) {
+    return JSON.stringify({
+      chaptersRevision: await document.serials.getChaptersRevision(),
+      scope: "all",
+    });
+  }
+
+  const uniqueChapters = [...new Set(chapters)].sort(compareNumbers);
+  const revisions = await document.serials.getRevisions(uniqueChapters);
+
+  return JSON.stringify({
+    chapters: uniqueChapters.map(
+      (chapterId) => [chapterId, revisions.get(chapterId) ?? 0] as const,
+    ),
+    scope: "chapters",
+  });
+}
+
+export async function rebuildArchiveSearchIndex(
+  document: ReadonlyDocument,
+): Promise<void> {
+  await ensureSearchIndex(document, await createSearchIndexRecords(document));
 }
 
 export async function grepArchiveObjects(
@@ -1052,6 +1106,257 @@ async function findArchiveObjectsUncached(
   hits.push(...(await findNodesLexical(document, search)));
 
   return [...structuredHits, ...hits];
+}
+
+async function findArchiveObjectsIndexed(
+  document: ReadonlyDocument,
+  query: string,
+  options: ArchiveFindOptions,
+): Promise<readonly ArchiveFindHit[] | undefined> {
+  try {
+    await ensureSearchIndex(document, await createSearchIndexRecords(document));
+  } catch (error) {
+    if (isReadonlySqliteError(error)) {
+      return undefined;
+    }
+
+    throw error;
+  }
+  const result = await querySearchIndex(document, query, {
+    ...(options.chapters === undefined ? {} : { chapters: options.chapters }),
+    ...(options.match === undefined ? {} : { match: options.match }),
+    types: options.types ?? null,
+  });
+
+  return result === undefined
+    ? undefined
+    : await hydrateSearchIndexHits(document, result);
+}
+
+function isReadonlySqliteError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message.includes("SQLITE_READONLY") ||
+      error.message.includes("readonly database"))
+  );
+}
+
+async function hydrateSearchIndexHits(
+  document: ReadonlyDocument,
+  result: SearchIndexQueryResult,
+): Promise<readonly ArchiveFindHit[]> {
+  const chapters = new Map(
+    (await listChapters(document)).map((chapter) => [
+      chapter.chapterId,
+      chapter,
+    ]),
+  );
+  const hits: ArchiveFindHit[] = [];
+
+  for (const hit of result.objectHits) {
+    const hydrated = await hydrateSearchObjectHit(document, chapters, hit);
+
+    if (hydrated !== undefined) {
+      hits.push(withSearchTerms(hydrated, result.terms));
+    }
+  }
+
+  for (const hit of result.textHits) {
+    const hydrated = await hydrateSearchTextHit(document, chapters, hit);
+
+    if (hydrated !== undefined) {
+      hits.push(withSearchTerms(hydrated, result.terms));
+    }
+  }
+
+  return hits;
+}
+
+function withSearchTerms(
+  hit: ArchiveFindHit,
+  terms: readonly string[],
+): ArchiveFindHit {
+  return {
+    ...hit,
+    matchCount: terms.length,
+    matchedTerms: terms,
+    missingTerms: [],
+  };
+}
+
+async function hydrateSearchObjectHit(
+  document: ReadonlyDocument,
+  chapters: ReadonlyMap<number, ChapterEntry>,
+  hit: SearchIndexObjectHit,
+): Promise<ArchiveFindHit | undefined> {
+  switch (hit.kind) {
+    case SEARCH_OBJECT_KIND.chapterTitle: {
+      const chapter = chapters.get(hit.refId);
+
+      if (chapter === undefined) {
+        return undefined;
+      }
+
+      const title = chapter.title ?? `[chapter ${chapter.chapterId}]`;
+
+      return {
+        chapter: chapter.chapterId,
+        field: "title",
+        id: formatChapterId(chapter.chapterId),
+        matchCount: 1,
+        position: { chapter: chapter.chapterId },
+        score: hit.score,
+        snippet: title,
+        state: await createChapterState(document, chapter),
+        title,
+        type: "chapter",
+      };
+    }
+    case SEARCH_OBJECT_KIND.nodeLabel:
+    case SEARCH_OBJECT_KIND.nodeContent: {
+      const node = await document.chunks.getById(hit.refId);
+
+      if (node === undefined) {
+        return undefined;
+      }
+
+      const position = createNodePosition(node.sentenceIds);
+
+      return {
+        chapter: node.sentenceId[0],
+        field: hit.kind === SEARCH_OBJECT_KIND.nodeLabel ? "title" : "content",
+        id: formatNodeId(node.id),
+        matchCount: 1,
+        ...(position === undefined ? {} : { position }),
+        score: hit.score,
+        snippet:
+          hit.kind === SEARCH_OBJECT_KIND.nodeLabel
+            ? node.label
+            : createSnippet(node.content),
+        title: node.label,
+        type: "node",
+      };
+    }
+  }
+}
+
+async function hydrateSearchTextHit(
+  document: ReadonlyDocument,
+  chapters: ReadonlyMap<number, ChapterEntry>,
+  hit: SearchIndexTextHit,
+): Promise<ArchiveFindHit | undefined> {
+  const stream =
+    hit.kind === TEXT_SENTENCE_KIND.source
+      ? ("source" as const)
+      : ("summary" as const);
+  const chapter = chapters.get(hit.chapterId);
+
+  if (chapter === undefined) {
+    return undefined;
+  }
+
+  const range = await readTextStreamRange(
+    document,
+    hit.chapterId,
+    stream,
+    hit.sentenceIndex,
+    hit.sentenceIndex,
+  );
+
+  return {
+    chapter: hit.chapterId,
+    field: stream,
+    id: range.id,
+    matchCount: 1,
+    position: {
+      chapter: hit.chapterId,
+      sentence: hit.sentenceIndex,
+    },
+    score: hit.score,
+    snippet: createSnippet(range.text),
+    title: chapter.title ?? `[chapter ${hit.chapterId}]`,
+    type: stream,
+  };
+}
+
+async function createSearchIndexRecords(
+  document: ReadonlyDocument,
+): Promise<SearchIndexInput> {
+  const objects: SearchIndexInput["objects"][number][] = [];
+  const textSentences: SearchIndexInput["textSentences"][number][] = [];
+
+  for (const chapter of await listChapters(document)) {
+    const title = chapter.title ?? `[chapter ${chapter.chapterId}]`;
+
+    objects.push({
+      chapterId: chapter.chapterId,
+      kind: SEARCH_OBJECT_KIND.chapterTitle,
+      refId: chapter.chapterId,
+      text: title,
+    });
+
+    textSentences.push(
+      ...(await createTextStreamSearchIndexRecords(
+        document,
+        chapter.chapterId,
+        "summary",
+        title,
+      )),
+    );
+    textSentences.push(
+      ...(await createTextStreamSearchIndexRecords(
+        document,
+        chapter.chapterId,
+        "source",
+        title,
+      )),
+    );
+  }
+
+  for (const node of await document.chunks.listAll()) {
+    const position = createNodePosition(node.sentenceIds);
+
+    objects.push({
+      chapterId: node.sentenceId[0],
+      kind: SEARCH_OBJECT_KIND.nodeLabel,
+      refId: node.id,
+      ...(position?.sentence === undefined
+        ? {}
+        : { sentenceIndex: position.sentence }),
+      text: node.label,
+    });
+    objects.push({
+      chapterId: node.sentenceId[0],
+      kind: SEARCH_OBJECT_KIND.nodeContent,
+      refId: node.id,
+      ...(position?.sentence === undefined
+        ? {}
+        : { sentenceIndex: position.sentence }),
+      text: node.content,
+    });
+  }
+
+  return { objects, textSentences };
+}
+
+async function createTextStreamSearchIndexRecords(
+  document: ReadonlyDocument,
+  chapterId: number,
+  stream: ArchiveTextStreamKind,
+  _title: string,
+): Promise<SearchIndexInput["textSentences"]> {
+  const index = await createTextStreamIndex(document, chapterId, stream);
+
+  return index.sentences.map((sentence) => ({
+    chapterId,
+    kind:
+      stream === "source"
+        ? TEXT_SENTENCE_KIND.source
+        : TEXT_SENTENCE_KIND.summary,
+    sentenceIndex: sentence.globalIndex,
+    text: sentence.text,
+    wordsCount: sentence.wordsCount,
+  }));
 }
 
 export async function readArchiveText(
@@ -2253,14 +2558,7 @@ async function findTriples(
 async function listAllMentions(
   document: ReadonlyDocument,
 ): Promise<readonly MentionRecord[]> {
-  return (
-    await Promise.all(
-      (await listChapters(document)).map(
-        async (chapter) =>
-          await document.mentions.listByChapter(chapter.chapterId),
-      ),
-    )
-  ).flat();
+  return await document.mentions.listAll();
 }
 
 function groupTripleEvidenceHits(

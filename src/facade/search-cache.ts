@@ -21,7 +21,7 @@ export interface SearchSessionInput {
   readonly match: string;
   readonly order: string;
   readonly query: string;
-  readonly records: readonly ArchiveFindHit[];
+  readonly revisionScope: string;
   readonly terms: readonly string[];
   readonly types: readonly string[] | null;
 }
@@ -52,6 +52,7 @@ export interface EntitySearchSessionInput {
   readonly match: string;
   readonly order: string;
   readonly query: string;
+  readonly revisionScope: string;
   readonly terms: readonly string[];
   readonly types: readonly string[] | null;
 }
@@ -112,13 +113,6 @@ CREATE TABLE IF NOT EXISTS search_results (
   PRIMARY KEY (session_id, rank)
 );
 
-CREATE TABLE IF NOT EXISTS search_record_hits (
-  session_id TEXT NOT NULL,
-  rank INTEGER NOT NULL,
-  item_json TEXT NOT NULL,
-  PRIMARY KEY (session_id, rank)
-);
-
 CREATE TABLE IF NOT EXISTS search_mention_hits (
   session_id TEXT NOT NULL,
   mention_id TEXT NOT NULL,
@@ -167,7 +161,7 @@ const SEARCH_RANKING_VERSION = 4;
 const SEARCH_SESSION_MAX_COUNT = 500;
 const SEARCH_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-type SearchSessionCacheInput = Omit<SearchSessionInput, "items" | "records">;
+type SearchSessionCacheInput = Omit<SearchSessionInput, "items">;
 type EntitySearchSessionCacheInput = Omit<EntitySearchSessionInput, "hits">;
 
 export async function readCachedSearchSessionPage(
@@ -254,15 +248,6 @@ export async function createSearchSession(
             VALUES (?, ?, ?)
           `,
           [sessionId, index, JSON.stringify(item)],
-        );
-      }
-      for (const [index, record] of input.records.entries()) {
-        await database.run(
-          `
-            INSERT INTO search_record_hits (session_id, rank, item_json)
-            VALUES (?, ?, ?)
-          `,
-          [sessionId, index, JSON.stringify(record)],
         );
       }
       await pruneSearchSessions(database);
@@ -749,9 +734,6 @@ async function deleteSearchSession(
   await database.run("DELETE FROM search_results WHERE session_id = ?", [
     sessionId,
   ]);
-  await database.run("DELETE FROM search_record_hits WHERE session_id = ?", [
-    sessionId,
-  ]);
   await database.run("DELETE FROM search_mention_hits WHERE session_id = ?", [
     sessionId,
   ]);
@@ -858,6 +840,7 @@ function createEntitySearchSessionId(
         match: input.match,
         order: input.order,
         rankingVersion: SEARCH_RANKING_VERSION,
+        revisionScope: input.revisionScope,
         scope: normalizeSearchSessionScope(input.chapters),
         terms: input.terms,
         types: normalizeSearchSessionTypes(input.types),
@@ -937,6 +920,7 @@ function createSearchSessionId(input: SearchSessionCacheInput): string {
         match: input.match,
         order: input.order,
         rankingVersion: SEARCH_RANKING_VERSION,
+        revisionScope: input.revisionScope,
         scope: normalizeSearchSessionScope(input.chapters),
         terms: input.terms,
         types: normalizeSearchSessionTypes(input.types),

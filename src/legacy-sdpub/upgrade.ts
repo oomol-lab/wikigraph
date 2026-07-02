@@ -14,6 +14,7 @@ import { Database } from "../document/database.js";
 import { DirectoryDocument } from "../document/document.js";
 import { initializeDocumentSchema, SCHEMA_SQL } from "../document/schema.js";
 import { writeWikgArchive } from "../facade/archive.js";
+import { rebuildArchiveSearchIndex } from "../facade/archive-view.js";
 import { isNodeError } from "../utils/node-error.js";
 
 const LEGACY_SDPUB_PATTERNS = [
@@ -48,11 +49,22 @@ export async function migrateLegacySdpubToWikg(
     await extractLegacySdpubArchive(inputPath, workspacePath);
     await migrateDatabase(join(workspacePath, "database.db"));
     await migrateSummaries(workspacePath);
+    await rebuildDerivedData(workspacePath);
     await writeWikgArchive(workspacePath, outputPath);
 
     return { inputPath, outputPath };
   } finally {
     await rm(workspacePath, { force: true, recursive: true });
+  }
+}
+
+async function rebuildDerivedData(workspacePath: string): Promise<void> {
+  const document = await DirectoryDocument.open(workspacePath);
+
+  try {
+    await rebuildArchiveSearchIndex(document);
+  } finally {
+    await document.release();
   }
 }
 

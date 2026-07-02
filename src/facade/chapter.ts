@@ -1,8 +1,5 @@
 import type { Document, ReadonlyDocument } from "../document/index.js";
-import {
-  normalizeLanguageCode,
-  type Language,
-} from "../common/language.js";
+import { normalizeLanguageCode, type Language } from "../common/language.js";
 import type { SpineDigestScope } from "../common/llm-scope.js";
 import type { LLM } from "../llm/index.js";
 import type { ReaderTextStream } from "../reader/index.js";

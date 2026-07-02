@@ -36,7 +36,7 @@ describe("facade/archive-view", () => {
     }
   });
 
-  it("searches sourced fragments before graph or summary build", async () => {
+  it("searches sourced sentences before graph or summary build", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
 
@@ -59,7 +59,6 @@ describe("facade/archive-view", () => {
             id: "wkg://chapter/1/source#0..2",
             position: {
               chapter: 1,
-              fragment: 0,
               sentence: 0,
             },
             type: "source",
@@ -92,7 +91,51 @@ describe("facade/archive-view", () => {
           type: "source",
         });
         expect(sourceHit?.matchedTerms).toContain("朱元璋");
-        expect(sourceHit?.missingTerms).toContain("不存在的关键词");
+        expect(sourceHit?.missingTerms).toStrictEqual([]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("searches through the archive-local FTS index with normalized tokens", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const chinese = await findArchiveObjects(document, "洪都");
+        const singleHan = await findArchiveObjects(document, "璋");
+        const stemmed = await findArchiveObjects(document, "exposing");
+
+        expect(chinese.items).toContainEqual(
+          expect.objectContaining({
+            field: "source",
+            type: "source",
+          }),
+        );
+        expect(singleHan.items).toContainEqual(
+          expect.objectContaining({
+            field: "source",
+            type: "source",
+          }),
+        );
+        expect(stemmed.items).toContainEqual(
+          expect.objectContaining({
+            field: "source",
+            type: "source",
+          }),
+        );
+        await expect(listDocumentTableNames(document)).resolves.toEqual(
+          expect.arrayContaining([
+            "search_index_state",
+            "search_object_fts",
+            "search_object_records",
+            "text_sentence_fts",
+            "text_sentence_records",
+          ]),
+        );
       } finally {
         await document.release();
       }
@@ -976,7 +1019,7 @@ describe("facade/archive-view", () => {
           expect.objectContaining({
             chapter: 1,
             id: "wkg://chapter/1/source#0..2",
-            position: { chapter: 1, fragment: 0, sentence: 0 },
+            position: { chapter: 1, sentence: 0 },
             type: "source",
           }),
         ]);
@@ -1138,7 +1181,7 @@ describe("facade/archive-view", () => {
     });
   });
 
-  it("searches only whitelisted metadata fields", async () => {
+  it("does not include metadata fields in search", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
       process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
@@ -1165,14 +1208,7 @@ describe("facade/archive-view", () => {
             archiveKey: `${path}/book.wikg`,
             types: ["meta"],
           }),
-        ).resolves.toMatchObject({
-          items: [
-            expect.objectContaining({
-              id: "meta:root",
-              type: "meta",
-            }),
-          ],
-        });
+        ).resolves.toMatchObject({ items: [] });
         await expect(
           findArchiveObjects(document, "Hidden Identifier", {
             archiveKey: `${path}/book.wikg`,
@@ -2656,6 +2692,24 @@ function restoreEnv(name: string, value: string | undefined): void {
   }
 
   process.env[name] = value;
+}
+
+async function listDocumentTableNames(
+  document: DirectoryDocument,
+): Promise<string[]> {
+  return await document.readDatabase(
+    async (database) =>
+      await database.queryAll(
+        `
+          SELECT name
+          FROM sqlite_master
+          WHERE type IN ('table', 'virtual table')
+          ORDER BY name
+        `,
+        undefined,
+        (row) => String(row.name),
+      ),
+  );
 }
 
 function createEntityWikipageMockFetch(): typeof fetch {

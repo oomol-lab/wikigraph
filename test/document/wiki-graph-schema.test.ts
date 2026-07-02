@@ -42,6 +42,7 @@ describe("document/wiki-graph-schema", () => {
           ).resolves.toStrictEqual({
             id: 1,
             knowledgeGraphReady: false,
+            revision: 0,
             topologyReady: true,
           });
 
@@ -61,6 +62,7 @@ describe("document/wiki-graph-schema", () => {
             id: 1,
             knowledgeGraphParameterHash: parameter.hash,
             knowledgeGraphReady: true,
+            revision: 0,
             topologyReady: true,
           });
         });

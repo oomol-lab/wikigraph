@@ -50,6 +50,7 @@ export interface SerialRecord {
   readonly knowledgeGraphReady: boolean;
   readonly knowledgeGraphParameterHash?: string;
   readonly id: number;
+  readonly revision: number;
   readonly topologyParameterHash?: string;
   readonly topologyReady: boolean;
 }

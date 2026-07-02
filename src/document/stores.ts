@@ -25,7 +25,12 @@ const MAX_SQL_BIND_PARAMS = 900;
 
 export interface ReadonlySerialStore {
   getById(serialId: number): Promise<SerialRecord | undefined>;
+  getRevision(serialId: number): Promise<number>;
+  getRevisions(
+    serialIds: readonly number[],
+  ): Promise<ReadonlyMap<number, number>>;
   getMaxId(): Promise<number>;
+  getChaptersRevision(): Promise<number>;
   listIds(): Promise<number[]>;
 }
 
@@ -56,6 +61,7 @@ export interface ReadonlyReadingEdgeStore {
 
 export interface ReadonlyMentionStore {
   getById(mentionId: string): Promise<MentionRecord | undefined>;
+  listAll(): Promise<MentionRecord[]>;
   listBySurfaceTerms(terms: readonly string[]): Promise<MentionRecord[]>;
   listBySurfaces(surfaces: readonly string[]): Promise<MentionRecord[]>;
   listByQid(qid: string): Promise<MentionRecord[]>;
@@ -116,11 +122,11 @@ export class SerialStore implements ReadonlySerialStore {
       await this.#database.run(
         `
           INSERT INTO serial_states (
-            serial_id, topology_ready, knowledge_graph_ready
+            serial_id, revision, topology_ready, knowledge_graph_ready
           )
-          VALUES (?, ?, ?)
+          VALUES (?, ?, ?, ?)
         `,
-        [serialId, 0, 0],
+        [serialId, 0, 0, 0],
       );
 
       return serialId;
@@ -141,11 +147,11 @@ export class SerialStore implements ReadonlySerialStore {
         await this.#database.run(
           `
             INSERT INTO serial_states (
-              serial_id, topology_ready, knowledge_graph_ready
-            )
-            VALUES (?, ?, ?)
-          `,
-          [serialId, 0, 0],
+            serial_id, revision, topology_ready, knowledge_graph_ready
+          )
+          VALUES (?, ?, ?, ?)
+        `,
+          [serialId, 0, 0, 0],
         );
       });
     } catch (error) {
@@ -170,11 +176,11 @@ export class SerialStore implements ReadonlySerialStore {
       await this.#database.run(
         `
           INSERT OR IGNORE INTO serial_states (
-            serial_id, topology_ready, knowledge_graph_ready
+            serial_id, revision, topology_ready, knowledge_graph_ready
           )
-          VALUES (?, ?, ?)
+          VALUES (?, ?, ?, ?)
         `,
-        [serialId, 0, 0],
+        [serialId, 0, 0, 0],
       );
     });
   }
@@ -184,6 +190,7 @@ export class SerialStore implements ReadonlySerialStore {
       `
         SELECT
           serials.id AS id,
+          COALESCE(serial_states.revision, 0) AS revision,
           COALESCE(serial_states.topology_ready, 0) AS topology_ready,
           serial_states.topology_parameter_hash AS topology_parameter_hash,
           COALESCE(serial_states.knowledge_graph_ready, 0) AS knowledge_graph_ready,
@@ -195,6 +202,83 @@ export class SerialStore implements ReadonlySerialStore {
       `,
       [serialId],
       mapSerialRow,
+    );
+  }
+
+  public async getRevision(serialId: number): Promise<number> {
+    return (
+      (await this.#database.queryOne(
+        `
+          SELECT COALESCE(revision, 0) AS revision
+          FROM serial_states
+          WHERE serial_id = ?
+        `,
+        [serialId],
+        (row) => getNumber(row, "revision"),
+      )) ?? 0
+    );
+  }
+
+  public async getRevisions(
+    serialIds: readonly number[],
+  ): Promise<ReadonlyMap<number, number>> {
+    const uniqueIds = [...new Set(serialIds)].sort(compareNumber);
+
+    if (uniqueIds.length === 0) {
+      return new Map();
+    }
+
+    const rows = await this.#database.queryAll(
+      `
+        SELECT serial_id, COALESCE(revision, 0) AS revision
+        FROM serial_states
+        WHERE serial_id IN (${uniqueIds.map(() => "?").join(", ")})
+        ORDER BY serial_id
+      `,
+      uniqueIds,
+      (row) =>
+        [getNumber(row, "serial_id"), getNumber(row, "revision")] as const,
+    );
+
+    return new Map(rows);
+  }
+
+  public async bumpRevision(serialId: number): Promise<void> {
+    await this.ensure(serialId);
+    await this.#database.transaction(async () => {
+      await this.#database.run(
+        `
+          UPDATE serial_states
+          SET revision = revision + 1
+          WHERE serial_id = ?
+        `,
+        [serialId],
+      );
+      await this.bumpChaptersRevision();
+    });
+  }
+
+  public async bumpChaptersRevision(): Promise<void> {
+    await this.#database.run(
+      `
+        INSERT INTO archive_revisions (key, value)
+        VALUES ('chapters', 1)
+        ON CONFLICT(key) DO UPDATE SET value = value + 1
+      `,
+    );
+  }
+
+  public async getChaptersRevision(): Promise<number> {
+    return (
+      (await this.#database.queryOne(
+        `
+          SELECT value
+          FROM archive_revisions
+          WHERE key = 'chapters'
+        `,
+        undefined,
+        (row) => getNumber(row, "value"),
+      )) ?? 0
     );
   }
 
@@ -306,14 +390,17 @@ function mapSerialRow(row: SqlRow): SerialRecord {
     ...(knowledgeGraphParameterHash === undefined
       ? {}
       : { knowledgeGraphParameterHash }),
+    revision: getNumber(row, "revision"),
     topologyReady: getNumber(row, "topology_ready") !== 0,
     ...(topologyParameterHash === undefined ? {} : { topologyParameterHash }),
   };
 }
 
-export class GraphBuildParameterStore
-  implements ReadonlyGraphBuildParameterStore
-{
+function compareNumber(left: number, right: number): number {
+  return left - right;
+}
+
+export class GraphBuildParameterStore implements ReadonlyGraphBuildParameterStore {
   readonly #database: Database;
 
   public constructor(database: Database) {
@@ -988,6 +1075,28 @@ export class MentionStore implements ReadonlyMentionStore {
         WHERE id = ?
       `,
       [mentionId],
+      mapMentionRow,
+    );
+  }
+
+  public async listAll(): Promise<MentionRecord[]> {
+    return await this.#database.queryAll(
+      `
+        SELECT
+          id,
+          chapter_id,
+          fragment_id,
+          sentence_index,
+          range_start,
+          range_end,
+          surface,
+          qid,
+          confidence,
+          note
+        FROM mentions
+        ORDER BY chapter_id, fragment_id, sentence_index, range_start, range_end, id
+      `,
+      undefined,
       mapMentionRow,
     );
   }

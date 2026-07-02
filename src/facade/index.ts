@@ -32,6 +32,7 @@ export {
   packArchiveContext,
   readArchivePage,
   readArchiveText,
+  rebuildArchiveSearchIndex,
 } from "./archive-view.js";
 export {
   addBuildJob,

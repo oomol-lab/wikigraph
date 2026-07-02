@@ -137,6 +137,8 @@ export async function writeSerialSource(
 
     await fragmentDraft.commit();
   }
+
+  await document.serials.bumpRevision(serialId);
 }
 
 export class SerialGeneration {

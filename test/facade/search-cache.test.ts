@@ -25,7 +25,7 @@ describe("facade/search-cache", () => {
         match: "any",
         order: "rank",
         query: "query",
-        records: [],
+        revisionScope: JSON.stringify({ chaptersRevision: 0, scope: "all" }),
         terms: ["query"],
         types: null,
       });
@@ -47,6 +47,9 @@ describe("facade/search-cache", () => {
             "idx_search_sessions_prune",
           ]),
         );
+        await expect(listTableNames(database)).resolves.not.toContain(
+          "search_record_hits",
+        );
       } finally {
         await database.close();
       }
@@ -61,6 +64,19 @@ async function listIndexNames(database: Database): Promise<string[]> {
       FROM sqlite_master
       WHERE type = 'index'
         AND name NOT LIKE 'sqlite_%'
+      ORDER BY name
+    `,
+    undefined,
+    (row) => String(row.name),
+  );
+}
+
+async function listTableNames(database: Database): Promise<string[]> {
+  return await database.queryAll(
+    `
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
       ORDER BY name
     `,
     undefined,

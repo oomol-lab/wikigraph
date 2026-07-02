@@ -443,12 +443,10 @@ describe("facade/knowledge-graph-build", () => {
           document.graphBuildParameters.getByHash(
             serial!.knowledgeGraphParameterHash!,
           ),
-        ).resolves.toMatchObject(
-          {
-            language: "zh",
-            prompt: "只保留神学实体",
-          },
-        );
+        ).resolves.toMatchObject({
+          language: "zh",
+          prompt: "只保留神学实体",
+        });
         expect(await document.mentions.listByChapter(1)).toHaveLength(2);
         expect(await document.mentionLinks.listByChapter(1)).toStrictEqual([
           {

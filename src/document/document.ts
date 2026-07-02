@@ -8,6 +8,7 @@ import { tocFileSchema, type TocFile } from "../source/toc.js";
 import type { SourceAsset } from "../source/types.js";
 import { isNodeError } from "../utils/node-error.js";
 import { Database } from "./database.js";
+import type { Database as DocumentDatabase } from "./database.js";
 import {
   Fragments,
   type ReadonlySerialFragments,
@@ -122,6 +123,9 @@ export interface ReadonlyDocument {
   getSummaryFragments(serialId: number): ReadonlySerialFragments;
   openSession<T>(
     operation: (document: ReadonlyDocument) => Promise<T> | T,
+  ): Promise<T>;
+  readDatabase<T>(
+    operation: (database: DocumentDatabase) => Promise<T> | T,
   ): Promise<T>;
   readBookMeta(): Promise<BookMeta | undefined>;
   readCover(): Promise<SourceAsset | undefined>;
@@ -305,12 +309,14 @@ export class DirectoryDocument implements Document {
     await this.#deleteSerialGraphRecords(serialId);
     await this.serials.setTopologyReady(serialId, false);
     await this.serials.setKnowledgeGraphReady(serialId, false);
+    await this.serials.bumpRevision(serialId);
     await this.graphBuildParameters.deleteUnreferenced();
   }
 
   public async clearSerialSource(serialId: number): Promise<void> {
     await this.clearSerialGraph(serialId);
     await this.#fileStore.deleteTree(this.#fragments.getSerial(serialId).path);
+    await this.serials.bumpRevision(serialId);
   }
 
   public async deleteSerial(serialId: number): Promise<void> {
@@ -348,6 +354,12 @@ export class DirectoryDocument implements Document {
     } finally {
       await context.dispose();
     }
+  }
+
+  public async readDatabase<T>(
+    operation: (database: Database) => Promise<T> | T,
+  ): Promise<T> {
+    return await operation(this.#database);
   }
 
   public async peekNextSerialId(): Promise<number> {
@@ -432,14 +444,17 @@ export class DirectoryDocument implements Document {
   public async writeSummary(serialId: number, summary: string): Promise<void> {
     await this.deleteSummary(serialId);
     await this.#fragments.getSummarySerial(serialId).writeTextStream(summary);
+    await this.serials.bumpRevision(serialId);
   }
 
   public async writeToc(toc: TocFile): Promise<void> {
     await this.#writeJsonFile(this.#getTocPath(), toc);
+    await this.serials.bumpChaptersRevision();
   }
 
   public async replaceToc(toc: TocFile): Promise<void> {
     await this.#writeJsonFile(this.#getTocPath(), toc, { overwrite: true });
+    await this.serials.bumpChaptersRevision();
   }
 
   public async flush(): Promise<void> {
@@ -507,6 +522,7 @@ export class DirectoryDocument implements Document {
 
     await this.#fileStore.deleteTree(this.#fragments.getSerial(serialId).path);
     await this.deleteSummary(serialId);
+    await this.serials.bumpChaptersRevision();
     await this.graphBuildParameters.deleteUnreferenced();
   }
 

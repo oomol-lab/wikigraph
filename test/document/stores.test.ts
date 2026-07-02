@@ -34,6 +34,7 @@ describe("document/stores", () => {
         expect(await openedDocument.serials.getById(1)).toStrictEqual({
           id: 1,
           knowledgeGraphReady: false,
+          revision: 0,
           topologyReady: false,
         });
 
@@ -51,11 +52,13 @@ describe("document/stores", () => {
         expect(await openedDocument.serials.getById(3)).toStrictEqual({
           id: 3,
           knowledgeGraphReady: true,
+          revision: 0,
           topologyReady: true,
         });
         expect(await openedDocument.serials.getById(5)).toStrictEqual({
           id: 5,
           knowledgeGraphReady: false,
+          revision: 0,
           topologyReady: true,
         });
         expect(await openedDocument.serials.getById(99)).toBeUndefined();
@@ -81,11 +84,7 @@ describe("document/stores", () => {
         });
 
         expect(sameParameter.hash).toBe(parameter.hash);
-        await openedDocument.serials.setTopologyReady(
-          1,
-          true,
-          parameter.hash,
-        );
+        await openedDocument.serials.setTopologyReady(1, true, parameter.hash);
         await openedDocument.serials.setKnowledgeGraphReady(
           2,
           true,
