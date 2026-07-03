@@ -1,5 +1,6 @@
 export {
   ensureSearchIndex,
+  isSearchIndexCurrent,
   querySearchIndex,
   SEARCH_OBJECT_PROPERTY_KIND,
   SEARCH_OBJECT_PROPERTY_OWNER_KIND,

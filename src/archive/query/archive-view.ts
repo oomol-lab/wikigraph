@@ -50,6 +50,7 @@ import {
 } from "./search-cache.js";
 import {
   ensureSearchIndex,
+  isSearchIndexCurrent,
   querySearchIndex,
   SEARCH_OBJECT_PROPERTY_KIND,
   SEARCH_OBJECT_PROPERTY_OWNER_KIND,
@@ -1157,7 +1158,12 @@ async function findArchiveObjectsIndexed(
   | undefined
 > {
   try {
-    await ensureSearchIndex(document, await createSearchIndexRecords(document));
+    if (!(await isSearchIndexCurrent(document))) {
+      await ensureSearchIndex(
+        document,
+        await createSearchIndexRecords(document),
+      );
+    }
   } catch (error) {
     if (isReadonlySqliteError(error)) {
       return undefined;
@@ -1173,7 +1179,14 @@ async function findArchiveObjectsIndexed(
 
   return result === undefined
     ? undefined
-    : { hits: await hydrateSearchIndexHits(document, result), result };
+    : {
+        hits: await hydrateSearchIndexHits(
+          document,
+          result,
+          createSearchIndexHydrationOptions(options),
+        ),
+        result,
+      };
 }
 
 function isReadonlySqliteError(error: unknown): boolean {
@@ -1187,6 +1200,9 @@ function isReadonlySqliteError(error: unknown): boolean {
 async function hydrateSearchIndexHits(
   document: ReadonlyDocument,
   result: SearchIndexQueryResult,
+  options: {
+    readonly textHitLimit?: number;
+  } = {},
 ): Promise<readonly ArchiveFindHit[]> {
   const chapters = new Map(
     (await listChapters(document)).map((chapter) => [
@@ -1204,7 +1220,12 @@ async function hydrateSearchIndexHits(
     }
   }
 
-  for (const hit of result.textHits) {
+  const textHits =
+    options.textHitLimit === undefined
+      ? result.textHits
+      : result.textHits.slice(0, options.textHitLimit);
+
+  for (const hit of textHits) {
     const hydrated = await hydrateSearchTextHit(document, chapters, hit);
 
     if (hydrated !== undefined) {
@@ -1213,6 +1234,24 @@ async function hydrateSearchIndexHits(
   }
 
   return hits;
+}
+
+function createSearchIndexHydrationOptions(options: ArchiveFindOptions): {
+  readonly textHitLimit?: number;
+} {
+  if (!isTextOnlySearch(options) || options.limit === undefined) {
+    return {};
+  }
+
+  return { textHitLimit: options.limit + 1 };
+}
+
+function isTextOnlySearch(options: ArchiveFindOptions): boolean {
+  return (
+    options.types !== undefined &&
+    options.types.length > 0 &&
+    options.types.every((type) => type === "source" || type === "summary")
+  );
 }
 
 function withSearchTerms(

@@ -93,17 +93,43 @@ const SEARCH_INDEX_VERSION = "3";
 const SEARCH_INDEX_OBJECT_TARGET = 1;
 const TIER_WEIGHTS = [1, 0.45, 0.08] as const;
 
+export async function isSearchIndexCurrent(
+  document: ReadonlyDocument,
+): Promise<boolean> {
+  const chaptersRevision = await document.serials.getChaptersRevision();
+
+  return await document.readDatabase(async (database) => {
+    const current = await database.queryAll(
+      `
+        SELECT key, value
+        FROM search_index_state
+        WHERE key IN ('version', 'chaptersRevision')
+      `,
+      undefined,
+      (row) => [String(row.key), String(row.value)] as const,
+    );
+    const state = new Map(current);
+
+    return (
+      state.get("version") === SEARCH_INDEX_VERSION &&
+      state.get("chaptersRevision") === String(chaptersRevision)
+    );
+  });
+}
+
 export async function ensureSearchIndex(
   document: ReadonlyDocument,
   input: SearchIndexInput,
 ): Promise<void> {
+  const chaptersRevision = await document.serials.getChaptersRevision();
+
   await document.readDatabase(async (database) => {
     const fingerprint = createSearchIndexFingerprint(input);
     const current = await database.queryAll(
       `
         SELECT key, value
         FROM search_index_state
-        WHERE key IN ('version', 'fingerprint')
+        WHERE key IN ('version', 'fingerprint', 'chaptersRevision')
       `,
       undefined,
       (row) => [String(row.key), String(row.value)] as const,
@@ -112,7 +138,8 @@ export async function ensureSearchIndex(
 
     if (
       state.get("version") === SEARCH_INDEX_VERSION &&
-      state.get("fingerprint") === fingerprint
+      state.get("fingerprint") === fingerprint &&
+      state.get("chaptersRevision") === String(chaptersRevision)
     ) {
       return;
     }
@@ -155,6 +182,13 @@ export async function ensureSearchIndex(
           VALUES ('fingerprint', ?)
         `,
         [fingerprint],
+      );
+      await database.run(
+        `
+          INSERT INTO search_index_state(key, value)
+          VALUES ('chaptersRevision', ?)
+        `,
+        [String(chaptersRevision)],
       );
     });
   });
