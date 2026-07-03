@@ -16,6 +16,7 @@ import type {
   ReadonlyReadingEdgeStore,
   ReadonlyMentionLinkStore,
   ReadonlyMentionStore,
+  ReadonlyObjectMetadataStore,
   ReadonlySerialFragments,
   ReadonlySerialStore,
   ReadonlySnakeChunkStore,
@@ -642,6 +643,7 @@ class SummaryInputSnapshotDocument implements ReadonlyDocument {
   public readonly readingEdges: ReadonlyReadingEdgeStore;
   public readonly mentionLinks: ReadonlyMentionLinkStore;
   public readonly mentions: ReadonlyMentionStore;
+  public readonly metadata: ReadonlyObjectMetadataStore;
   public readonly serials: ReadonlySerialStore;
   public readonly snakeChunks: ReadonlySnakeChunkStore;
   public readonly snakeEdges: ReadonlySnakeEdgeStore;
@@ -662,6 +664,7 @@ class SummaryInputSnapshotDocument implements ReadonlyDocument {
     );
     this.mentionLinks = new EmptySnapshotMentionLinkStore();
     this.mentions = new EmptySnapshotMentionStore();
+    this.metadata = new EmptySnapshotObjectMetadataStore();
     this.serials = new SnapshotSerialStore(snapshot.serial);
     this.snakeChunks = new SnapshotSnakeChunkStore(snapshot.snakeChunks);
     this.snakeEdges = new SnapshotSnakeEdgeStore(
@@ -774,6 +777,14 @@ class EmptySnapshotMentionLinkStore implements ReadonlyMentionLinkStore {
 
   public listByChapter(_chapterId: number): Promise<MentionLinkRecord[]> {
     return Promise.resolve([]);
+  }
+}
+
+class EmptySnapshotObjectMetadataStore implements ReadonlyObjectMetadataStore {
+  public getMap(
+    _objectPath: string,
+  ): Promise<Readonly<Record<string, unknown>>> {
+    return Promise.resolve({});
   }
 }
 

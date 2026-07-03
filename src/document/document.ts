@@ -22,12 +22,14 @@ import {
   ReadingEdgeStore,
   MentionLinkStore,
   MentionStore,
+  ObjectMetadataStore,
   type ReadonlyChunkStore,
   type ReadonlyFragmentGroupStore,
   type ReadonlyGraphBuildParameterStore,
   type ReadonlyReadingEdgeStore,
   type ReadonlyMentionLinkStore,
   type ReadonlyMentionStore,
+  type ReadonlyObjectMetadataStore,
   type ReadonlySerialStore,
   type ReadonlySnakeChunkStore,
   type ReadonlySnakeEdgeStore,
@@ -113,6 +115,7 @@ export interface ReadonlyDocument {
   readonly readingEdges: ReadonlyReadingEdgeStore;
   readonly mentionLinks: ReadonlyMentionLinkStore;
   readonly mentions: ReadonlyMentionStore;
+  readonly metadata: ReadonlyObjectMetadataStore;
   readonly serials: ReadonlySerialStore;
   readonly snakeChunks: ReadonlySnakeChunkStore;
   readonly snakeEdges: ReadonlySnakeEdgeStore;
@@ -148,6 +151,7 @@ export interface Document extends ReadonlyDocument {
   readonly readingEdges: ReadingEdgeStore;
   readonly mentionLinks: MentionLinkStore;
   readonly mentions: MentionStore;
+  readonly metadata: ObjectMetadataStore;
   readonly serials: SerialStore;
   readonly snakeChunks: SnakeChunkStore;
   readonly snakeEdges: SnakeEdgeStore;
@@ -179,6 +183,7 @@ export class DirectoryDocument implements Document {
   public readonly readingEdges: ReadingEdgeStore;
   public readonly mentionLinks: MentionLinkStore;
   public readonly mentions: MentionStore;
+  public readonly metadata: ObjectMetadataStore;
   public readonly path: string;
   public readonly serials: SerialStore;
   public readonly snakeChunks: SnakeChunkStore;
@@ -205,6 +210,7 @@ export class DirectoryDocument implements Document {
     this.readingEdges = new ReadingEdgeStore(database);
     this.mentionLinks = new MentionLinkStore(database);
     this.mentions = new MentionStore(database);
+    this.metadata = new ObjectMetadataStore(database);
     this.path = path;
     this.serials = new SerialStore(database);
     this.snakeChunks = new SnakeChunkStore(database);
@@ -473,6 +479,7 @@ export class DirectoryDocument implements Document {
   }
 
   async #deleteSerialResources(serialId: number): Promise<void> {
+    await this.metadata.deleteChapterSubtree(serialId);
     await this.#deleteSerialGraphRecords(serialId);
     await this.#database.transaction(async () => {
       await this.#database.run(
@@ -606,6 +613,8 @@ export class DirectoryDocument implements Document {
         `,
         [serialId],
       );
+      await this.metadata.deleteDeletedChunks();
+      await this.metadata.deleteDeletedEntitiesAndTriples();
     });
   }
 

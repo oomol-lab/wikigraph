@@ -281,6 +281,41 @@ export const SCHEMA_SQL = `
     tier3,
     tokenize='ascii'
   );
+
+  CREATE TABLE IF NOT EXISTS object_metadata (
+    id INTEGER PRIMARY KEY,
+    object_kind INTEGER NOT NULL,
+    object_path TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    chapter_id INTEGER,
+    chunk_id INTEGER,
+    entity_qid TEXT,
+    triple_subject_qid TEXT,
+    triple_predicate TEXT,
+    triple_object_qid TEXT,
+    UNIQUE(object_path, key)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_object_metadata_object
+  ON object_metadata(object_path);
+
+  CREATE INDEX IF NOT EXISTS idx_object_metadata_chapter
+  ON object_metadata(chapter_id);
+
+  CREATE INDEX IF NOT EXISTS idx_object_metadata_chunk
+  ON object_metadata(chunk_id);
+
+  CREATE INDEX IF NOT EXISTS idx_object_metadata_entity
+  ON object_metadata(entity_qid);
+
+  CREATE INDEX IF NOT EXISTS idx_object_metadata_triple
+  ON object_metadata(
+    triple_subject_qid,
+    triple_predicate,
+    triple_object_qid
+  );
 `;
 
 export async function initializeDocumentSchema(

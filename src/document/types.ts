@@ -147,3 +147,23 @@ export interface SentenceGroupRecord {
 }
 
 export type FragmentGroupRecord = SentenceGroupRecord;
+
+export const enum ObjectMetadataKind {
+  Archive = 1,
+  Chapter = 2,
+  Chunk = 3,
+  Entity = 4,
+  Triple = 5,
+  Object = 6,
+}
+
+export interface ObjectMetadataTarget {
+  readonly kind: ObjectMetadataKind;
+  readonly objectPath: string;
+  readonly chapterId?: number;
+  readonly chunkId?: number;
+  readonly entityQid?: string;
+  readonly tripleSubjectQid?: string;
+  readonly triplePredicate?: string;
+  readonly tripleObjectQid?: string;
+}

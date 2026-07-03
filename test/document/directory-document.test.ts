@@ -3,7 +3,10 @@ import { constants as fsConstants } from "fs";
 
 import { describe, expect, it } from "vitest";
 
-import { DirectoryDocument } from "../../src/document/index.js";
+import {
+  DirectoryDocument,
+  ObjectMetadataKind,
+} from "../../src/document/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("document/directory-document", () => {
@@ -171,6 +174,56 @@ describe("document/directory-document", () => {
           language: "en",
           title: "Replacement",
         });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("persists object metadata and clears chapter-owned rows", async () => {
+    await withTempDir("spinedigest-document-", async (path) => {
+      const document = await DirectoryDocument.open(path);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.serials.createWithId(1);
+          await openedDocument.metadata.put(
+            {
+              chapterId: 1,
+              kind: ObjectMetadataKind.Chapter,
+              objectPath: "chapter/1",
+            },
+            "note",
+            "chapter note",
+          );
+          await openedDocument.metadata.put(
+            {
+              entityQid: "Q42",
+              kind: ObjectMetadataKind.Entity,
+              objectPath: "entity/Q42",
+            },
+            "rank",
+            7,
+          );
+        });
+
+        await expect(document.metadata.getMap("chapter/1")).resolves.toEqual({
+          note: "chapter note",
+        });
+        await expect(document.metadata.getMap("entity/Q42")).resolves.toEqual({
+          rank: 7,
+        });
+
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.deleteSerial(1);
+        });
+
+        await expect(document.metadata.getMap("chapter/1")).resolves.toEqual(
+          {},
+        );
+        await expect(document.metadata.getMap("entity/Q42")).resolves.toEqual(
+          {},
+        );
       } finally {
         await document.release();
       }

@@ -25,6 +25,7 @@ export {
   ReadingEdgeStore,
   MentionLinkStore,
   MentionStore,
+  ObjectMetadataStore,
   SerialStore,
   SnakeChunkStore,
   SnakeEdgeStore,
@@ -37,6 +38,7 @@ export type {
   ReadonlyReadingEdgeStore,
   ReadonlyMentionLinkStore,
   ReadonlyMentionStore,
+  ReadonlyObjectMetadataStore,
   ReadonlySerialStore,
   ReadonlySnakeChunkStore,
   ReadonlySnakeEdgeStore,
@@ -49,6 +51,7 @@ export {
   expectChunkRetention,
   isChunkImportance,
   isChunkRetention,
+  ObjectMetadataKind,
 } from "./types.js";
 export type {
   ChunkRecord,
@@ -58,6 +61,7 @@ export type {
   ReadingEdgeRecord,
   MentionLinkRecord,
   MentionRecord,
+  ObjectMetadataTarget,
   SerialRecord,
   SentenceId,
   SentenceGroupRecord,
