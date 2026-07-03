@@ -4,6 +4,11 @@ import { join } from "path";
 import { isNodeError } from "../utils/node-error.js";
 
 const DISPOSABLE_DIRECTORY_ENTRIES = new Set([".DS_Store"]);
+const DISPOSABLE_DIRECTORY_TTL_MS = 60_000;
+
+export function isDisposableDirectoryEntry(name: string): boolean {
+  return DISPOSABLE_DIRECTORY_ENTRIES.has(name);
+}
 
 export async function removeDisposableDirectory(
   directoryPath: string,
@@ -19,7 +24,7 @@ export async function removeDisposableDirectory(
   if (entries === undefined) {
     return 0;
   }
-  if (entries.some((entry) => !DISPOSABLE_DIRECTORY_ENTRIES.has(entry))) {
+  if (entries.some((entry) => !isDisposableDirectoryEntry(entry))) {
     return 0;
   }
 
@@ -69,6 +74,21 @@ export async function removeDisposableChildDirectories(
 
     scanned += 1;
     const directoryPath = join(rootPath, entry.name);
+    const stats = await stat(directoryPath).catch((error: unknown) => {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        return undefined;
+      }
+
+      throw error;
+    });
+
+    if (
+      stats === undefined ||
+      Date.now() - stats.mtimeMs < DISPOSABLE_DIRECTORY_TTL_MS
+    ) {
+      continue;
+    }
+
     const removedBytes = await removeDisposableDirectory(directoryPath);
 
     if (await pathExists(directoryPath)) {

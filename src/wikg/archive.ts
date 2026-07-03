@@ -359,7 +359,7 @@ async function shouldEmbedSearchIndex(
   ).catch(() => undefined);
 
   if (database === undefined) {
-    return true;
+    return false;
   }
 
   try {
@@ -375,7 +375,7 @@ async function shouldEmbedSearchIndex(
 
     return row ?? false;
   } catch {
-    return true;
+    return false;
   } finally {
     await database.close();
   }

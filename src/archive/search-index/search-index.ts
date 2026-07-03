@@ -117,7 +117,7 @@ export async function readArchiveIndexSettings(
 }
 
 export async function setFtsIndexEmbedded(
-  document: ReadonlyDocument,
+  document: Document,
   embedded: boolean,
 ): Promise<void> {
   await document.readDatabase(async (database) => {

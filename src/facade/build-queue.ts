@@ -869,9 +869,9 @@ WHERE state IN ('succeeded', 'failed', 'canceled')
       [cutoff],
       mapBuildJob,
     );
-    const childDirectories = await removeDisposableChildDirectories(
-      getBuildJobWorkspaceRootPath(),
-    );
+    const childDirectories = context.dryRun
+      ? { freedBytes: 0, removed: 0, scanned: 0 }
+      : await removeDisposableChildDirectories(getBuildJobWorkspaceRootPath());
     let freedBytes = 0;
 
     for (const job of jobs) {

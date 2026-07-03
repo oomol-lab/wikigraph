@@ -117,15 +117,22 @@ async function externalizeIndex(args: CLIArchiveIndexArguments): Promise<void> {
 }
 
 async function clearIndex(args: CLIArchiveIndexArguments): Promise<void> {
-  await new SpineDigestFile(args.archivePath).write(async (document) => {
-    await document.deleteSearchIndexDatabase();
-    const settings = await readArchiveIndexSettings(document);
+  await new SpineDigestFile(args.archivePath).write(
+    async (document) => {
+      await document.deleteSearchIndexDatabase();
+      const settings = await readArchiveIndexSettings(document);
 
-    await writeIndexOutput(args, {
-      ftsEmbedded: settings.ftsEmbedded,
-      ftsCurrent: false,
-    });
-  });
+      await writeIndexOutput(args, {
+        ftsEmbedded: settings.ftsEmbedded,
+        ftsCurrent: false,
+      });
+    },
+    {
+      searchIndexWritebackPolicy: await readSearchIndexWritebackPolicy(
+        args.archivePath,
+      ),
+    },
+  );
   await deleteArchiveSearchSessions(args.archivePath);
 }
 

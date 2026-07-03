@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "async_hooks";
+import { stat } from "fs/promises";
 import { resolve } from "path";
 
 import type * as Sqlite3Namespace from "sqlite3";
@@ -14,6 +15,23 @@ export type SqlRow = Record<string, SqlRowValue>;
 const SQLITE_BUSY_TIMEOUT_MS = 15 * 60 * 1000;
 
 type DatabaseOperationScope = symbol;
+
+async function isMissingOrEmptyFile(path: string): Promise<boolean> {
+  const stats = await stat(path).catch((error: unknown) => {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
+      return undefined;
+    }
+
+    throw error;
+  });
+
+  return stats === undefined || stats.size === 0;
+}
 
 export class Database {
   readonly #database: SqliteDatabase;
@@ -41,6 +59,10 @@ export class Database {
     } = {},
   ): Promise<Database> {
     const resolvedDatabasePath = resolve(databasePath);
+    const shouldMarkSchemaWritten =
+      options.readonly !== true &&
+      schemaSql.trim() !== "" &&
+      (await isMissingOrEmptyFile(resolvedDatabasePath));
     const database = await openSqliteDatabase(resolvedDatabasePath, options);
     const openedDatabase = new Database(database, options);
 
@@ -49,7 +71,9 @@ export class Database {
     );
     if (options.readonly !== true && schemaSql.trim() !== "") {
       await openedDatabase.#executeSql(schemaSql);
-      openedDatabase.#markWritten();
+      if (shouldMarkSchemaWritten) {
+        openedDatabase.#markWritten();
+      }
     }
 
     return openedDatabase;

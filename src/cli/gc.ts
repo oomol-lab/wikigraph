@@ -5,7 +5,10 @@ import { writeTextToStdout } from "./io.js";
 import { formatCLIJSON } from "./json.js";
 
 export async function runGcCommand(args: CLIGcArguments): Promise<void> {
-  const report = await tryRunWikiGraphGc({ force: args.force === true });
+  const report = await tryRunWikiGraphGc({
+    dryRun: args.dryRun === true,
+    force: args.force === true,
+  });
 
   if (args.json === true) {
     await writeTextToStdout(formatCLIJSON(report));

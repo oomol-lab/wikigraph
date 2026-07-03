@@ -63,6 +63,20 @@ describe("archive/query/archive-view", () => {
     });
   });
 
+  it("rejects search when the FTS index is missing", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await expect(findArchiveObjects(document, "missing")).rejects.toThrow(
+          "Wiki Graph search index is missing or outdated. Run `<archive-uri>/index build` before searching.",
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("searches sourced sentences before graph or summary build", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);

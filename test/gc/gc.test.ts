@@ -119,6 +119,8 @@ describe("gc", () => {
       await mkdir(buildJobBucketPath, { recursive: true });
       await writeFile(join(workspaceBucketPath, ".DS_Store"), "finder");
       await writeFile(join(buildJobBucketPath, ".DS_Store"), "finder");
+      await makeOldPath(workspaceBucketPath);
+      await makeOldPath(buildJobBucketPath);
 
       const report = await tryRunWikiGraphGc();
 
@@ -133,6 +135,32 @@ describe("gc", () => {
       ).toMatchObject({ removed: 1 });
       await expect(stat(workspaceBucketPath)).rejects.toThrow();
       await expect(stat(buildJobBucketPath)).rejects.toThrow();
+    });
+  });
+
+  it("keeps external fts sqlite cache during normal GC and removes it during forced GC", async () => {
+    await withTempDir("spinedigest-gc-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
+      const sqliteCachePath = await createCoordinatorSqliteCache(path, {
+        entryPath: "fts.db",
+        updatedAt: Date.now() - 2 * 60 * 60 * 1000,
+      });
+
+      const normalReport = await tryRunWikiGraphGc();
+
+      expect(normalReport.skipped).toBe(false);
+      await expect(stat(sqliteCachePath)).resolves.toBeDefined();
+
+      const forcedReport = await tryRunWikiGraphGc({ force: true });
+
+      expect(forcedReport.skipped).toBe(false);
+      expect(
+        forcedReport.jobs.find((item) => item.name === "wikg-coordinator"),
+      ).toMatchObject({
+        removed: 1,
+        scanned: 1,
+      });
+      await expect(stat(sqliteCachePath)).rejects.toThrow();
     });
   });
 
@@ -226,10 +254,11 @@ async function createOldCoordinatorSqliteCache(path: string): Promise<string> {
 
 async function createCoordinatorSqliteCache(
   path: string,
-  options: { readonly updatedAt: number },
+  options: { readonly entryPath?: string; readonly updatedAt: number },
 ): Promise<string> {
   const archivePath = join(path, "book.wikg");
   const workspacePath = join(path, "state", "workspaces", "archive-key", "db");
+  const entryPath = options.entryPath ?? "database.db";
 
   await writeFile(archivePath, "archive", "utf8");
   await mkdir(join(path, "state", "workspaces", "archive-key"), {
@@ -264,9 +293,9 @@ CREATE TABLE IF NOT EXISTS entry_overlays (
 INSERT INTO entry_overlays (
   archive_key, archive_path, entry_path, kind, workspace_path,
   archive_signature, updated_at
-) VALUES (?, ?, 'database.db', 'file', ?, 'test-signature', ?)
+) VALUES (?, ?, ?, 'file', ?, 'test-signature', ?)
 `,
-      ["archive-key", archivePath, workspacePath, options.updatedAt],
+      ["archive-key", archivePath, entryPath, workspacePath, options.updatedAt],
     );
   } finally {
     await database.close();
@@ -408,6 +437,12 @@ async function createOldTmpDirectory(): Promise<string> {
   await utimes(tmpPath, oldDate, oldDate);
 
   return tmpPath;
+}
+
+async function makeOldPath(path: string): Promise<void> {
+  const oldDate = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+  await utimes(path, oldDate, oldDate);
 }
 
 async function insertGcLock(): Promise<void> {

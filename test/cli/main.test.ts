@@ -392,6 +392,7 @@ describe("cli/main", () => {
   it("runs the gc command", async () => {
     mainMockState.argsResult = {
       args: {
+        dryRun: true,
         force: true,
         json: true,
       },
@@ -402,7 +403,7 @@ describe("cli/main", () => {
     await main();
 
     expect(mainMockState.gcRunCalls).toStrictEqual([
-      { force: true, json: true },
+      { dryRun: true, force: true, json: true },
     ]);
     expect(mainMockState.archiveRunCalls).toHaveLength(0);
     expect(mainMockState.statusRunCalls).toBe(0);

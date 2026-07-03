@@ -8,6 +8,7 @@ import { runWikgCoordinatorGc } from "../wikg/index.js";
 import { formatError } from "../utils/node-error.js";
 
 import { tryAcquireGcLock } from "./lock.js";
+import { runTempDirectoryGc } from "./tmp-gc.js";
 import type { GcContext, GcJob, GcJobReport, GcRunReport } from "./types.js";
 
 interface NamedGcJob {
@@ -30,7 +31,7 @@ const GC_JOBS: readonly NamedGcJob[] = [
   },
   {
     name: "tmp",
-    run: runTmpDirectoryGc,
+    run: runTempDirectoryGc,
   },
 ];
 const OPPORTUNISTIC_GC_INTERVAL_MS = 10 * 60 * 1000;
@@ -96,7 +97,9 @@ export async function tryRunWikiGraphGc(
       startedAt,
     };
 
-    await writeLastGcRunAt(stateDirectoryPath, report.finishedAt);
+    await writeLastGcRunAt(stateDirectoryPath, report.finishedAt).catch(
+      () => undefined,
+    );
     return report;
   } finally {
     await release();
@@ -121,16 +124,6 @@ async function runJob(
       scanned: 0,
     };
   }
-}
-
-async function runTmpDirectoryGc(context: GcContext): Promise<{
-  readonly freedBytes: number;
-  readonly removed: number;
-  readonly scanned: number;
-}> {
-  const { runTempDirectoryGc } = await import("./tmp-gc.js");
-
-  return await runTempDirectoryGc(context);
 }
 
 function sum(jobs: readonly GcJobReport[], key: keyof GcJobReport): number {

@@ -26,6 +26,7 @@ import { openSharedStateDatabase } from "../document/index.js";
 import type { Database } from "../document/index.js";
 import type { DocumentFileStore } from "../document/document.js";
 import {
+  isDisposableDirectoryEntry,
   readPathSize,
   removeDisposableChildDirectories,
   removeDisposableDirectory,
@@ -379,9 +380,9 @@ export async function runWikgCoordinatorGc(
   }
 
   const orphanedFiles = await removeOrphanedWorkspaceFiles(context);
-  const childDirectories = await removeDisposableChildDirectories(
-    getCoordinatorWorkspaceRootPath(),
-  );
+  const childDirectories = context.dryRun
+    ? { freedBytes: 0, removed: 0, scanned: 0 }
+    : await removeDisposableChildDirectories(getCoordinatorWorkspaceRootPath());
 
   return {
     freedBytes:
@@ -464,7 +465,12 @@ async function canRemoveSqliteCacheOverlay(
   overlay: EntryOverlay,
   context: GcContext,
 ): Promise<boolean> {
-  if (await hasActiveArchiveOwnerOrSqliteLease(overlay.archiveKey)) {
+  if (
+    await hasActiveArchiveOwnerOrSqliteLease(
+      overlay.archiveKey,
+      overlay.entryPath,
+    )
+  ) {
     return false;
   }
   if (
@@ -499,6 +505,7 @@ async function canRemoveSqliteCacheOverlay(
 
 async function hasActiveArchiveOwnerOrSqliteLease(
   archiveKey: string,
+  entryPath: string,
 ): Promise<boolean> {
   return await withStateDatabase(async (state) => {
     await cleanupStaleState(state);
@@ -514,7 +521,7 @@ FROM entry_sqlite_leases
 WHERE archive_key = ?
   AND entry_path = ?
 `,
-      [archiveKey, DATABASE_ENTRY_PATH],
+      [archiveKey, entryPath],
       (row) => getNumber(row, "count"),
     );
 
@@ -589,6 +596,9 @@ async function removeOrphanedWorkspaceFiles(
     )) {
       scanned += 1;
 
+      if (isDisposableDirectoryEntry(basename(workspacePath))) {
+        continue;
+      }
       if (referencedWorkspacePaths.has(workspacePath)) {
         continue;
       }
@@ -936,7 +946,16 @@ class WikgDocumentFileStore implements DocumentFileStore {
         );
 
         await mkdir(dirname(workspacePath), { recursive: true });
-        await writeFile(workspacePath, content);
+        const temporaryWorkspacePath = `${workspacePath}.${process.pid}.${Date.now()}.tmp`;
+
+        try {
+          await writeFile(temporaryWorkspacePath, content);
+          await rename(temporaryWorkspacePath, workspacePath);
+        } finally {
+          await rm(temporaryWorkspacePath, { force: true }).catch(
+            () => undefined,
+          );
+        }
         await upsertOverlay({
           archiveKey: this.#archiveKey,
           archivePath: this.#archivePath,

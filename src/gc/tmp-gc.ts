@@ -4,6 +4,7 @@ import { join } from "path";
 import { resolveWikiGraphTempDirectoryPath } from "../common/wiki-graph-temp.js";
 import { isNodeError } from "../utils/node-error.js";
 
+import { readPathSize } from "./files.js";
 import type { GcContext, GcJobResult } from "./types.js";
 
 const TEMP_DIRECTORY_TTL_MS = 60 * 60 * 1000;
@@ -33,7 +34,7 @@ export async function runTempDirectoryGc(
       continue;
     }
 
-    const bytes = stats.size;
+    const bytes = await readPathSize(path);
 
     if (!context.dryRun) {
       await rm(path, { force: true, recursive: true });

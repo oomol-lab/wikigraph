@@ -127,6 +127,7 @@ export interface CLIStatusArguments {
 }
 
 export interface CLIGcArguments {
+  readonly dryRun?: boolean;
   readonly force?: boolean;
   readonly json?: boolean;
 }
@@ -830,6 +831,7 @@ function parseArchiveIndexUriArguments(
   rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
   rejectArchiveBooleanFlag(action, "--backlinks", values.backlinks, helpRoute);
   rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+  rejectArchiveBooleanFlag(action, "--dry-run", values["dry-run"], helpRoute);
 
   return {
     args: {
@@ -2075,6 +2077,7 @@ function parseGcArguments(
 
   return {
     args: {
+      ...(values["dry-run"] === undefined ? {} : { dryRun: values["dry-run"] }),
       ...(values.force === undefined ? {} : { force: values.force }),
       ...(values.json === undefined ? {} : { json: values.json }),
     },

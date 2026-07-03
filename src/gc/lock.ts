@@ -33,29 +33,32 @@ export async function tryAcquireGcLock(
   const database = await openGcStateDatabase();
   const ownerId = `${process.pid}-${randomUUID()}`;
   const now = Date.now();
+  let acquired = false;
 
   try {
-    await cleanupStaleGcLocks(database);
-    const existing = await database.queryOne(
-      "SELECT * FROM gc_locks WHERE scope = ?",
-      [scope],
-      mapGcLock,
-    );
-
-    if (existing !== undefined) {
-      return undefined;
-    }
-
-    await database.run(
-      `
-INSERT INTO gc_locks (
+    await database.transaction(async () => {
+      await cleanupStaleGcLocks(database);
+      await database.run(
+        `
+INSERT OR IGNORE INTO gc_locks (
   scope, owner_id, owner_pid, heartbeat_at, created_at
 ) VALUES (?, ?, ?, ?, ?)
 `,
-      [scope, ownerId, process.pid, now, now],
-    );
+        [scope, ownerId, process.pid, now, now],
+      );
+      acquired =
+        (await database.queryOne(
+          "SELECT owner_id FROM gc_locks WHERE scope = ?",
+          [scope],
+          (row) => getString(row, "owner_id"),
+        )) === ownerId;
+    });
   } finally {
     await database.close();
+  }
+
+  if (!acquired) {
+    return undefined;
   }
 
   const heartbeat = setInterval(() => {
@@ -100,12 +103,19 @@ async function cleanupStaleGcLocks(database: Database): Promise<void> {
     undefined,
     mapGcLockWithScope,
   );
-  const staleScopes = locks
-    .filter(({ lock }) => isStaleGcLock(lock))
-    .map(({ scope }) => scope);
 
-  for (const scope of staleScopes) {
-    await database.run("DELETE FROM gc_locks WHERE scope = ?", [scope]);
+  for (const { lock, scope } of locks.filter(({ lock }) =>
+    isStaleGcLock(lock),
+  )) {
+    await database.run(
+      `
+DELETE FROM gc_locks
+WHERE scope = ?
+  AND owner_id = ?
+  AND heartbeat_at = ?
+`,
+      [scope, lock.ownerId, lock.heartbeatAt],
+    );
   }
 }
 

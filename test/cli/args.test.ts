@@ -155,6 +155,14 @@ describe("cli/args", () => {
       help: false,
       kind: "gc",
     });
+    expect(parseCLIArguments(["gc", "--force", "--dry-run"])).toStrictEqual({
+      args: {
+        dryRun: true,
+        force: true,
+      },
+      help: false,
+      kind: "gc",
+    });
     expect(parseCLIArguments(["gc", "--help"])).toStrictEqual({
       help: true,
       helpText: renderGcCommandHelpText(),
@@ -207,6 +215,9 @@ describe("cli/args", () => {
       helpText: renderHelpMatrixText({ kind: "verb", verb: "build" }),
       kind: "help",
     });
+    expect(() =>
+      parseCLIArguments(["wkg:///tmp/book.wikg/index", "clear", "--dry-run"]),
+    ).toThrow("The `clear` command does not support --dry-run.");
   });
 
   it("parses queue commands", () => {

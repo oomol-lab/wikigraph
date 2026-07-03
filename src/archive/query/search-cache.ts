@@ -426,8 +426,12 @@ export async function runSearchCacheGc(
       undefined,
       (row) => getNumber(row, "count"),
     );
-    const expiredSessionIds = await listExpiredSearchSessionIds(database);
-    const prunedSessionIds = await listPrunedSearchSessionIds(database);
+    const expiredSessionIds = context.force
+      ? await listAllSearchSessionIds(database)
+      : await listExpiredSearchSessionIds(database, context.now);
+    const prunedSessionIds = context.force
+      ? []
+      : await listPrunedSearchSessionIds(database);
     const sessionIds = [
       ...new Set([...expiredSessionIds, ...prunedSessionIds]),
     ].sort();
@@ -722,6 +726,7 @@ function getSearchSessionStateDirectoryPath(): string {
 
 async function listExpiredSearchSessionIds(
   database: Database,
+  now: number,
 ): Promise<string[]> {
   return await database.queryAll(
     `
@@ -729,7 +734,15 @@ async function listExpiredSearchSessionIds(
       FROM search_sessions
       WHERE expires_at < ?
     `,
-    [Date.now()],
+    [now],
+    (row) => getString(row, "session_id"),
+  );
+}
+
+async function listAllSearchSessionIds(database: Database): Promise<string[]> {
+  return await database.queryAll(
+    "SELECT session_id FROM search_sessions",
+    undefined,
     (row) => getString(row, "session_id"),
   );
 }
