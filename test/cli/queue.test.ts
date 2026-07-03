@@ -11,6 +11,9 @@ const queueMockState = vi.hoisted(() => ({
   commitGraphCalls: [] as unknown[],
   commitKnowledgeGraphCalls: [] as unknown[],
   commitSummaryCalls: [] as unknown[],
+  inputRevisionAssertions: [] as unknown[],
+  inputRevisionRecords: [] as unknown[],
+  revision: 1,
   events: [] as unknown[],
   getJobIds: [] as string[],
   jobs: [] as unknown[],
@@ -72,7 +75,11 @@ vi.mock("../../src/wikg/spine-digest-file.js", () => ({
       queueMockState.readDocumentCalls.push(this.#path);
       queueMockState.stepLog.push("read:start");
       try {
-        return await operation({});
+        return await operation({
+          serials: {
+            getRevision: () => Promise.resolve(queueMockState.revision),
+          },
+        });
       } finally {
         queueMockState.stepLog.push("read:end");
       }
@@ -84,7 +91,11 @@ vi.mock("../../src/wikg/spine-digest-file.js", () => ({
       queueMockState.writeCalls.push(this.#path);
       queueMockState.stepLog.push("write:start");
       try {
-        return await operation({});
+        return await operation({
+          serials: {
+            getRevision: () => Promise.resolve(queueMockState.revision),
+          },
+        });
       } finally {
         queueMockState.stepLog.push("write:end");
       }
@@ -110,6 +121,10 @@ vi.mock("../../src/facade/index.js", () => ({
     }
     return Promise.resolve();
   }),
+  assertBuildJobInputRevision: vi.fn((input: unknown) => {
+    queueMockState.inputRevisionAssertions.push(input);
+    return Promise.resolve();
+  }),
   boostBuildJob: vi.fn(),
   buildChapterGraphArtifact: vi.fn((_chapterId: number, options: unknown) => {
     queueMockState.stepLog.push("build-graph");
@@ -132,6 +147,7 @@ vi.mock("../../src/facade/index.js", () => ({
     queueMockState.stepLog.push("commit-graph");
     queueMockState.commitGraphCalls.push({});
     queueMockState.buildInputStage = "graphed";
+    queueMockState.revision = 2;
     return Promise.resolve({
       chapterId: 12,
       stage: "graphed",
@@ -152,6 +168,7 @@ vi.mock("../../src/facade/index.js", () => ({
   commitChapterSummaryArtifact: vi.fn(() => {
     queueMockState.stepLog.push("commit-summary");
     queueMockState.commitSummaryCalls.push({});
+    queueMockState.revision = 3;
     return Promise.resolve({
       chapterId: 12,
       stage: "summarized",
@@ -175,6 +192,10 @@ vi.mock("../../src/facade/index.js", () => ({
   listBuildJobs: vi.fn(() => Promise.resolve(queueMockState.jobs)),
   pauseBuildJob: vi.fn(),
   readBuildJobEvents: vi.fn(() => Promise.resolve(queueMockState.events)),
+  recordBuildJobInputRevision: vi.fn((input: unknown) => {
+    queueMockState.inputRevisionRecords.push(input);
+    return Promise.resolve(queueMockState.job);
+  }),
   resolveBuildJobId: vi.fn((jobId: string) => {
     queueMockState.resolveJobIds.push(jobId);
     return Promise.resolve(jobId === "job-1-short" ? "job-1-full" : jobId);
@@ -193,6 +214,7 @@ vi.mock("../../src/facade/index.js", () => ({
         stage: queueMockState.buildInputStage,
         words: 4,
       },
+      revision: queueMockState.revision,
       sourceText: ["Alpha beta."],
     }),
   ),
@@ -258,6 +280,8 @@ describe("cli/queue", () => {
     queueMockState.commitSummaryCalls.length = 0;
     queueMockState.events = [];
     queueMockState.getJobIds.length = 0;
+    queueMockState.inputRevisionAssertions.length = 0;
+    queueMockState.inputRevisionRecords.length = 0;
     queueMockState.jobs = [];
     queueMockState.job = {
       archiveKey: "archive-key",
@@ -266,6 +290,7 @@ describe("cli/queue", () => {
       createdAt: 1,
       eventsPath: "events.ndjson",
       jobId: "job-1",
+      ownerId: "owner-1",
       queueRank: 10,
       state: "succeeded",
       target: "reading-summary",
@@ -275,6 +300,7 @@ describe("cli/queue", () => {
     queueMockState.openPaths.length = 0;
     queueMockState.readDocumentCalls.length = 0;
     queueMockState.readChapterStageError = undefined;
+    queueMockState.revision = 1;
     queueMockState.resolveJobIds.length = 0;
     queueMockState.runWorkerOptions = undefined;
     queueMockState.stepLog.length = 0;
@@ -496,6 +522,35 @@ describe("cli/queue", () => {
     expect(queueMockState.buildSummaryCalls[0]).not.toHaveProperty(
       "sourceDocumentPath",
     );
+    expect(queueMockState.inputRevisionRecords).toStrictEqual([
+      {
+        currentRevision: 1,
+        jobId: "job-1",
+        ownerId: "owner-1",
+      },
+      {
+        currentRevision: 2,
+        jobId: "job-1",
+        ownerId: "owner-1",
+      },
+    ]);
+    expect(queueMockState.inputRevisionAssertions).toStrictEqual([
+      {
+        currentRevision: 1,
+        jobId: "job-1",
+        ownerId: "owner-1",
+      },
+      {
+        currentRevision: 2,
+        jobId: "job-1",
+        ownerId: "owner-1",
+      },
+      {
+        currentRevision: 2,
+        jobId: "job-1",
+        ownerId: "owner-1",
+      },
+    ]);
   });
 
   it("uses queue concurrency for worker slots", async () => {
@@ -551,6 +606,20 @@ describe("cli/queue", () => {
       {
         chapterId: 12,
         manifestPath: "/tmp/job-workspace/knowledge-graph/manifest.json",
+      },
+    ]);
+    expect(queueMockState.inputRevisionRecords).toStrictEqual([
+      {
+        currentRevision: 1,
+        jobId: "job-1",
+        ownerId: "owner-1",
+      },
+    ]);
+    expect(queueMockState.inputRevisionAssertions).toStrictEqual([
+      {
+        currentRevision: 1,
+        jobId: "job-1",
+        ownerId: "owner-1",
       },
     ]);
     expect(queueMockState.buildGraphCalls).toStrictEqual([]);

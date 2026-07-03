@@ -36,6 +36,8 @@ export {
 } from "../archive/query/index.js";
 export {
   addBuildJob,
+  assertBuildJobInputRevision,
+  assertNoActiveBuildJobConflicts,
   assertNoActiveBuildJobs,
   boostBuildJob,
   cancelBuildJob,
@@ -44,6 +46,7 @@ export {
   listBuildJobs,
   pauseBuildJob,
   readBuildJobEvents,
+  recordBuildJobInputRevision,
   resumeBuildJob,
   resolveBuildJobId,
   runBuildQueueGc,
@@ -52,6 +55,7 @@ export {
 } from "./build-queue.js";
 export type {
   AddBuildJobOptions,
+  BuildJobConflictScope,
   BuildJobExecutionContext,
   BuildJob,
   BuildJobEvent,
