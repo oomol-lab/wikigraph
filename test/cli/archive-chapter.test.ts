@@ -67,7 +67,7 @@ const chapterDetails = {
   tocPath: ["Part I", "Chapter 1"],
 };
 
-vi.mock("../../src/facade/spine-digest-file.js", () => ({
+vi.mock("../../src/wikg/spine-digest-file.js", () => ({
   SpineDigestFile: class {
     readonly #path: string;
 

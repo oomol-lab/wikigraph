@@ -12,8 +12,8 @@ import {
 
 import { Database, type SqlBindValue } from "../document/database.js";
 import { DirectoryDocument } from "../document/document.js";
-import { writeWikgArchive } from "../facade/archive.js";
-import { rebuildArchiveSearchIndex } from "../facade/archive-view.js";
+import { rebuildArchiveSearchIndex } from "../archive/query/index.js";
+import { writeWikgArchive } from "../wikg/index.js";
 import { isNodeError } from "../utils/node-error.js";
 
 const LEGACY_SDPUB_PATTERNS = [

@@ -6,7 +6,7 @@ import type {
   ArchiveFindHit,
   ArchiveListItem,
   ArchivePage,
-} from "../../src/facade/archive-view.js";
+} from "../../src/archive/query/archive-view.js";
 
 const archiveMockState = vi.hoisted(() => ({
   backlinks: {
@@ -415,7 +415,7 @@ function parseJSONLLastLine(text: string | undefined): unknown {
   return JSON.parse(line) as unknown;
 }
 
-vi.mock("../../src/facade/spine-digest-file.js", () => ({
+vi.mock("../../src/wikg/spine-digest-file.js", () => ({
   SpineDigestFile: class {
     readonly #path: string;
 

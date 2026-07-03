@@ -21,7 +21,7 @@ import {
   type ChapterDetails,
   type ChapterEntry,
 } from "../facade/index.js";
-import { SpineDigestFile } from "../facade/spine-digest-file.js";
+import { SpineDigestFile } from "../wikg/index.js";
 
 import type { CLIArchiveChapterArguments } from "./args.js";
 import { readTextStreamFromStdin, writeTextToStdout } from "./io.js";

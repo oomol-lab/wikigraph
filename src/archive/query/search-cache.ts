@@ -1,11 +1,11 @@
 import { createHash } from "crypto";
 import { join, resolve } from "path";
 
-import { resolveWikiGraphStateDirectoryPath } from "../common/wiki-graph-dir.js";
-import { getNumber, getString } from "../document/database.js";
-import type { SqlBindValue } from "../document/database.js";
-import { openSharedStateDatabase } from "../document/index.js";
-import type { Database } from "../document/index.js";
+import { resolveWikiGraphStateDirectoryPath } from "../../common/wiki-graph-dir.js";
+import { getNumber, getString } from "../../document/database.js";
+import type { SqlBindValue } from "../../document/database.js";
+import { openSharedStateDatabase } from "../../document/index.js";
+import type { Database } from "../../document/index.js";
 
 import type { ArchiveFindHit } from "./archive-view.js";
 

@@ -11,10 +11,10 @@ import {
   readWikgArchiveEntry,
   writeWikgArchive,
   writeWikgArchiveWithOverlays,
-} from "../../src/facade/archive.js";
+} from "../../src/wikg/archive.js";
 import { withTempDir } from "../helpers/temp.js";
 
-describe("facade/archive", () => {
+describe("wikg/archive", () => {
   it("writes and extracts only whitelisted wikg document files", async () => {
     await withTempDir("spinedigest-archive-", async (path) => {
       const sourceDir = `${path}/source`;

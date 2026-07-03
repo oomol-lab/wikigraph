@@ -4,7 +4,7 @@ import {
   ObjectMetadataKind,
   type ObjectMetadataTarget,
 } from "../document/index.js";
-import { SpineDigestFile } from "../facade/spine-digest-file.js";
+import { SpineDigestFile } from "../wikg/index.js";
 
 import type { CLIObjectMetadataArguments } from "./args.js";
 import { readTextStreamFromStdin, writeTextToStdout } from "./io.js";

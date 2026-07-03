@@ -5,26 +5,26 @@ import type {
   ReadonlyDocument,
   ReadingEdgeRecord,
   SentenceId,
-} from "../document/index.js";
-import type { BookMeta } from "../source/index.js";
+} from "../../document/index.js";
+import type { BookMeta } from "../../source/index.js";
 import {
   WikipageResolver,
   type WikipageResolverOptions,
-} from "../wikipage/index.js";
-import type { QidResolution, WikipageSitelink } from "../wikipage/index.js";
+} from "../../wikipage/index.js";
+import type { QidResolution, WikipageSitelink } from "../../wikipage/index.js";
 
 import {
   getGraphNode,
   listGraphNeighbors,
   type GraphNeighbor,
   type GraphNode,
-} from "./graph.js";
+} from "../../facade/graph.js";
 import {
   getChapterTree,
   listChapters,
   type ChapterEntry,
   type ChapterTree,
-} from "./chapter.js";
+} from "../../facade/chapter.js";
 import {
   createLexicalQuery,
   listLexicalQueryCandidateTerms,
@@ -58,7 +58,7 @@ import {
   type SearchIndexObjectHit,
   type SearchIndexQueryResult,
   type SearchIndexTextHit,
-} from "./search-index.js";
+} from "../search-index/search-index.js";
 
 export type ArchiveObjectType =
   | "chapter"

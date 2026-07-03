@@ -27,7 +27,7 @@ import {
   type BuildJobProgressReporter,
   type BuildJobState,
 } from "../facade/index.js";
-import { SpineDigestFile } from "../facade/spine-digest-file.js";
+import { SpineDigestFile } from "../wikg/index.js";
 import type {
   GuaranteedRequest,
   GuaranteedRequestController,

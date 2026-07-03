@@ -4,7 +4,7 @@ import { join } from "path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { DirectoryDocument } from "../../src/document/index.js";
+import { DirectoryDocument } from "../../../src/document/index.js";
 import {
   findArchiveObjects,
   grepArchiveObjects,
@@ -15,14 +15,14 @@ import {
   listRelatedArchiveObjects,
   readArchiveText,
   readArchivePage,
-} from "../../src/facade/archive-view.js";
-import { deleteArchiveSearchSessions } from "../../src/facade/search-cache.js";
-import { withTempDir } from "../helpers/temp.js";
+} from "../../../src/archive/query/archive-view.js";
+import { deleteArchiveSearchSessions } from "../../../src/archive/query/search-cache.js";
+import { withTempDir } from "../../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
 let testStateDir: string | undefined;
 
-describe("facade/archive-view", () => {
+describe("archive/query/archive-view", () => {
   beforeEach(async () => {
     testStateDir = await mkdtemp(join(tmpdir(), "spinedigest-state-"));
     process.env.WIKIGRAPH_STATE_DIR = testStateDir;

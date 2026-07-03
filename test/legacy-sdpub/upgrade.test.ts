@@ -7,7 +7,7 @@ import { ZipFile } from "yazl";
 import { describe, expect, it } from "vitest";
 
 import { Database, DirectoryDocument } from "../../src/document/index.js";
-import { extractWikgArchive } from "../../src/facade/archive.js";
+import { extractWikgArchive } from "../../src/wikg/archive.js";
 import { migrateLegacySdpubToWikg } from "../../src/legacy-sdpub/upgrade.js";
 import { withTempDir } from "../helpers/temp.js";
 

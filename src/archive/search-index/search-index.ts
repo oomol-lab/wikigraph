@@ -4,8 +4,8 @@ import {
   getNumber,
   type Database,
   type SqlBindValue,
-} from "../document/database.js";
-import type { ReadonlyDocument } from "../document/index.js";
+} from "../../document/database.js";
+import type { ReadonlyDocument } from "../../document/index.js";
 
 import {
   createSearchTokenPlan,
@@ -17,7 +17,7 @@ import {
 import type {
   ArchiveFindMatch,
   ArchiveFindObjectType,
-} from "./archive-view.js";
+} from "../query/archive-view.js";
 
 export const TEXT_SENTENCE_KIND = {
   source: 1,

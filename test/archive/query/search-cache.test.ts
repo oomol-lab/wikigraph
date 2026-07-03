@@ -2,13 +2,13 @@ import { join } from "path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Database } from "../../src/document/index.js";
-import { createSearchSession } from "../../src/facade/search-cache.js";
-import { withTempDir } from "../helpers/temp.js";
+import { Database } from "../../../src/document/index.js";
+import { createSearchSession } from "../../../src/archive/query/search-cache.js";
+import { withTempDir } from "../../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
 
-describe("facade/search-cache", () => {
+describe("archive/query/search-cache", () => {
   afterEach(() => {
     restoreEnv("WIKIGRAPH_STATE_DIR", originalStateDir);
   });

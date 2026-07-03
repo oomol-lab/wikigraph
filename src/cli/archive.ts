@@ -33,8 +33,8 @@ import {
   formatLocatedWikiGraphUri,
   parseLocatedWikiGraphUri,
   requireLocatedObjectOrArchiveUri,
-} from "../facade/archive-uri.js";
-import { SpineDigestFile } from "../facade/spine-digest-file.js";
+  SpineDigestFile,
+} from "../wikg/index.js";
 import type { ReadonlyDocument } from "../document/index.js";
 
 import type { CLIArchiveArguments } from "./args.js";

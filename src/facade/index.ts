@@ -33,7 +33,7 @@ export {
   readArchivePage,
   readArchiveText,
   rebuildArchiveSearchIndex,
-} from "./archive-view.js";
+} from "../archive/query/index.js";
 export {
   addBuildJob,
   assertNoActiveBuildJobs,
@@ -79,8 +79,8 @@ export {
 export {
   createContinuationCursor,
   readContinuationCursor,
-} from "./continuation-cursor.js";
-export type { ContinuationCursor } from "./continuation-cursor.js";
+} from "../archive/query/index.js";
+export type { ContinuationCursor } from "../archive/query/index.js";
 export type {
   BuildChapterGraphArtifactOptions,
   BuildChapterSummaryArtifactOptions,
@@ -145,7 +145,7 @@ export type {
   ArchivePage,
   ArchiveRelatedResult,
   ArchiveTriplePattern,
-} from "./archive-view.js";
+} from "../archive/query/index.js";
 export type {
   AddChapterOptions,
   AdvanceChapterStagesOptions,

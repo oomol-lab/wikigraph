@@ -26,7 +26,7 @@ import {
   formatLocatedChapterSourceCollectionUri,
   formatLocatedChapterUri,
   parseLocatedWikiGraphUri,
-} from "../facade/archive-uri.js";
+} from "../wikg/index.js";
 
 export interface CLIArguments {
   readonly digestDirPath?: string;
