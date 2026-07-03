@@ -13,7 +13,10 @@ export async function formatClueAsBook(input: {
 }): Promise<string> {
   return await formatChunksAsBook({
     chunks: input.chunks,
-    fragmentIds: listFragmentIdsFromChunks(input.chunks),
+    segmentStartIndexes: await listSegmentStartIndexesCoveringChunks(
+      input.chunks,
+      input.serialFragments,
+    ),
     serialFragments: input.serialFragments,
     ...(input.fullMarkup === undefined
       ? {}
@@ -30,46 +33,46 @@ export async function formatClueAsBook(input: {
 
 export async function formatChunksAsBook(input: {
   chunks: readonly ChunkRecord[];
-  fragmentIds: readonly number[];
+  segmentStartIndexes: readonly number[];
   serialFragments: ReadonlySerialFragments;
   fullMarkup?: boolean;
   wrapHighRetention?: boolean;
 }): Promise<string> {
-  if (input.fragmentIds.length === 0) {
+  if (input.segmentStartIndexes.length === 0) {
     return "";
   }
 
   const chunkCoverage = createChunkCoverage(input.chunks);
   const fragments = await loadFragments(
-    input.fragmentIds,
+    input.segmentStartIndexes,
     input.serialFragments,
   );
   const resultParts: string[] = [];
 
-  for (let index = 0; index < input.fragmentIds.length; index += 1) {
-    const fragmentId = input.fragmentIds[index];
+  for (let index = 0; index < input.segmentStartIndexes.length; index += 1) {
+    const startSentenceIndex = input.segmentStartIndexes[index];
 
-    if (fragmentId === undefined) {
+    if (startSentenceIndex === undefined) {
       continue;
     }
 
-    const fragment = fragments[String(fragmentId)];
+    const fragment = fragments[String(startSentenceIndex)];
 
     if (fragment === undefined) {
       continue;
     }
 
     if (index > 0) {
-      const previousFragmentId = input.fragmentIds[index - 1];
+      const previousStartSentenceIndex = input.segmentStartIndexes[index - 1];
 
       if (
-        previousFragmentId !== undefined &&
-        fragmentId > previousFragmentId + 1
+        previousStartSentenceIndex !== undefined &&
+        startSentenceIndex > previousStartSentenceIndex + 1
       ) {
         const skippedSummary = collectSkippedSummary({
-          endFragmentId: fragmentId,
+          endStartSentenceIndex: startSentenceIndex,
           fragments,
-          startFragmentId: previousFragmentId,
+          startStartSentenceIndex: previousStartSentenceIndex,
         });
 
         if (skippedSummary !== "") {
@@ -172,18 +175,19 @@ function buildFragmentMarkup(input: {
 }
 
 function collectSkippedSummary(input: {
-  endFragmentId: number;
+  endStartSentenceIndex: number;
   fragments: Record<string, FragmentRecord | undefined>;
-  startFragmentId: number;
+  startStartSentenceIndex: number;
 }): string {
   const summaries: string[] = [];
 
   for (
-    let fragmentId = input.startFragmentId + 1;
-    fragmentId < input.endFragmentId;
-    fragmentId += 1
+    let startSentenceIndex = input.startStartSentenceIndex + 1;
+    startSentenceIndex < input.endStartSentenceIndex;
+    startSentenceIndex += 1
   ) {
-    const summary = input.fragments[String(fragmentId)]?.summary?.trim() ?? "";
+    const summary =
+      input.fragments[String(startSentenceIndex)]?.summary?.trim() ?? "";
 
     if (summary !== "") {
       summaries.push(summary);
@@ -218,31 +222,62 @@ function createSentenceKey(serialId: number, sentenceIndex: number): string {
   return `${serialId}:${sentenceIndex}`;
 }
 
-function listFragmentIdsFromChunks(chunks: readonly ChunkRecord[]): number[] {
-  const fragmentIdRecord = Object.create(null) as Record<string, true>;
-  const fragmentIds: number[] = [];
+async function listSegmentStartIndexesCoveringChunks(
+  chunks: readonly ChunkRecord[],
+  serialFragments: ReadonlySerialFragments,
+): Promise<number[]> {
+  const allSegmentStartIndexes = [
+    ...(await serialFragments.listFragmentIds()),
+  ].sort(compareNumber);
+  const startIndexRecord = Object.create(null) as Record<string, true>;
+  const startIndexes: number[] = [];
 
   for (const chunk of chunks) {
     for (const sentenceId of chunk.sentenceIds) {
-      const fragmentId = sentenceId[1];
-      const fragmentKey = String(fragmentId);
+      const startSentenceIndex = findContainingSegmentStartIndex(
+        allSegmentStartIndexes,
+        sentenceId[1],
+      );
 
-      if (fragmentIdRecord[fragmentKey] === true) {
+      if (startSentenceIndex === undefined) {
         continue;
       }
 
-      fragmentIdRecord[fragmentKey] = true;
-      fragmentIds.push(fragmentId);
+      const startIndexKey = String(startSentenceIndex);
+
+      if (startIndexRecord[startIndexKey] === true) {
+        continue;
+      }
+
+      startIndexRecord[startIndexKey] = true;
+      startIndexes.push(startSentenceIndex);
     }
   }
 
-  fragmentIds.sort(compareNumber);
+  startIndexes.sort(compareNumber);
 
-  return fragmentIds;
+  return startIndexes;
+}
+
+function findContainingSegmentStartIndex(
+  segmentStartIndexes: readonly number[],
+  sentenceIndex: number,
+): number | undefined {
+  let containingStartIndex: number | undefined;
+
+  for (const startIndex of segmentStartIndexes) {
+    if (startIndex > sentenceIndex) {
+      break;
+    }
+
+    containingStartIndex = startIndex;
+  }
+
+  return containingStartIndex;
 }
 
 async function loadFragments(
-  fragmentIds: readonly number[],
+  startSentenceIndexes: readonly number[],
   serialFragments: ReadonlySerialFragments,
 ): Promise<Record<string, FragmentRecord | undefined>> {
   const fragments = Object.create(null) as Record<
@@ -251,9 +286,9 @@ async function loadFragments(
   >;
 
   await Promise.all(
-    fragmentIds.map(async (fragmentId) => {
-      fragments[String(fragmentId)] =
-        await serialFragments.getFragment(fragmentId);
+    startSentenceIndexes.map(async (startSentenceIndex) => {
+      fragments[String(startSentenceIndex)] =
+        await serialFragments.getFragment(startSentenceIndex);
     }),
   );
 
