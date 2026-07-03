@@ -1549,6 +1549,31 @@ describe("archive/query/archive-view", () => {
     });
   });
 
+  it("maps node sentence indexes back to source fragments", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        const page = await readArchivePage(document, "node:101");
+
+        expect(page.type).toBe("node");
+        if (page.type !== "node") {
+          throw new Error("Expected node page");
+        }
+        expect(page.sourceFragments[0]?.id).toBe(
+          "wikg://chapter/1/source#0..2",
+        );
+        expect(page.sourceFragments[0]?.text).toContain(
+          "Source-only archives should be searchable.",
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("lists objects as a pageable collection", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);

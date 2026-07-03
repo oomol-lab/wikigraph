@@ -4187,8 +4187,10 @@ async function readNodeSourceFragments(
   document: ReadonlyDocument,
   node: GraphNode,
 ): Promise<readonly ArchiveNodeSourceFragment[]> {
+  const fragmentIds = await collectNodeSourceFragmentIds(document, node);
+
   return await Promise.all(
-    collectNodeSourceFragmentIds(node).map(async ([chapterId, fragmentId]) => {
+    fragmentIds.map(async ([chapterId, fragmentId]) => {
       const fragment = await readSourceFragment(
         document,
         chapterId,
@@ -4219,13 +4221,29 @@ async function readNodeSourceFragments(
   );
 }
 
-function collectNodeSourceFragmentIds(
+async function collectNodeSourceFragmentIds(
+  document: ReadonlyDocument,
   node: Pick<GraphNode, "sentenceIds">,
-): readonly (readonly [number, number])[] {
+): Promise<readonly (readonly [number, number])[]> {
   const seen = new Set<string>();
   const fragmentIds: (readonly [number, number])[] = [];
+  const indexes = new Map<number, Promise<ArchiveTextStreamIndex>>();
 
-  for (const [chapterId, fragmentId] of node.sentenceIds) {
+  for (const [chapterId, sentenceIndex] of node.sentenceIds) {
+    let index = indexes.get(chapterId);
+
+    if (index === undefined) {
+      index = createTextStreamIndex(document, chapterId, "source");
+      indexes.set(chapterId, index);
+    }
+
+    const sentence = (await index).sentences[sentenceIndex];
+
+    if (sentence === undefined) {
+      continue;
+    }
+
+    const fragmentId = sentence.fragmentId;
     const key = `${chapterId}:${fragmentId}`;
 
     if (!seen.has(key)) {
