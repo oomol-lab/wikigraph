@@ -90,6 +90,7 @@ export interface SearchIndexQueryResult {
 }
 
 const SEARCH_INDEX_VERSION = "3";
+export const SEARCH_INDEX_FTS_HIT_LIMIT = 32_000;
 const TIER_WEIGHTS = [1, 0.45, 0.08] as const;
 
 export interface ArchiveIndexSettings {
@@ -248,6 +249,7 @@ export async function querySearchIndex(
   options: {
     readonly chapters?: readonly number[];
     readonly match?: ArchiveFindMatch;
+    readonly objectHitLimit?: number;
     readonly textHitLimit?: number;
     readonly types?: readonly ArchiveFindObjectType[] | null;
   } = {},
@@ -262,6 +264,10 @@ export async function querySearchIndex(
 
   return await document.readSearchIndexDatabase(async (database) => {
     const tierQueries = createTierQueries(query, plan, options.match ?? "any");
+    const objectHitLimit = options.objectHitLimit ?? SEARCH_INDEX_FTS_HIT_LIMIT;
+    const textHitLimit = options.textHitLimit ?? SEARCH_INDEX_FTS_HIT_LIMIT;
+    const queriesObjects = shouldQueryObjects(options.types);
+    const queriesText = createTextKindFilter(options.types).length > 0;
     const objectHitsByKey = new Map<string, SearchIndexObjectHit>();
     const textHitsByKey = new Map<string, SearchIndexTextHit>();
 
@@ -270,9 +276,28 @@ export async function querySearchIndex(
         continue;
       }
 
+      const objectHitRemaining = Math.max(
+        0,
+        objectHitLimit - objectHitsByKey.size,
+      );
+      const textHitRemaining = Math.max(0, textHitLimit - textHitsByKey.size);
+
+      if (
+        (!queriesObjects || objectHitRemaining <= 0) &&
+        (!queriesText || textHitRemaining <= 0)
+      ) {
+        break;
+      }
+
       const [objectRows, textRows] = await Promise.all([
-        queryObjectRows(database, tierQuery.matchExpression, options),
-        queryTextRows(database, tierQuery.matchExpression, options),
+        queryObjectRows(database, tierQuery.matchExpression, {
+          ...options,
+          objectHitLimit: objectHitRemaining,
+        }),
+        queryTextRows(database, tierQuery.matchExpression, {
+          ...options,
+          textHitLimit: textHitRemaining,
+        }),
       ]);
 
       for (const hit of objectRows) {
@@ -282,8 +307,8 @@ export async function querySearchIndex(
         textHitsByKey.set(createTextHitKey(hit), hit);
       }
       if (
-        options.textHitLimit !== undefined &&
-        textHitsByKey.size >= options.textHitLimit
+        (!queriesObjects || objectHitsByKey.size >= objectHitLimit) &&
+        (!queriesText || textHitsByKey.size >= textHitLimit)
       ) {
         break;
       }
@@ -302,10 +327,11 @@ async function queryObjectRows(
   matchExpression: string,
   options: {
     readonly chapters?: readonly number[];
+    readonly objectHitLimit?: number;
     readonly types?: readonly ArchiveFindObjectType[] | null;
   },
 ): Promise<readonly SearchIndexObjectHit[]> {
-  if (!shouldQueryObjects(options.types)) {
+  if (!shouldQueryObjects(options.types) || options.objectHitLimit === 0) {
     return [];
   }
 
@@ -323,11 +349,13 @@ async function queryObjectRows(
       WHERE search_object_properties_fts MATCH ?
         ${createChapterSql(options.chapters)}
       ORDER BY rank ASC, r.chapter_id, r.owner_kind, r.owner_id, r.property_kind
+      ${createLimitSql(options.objectHitLimit)}
     `,
     [
       ...TIER_WEIGHTS,
       matchExpression,
       ...createChapterParams(options.chapters),
+      ...createLimitParams(options.objectHitLimit),
     ],
     (row) => ({
       ownerId: String(row.owner_id),
@@ -353,6 +381,9 @@ async function queryTextRows(
   const kinds = createTextKindFilter(options.types);
 
   if (kinds.length === 0) {
+    return [];
+  }
+  if (options.textHitLimit === 0) {
     return [];
   }
 

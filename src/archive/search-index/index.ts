@@ -3,6 +3,7 @@ export {
   isSearchIndexCurrent,
   querySearchIndex,
   readArchiveIndexSettings,
+  SEARCH_INDEX_FTS_HIT_LIMIT,
   SEARCH_OBJECT_PROPERTY_KIND,
   SEARCH_OBJECT_PROPERTY_OWNER_KIND,
   setFtsIndexEmbedded,

@@ -19,7 +19,9 @@ import {
 } from "../../../src/archive/query/archive-view.js";
 import {
   isSearchIndexCurrent,
+  querySearchIndex,
   readArchiveIndexSettings,
+  SEARCH_INDEX_FTS_HIT_LIMIT,
 } from "../../../src/archive/search-index/index.js";
 import { deleteArchiveSearchSessions } from "../../../src/archive/query/search-cache.js";
 import { withTempDir } from "../../helpers/temp.js";
@@ -188,6 +190,54 @@ describe("archive/query/archive-view", () => {
             "text_sentence_records",
           ]),
         );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("limits FTS candidates before search cache hydration", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        expect(SEARCH_INDEX_FTS_HIT_LIMIT).toBe(32_000);
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.writeSummary(
+            1,
+            "Wiki summary candidate one. Wiki summary candidate two.",
+          );
+          await openedDocument.chunks.save({
+            content: "Wiki limit candidate one",
+            generation: 0,
+            id: 200,
+            label: "Wiki limit one",
+            sentenceId: [1, 0],
+            sentenceIds: [[1, 0]],
+            wordsCount: 4,
+            weight: 1,
+          });
+          await openedDocument.chunks.save({
+            content: "Wiki limit candidate two",
+            generation: 0,
+            id: 201,
+            label: "Wiki limit two",
+            sentenceId: [1, 1],
+            sentenceIds: [[1, 1]],
+            wordsCount: 4,
+            weight: 1,
+          });
+        });
+        await rebuildArchiveSearchIndex(document);
+
+        const result = await querySearchIndex(document, "Wiki", {
+          objectHitLimit: 2,
+          textHitLimit: 2,
+        });
+
+        expect(result?.objectHits).toHaveLength(2);
+        expect(result?.textHits).toHaveLength(2);
       } finally {
         await document.release();
       }
