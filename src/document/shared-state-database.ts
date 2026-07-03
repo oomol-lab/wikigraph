@@ -43,12 +43,15 @@ export async function ensureSharedStateDatabaseInitialized(
   const schemaHash = hashSchema(schemaSql);
 
   if (await hasInitMarker(markerPath, schemaHash)) {
+    await hardenSharedStateFile(resolvedDatabasePath);
+    await hardenSharedStateFile(markerPath);
     return;
   }
 
   await mkdir(dirname(resolvedDatabasePath), { recursive: true });
   await withInitLock(resolvedDatabasePath, async () => {
     if (await hasInitMarker(markerPath, schemaHash)) {
+      await hardenSharedStateFile(resolvedDatabasePath);
       await hardenSharedStateFile(markerPath);
       return;
     }
