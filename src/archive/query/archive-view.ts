@@ -2441,7 +2441,7 @@ export async function estimateArchiveBuild(
   targetStage: string,
 ): Promise<ArchiveEstimate> {
   const chapters = await listChapters(document);
-  const words = await estimateSourceWords(document, chapters);
+  const words = chapters.reduce((total, chapter) => total + chapter.words, 0);
   const pendingGraph = chapters.filter(
     (chapter) => chapter.stage === "sourced",
   ).length;
@@ -4292,28 +4292,6 @@ async function findNodes(
   }
 
   return hits;
-}
-
-async function estimateSourceWords(
-  document: ReadonlyDocument,
-  chapters: readonly ChapterEntry[],
-): Promise<number> {
-  let words = 0;
-
-  for (const chapter of chapters) {
-    const fragments = document.getSerialFragments(chapter.chapterId);
-
-    for (const fragmentId of await fragments.listFragmentIds()) {
-      const fragment = await fragments.getFragment(fragmentId);
-
-      words += fragment.sentences.reduce(
-        (total, sentence) => total + sentence.wordsCount,
-        0,
-      );
-    }
-  }
-
-  return words;
 }
 
 async function requireChapter(
