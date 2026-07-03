@@ -809,6 +809,10 @@ export function renderTransformHelpText(): string {
   return renderHelpTemplate("help/commands/transform");
 }
 
+export function renderGcCommandHelpText(): string {
+  return renderHelpTemplate("help/commands/gc");
+}
+
 export function renderLegacyCommandHelpText(action?: "migrate"): string {
   return renderHelpTemplate(
     action === undefined

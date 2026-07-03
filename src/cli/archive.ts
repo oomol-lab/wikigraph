@@ -1,7 +1,7 @@
-import { mkdtemp, rm, writeFile } from "fs/promises";
+import { rm, writeFile } from "fs/promises";
 import { join } from "path";
-import { tmpdir } from "os";
 
+import { createWikiGraphTempDirectory } from "../common/wiki-graph-temp.js";
 import {
   listArchiveCollection,
   listArchiveEvidence,
@@ -395,9 +395,8 @@ async function createArchive(args: CLIArchiveArguments): Promise<void> {
     return;
   }
 
-  const temporaryDirectoryPath = await mkdtemp(
-    join(tmpdir(), "wikigraph-url-create-"),
-  );
+  const temporaryDirectoryPath =
+    await createWikiGraphTempDirectory("url-create");
   const sourcePath = join(temporaryDirectoryPath, "source.md");
 
   try {
@@ -632,9 +631,8 @@ async function createArchiveFromStdin(
     );
   }
 
-  const temporaryDirectoryPath = await mkdtemp(
-    join(tmpdir(), "wikigraph-stdin-create-"),
-  );
+  const temporaryDirectoryPath =
+    await createWikiGraphTempDirectory("stdin-create");
   const extension = args.inputFormat === "markdown" ? ".md" : ".txt";
   const sourcePath = join(temporaryDirectoryPath, `source${extension}`);
 

@@ -6,6 +6,7 @@ import {
   runArchiveMetaCommand,
 } from "./archive-maintenance.js";
 import { runConvertCommand } from "./convert.js";
+import { runGcCommand } from "./gc.js";
 import { runLegacyCommand } from "./legacy.js";
 import { renderMainHelpText } from "./help.js";
 import { runObjectMetadataCommand } from "./object-metadata.js";
@@ -54,6 +55,9 @@ export async function main(): Promise<void> {
         return;
       case "queue":
         await runQueueCommand(parsed.args);
+        return;
+      case "gc":
+        await runGcCommand(parsed.args);
         return;
       case "legacy":
         await runLegacyCommand(parsed.args);

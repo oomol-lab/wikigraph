@@ -21,10 +21,18 @@ import {
 } from "path";
 
 import { resolveWikiGraphStateDirectoryPath } from "../common/wiki-graph-dir.js";
+import { createWikiGraphTempDirectory } from "../common/wiki-graph-temp.js";
 import { openSharedStateDatabase } from "../document/index.js";
 import type { Database } from "../document/index.js";
 import type { DocumentFileStore } from "../document/document.js";
+import {
+  readPathSize,
+  removeDisposableChildDirectories,
+  removeDisposableDirectory,
+} from "../gc/files.js";
+import type { GcContext, GcJobResult } from "../gc/index.js";
 import { AsyncSemaphore } from "../utils/async-semaphore.js";
+import { isNodeError } from "../utils/node-error.js";
 
 import {
   extractWikgArchive,
@@ -90,6 +98,7 @@ const DATABASE_ENTRY_PATH = "database.db";
 const LOCK_POLL_INTERVAL_MS = 100;
 const LOCK_STALE_TIMEOUT_MS = 60_000;
 const OWNER_HEARTBEAT_INTERVAL_MS = 20_000;
+const SQLITE_CACHE_TTL_MS = 60 * 60 * 1000;
 const STATE_DATABASE_SEMAPHORE = new AsyncSemaphore(1);
 const ARCHIVE_SESSION_CONSTRUCTOR_TOKEN = Symbol(
   "WikgArchiveSession constructor token",
@@ -130,7 +139,7 @@ export class WikgCoordinator {
   ): Promise<T> {
     const directoryPath =
       options.documentDirPath === undefined
-        ? await mkdtemp(join(tmpdir(), "wikigraph-open-"))
+        ? await createWikiGraphTempDirectory("archive-open")
         : resolve(options.documentDirPath);
 
     try {
@@ -147,7 +156,7 @@ export class WikgCoordinator {
     archivePath: string,
     operation: (documentDirectoryPath: string) => Promise<T> | T,
   ): Promise<T> {
-    const directoryPath = await mkdtemp(join(tmpdir(), "wikigraph-write-"));
+    const directoryPath = await createWikiGraphTempDirectory("archive-write");
 
     try {
       await extractWikgArchive(resolve(archivePath), directoryPath);
@@ -235,7 +244,7 @@ export class WikgArchiveSession {
   ): Promise<T> {
     const ownsDirectoryPath = directoryPath === undefined;
     const resolvedDirectoryPath = ownsDirectoryPath
-      ? await mkdtemp(join(tmpdir(), "wikigraph-open-"))
+      ? await createWikiGraphTempDirectory("archive-open")
       : resolve(directoryPath);
 
     if (!ownsDirectoryPath) {
@@ -299,6 +308,12 @@ export class WikgArchiveSession {
         ownerId: this.#ownerId,
       });
     }
+
+    await import("../gc/index.js")
+      .then(async ({ tryRunWikiGraphGc }) => {
+        await tryRunWikiGraphGc({ opportunistic: true });
+      })
+      .catch(() => undefined);
   }
 
   async #settle(): Promise<void> {
@@ -337,6 +352,159 @@ ORDER BY archive_key
   for (const archiveKey of archiveKeys) {
     await flushArchiveOverlays(archiveKey);
   }
+}
+
+export async function runWikgCoordinatorGc(
+  context: GcContext,
+): Promise<GcJobResult> {
+  const candidates = await listSqliteCacheGcCandidates();
+  const childDirectories = await removeDisposableChildDirectories(
+    getCoordinatorWorkspaceRootPath(),
+  );
+  let removed = 0;
+  let freedBytes = 0;
+
+  for (const candidate of candidates) {
+    const result = await tryRemoveSqliteCacheCandidate(candidate, context);
+
+    if (result.removed) {
+      removed += 1;
+      freedBytes += result.freedBytes;
+    }
+  }
+
+  return {
+    freedBytes: freedBytes + childDirectories.freedBytes,
+    removed: removed + childDirectories.removed,
+    scanned: candidates.length + childDirectories.scanned,
+  };
+}
+
+async function listSqliteCacheGcCandidates(): Promise<readonly EntryOverlay[]> {
+  return await withStateDatabase(async (state) => {
+    await cleanupStaleState(state);
+    return await state.queryAll(
+      `
+SELECT overlay.*
+FROM entry_overlays AS overlay
+WHERE overlay.entry_path = ?
+  AND overlay.kind = 'file'
+  AND overlay.workspace_path IS NOT NULL
+ORDER BY overlay.updated_at ASC
+`,
+      [DATABASE_ENTRY_PATH],
+      mapEntryOverlay,
+    );
+  });
+}
+
+async function tryRemoveSqliteCacheCandidate(
+  candidate: EntryOverlay,
+  context: GcContext,
+): Promise<{ readonly freedBytes: number; readonly removed: boolean }> {
+  const releaseWriteLock = await acquireEntryLock(
+    candidate.archiveKey,
+    candidate.entryPath,
+    "write",
+  );
+
+  try {
+    const releaseStateLock = await acquireEntryLock(
+      candidate.archiveKey,
+      candidate.entryPath,
+      "state",
+    );
+
+    try {
+      const overlay = await readOverlay(
+        candidate.archiveKey,
+        candidate.entryPath,
+      );
+
+      if (
+        overlay?.workspacePath === undefined ||
+        overlay.workspacePath !== candidate.workspacePath ||
+        !(await canRemoveSqliteCacheOverlay(overlay, context))
+      ) {
+        return { freedBytes: 0, removed: false };
+      }
+
+      let freedBytes = await readPathSize(overlay.workspacePath);
+
+      if (!context.dryRun) {
+        await deleteOverlay(overlay.archiveKey, overlay.entryPath);
+        await rm(overlay.workspacePath, { force: true });
+        freedBytes += await removeDisposableDirectory(
+          dirname(overlay.workspacePath),
+        );
+      }
+
+      return { freedBytes, removed: true };
+    } finally {
+      await releaseStateLock();
+    }
+  } finally {
+    await releaseWriteLock();
+  }
+}
+
+async function canRemoveSqliteCacheOverlay(
+  overlay: EntryOverlay,
+  context: GcContext,
+): Promise<boolean> {
+  if (await hasActiveArchiveOwnerOrSqliteLease(overlay.archiveKey)) {
+    return false;
+  }
+  if (
+    !context.aggressive &&
+    context.now - overlay.updatedAt < SQLITE_CACHE_TTL_MS
+  ) {
+    return false;
+  }
+  if (overlay.workspacePath === undefined) {
+    return false;
+  }
+
+  const workspaceExists = await pathExists(overlay.workspacePath);
+
+  if (!workspaceExists) {
+    return true;
+  }
+
+  await createArchiveSignature(overlay.archivePath).catch((error: unknown) => {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return undefined;
+    }
+
+    throw error;
+  });
+
+  return true;
+}
+
+async function hasActiveArchiveOwnerOrSqliteLease(
+  archiveKey: string,
+): Promise<boolean> {
+  return await withStateDatabase(async (state) => {
+    await cleanupStaleState(state);
+    const ownerCount = await state.queryOne(
+      "SELECT COUNT(*) AS count FROM archive_owners WHERE archive_key = ?",
+      [archiveKey],
+      (row) => getNumber(row, "count"),
+    );
+    const leaseCount = await state.queryOne(
+      `
+SELECT COUNT(*) AS count
+FROM entry_sqlite_leases
+WHERE archive_key = ?
+  AND entry_path = ?
+`,
+      [archiveKey, DATABASE_ENTRY_PATH],
+      (row) => getNumber(row, "count"),
+    );
+
+    return (ownerCount ?? 0) > 0 || (leaseCount ?? 0) > 0;
+  });
 }
 
 class WikgDocumentFileStore implements DocumentFileStore {
@@ -1419,14 +1587,17 @@ async function createWorkspaceFilePath(
   entryPath: string,
 ): Promise<string> {
   const directoryPath = join(
-    getCoordinatorStateDirectoryPath(),
-    "workspaces",
+    getCoordinatorWorkspaceRootPath(),
     archiveKey,
     dirname(entryPath),
   );
 
   await mkdir(directoryPath, { recursive: true });
   return join(directoryPath, `${basename(entryPath)}.${randomUUID()}`);
+}
+
+function getCoordinatorWorkspaceRootPath(): string {
+  return join(getCoordinatorStateDirectoryPath(), "workspaces");
 }
 
 async function ensureEmptyDirectory(directoryPath: string): Promise<void> {
@@ -1499,12 +1670,26 @@ async function delay(ms: number): Promise<void> {
   });
 }
 
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
 interface EntryOverlay {
   readonly archiveKey: string;
   readonly archivePath: string;
   readonly archiveSignature?: string;
   readonly entryPath: string;
   readonly kind: "deleted" | "file";
+  readonly updatedAt: number;
   readonly workspacePath?: string;
 }
 
@@ -1528,6 +1713,7 @@ function mapEntryOverlay(row: Record<string, unknown>): EntryOverlay {
     ...(archiveSignature === undefined ? {} : { archiveSignature }),
     entryPath: getString(row, "entry_path"),
     kind: getOverlayKind(row),
+    updatedAt: getNumber(row, "updated_at"),
     ...(workspacePath === undefined ? {} : { workspacePath }),
   };
 }

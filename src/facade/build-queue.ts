@@ -1,10 +1,16 @@
 import { createHash, randomUUID } from "crypto";
 import { appendFile, mkdir, mkdtemp, readFile, rm } from "fs/promises";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
 
 import { resolveWikiGraphStateDirectoryPath } from "../common/wiki-graph-dir.js";
 import { openSharedStateDatabase } from "../document/index.js";
 import type { Database } from "../document/index.js";
+import {
+  readPathSize,
+  removeDisposableChildDirectories,
+  removeDisposableDirectory,
+} from "../gc/files.js";
+import type { GcContext, GcJobResult } from "../gc/index.js";
 
 export const BUILD_JOB_STATES = [
   "queued",
@@ -839,6 +845,56 @@ WHERE state IN (${placeholders})
   }
 }
 
+export async function runBuildQueueGc(
+  context: GcContext,
+): Promise<GcJobResult> {
+  const state = await openBuildQueueDatabase();
+  const cutoff = context.now - 7 * 24 * 60 * 60 * 1000;
+
+  try {
+    const scanned = await state.queryOne(
+      "SELECT COUNT(*) AS count FROM build_jobs",
+      undefined,
+      (row) => getNumber(row, "count"),
+    );
+    const jobs = await state.queryAll(
+      `
+SELECT *
+FROM build_jobs
+WHERE state IN ('succeeded', 'failed', 'canceled')
+  AND updated_at <= ?
+`,
+      [cutoff],
+      mapBuildJob,
+    );
+    const childDirectories = await removeDisposableChildDirectories(
+      getBuildJobWorkspaceRootPath(),
+    );
+    let freedBytes = 0;
+
+    for (const job of jobs) {
+      freedBytes += await readPathSize(job.workspacePath);
+      freedBytes += await readPathSize(job.eventsPath);
+      if (!context.dryRun) {
+        await rm(job.workspacePath, { force: true, recursive: true });
+        freedBytes += await removeDisposableDirectory(
+          dirname(job.workspacePath),
+        );
+        await rm(job.eventsPath, { force: true });
+        await state.run("DELETE FROM build_jobs WHERE job_id = ?", [job.jobId]);
+      }
+    }
+
+    return {
+      freedBytes: freedBytes + childDirectories.freedBytes,
+      removed: jobs.length + childDirectories.removed,
+      scanned: (scanned ?? 0) + childDirectories.scanned,
+    };
+  } finally {
+    await state.close();
+  }
+}
+
 async function updateBuildJobState(
   jobId: string,
   stateName: BuildJobState,
@@ -1346,14 +1402,14 @@ async function createJobWorkspacePath(
   archiveKey: string,
   jobId: string,
 ): Promise<string> {
-  const rootPath = join(
-    getBuildQueueStateDirectoryPath(),
-    "build-jobs",
-    archiveKey,
-  );
+  const rootPath = join(getBuildJobWorkspaceRootPath(), archiveKey);
 
   await mkdir(rootPath, { recursive: true });
   return await mkdtemp(join(rootPath, `${jobId}-`));
+}
+
+function getBuildJobWorkspaceRootPath(): string {
+  return join(getBuildQueueStateDirectoryPath(), "build-jobs");
 }
 
 async function createJobEventsPath(jobId: string): Promise<string> {

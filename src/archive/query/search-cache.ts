@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { stat } from "fs/promises";
 import { join, resolve } from "path";
 
 import { resolveWikiGraphStateDirectoryPath } from "../../common/wiki-graph-dir.js";
@@ -6,6 +7,8 @@ import { getNumber, getString } from "../../document/database.js";
 import type { SqlBindValue } from "../../document/database.js";
 import { openSharedStateDatabase } from "../../document/index.js";
 import type { Database } from "../../document/index.js";
+import type { GcContext, GcJobResult } from "../../gc/index.js";
+import { isNodeError } from "../../utils/node-error.js";
 
 import type { ArchiveFindHit } from "./archive-view.js";
 
@@ -265,7 +268,6 @@ export async function createSearchSession(
   const database = await openSearchSessionDatabase();
 
   try {
-    await cleanExpiredSearchSessions(database);
     const now = Date.now();
     const sessionId = createSearchSessionId(input);
     const optionsJSON = JSON.stringify({
@@ -319,7 +321,6 @@ export async function createSearchSession(
       for (const hit of input.chunkHits ?? []) {
         await upsertSearchChunkHit(database, sessionId, hit);
       }
-      await pruneSearchSessions(database);
     });
 
     return sessionId;
@@ -334,7 +335,6 @@ export async function createEntitySearchSession(
   const database = await openSearchSessionDatabase();
 
   try {
-    await cleanExpiredSearchSessions(database);
     const now = Date.now();
     const sessionId = createEntitySearchSessionId(input);
     const optionsJSON = JSON.stringify({
@@ -379,7 +379,6 @@ export async function createEntitySearchSession(
       for (const hit of input.chunkHits ?? []) {
         await upsertSearchChunkHit(database, sessionId, hit);
       }
-      await pruneSearchSessions(database);
     });
 
     return sessionId;
@@ -414,6 +413,46 @@ export async function deleteArchiveSearchSessions(
   }
 }
 
+export async function runSearchCacheGc(
+  context: GcContext,
+): Promise<GcJobResult> {
+  const databasePath = getSearchSessionDatabasePath();
+  const beforeBytes = await readFileSize(databasePath);
+  const database = await openSearchSessionDatabase();
+
+  try {
+    const scanned = await database.queryOne(
+      "SELECT COUNT(*) AS count FROM search_sessions",
+      undefined,
+      (row) => getNumber(row, "count"),
+    );
+    const expiredSessionIds = await listExpiredSearchSessionIds(database);
+    const prunedSessionIds = await listPrunedSearchSessionIds(database);
+    const sessionIds = [
+      ...new Set([...expiredSessionIds, ...prunedSessionIds]),
+    ].sort();
+
+    if (!context.dryRun && sessionIds.length > 0) {
+      await database.transaction(async () => {
+        for (const sessionId of sessionIds) {
+          await deleteSearchSession(database, sessionId);
+        }
+      });
+      await database.run("VACUUM");
+    }
+
+    const afterBytes = await readFileSize(databasePath);
+
+    return {
+      freedBytes: Math.max(0, beforeBytes - afterBytes),
+      removed: sessionIds.length,
+      scanned: scanned ?? 0,
+    };
+  } finally {
+    await database.close();
+  }
+}
+
 export async function readSearchSessionPage(
   sessionId: string,
   offset: number,
@@ -424,7 +463,6 @@ export async function readSearchSessionPage(
   const database = await openSearchSessionDatabase();
 
   try {
-    await cleanExpiredSearchSessions(database);
     const session = await readSearchSessionMetadata(
       database,
       sessionId,
@@ -484,7 +522,6 @@ export async function readEntitySearchSessionPage(
   const database = await openSearchSessionDatabase();
 
   try {
-    await cleanExpiredSearchSessions(database);
     const session = await readSearchSessionMetadata(
       database,
       sessionId,
@@ -536,7 +573,6 @@ export async function readSearchSessionDescriptor(
   const database = await openSearchSessionDatabase();
 
   try {
-    await cleanExpiredSearchSessions(database);
     const session = await readSearchSessionMetadata(
       database,
       sessionId,
@@ -665,9 +701,13 @@ export function decodeSearchSessionCursor(cursor: string): {
 
 async function openSearchSessionDatabase(): Promise<Database> {
   return await openSharedStateDatabase(
-    join(getSearchSessionStateDirectoryPath(), "search-sessions.sqlite"),
+    getSearchSessionDatabasePath(),
     SEARCH_SESSION_SCHEMA_SQL,
   );
+}
+
+function getSearchSessionDatabasePath(): string {
+  return join(getSearchSessionStateDirectoryPath(), "search-sessions.sqlite");
 }
 
 function getSearchSessionStateDirectoryPath(): string {
@@ -680,27 +720,18 @@ function getSearchSessionStateDirectoryPath(): string {
   return resolveWikiGraphStateDirectoryPath();
 }
 
-async function cleanExpiredSearchSessions(database: Database): Promise<void> {
-  const now = Date.now();
-  const expiredSessionIds = await database.queryAll(
+async function listExpiredSearchSessionIds(
+  database: Database,
+): Promise<string[]> {
+  return await database.queryAll(
     `
       SELECT session_id
       FROM search_sessions
       WHERE expires_at < ?
     `,
-    [now],
+    [Date.now()],
     (row) => getString(row, "session_id"),
   );
-
-  if (expiredSessionIds.length === 0) {
-    return;
-  }
-
-  await database.transaction(async () => {
-    for (const sessionId of expiredSessionIds) {
-      await deleteSearchSession(database, sessionId);
-    }
-  });
 }
 
 async function hasSearchSession(
@@ -710,14 +741,14 @@ async function hasSearchSession(
   const database = await openSearchSessionDatabase();
 
   try {
-    await cleanExpiredSearchSessions(database);
     const row = await database.queryOne(
       `
         SELECT session_id
         FROM search_sessions
         WHERE session_id = ? AND archive_key = ?
+          AND expires_at >= ?
       `,
-      [sessionId, archiveKey],
+      [sessionId, archiveKey, Date.now()],
       () => true,
     );
 
@@ -991,8 +1022,10 @@ async function getOrCreatePredicateId(
   return id;
 }
 
-async function pruneSearchSessions(database: Database): Promise<void> {
-  const prunedSessionIds = await database.queryAll(
+async function listPrunedSearchSessionIds(
+  database: Database,
+): Promise<string[]> {
+  return await database.queryAll(
     `
       SELECT session_id
       FROM search_sessions
@@ -1002,9 +1035,17 @@ async function pruneSearchSessions(database: Database): Promise<void> {
     [SEARCH_SESSION_MAX_COUNT],
     (row) => getString(row, "session_id"),
   );
+}
 
-  for (const sessionId of prunedSessionIds) {
-    await deleteSearchSession(database, sessionId);
+async function readFileSize(path: string): Promise<number> {
+  try {
+    return (await stat(path)).size;
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return 0;
+    }
+
+    throw error;
   }
 }
 
@@ -1024,6 +1065,7 @@ async function readSearchSessionMetadata(
   readonly query: string;
   readonly sessionId: string;
   readonly terms: readonly string[];
+  readonly expiresAt: number;
 }> {
   const session = await database.queryOne(
     `
@@ -1034,7 +1076,8 @@ async function readSearchSessionMetadata(
         terms_json,
         lens,
         match,
-        created_at
+        created_at,
+        expires_at
       FROM search_sessions
       WHERE session_id = ?
         ${expectedArchiveKey === undefined ? "" : "AND archive_key = ?"}
@@ -1047,6 +1090,7 @@ async function readSearchSessionMetadata(
     ],
     (row) => ({
       createdAt: getNumber(row, "created_at"),
+      expiresAt: getNumber(row, "expires_at"),
       lens: getString(row, "lens"),
       match: getString(row, "match"),
       options: parseSessionOptions(getString(row, "options_json")),
@@ -1056,7 +1100,7 @@ async function readSearchSessionMetadata(
     }),
   );
 
-  if (session === undefined) {
+  if (session === undefined || session.expiresAt < Date.now()) {
     throw new Error("Search cursor expired. Run the search again.");
   }
 

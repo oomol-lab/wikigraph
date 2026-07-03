@@ -28,4 +28,4 @@ export {
 } from "./archive-uri.js";
 export type { LocatedWikiGraphUri } from "./archive-uri.js";
 export { SpineDigestFile } from "./spine-digest-file.js";
-export { WikgCoordinator } from "./wikg-coordinator.js";
+export { runWikgCoordinatorGc, WikgCoordinator } from "./wikg-coordinator.js";

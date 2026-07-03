@@ -56,6 +56,7 @@ export {
   createSearchSession,
   deleteArchiveSearchSessions,
   readCachedSearchSessionPage,
+  runSearchCacheGc,
 } from "./search-cache.js";
 export type {
   SearchSessionDescriptor,

@@ -1,9 +1,9 @@
 import { createWriteStream } from "fs";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "fs/promises";
 import { dirname, join, posix, resolve, sep } from "path";
-import { tmpdir } from "os";
 import { pipeline } from "stream/promises";
 
+import { createWikiGraphTempDirectory } from "../common/wiki-graph-temp.js";
 import {
   open as openZip,
   type Entry,
@@ -42,7 +42,7 @@ export async function migrateLegacySdpubToWikg(
     );
   }
 
-  const workspacePath = await mkdtemp(join(tmpdir(), "wikigraph-sdpub-"));
+  const workspacePath = await createWikiGraphTempDirectory("sdpub-upgrade");
 
   try {
     await extractLegacySdpubArchive(inputPath, workspacePath);

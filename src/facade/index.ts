@@ -46,6 +46,7 @@ export {
   readBuildJobEvents,
   resumeBuildJob,
   resolveBuildJobId,
+  runBuildQueueGc,
   runBuildJobWorker,
   updateBuildJobTarget,
 } from "./build-queue.js";

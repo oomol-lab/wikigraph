@@ -12,6 +12,7 @@ import {
   parseHelpMatrixPage,
   renderArchiveCommandHelpText,
   renderArchiveMaintenanceCommandHelpText,
+  renderGcCommandHelpText,
   renderHelpMatrixText,
   renderHelpTopicText,
   renderLegacyCommandHelpText,
@@ -123,6 +124,10 @@ export interface CLIObjectMetadataArguments {
 
 export interface CLIStatusArguments {
   readonly llmJSON?: string;
+}
+
+export interface CLIGcArguments {
+  readonly json?: boolean;
 }
 
 export interface CLILegacyArguments {
@@ -346,6 +351,11 @@ export type ParsedCLIArguments =
       readonly help: true;
       readonly helpText: string;
       readonly kind: "help";
+    }
+  | {
+      readonly args: CLIGcArguments;
+      readonly help: false;
+      readonly kind: "gc";
     }
   | {
       readonly args: CLIStatusArguments;
@@ -575,6 +585,10 @@ export function parseCLIArguments(
 
   if (positionals[0] === "config") {
     return parseConfigArguments(positionals.slice(1), values);
+  }
+
+  if (positionals[0] === "gc") {
+    return parseGcArguments(positionals.slice(1), values);
   }
 
   if (positionals[0] === "queue") {
@@ -1938,6 +1952,55 @@ function parseConfigArguments(
   }
 
   return parseConfigStatusArguments(positionals.slice(1), values);
+}
+
+function parseGcArguments(
+  positionals: readonly string[],
+  values: ArchiveArgumentValues & ArchiveMetaFlagValues,
+): ParsedCLIArguments {
+  const helpRoute = "wikigraph gc --help";
+
+  if (values.help === true) {
+    return {
+      help: true,
+      helpText: renderGcCommandHelpText(),
+      kind: "help",
+    };
+  }
+
+  rejectGcFlag("digest-dir", values["digest-dir"], helpRoute);
+  rejectGcFlag("input", values.input, helpRoute);
+  rejectGcFlag("input-format", values["input-format"], helpRoute);
+  rejectGcFlag("jsonl", values.jsonl, helpRoute);
+  rejectGcFlag("limit", values.limit, helpRoute);
+  rejectGcFlag("llm", values.llm, helpRoute);
+  rejectGcFlag("output", values.output, helpRoute);
+  rejectGcFlag("output-format", values["output-format"], helpRoute);
+  rejectGcFlag("prompt", values.prompt, helpRoute);
+  rejectGcFlag("stage", values.stage, helpRoute);
+  rejectGcMetaFlags(values);
+
+  if (values.verbose === true) {
+    throw new Error(
+      withHelpRoute("The `gc` command does not support --verbose.", helpRoute),
+    );
+  }
+  if (positionals.length > 0) {
+    throw new Error(
+      withHelpRoute(
+        `Unexpected positional arguments for \`gc\`: ${positionals.join(" ")}.`,
+        helpRoute,
+      ),
+    );
+  }
+
+  return {
+    args: {
+      ...(values.json === undefined ? {} : { json: values.json }),
+    },
+    help: false,
+    kind: "gc",
+  };
 }
 
 function parseLegacyArguments(
@@ -3982,14 +4045,40 @@ function rejectArchiveChapterMetaFlags(
 }
 
 function rejectHelpMetaFlags(values: ArchiveMetaFlagValues): void {
+  rejectCommandMetaFlags(values, "help", CLI_HELP_ROUTES.root);
+}
+
+function rejectGcMetaFlags(values: ArchiveMetaFlagValues): void {
+  rejectCommandMetaFlags(values, "gc", "wikigraph gc --help");
+}
+
+function rejectCommandMetaFlags(
+  values: ArchiveMetaFlagValues,
+  command: string,
+  helpRoute: string,
+): void {
   for (const flag of listPresentMetaFlags(values)) {
     throw new Error(
       withHelpRoute(
-        `The \`help\` command does not support ${flag}.`,
-        CLI_HELP_ROUTES.root,
+        `The \`${command}\` command does not support ${flag}.`,
+        helpRoute,
       ),
     );
   }
+}
+
+function rejectGcFlag(
+  name: string,
+  value: string | boolean | readonly string[] | undefined,
+  helpRoute: string,
+): void {
+  if (value === undefined || value === false) {
+    return;
+  }
+
+  throw new Error(
+    withHelpRoute(`The \`gc\` command does not support --${name}.`, helpRoute),
+  );
 }
 
 function rejectStatusMetaFlags(values: ArchiveMetaFlagValues): void {

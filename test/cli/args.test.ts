@@ -7,6 +7,7 @@ import {
   renderArchiveCommandHelpText,
   renderArchiveMaintenanceChapterActionHelpText,
   renderArchiveMaintenanceCommandHelpText,
+  renderGcCommandHelpText,
   renderHelpMatrixText,
   renderHelpTopicText,
   renderLegacyCommandHelpText,
@@ -131,6 +132,29 @@ describe("cli/args", () => {
       help: false,
       kind: "config-status",
     });
+  });
+
+  it("parses gc commands", () => {
+    expect(parseCLIArguments(["gc"])).toStrictEqual({
+      args: {},
+      help: false,
+      kind: "gc",
+    });
+    expect(parseCLIArguments(["gc", "--json"])).toStrictEqual({
+      args: {
+        json: true,
+      },
+      help: false,
+      kind: "gc",
+    });
+    expect(parseCLIArguments(["gc", "--help"])).toStrictEqual({
+      help: true,
+      helpText: renderGcCommandHelpText(),
+      kind: "help",
+    });
+    expect(() => parseCLIArguments(["gc", "--jsonl"])).toThrow(
+      "The `gc` command does not support --jsonl",
+    );
   });
 
   it("parses queue commands", () => {

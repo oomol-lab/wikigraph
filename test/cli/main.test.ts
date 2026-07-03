@@ -15,6 +15,7 @@ const mainMockState = vi.hoisted(() => ({
   convertRunCalls: [] as unknown[],
   statusRunCalls: 0,
   statusRunArgs: [] as unknown[],
+  gcRunCalls: [] as unknown[],
   archiveChapterRunCalls: [] as unknown[],
   archiveCoverRunCalls: [] as unknown[],
   archiveMetaRunCalls: [] as unknown[],
@@ -22,6 +23,7 @@ const mainMockState = vi.hoisted(() => ({
   archiveRunError: undefined as Error | undefined,
   convertRunError: undefined as Error | undefined,
   statusRunError: undefined as Error | undefined,
+  gcRunError: undefined as Error | undefined,
   archiveChapterRunError: undefined as Error | undefined,
   archiveCoverRunError: undefined as Error | undefined,
   archiveMetaRunError: undefined as Error | undefined,
@@ -69,6 +71,18 @@ vi.mock("../../src/cli/status.js", () => ({
 
     if (mainMockState.statusRunError !== undefined) {
       return Promise.reject(mainMockState.statusRunError);
+    }
+
+    return Promise.resolve();
+  }),
+}));
+
+vi.mock("../../src/cli/gc.js", () => ({
+  runGcCommand: vi.fn((args: unknown) => {
+    mainMockState.gcRunCalls.push(args);
+
+    if (mainMockState.gcRunError !== undefined) {
+      return Promise.reject(mainMockState.gcRunError);
     }
 
     return Promise.resolve();
@@ -147,6 +161,7 @@ describe("cli/main", () => {
     mainMockState.convertRunCalls.length = 0;
     mainMockState.statusRunCalls = 0;
     mainMockState.statusRunArgs.length = 0;
+    mainMockState.gcRunCalls.length = 0;
     mainMockState.archiveChapterRunCalls.length = 0;
     mainMockState.archiveCoverRunCalls.length = 0;
     mainMockState.archiveMetaRunCalls.length = 0;
@@ -154,6 +169,7 @@ describe("cli/main", () => {
     mainMockState.archiveRunError = undefined;
     mainMockState.convertRunError = undefined;
     mainMockState.statusRunError = undefined;
+    mainMockState.gcRunError = undefined;
     mainMockState.archiveChapterRunError = undefined;
     mainMockState.archiveCoverRunError = undefined;
     mainMockState.archiveMetaRunError = undefined;
@@ -332,6 +348,23 @@ describe("cli/main", () => {
       },
     ]);
     expect(mainMockState.archiveMetaRunCalls).toHaveLength(0);
+    expect(process.exitCode).toBe(0);
+  });
+
+  it("runs the gc command", async () => {
+    mainMockState.argsResult = {
+      args: {
+        json: true,
+      },
+      help: false,
+      kind: "gc",
+    };
+
+    await main();
+
+    expect(mainMockState.gcRunCalls).toStrictEqual([{ json: true }]);
+    expect(mainMockState.archiveRunCalls).toHaveLength(0);
+    expect(mainMockState.statusRunCalls).toBe(0);
     expect(process.exitCode).toBe(0);
   });
 
