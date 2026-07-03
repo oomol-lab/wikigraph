@@ -12,6 +12,7 @@ import {
   parseHelpMatrixPage,
   renderArchiveCommandHelpText,
   renderArchiveMaintenanceCommandHelpText,
+  renderGcCommandHelpText,
   renderHelpMatrixText,
   renderHelpTopicText,
   renderLegacyCommandHelpText,
@@ -125,6 +126,12 @@ export interface CLIStatusArguments {
   readonly llmJSON?: string;
 }
 
+export interface CLIGcArguments {
+  readonly dryRun?: boolean;
+  readonly force?: boolean;
+  readonly json?: boolean;
+}
+
 export interface CLILegacyArguments {
   readonly action: "migrate";
   readonly inputPath: string;
@@ -184,10 +191,17 @@ export type CLIArchiveAction =
   | "search";
 
 export type CLIArchiveMaintenanceCommand = "chapter" | "cover" | "meta";
+export type CLIArchiveIndexAction =
+  | "build"
+  | "clear"
+  | "embed"
+  | "external"
+  | "get";
 type CLIArchiveRootAction = CLIArchiveAction | "queue";
 type CLIArchiveUriAction =
   | CLIArchiveRootAction
   | CLIArchiveChapterAction
+  | CLIArchiveIndexAction
   | CLIMetadataAction;
 type CLIJobAction = CLIQueueAction | "get" | "set";
 type ArchiveUriLens = Exclude<CLIObjectKind, "meta">;
@@ -227,6 +241,12 @@ export interface CLIArchiveArguments {
   readonly triplePattern?: ArchiveTriplePattern;
 }
 
+export interface CLIArchiveIndexArguments {
+  readonly action: CLIArchiveIndexAction;
+  readonly archivePath: string;
+  readonly json?: boolean;
+}
+
 interface ArchiveMetaFlagValues {
   readonly author?: readonly string[];
   readonly "clear-authors"?: boolean;
@@ -262,6 +282,7 @@ interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly "dry-run"?: boolean;
   readonly evidence?: string;
   readonly first?: boolean;
+  readonly force?: boolean;
   readonly from?: string;
   readonly help?: boolean;
   readonly input?: string;
@@ -338,6 +359,11 @@ export type ParsedCLIArguments =
       readonly kind: "archive";
     }
   | {
+      readonly args: CLIArchiveIndexArguments;
+      readonly help: false;
+      readonly kind: "archive-index";
+    }
+  | {
       readonly args: CLIQueueArguments;
       readonly help: false;
       readonly kind: "queue";
@@ -346,6 +372,11 @@ export type ParsedCLIArguments =
       readonly help: true;
       readonly helpText: string;
       readonly kind: "help";
+    }
+  | {
+      readonly args: CLIGcArguments;
+      readonly help: false;
+      readonly kind: "gc";
     }
   | {
       readonly args: CLIStatusArguments;
@@ -445,6 +476,9 @@ export function parseCLIArguments(
       from: {
         type: "string",
       },
+      force: {
+        type: "boolean",
+      },
       input: {
         type: "string",
       },
@@ -537,6 +571,8 @@ export function parseCLIArguments(
     strict: true,
   });
 
+  rejectNonGcForceFlag(positionals, values);
+
   if (values.version === true) {
     return {
       help: false,
@@ -575,6 +611,10 @@ export function parseCLIArguments(
 
   if (positionals[0] === "config") {
     return parseConfigArguments(positionals.slice(1), values);
+  }
+
+  if (positionals[0] === "gc") {
+    return parseGcArguments(positionals.slice(1), values);
   }
 
   if (positionals[0] === "queue") {
@@ -725,6 +765,10 @@ function parseArchiveUriTargetArguments(
     );
   }
 
+  if (objectUri === "wkg://index") {
+    return parseArchiveIndexUriArguments(archivePath, action, tail, values);
+  }
+
   const chapterTarget = parseChapterTarget(objectUri);
   if (chapterTarget !== undefined) {
     return parseArchiveChapterUriArguments(
@@ -747,6 +791,80 @@ function parseArchiveUriTargetArguments(
   }
 
   return parseArchiveArguments(action, [uri, ...tail], values, helpRoute);
+}
+
+function parseArchiveIndexUriArguments(
+  archivePath: string,
+  action: CLIArchiveUriAction,
+  tail: readonly string[],
+  values: ArchiveArgumentValues,
+): ParsedCLIArguments {
+  const helpRoute = `wikigraph wkg://<archive.wikg>/index ${action} --help`;
+
+  if (values.help === true) {
+    return {
+      help: true,
+      helpText: renderHelpMatrixText({ kind: "object", object: "index" }),
+      kind: "help",
+    };
+  }
+
+  if (!isArchiveIndexAction(action)) {
+    throw new Error(
+      withHelpRoute(
+        `The index object does not support \`${action}\`. Expected get, build, embed, external, or clear.`,
+        "wikigraph help object",
+      ),
+    );
+  }
+  rejectArchiveExtraPositionals(action, tail, 0, helpRoute);
+  rejectArchiveNonReadFlags(action, values, helpRoute);
+  rejectArchiveFlag(action, "--after", values.after, helpRoute);
+  rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+  rejectArchiveFlag(action, "--before", values.before, helpRoute);
+  rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
+  rejectArchiveFlag(action, "--context", values.context, helpRoute);
+  rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+  rejectArchiveFlag(action, "--digest-dir", values["digest-dir"], helpRoute);
+  rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+  rejectArchiveFlag(action, "--from", values.from, helpRoute);
+  rejectArchiveFlag(action, "--json-input", values["json-input"], helpRoute);
+  rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
+  rejectArchiveFlag(action, "--parent", values.parent, helpRoute);
+  rejectArchiveFlag(action, "--predicate", values.predicate, helpRoute);
+  rejectArchiveFlag(action, "--role", values.role, helpRoute);
+  rejectArchiveFlag(action, "--stage", values.stage, helpRoute);
+  rejectArchiveFlag(action, "--task", values.task, helpRoute);
+  rejectArchiveFlag(action, "--to", values.to, helpRoute);
+  rejectArchiveBooleanFlag(
+    action,
+    "--accept-cost",
+    values["accept-cost"],
+    helpRoute,
+  );
+  rejectArchiveBooleanFlag(action, "--active", values.active, helpRoute);
+  rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
+  rejectArchiveBooleanFlag(action, "--backlinks", values.backlinks, helpRoute);
+  rejectArchiveBooleanFlag(action, "--boost", values.boost, helpRoute);
+  rejectArchiveBooleanFlag(action, "--clear", values.clear, helpRoute);
+  rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+  rejectArchiveBooleanFlag(action, "--dry-run", values["dry-run"], helpRoute);
+  rejectArchiveBooleanFlag(action, "--first", values.first, helpRoute);
+  rejectArchiveBooleanFlag(action, "--jsonl", values.jsonl, helpRoute);
+  rejectArchiveBooleanFlag(action, "--last", values.last, helpRoute);
+  rejectArchiveBooleanFlag(action, "--root", values.root, helpRoute);
+  rejectArchiveBooleanFlag(action, "--verbose", values.verbose, helpRoute);
+  rejectCommandMetaFlags(values, action, helpRoute);
+
+  return {
+    args: {
+      action,
+      archivePath,
+      ...(values.json === undefined ? {} : { json: values.json }),
+    },
+    help: false,
+    kind: "archive-index",
+  };
 }
 
 function parseMetadataUriArguments(
@@ -1938,6 +2056,57 @@ function parseConfigArguments(
   }
 
   return parseConfigStatusArguments(positionals.slice(1), values);
+}
+
+function parseGcArguments(
+  positionals: readonly string[],
+  values: ArchiveArgumentValues & ArchiveMetaFlagValues,
+): ParsedCLIArguments {
+  const helpRoute = "wikigraph gc --help";
+
+  if (values.help === true) {
+    return {
+      help: true,
+      helpText: renderGcCommandHelpText(),
+      kind: "help",
+    };
+  }
+
+  rejectGcFlag("digest-dir", values["digest-dir"], helpRoute);
+  rejectGcFlag("input", values.input, helpRoute);
+  rejectGcFlag("input-format", values["input-format"], helpRoute);
+  rejectGcFlag("jsonl", values.jsonl, helpRoute);
+  rejectGcFlag("limit", values.limit, helpRoute);
+  rejectGcFlag("llm", values.llm, helpRoute);
+  rejectGcFlag("output", values.output, helpRoute);
+  rejectGcFlag("output-format", values["output-format"], helpRoute);
+  rejectGcFlag("prompt", values.prompt, helpRoute);
+  rejectGcFlag("stage", values.stage, helpRoute);
+  rejectGcMetaFlags(values);
+
+  if (values.verbose === true) {
+    throw new Error(
+      withHelpRoute("The `gc` command does not support --verbose.", helpRoute),
+    );
+  }
+  if (positionals.length > 0) {
+    throw new Error(
+      withHelpRoute(
+        `Unexpected positional arguments for \`gc\`: ${positionals.join(" ")}.`,
+        helpRoute,
+      ),
+    );
+  }
+
+  return {
+    args: {
+      ...(values["dry-run"] === undefined ? {} : { dryRun: values["dry-run"] }),
+      ...(values.force === undefined ? {} : { force: values.force }),
+      ...(values.json === undefined ? {} : { json: values.json }),
+    },
+    help: false,
+    kind: "gc",
+  };
 }
 
 function parseLegacyArguments(
@@ -3982,14 +4151,56 @@ function rejectArchiveChapterMetaFlags(
 }
 
 function rejectHelpMetaFlags(values: ArchiveMetaFlagValues): void {
+  rejectCommandMetaFlags(values, "help", CLI_HELP_ROUTES.root);
+}
+
+function rejectNonGcForceFlag(
+  positionals: readonly string[],
+  values: ArchiveArgumentValues,
+): void {
+  if (values.force !== true || positionals[0] === "gc") {
+    return;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      "The --force option is only supported by `gc`.",
+      CLI_HELP_ROUTES.root,
+    ),
+  );
+}
+
+function rejectGcMetaFlags(values: ArchiveMetaFlagValues): void {
+  rejectCommandMetaFlags(values, "gc", "wikigraph gc --help");
+}
+
+function rejectCommandMetaFlags(
+  values: ArchiveMetaFlagValues,
+  command: string,
+  helpRoute: string,
+): void {
   for (const flag of listPresentMetaFlags(values)) {
     throw new Error(
       withHelpRoute(
-        `The \`help\` command does not support ${flag}.`,
-        CLI_HELP_ROUTES.root,
+        `The \`${command}\` command does not support ${flag}.`,
+        helpRoute,
       ),
     );
   }
+}
+
+function rejectGcFlag(
+  name: string,
+  value: string | boolean | readonly string[] | undefined,
+  helpRoute: string,
+): void {
+  if (value === undefined || value === false) {
+    return;
+  }
+
+  throw new Error(
+    withHelpRoute(`The \`gc\` command does not support --${name}.`, helpRoute),
+  );
 }
 
 function rejectStatusMetaFlags(values: ArchiveMetaFlagValues): void {
@@ -4126,8 +4337,21 @@ function isArchiveUriAction(
   return (
     isArchiveAction(value) ||
     isArchiveChapterAction(value) ||
+    isArchiveIndexAction(value) ||
     isMetadataAction(value) ||
     value === "queue"
+  );
+}
+
+function isArchiveIndexAction(
+  value: string | undefined,
+): value is CLIArchiveIndexAction {
+  return (
+    value === "build" ||
+    value === "clear" ||
+    value === "embed" ||
+    value === "external" ||
+    value === "get"
   );
 }
 
@@ -4557,7 +4781,7 @@ function isValueInputJsonFlagContext(argv: readonly string[]): boolean {
 }
 
 function rejectArchiveExtraPositionals(
-  action: CLIArchiveAction,
+  action: string,
   positionals: readonly string[],
   allowed: number,
   helpRoute: string,
@@ -4676,7 +4900,7 @@ function rejectCoverMetaFlags(values: ArchiveMetaFlagValues): void {
 }
 
 function rejectArchiveFlag(
-  action: CLIArchiveAction,
+  action: string,
   flag: string,
   value: string | undefined,
   helpRoute: string,
@@ -4692,7 +4916,7 @@ function rejectArchiveFlag(
 }
 
 function rejectArchiveBooleanFlag(
-  action: CLIArchiveAction,
+  action: string,
   flag: string,
   value: boolean | undefined,
   helpRoute: string,
@@ -4708,7 +4932,7 @@ function rejectArchiveBooleanFlag(
 }
 
 function rejectArchiveNonReadFlags(
-  action: CLIArchiveAction,
+  action: string,
   values: {
     readonly input?: string;
     readonly "input-format"?: string;

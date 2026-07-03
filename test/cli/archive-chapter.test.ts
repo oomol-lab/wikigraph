@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const chapterMockState = vi.hoisted(() => ({
+  activeConflictChecks: [] as unknown[],
+  activeJobChecks: [] as unknown[],
   addCalls: [] as unknown[],
   readCalls: [] as string[],
   writeCalls: [] as string[],
@@ -101,7 +103,14 @@ vi.mock("../../src/facade/index.js", () => ({
       title: "New Chapter",
     });
   }),
-  assertNoActiveBuildJobs: vi.fn(() => Promise.resolve()),
+  assertNoActiveBuildJobs: vi.fn((input: unknown) => {
+    chapterMockState.activeJobChecks.push(input);
+    return Promise.resolve();
+  }),
+  assertNoActiveBuildJobConflicts: vi.fn((input: unknown) => {
+    chapterMockState.activeConflictChecks.push(input);
+    return Promise.resolve();
+  }),
   getChapterDetails: vi.fn(() => Promise.resolve(chapterDetails)),
   getChapterTree: vi.fn(() => Promise.resolve(chapterMockState.tree)),
   listChapters: vi.fn(() => Promise.resolve(chapterMockState.listEntries)),
@@ -248,6 +257,8 @@ describe("cli/archive-chapter", () => {
   const originalStdinIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
+    chapterMockState.activeConflictChecks.length = 0;
+    chapterMockState.activeJobChecks.length = 0;
     chapterMockState.addCalls.length = 0;
     chapterMockState.readCalls.length = 0;
     chapterMockState.writeCalls.length = 0;
@@ -435,6 +446,13 @@ describe("cli/archive-chapter", () => {
       path: "/tmp/book.wikg",
     });
 
+    expect(chapterMockState.activeJobChecks).toStrictEqual([
+      {
+        archivePath: "/tmp/book.wikg",
+        chapterIds: [2],
+        operation: "Setting chapter title",
+      },
+    ]);
     expect(chapterMockState.setTitleCalls).toStrictEqual([
       {
         chapterId: 2,
@@ -452,6 +470,13 @@ describe("cli/archive-chapter", () => {
       path: "/tmp/book.wikg",
     });
 
+    expect(chapterMockState.activeConflictChecks).toStrictEqual([
+      {
+        archivePath: "/tmp/book.wikg",
+        operation: "Moving chapter",
+        scope: { kind: "archive" },
+      },
+    ]);
     expect(chapterMockState.moveCalls).toStrictEqual([
       {
         chapterId: 2,
@@ -532,6 +557,7 @@ describe("cli/archive-chapter", () => {
     expect(chapterMockState.textWrites.at(-1)).toContain(
       "Dry run: chapter tree not changed.",
     );
+    expect(chapterMockState.activeConflictChecks).toStrictEqual([]);
   });
 
   it("removes chapters recursively when requested", async () => {
@@ -542,6 +568,13 @@ describe("cli/archive-chapter", () => {
       recursive: true,
     });
 
+    expect(chapterMockState.activeConflictChecks).toStrictEqual([
+      {
+        archivePath: "/tmp/book.wikg",
+        operation: "Removing chapter",
+        scope: { kind: "archive" },
+      },
+    ]);
     expect(chapterMockState.removeCalls).toStrictEqual([
       {
         chapterId: 1,

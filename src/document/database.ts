@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "async_hooks";
+import { stat } from "fs/promises";
 import { resolve } from "path";
 
 import type * as Sqlite3Namespace from "sqlite3";
@@ -15,32 +16,64 @@ const SQLITE_BUSY_TIMEOUT_MS = 15 * 60 * 1000;
 
 type DatabaseOperationScope = symbol;
 
+async function isMissingOrEmptyFile(path: string): Promise<boolean> {
+  const stats = await stat(path).catch((error: unknown) => {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
+      return undefined;
+    }
+
+    throw error;
+  });
+
+  return stats === undefined || stats.size === 0;
+}
+
 export class Database {
   readonly #database: SqliteDatabase;
+  readonly #onWrite: (() => void) | undefined;
   readonly #operationScope = new AsyncLocalStorage<DatabaseOperationScope>();
   #activeTransactionScope: DatabaseOperationScope | undefined;
   #closed = false;
   #operationChain: Promise<void> = Promise.resolve();
   #transactionDepth = 0;
 
-  public constructor(database: SqliteDatabase) {
+  public constructor(
+    database: SqliteDatabase,
+    options: { readonly onWrite?: () => void } = {},
+  ) {
     this.#database = database;
+    this.#onWrite = options.onWrite;
   }
 
   public static async open(
     databasePath: string,
     schemaSql = "",
-    options: { readonly readonly?: boolean } = {},
+    options: {
+      readonly onWrite?: () => void;
+      readonly readonly?: boolean;
+    } = {},
   ): Promise<Database> {
     const resolvedDatabasePath = resolve(databasePath);
+    const shouldMarkSchemaWritten =
+      options.readonly !== true &&
+      schemaSql.trim() !== "" &&
+      (await isMissingOrEmptyFile(resolvedDatabasePath));
     const database = await openSqliteDatabase(resolvedDatabasePath, options);
-    const openedDatabase = new Database(database);
+    const openedDatabase = new Database(database, options);
 
     await openedDatabase.#executeSql(
       `PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`,
     );
     if (options.readonly !== true && schemaSql.trim() !== "") {
       await openedDatabase.#executeSql(schemaSql);
+      if (shouldMarkSchemaWritten) {
+        openedDatabase.#markWritten();
+      }
     }
 
     return openedDatabase;
@@ -91,6 +124,7 @@ export class Database {
     await this.#runSerialized(async () => {
       this.#assertOpen();
       await this.#runStatement(sql, params);
+      this.#markWritten();
     });
   }
 
@@ -189,6 +223,10 @@ export class Database {
     );
 
     return await queuedOperation;
+  }
+
+  #markWritten(): void {
+    this.#onWrite?.();
   }
 
   async #closeDatabase(): Promise<void> {

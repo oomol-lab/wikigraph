@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Database } from "../../src/document/index.js";
 import {
   addBuildJob,
+  assertBuildJobInputRevision,
+  assertNoActiveBuildJobConflicts,
   getBuildJob,
   listBuildJobs,
   readBuildJobEvents,
@@ -13,6 +15,7 @@ import {
   boostBuildJob,
   updateBuildJobTarget,
   cancelBuildJob,
+  recordBuildJobInputRevision,
 } from "../../src/facade/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
@@ -175,6 +178,76 @@ describe("facade/build-queue", () => {
       await expect(
         updateBuildJobTarget(reading.jobId, "knowledge-graph"),
       ).rejects.toThrow("already has active knowledge-graph job");
+    });
+  });
+
+  it("blocks archive scoped mutations when any build job is active", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+      await addBuildJob({
+        archivePath: `${path}/book.wikg`,
+        chapterId: 2,
+        target: "reading-summary",
+      });
+
+      await expect(
+        assertNoActiveBuildJobConflicts({
+          archivePath: `${path}/book.wikg`,
+          operation: "Changing chapter tree",
+          scope: { kind: "archive" },
+        }),
+      ).rejects.toThrow("Changing chapter tree is blocked");
+      await expect(
+        assertNoActiveBuildJobConflicts({
+          archivePath: `${path}/book.wikg`,
+          operation: "Setting unrelated chapter source",
+          scope: { chapterIds: [1], kind: "chapter" },
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  it("records and validates running job input revisions", async () => {
+    await withTempDir("spinedigest-build-queue-", async (path) => {
+      useStateDir(`${path}/state`);
+      const job = await addBuildJob({
+        archivePath: `${path}/book.wikg`,
+        chapterId: 1,
+        target: "reading-summary",
+      });
+
+      await runBuildJobWorker({
+        concurrency: 1,
+        executeJob: async (runningJob) => {
+          const recorded = await recordBuildJobInputRevision({
+            currentRevision: 3,
+            jobId: runningJob.jobId,
+            ownerId: runningJob.ownerId!,
+          });
+
+          expect(recorded.inputRevision).toBe(3);
+          await expect(
+            assertBuildJobInputRevision({
+              currentRevision: 3,
+              jobId: runningJob.jobId,
+              ownerId: runningJob.ownerId!,
+            }),
+          ).resolves.toBeUndefined();
+          await expect(
+            assertBuildJobInputRevision({
+              currentRevision: 4,
+              jobId: runningJob.jobId,
+              ownerId: runningJob.ownerId!,
+            }),
+          ).rejects.toThrow("changed while job");
+        },
+        idleTimeoutMs: 0,
+      });
+
+      await expect(getBuildJob(job.jobId)).resolves.toMatchObject({
+        inputRevision: 3,
+        state: "succeeded",
+      });
     });
   });
 

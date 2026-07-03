@@ -5,7 +5,7 @@ import {
   type Database,
   type SqlBindValue,
 } from "../../document/database.js";
-import type { ReadonlyDocument } from "../../document/index.js";
+import type { Document, ReadonlyDocument } from "../../document/index.js";
 
 import {
   createSearchTokenPlan,
@@ -90,39 +90,89 @@ export interface SearchIndexQueryResult {
 }
 
 const SEARCH_INDEX_VERSION = "3";
+export const SEARCH_INDEX_FTS_HIT_LIMIT = 32_000;
 const TIER_WEIGHTS = [1, 0.45, 0.08] as const;
+
+export interface ArchiveIndexSettings {
+  readonly ftsEmbedded: boolean;
+}
+
+export async function readArchiveIndexSettings(
+  document: ReadonlyDocument,
+): Promise<ArchiveIndexSettings> {
+  return await document.readDatabase(async (database) => {
+    const row = await database.queryOne(
+      `
+        SELECT fts_embedded
+        FROM archive_index_settings
+        WHERE id = 1
+      `,
+      undefined,
+      (value) => ({
+        ftsEmbedded: getNumber(value, "fts_embedded") !== 0,
+      }),
+    );
+
+    return row ?? { ftsEmbedded: false };
+  });
+}
+
+export async function setFtsIndexEmbedded(
+  document: Document,
+  embedded: boolean,
+): Promise<void> {
+  await document.readDatabase(async (database) => {
+    await database.run(
+      `
+        INSERT INTO archive_index_settings(id, fts_embedded)
+        VALUES (1, ?)
+        ON CONFLICT(id)
+        DO UPDATE SET fts_embedded = excluded.fts_embedded
+      `,
+      [embedded ? 1 : 0],
+    );
+  });
+}
 
 export async function isSearchIndexCurrent(
   document: ReadonlyDocument,
 ): Promise<boolean> {
   const chaptersRevision = await document.serials.getChaptersRevision();
 
-  return await document.readDatabase(async (database) => {
-    const current = await database.queryAll(
-      `
-        SELECT key, value
-        FROM search_index_state
-        WHERE key IN ('version', 'chaptersRevision')
-      `,
-      undefined,
-      (row) => [String(row.key), String(row.value)] as const,
-    );
-    const state = new Map(current);
+  try {
+    return await document.readSearchIndexDatabase(async (database) => {
+      const current = await database.queryAll(
+        `
+          SELECT key, value
+          FROM search_index_state
+          WHERE key IN ('version', 'chaptersRevision')
+        `,
+        undefined,
+        (row) => [String(row.key), String(row.value)] as const,
+      );
+      const state = new Map(current);
 
-    return (
-      state.get("version") === SEARCH_INDEX_VERSION &&
-      state.get("chaptersRevision") === String(chaptersRevision)
-    );
-  });
+      return (
+        state.get("version") === SEARCH_INDEX_VERSION &&
+        state.get("chaptersRevision") === String(chaptersRevision)
+      );
+    });
+  } catch (error) {
+    if (isMissingSearchIndexError(error)) {
+      return false;
+    }
+
+    throw error;
+  }
 }
 
 export async function ensureSearchIndex(
-  document: ReadonlyDocument,
+  document: Document,
   input: SearchIndexInput,
 ): Promise<void> {
   const chaptersRevision = await document.serials.getChaptersRevision();
 
-  await document.readDatabase(async (database) => {
+  await document.writeSearchIndexDatabase(async (database) => {
     const fingerprint = createSearchIndexFingerprint(input);
     const current = await database.queryAll(
       `
@@ -199,6 +249,8 @@ export async function querySearchIndex(
   options: {
     readonly chapters?: readonly number[];
     readonly match?: ArchiveFindMatch;
+    readonly objectHitLimit?: number;
+    readonly textHitLimit?: number;
     readonly types?: readonly ArchiveFindObjectType[] | null;
   } = {},
 ): Promise<SearchIndexQueryResult | undefined> {
@@ -210,8 +262,12 @@ export async function querySearchIndex(
 
   const terms = listSearchPlanTerms(plan);
 
-  return await document.readDatabase(async (database) => {
+  return await document.readSearchIndexDatabase(async (database) => {
     const tierQueries = createTierQueries(query, plan, options.match ?? "any");
+    const objectHitLimit = options.objectHitLimit ?? SEARCH_INDEX_FTS_HIT_LIMIT;
+    const textHitLimit = options.textHitLimit ?? SEARCH_INDEX_FTS_HIT_LIMIT;
+    const queriesObjects = shouldQueryObjects(options.types);
+    const queriesText = createTextKindFilter(options.types).length > 0;
     const objectHitsByKey = new Map<string, SearchIndexObjectHit>();
     const textHitsByKey = new Map<string, SearchIndexTextHit>();
 
@@ -220,9 +276,28 @@ export async function querySearchIndex(
         continue;
       }
 
+      const objectHitRemaining = Math.max(
+        0,
+        objectHitLimit - objectHitsByKey.size,
+      );
+      const textHitRemaining = Math.max(0, textHitLimit - textHitsByKey.size);
+
+      if (
+        (!queriesObjects || objectHitRemaining <= 0) &&
+        (!queriesText || textHitRemaining <= 0)
+      ) {
+        break;
+      }
+
       const [objectRows, textRows] = await Promise.all([
-        queryObjectRows(database, tierQuery.matchExpression, options),
-        queryTextRows(database, tierQuery.matchExpression, options),
+        queryObjectRows(database, tierQuery.matchExpression, {
+          ...options,
+          objectHitLimit: objectHitRemaining,
+        }),
+        queryTextRows(database, tierQuery.matchExpression, {
+          ...options,
+          textHitLimit: textHitRemaining,
+        }),
       ]);
 
       for (const hit of objectRows) {
@@ -230,6 +305,12 @@ export async function querySearchIndex(
       }
       for (const hit of textRows) {
         textHitsByKey.set(createTextHitKey(hit), hit);
+      }
+      if (
+        (!queriesObjects || objectHitsByKey.size >= objectHitLimit) &&
+        (!queriesText || textHitsByKey.size >= textHitLimit)
+      ) {
+        break;
       }
     }
 
@@ -246,10 +327,11 @@ async function queryObjectRows(
   matchExpression: string,
   options: {
     readonly chapters?: readonly number[];
+    readonly objectHitLimit?: number;
     readonly types?: readonly ArchiveFindObjectType[] | null;
   },
 ): Promise<readonly SearchIndexObjectHit[]> {
-  if (!shouldQueryObjects(options.types)) {
+  if (!shouldQueryObjects(options.types) || options.objectHitLimit === 0) {
     return [];
   }
 
@@ -267,11 +349,13 @@ async function queryObjectRows(
       WHERE search_object_properties_fts MATCH ?
         ${createChapterSql(options.chapters)}
       ORDER BY rank ASC, r.chapter_id, r.owner_kind, r.owner_id, r.property_kind
+      ${createLimitSql(options.objectHitLimit)}
     `,
     [
       ...TIER_WEIGHTS,
       matchExpression,
       ...createChapterParams(options.chapters),
+      ...createLimitParams(options.objectHitLimit),
     ],
     (row) => ({
       ownerId: String(row.owner_id),
@@ -290,12 +374,16 @@ async function queryTextRows(
   matchExpression: string,
   options: {
     readonly chapters?: readonly number[];
+    readonly textHitLimit?: number;
     readonly types?: readonly ArchiveFindObjectType[] | null;
   },
 ): Promise<readonly SearchIndexTextHit[]> {
   const kinds = createTextKindFilter(options.types);
 
   if (kinds.length === 0) {
+    return [];
+  }
+  if (options.textHitLimit === 0) {
     return [];
   }
 
@@ -314,12 +402,14 @@ async function queryTextRows(
         AND r.kind IN (${kinds.map(() => "?").join(", ")})
         ${createChapterSql(options.chapters)}
       ORDER BY rank ASC, r.chapter_id, r.sentence_index, r.kind
+      ${createLimitSql(options.textHitLimit)}
     `,
     [
       ...TIER_WEIGHTS,
       matchExpression,
       ...kinds,
       ...createChapterParams(options.chapters),
+      ...createLimitParams(options.textHitLimit),
     ],
     (row) => ({
       chapterId: getNumber(row, "chapter_id"),
@@ -546,6 +636,20 @@ function createSearchIndexFingerprint(input: SearchIndexInput): string {
   return hash.digest("hex");
 }
 
+function isMissingSearchIndexError(error: unknown): boolean {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? error.code
+      : undefined;
+
+  return (
+    code === "SQLITE_CANTOPEN" ||
+    (error instanceof Error &&
+      (error.message.includes("Archive SQLite entry is missing: fts.db") ||
+        error.message.includes("no such table: search_index_state")))
+  );
+}
+
 function serializeTokens(
   tokens: readonly {
     readonly encoded: string;
@@ -564,6 +668,14 @@ function createChapterParams(
   chapters: readonly number[] | undefined,
 ): readonly SqlBindValue[] {
   return chapters === undefined ? [] : [...chapters];
+}
+
+function createLimitSql(limit: number | undefined): string {
+  return limit === undefined ? "" : "LIMIT ?";
+}
+
+function createLimitParams(limit: number | undefined): readonly SqlBindValue[] {
+  return limit === undefined ? [] : [limit];
 }
 
 function shouldQueryObjects(

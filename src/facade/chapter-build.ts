@@ -181,12 +181,14 @@ export async function readChapterBuildInput(
   chapterId: number,
 ): Promise<{
   readonly details: ChapterDetails;
+  readonly revision: number;
   readonly sourceText: readonly string[];
 }> {
   const details = await getChapterDetails(document, chapterId);
 
   return {
     details,
+    revision: await document.serials.getRevision(chapterId),
     sourceText: await collectReaderText(readChapterSource(document, chapterId)),
   };
 }
@@ -708,6 +710,14 @@ class SummaryInputSnapshotDocument implements ReadonlyDocument {
   public readDatabase<T>(): Promise<T> {
     return Promise.reject(
       new Error("Summary input snapshots do not expose a SQLite database."),
+    );
+  }
+
+  public readSearchIndexDatabase<T>(): Promise<T> {
+    return Promise.reject(
+      new Error(
+        "Summary input snapshots do not expose a search index database.",
+      ),
     );
   }
 

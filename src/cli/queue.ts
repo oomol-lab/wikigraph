@@ -3,6 +3,7 @@ import { spawn } from "child_process";
 import { SpineDigestScope } from "../common/llm-scope.js";
 import {
   addBuildJob,
+  assertBuildJobInputRevision,
   boostBuildJob,
   buildChapterGraphArtifact,
   buildChapterSummaryArtifactFromSnapshot,
@@ -17,6 +18,7 @@ import {
   pauseBuildJob,
   readChapterBuildInput,
   readBuildJobEvents,
+  recordBuildJobInputRevision,
   resumeBuildJob,
   resolveBuildJobId,
   runBuildJobWorker,
@@ -204,6 +206,11 @@ async function executeBuildJob(
   );
   let { details } = buildInput;
   const { sourceText } = buildInput;
+  await recordBuildJobInputRevision({
+    currentRevision: buildInput.revision,
+    jobId: job.jobId,
+    ownerId: requireRunningJobOwnerId(job),
+  });
 
   await reporter.setTotals({
     totalGraphWords: details.stage === "sourced" ? details.words : 0,
@@ -232,6 +239,7 @@ async function executeBuildJob(
 
     await new SpineDigestFile(job.archivePath).write(async (document) => {
       assertJobStillRunning(await getBuildJob(job.jobId));
+      await assertCurrentBuildInputRevision(job, document);
       await commitChapterKnowledgeGraphArtifact(document, artifact);
     });
     await reporter.stepCompleted("knowledge-graph");
@@ -262,12 +270,21 @@ async function executeBuildJob(
     details = await new SpineDigestFile(job.archivePath).write(
       async (document) => {
         assertJobStillRunning(await getBuildJob(job.jobId));
+        await assertCurrentBuildInputRevision(job, document);
         return await commitChapterGraphArtifact(document, artifact);
       },
     );
-    ({ details } = await new SpineDigestFile(job.archivePath).readDocument(
+    const nextBuildInput = await new SpineDigestFile(
+      job.archivePath,
+    ).readDocument(
       async (document) => await readChapterBuildInput(document, job.chapterId),
-    ));
+    );
+    details = nextBuildInput.details;
+    await recordBuildJobInputRevision({
+      currentRevision: nextBuildInput.revision,
+      jobId: job.jobId,
+      ownerId: requireRunningJobOwnerId(job),
+    });
     await reporter.updateWords({ graphWords: details.words });
     await reporter.stepCompleted("reading-graph");
   }
@@ -291,12 +308,14 @@ async function executeBuildJob(
 
   await reporter.stepStarted("reading-summary");
   const summaryInput = await new SpineDigestFile(job.archivePath).readDocument(
-    async (document) =>
-      await snapshotChapterSummaryInput(
+    async (document) => {
+      await assertCurrentBuildInputRevision(job, document);
+      return await snapshotChapterSummaryInput(
         document,
         job.chapterId,
         job.workspacePath,
-      ),
+      );
+    },
   );
   const summary = await buildChapterSummaryArtifactFromSnapshot(job.chapterId, {
     llm,
@@ -306,6 +325,7 @@ async function executeBuildJob(
   details = await new SpineDigestFile(job.archivePath).write(
     async (document) => {
       assertJobStillRunning(await getBuildJob(job.jobId));
+      await assertCurrentBuildInputRevision(job, document);
       return await commitChapterSummaryArtifact(
         document,
         job.chapterId,
@@ -322,6 +342,29 @@ function assertJobStillRunning(job: BuildJob): void {
   if (job.state !== "running") {
     throw new Error(`Job ${job.jobId} is ${job.state}. Stop before flushing.`);
   }
+}
+
+async function assertCurrentBuildInputRevision(
+  job: BuildJob,
+  document: {
+    readonly serials: {
+      getRevision(serialId: number): Promise<number>;
+    };
+  },
+): Promise<void> {
+  await assertBuildJobInputRevision({
+    currentRevision: await document.serials.getRevision(job.chapterId),
+    jobId: job.jobId,
+    ownerId: requireRunningJobOwnerId(job),
+  });
+}
+
+function requireRunningJobOwnerId(job: BuildJob): string {
+  if (job.ownerId === undefined) {
+    throw new Error(`Job ${job.jobId} is not owned by this worker.`);
+  }
+
+  return job.ownerId;
 }
 
 async function watchBuildJob(

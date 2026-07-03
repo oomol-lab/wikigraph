@@ -1,7 +1,7 @@
-import { mkdtemp, rm } from "fs/promises";
-import { join, resolve } from "path";
-import { tmpdir } from "os";
+import { rm } from "fs/promises";
+import { resolve } from "path";
 
+import { createWikiGraphTempDirectory } from "../common/wiki-graph-temp.js";
 import { BOOK_META_VERSION, TOC_FILE_VERSION } from "../source/index.js";
 import {
   EPUB_SOURCE_ADAPTER,
@@ -234,7 +234,7 @@ async function withTemporaryDocumentSession<T>(
 ): Promise<T> {
   const directoryPath =
     documentDirPath === undefined
-      ? await mkdtemp(join(tmpdir(), "wikigraph-digest-"))
+      ? await createWikiGraphTempDirectory("archive-open")
       : resolve(documentDirPath);
   const document = await DirectoryDocument.open(directoryPath);
 

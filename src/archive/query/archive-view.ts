@@ -7,6 +7,7 @@ import type {
   SentenceId,
 } from "../../document/index.js";
 import type { BookMeta } from "../../source/index.js";
+import type { Document } from "../../document/index.js";
 import {
   WikipageResolver,
   type WikipageResolverOptions,
@@ -773,8 +774,12 @@ export async function findArchiveObjects(
   options: ArchiveFindOptions = {},
 ): Promise<ArchiveFindResult> {
   const limit = options.limit ?? DEFAULT_FIND_LIMIT;
+  const textOnlySearch = isTextOnlySearch(options);
 
-  if (options.cursor !== undefined) {
+  if (
+    options.cursor !== undefined &&
+    (!textOnlySearch || !isFindCursor(options.cursor))
+  ) {
     const cursor = decodeSearchSessionCursor(options.cursor);
     const descriptor = await readSearchSessionDescriptor(
       cursor.sessionId,
@@ -831,6 +836,15 @@ export async function findArchiveObjects(
 
   if (search === undefined) {
     return createFindResult(query, [], options);
+  }
+
+  if (textOnlySearch) {
+    return await findTextOnlyArchiveObjectsIndexed(
+      document,
+      query,
+      options,
+      search,
+    );
   }
 
   const revisionScope = await createSearchRevisionScope(
@@ -920,12 +934,7 @@ export async function findArchiveObjects(
         ...(await findTriples(document, search, { mentions: allMentions })),
       ]
     : [];
-  const hits =
-    indexed === undefined
-      ? await findArchiveObjectsUncached(document, search, options, {
-          allMentions,
-        })
-      : [...structuredHits, ...indexed.hits];
+  const hits = [...structuredHits, ...(indexed?.hits ?? [])];
   if (isEntityOnlySearch(options)) {
     const ranked = createRankedFindResult(
       query,
@@ -940,6 +949,7 @@ export async function findArchiveObjects(
     const sentenceCacheInput = await createSentenceEvidenceSearchCacheInput(
       document,
       indexed?.result,
+      options,
     );
     const sessionId = await createEntitySearchSession({
       archiveKey: options.archiveKey ?? "archive",
@@ -992,6 +1002,7 @@ export async function findArchiveObjects(
   const sentenceCacheInput = await createSentenceEvidenceSearchCacheInput(
     document,
     indexed?.result,
+    options,
   );
   const sessionId = await createSearchSession({
     archiveKey: options.archiveKey ?? "archive",
@@ -1032,6 +1043,23 @@ export async function findArchiveObjects(
   );
 }
 
+async function findTextOnlyArchiveObjectsIndexed(
+  document: ReadonlyDocument,
+  query: string,
+  options: ArchiveFindOptions,
+  search: LexicalQuery,
+): Promise<ArchiveFindResult> {
+  const indexed = await findArchiveObjectsIndexed(document, query, options);
+  const hits = indexed?.hits ?? [];
+
+  return createFindResult(
+    query,
+    filterLexicalHitsByMatch(hits, search, options.match ?? "any"),
+    options,
+    indexed?.result.terms ?? search.terms,
+  );
+}
+
 async function createSearchRevisionScope(
   document: ReadonlyDocument,
   chapters: readonly number[] | undefined,
@@ -1055,7 +1083,7 @@ async function createSearchRevisionScope(
 }
 
 export async function rebuildArchiveSearchIndex(
-  document: ReadonlyDocument,
+  document: Document,
 ): Promise<void> {
   await ensureSearchIndex(document, await createSearchIndexRecords(document));
 }
@@ -1092,60 +1120,6 @@ export async function grepArchiveObjects(
   );
 }
 
-async function findArchiveObjectsUncached(
-  document: ReadonlyDocument,
-  search: LexicalQuery,
-  options: ArchiveFindOptions,
-  context: {
-    readonly allMentions: readonly MentionRecord[];
-  },
-): Promise<readonly ArchiveFindHit[]> {
-  const requestedTypes = options.types ?? null;
-  const shouldFindMeta =
-    requestedTypes === null || requestedTypes.includes("meta");
-  const shouldFindEntities =
-    requestedTypes === null || requestedTypes.includes("entity");
-  const shouldFindTriples =
-    requestedTypes === null || requestedTypes.includes("triple");
-  const hasOnlyStructuredTypeRequest =
-    requestedTypes !== null &&
-    requestedTypes.every((type) => type === "entity" || type === "triple");
-  const hasTextTypeRequest =
-    requestedTypes === null ||
-    requestedTypes.includes("chapter") ||
-    requestedTypes.includes("meta") ||
-    requestedTypes.includes("fragment") ||
-    requestedTypes.includes("node") ||
-    requestedTypes.includes("source") ||
-    requestedTypes.includes("summary");
-  const metaHits = shouldFindMeta
-    ? findMetaLexical(await document.readBookMeta(), search)
-    : [];
-  const structuredHits = [
-    ...metaHits,
-    ...(shouldFindEntities
-      ? findEntities(search, { mentions: context.allMentions })
-      : []),
-    ...(shouldFindTriples
-      ? await findTriples(document, search, { mentions: context.allMentions })
-      : []),
-  ];
-
-  if (structuredHits.length > 0 && hasOnlyStructuredTypeRequest) {
-    return structuredHits;
-  }
-  if (!hasTextTypeRequest) {
-    return structuredHits;
-  }
-
-  const hits: ArchiveFindHit[] = [];
-
-  hits.push(...(await findChaptersLexical(document, search)));
-  hits.push(...(await findNodesLexical(document, search)));
-
-  return [...structuredHits, ...hits];
-}
-
 async function findArchiveObjectsIndexed(
   document: ReadonlyDocument,
   query: string,
@@ -1157,23 +1131,15 @@ async function findArchiveObjectsIndexed(
     }
   | undefined
 > {
-  try {
-    if (!(await isSearchIndexCurrent(document))) {
-      await ensureSearchIndex(
-        document,
-        await createSearchIndexRecords(document),
-      );
-    }
-  } catch (error) {
-    if (isReadonlySqliteError(error)) {
-      return undefined;
-    }
-
-    throw error;
+  if (!(await isSearchIndexCurrent(document))) {
+    throw new Error(
+      "Wiki Graph search index is missing or outdated. Run `<archive-uri>/index build` before searching.",
+    );
   }
   const result = await querySearchIndex(document, query, {
     ...(options.chapters === undefined ? {} : { chapters: options.chapters }),
     ...(options.match === undefined ? {} : { match: options.match }),
+    ...createSearchIndexQueryLimitOptions(options),
     types: options.types ?? null,
   });
 
@@ -1187,26 +1153,6 @@ async function findArchiveObjectsIndexed(
         ),
         result,
       };
-}
-
-function isReadonlySqliteError(error: unknown): boolean {
-  const code = getErrorCode(error);
-
-  if (code !== undefined && code.startsWith("SQLITE_READONLY")) {
-    return true;
-  }
-
-  return error instanceof Error && error.message.includes("readonly database");
-}
-
-function getErrorCode(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null || !("code" in error)) {
-    return undefined;
-  }
-
-  const code = error.code;
-
-  return typeof code === "string" ? code : undefined;
 }
 
 async function hydrateSearchIndexHits(
@@ -1255,7 +1201,21 @@ function createSearchIndexHydrationOptions(options: ArchiveFindOptions): {
     return {};
   }
 
-  return { textHitLimit: options.limit + 1 };
+  return { textHitLimit: createTextOnlySearchCacheWindow(options.limit) };
+}
+
+function createSearchIndexQueryLimitOptions(options: ArchiveFindOptions): {
+  readonly textHitLimit?: number;
+} {
+  if (!isTextOnlySearch(options) || options.limit === undefined) {
+    return {};
+  }
+
+  return { textHitLimit: createTextOnlySearchCacheWindow(options.limit) };
+}
+
+function createTextOnlySearchCacheWindow(limit: number): number {
+  return Math.max(limit + 1, TEXT_ONLY_SEARCH_CACHE_WINDOW);
 }
 
 function isTextOnlySearch(options: ArchiveFindOptions): boolean {
@@ -3479,13 +3439,14 @@ function createEntitySearchCacheInput(
 async function createSentenceEvidenceSearchCacheInput(
   document: ReadonlyDocument,
   indexResult: SearchIndexQueryResult | undefined,
+  options: ArchiveFindOptions,
 ): Promise<{
   readonly chunkHits: readonly SearchChunkHitInput[];
   readonly entityHits: readonly SearchEntityHitInput[];
   readonly evidenceEvents: readonly SearchEvidenceHitEventInput[];
   readonly tripleHits: readonly SearchTripleHitInput[];
 }> {
-  if (indexResult === undefined) {
+  if (indexResult === undefined || isTextOnlySearch(options)) {
     return {
       chunkHits: [],
       entityHits: [],
@@ -3664,39 +3625,6 @@ function parseEntityQid(id: string): string | undefined {
   return id.startsWith(prefix) ? id.slice(prefix.length) : undefined;
 }
 
-function findMetaLexical(
-  meta: BookMeta | undefined,
-  search: LexicalQuery,
-): readonly ArchiveFindHit[] {
-  if (meta === undefined) {
-    return [];
-  }
-
-  const fields = [
-    meta.title,
-    ...meta.authors,
-    meta.description,
-    meta.publisher,
-  ].filter(isDefined);
-  const content = fields.join("\n");
-  const contentMatch = scoreLexicalText(content, search);
-
-  if (contentMatch === undefined) {
-    return [];
-  }
-
-  return [
-    {
-      field: "metadata",
-      id: ARCHIVE_ROOT_ID,
-      ...createFindMatchFields(contentMatch),
-      snippet: createSnippet(content, contentMatch.snippetNeedle),
-      title: meta.title ?? "Book metadata",
-      type: "meta",
-    },
-  ];
-}
-
 function filterLexicalHitsByMatch(
   hits: readonly ArchiveFindHit[],
   search: LexicalQuery,
@@ -3715,97 +3643,6 @@ function filterLexicalHitsByMatch(
   return hits.filter((hit) =>
     requiredTerms.every((term) => hit.matchedTerms?.includes(term) === true),
   );
-}
-
-async function findChaptersLexical(
-  document: ReadonlyDocument,
-  search: LexicalQuery,
-): Promise<readonly ArchiveFindHit[]> {
-  const hits: ArchiveFindHit[] = [];
-
-  for (const chapter of await listChapters(document)) {
-    const title = chapter.title ?? `[chapter ${chapter.chapterId}]`;
-    const titleMatch = scoreLexicalText(title, search);
-
-    if (titleMatch !== undefined) {
-      hits.push({
-        chapter: chapter.chapterId,
-        field: "title",
-        id: formatChapterId(chapter.chapterId),
-        ...createFindMatchFields(titleMatch),
-        position: {
-          chapter: chapter.chapterId,
-        },
-        snippet: title,
-        state: await createChapterState(document, chapter),
-        title,
-        type: "chapter",
-      });
-    }
-
-    hits.push(
-      ...(await findTextStreamSentencesLexical(
-        document,
-        chapter.chapterId,
-        "summary",
-        title,
-        search,
-      )),
-    );
-
-    hits.push(
-      ...(await findTextStreamSentencesLexical(
-        document,
-        chapter.chapterId,
-        "source",
-        title,
-        search,
-      )),
-    );
-  }
-
-  return hits;
-}
-
-async function findNodesLexical(
-  document: ReadonlyDocument,
-  search: LexicalQuery,
-): Promise<readonly ArchiveFindHit[]> {
-  const hits: ArchiveFindHit[] = [];
-
-  for (const node of await document.chunks.listAll()) {
-    const position = createNodePosition(node.sentenceIds);
-    const labelMatch = scoreLexicalText(node.label, search);
-
-    if (labelMatch !== undefined) {
-      hits.push({
-        chapter: node.sentenceId[0],
-        field: "title",
-        id: formatNodeId(node.id),
-        ...createFindMatchFields(labelMatch),
-        ...(position === undefined ? {} : { position }),
-        snippet: node.label,
-        title: node.label,
-        type: "node",
-      });
-    }
-    const contentMatch = scoreLexicalText(node.content, search);
-
-    if (contentMatch !== undefined) {
-      hits.push({
-        chapter: node.sentenceId[0],
-        field: "content",
-        id: formatNodeId(node.id),
-        ...createFindMatchFields(contentMatch),
-        ...(position === undefined ? {} : { position }),
-        snippet: createSnippet(node.content, contentMatch.snippetNeedle),
-        title: node.label,
-        type: "node",
-      });
-    }
-  }
-
-  return hits;
 }
 
 async function findChapters(
@@ -3856,46 +3693,6 @@ async function findChapters(
   }
 
   return hits;
-}
-
-async function findTextStreamSentencesLexical(
-  document: ReadonlyDocument,
-  chapterId: number,
-  stream: ArchiveTextStreamKind,
-  title: string,
-  search: LexicalQuery,
-): Promise<readonly ArchiveFindHit[]> {
-  const index = await createTextStreamIndex(document, chapterId, stream);
-
-  return index.sentences.flatMap((sentence) => {
-    const match = scoreLexicalText(sentence.text, search);
-
-    if (match === undefined) {
-      return [];
-    }
-
-    return [
-      {
-        chapter: chapterId,
-        field: stream,
-        id: formatTextStreamRangeUri(
-          chapterId,
-          stream,
-          sentence.globalIndex,
-          sentence.globalIndex,
-        ),
-        ...createFindMatchFields(match),
-        position: {
-          chapter: chapterId,
-          fragment: sentence.fragmentId,
-          sentence: sentence.localIndex,
-        },
-        snippet: createSnippet(sentence.text, match.snippetNeedle),
-        title,
-        type: stream === "source" ? ("source" as const) : ("summary" as const),
-      },
-    ];
-  });
 }
 
 async function findTextStreamSentences(
@@ -5399,6 +5196,7 @@ interface ArchiveTextMatch {
 
 const DEFAULT_FIND_LIMIT = 20;
 const GROUP_SCORE_EVIDENCE_LIMIT = 10;
+const TEXT_ONLY_SEARCH_CACHE_WINDOW = 100;
 const GROUP_SCORE_MAX_EQUAL_EVIDENCE_BONUS = 0.3;
 const ARCHIVE_ROOT_ID = "meta:root";
 
@@ -6028,6 +5826,15 @@ function decodeFindCursor(cursor: string | undefined): number {
   }
 
   throw new Error("Invalid search cursor.");
+}
+
+function isFindCursor(cursor: string): boolean {
+  try {
+    decodeFindCursor(cursor);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function createSnippet(value: string, needle?: string): string {

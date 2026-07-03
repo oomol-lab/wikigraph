@@ -12,16 +12,20 @@ const mainMockState = vi.hoisted(() => ({
   } as Record<string, unknown>,
   parseError: undefined as Error | undefined,
   archiveRunCalls: [] as unknown[],
+  archiveIndexRunCalls: [] as unknown[],
   convertRunCalls: [] as unknown[],
   statusRunCalls: 0,
   statusRunArgs: [] as unknown[],
+  gcRunCalls: [] as unknown[],
   archiveChapterRunCalls: [] as unknown[],
   archiveCoverRunCalls: [] as unknown[],
   archiveMetaRunCalls: [] as unknown[],
   legacyRunCalls: [] as unknown[],
   archiveRunError: undefined as Error | undefined,
+  archiveIndexRunError: undefined as Error | undefined,
   convertRunError: undefined as Error | undefined,
   statusRunError: undefined as Error | undefined,
+  gcRunError: undefined as Error | undefined,
   archiveChapterRunError: undefined as Error | undefined,
   archiveCoverRunError: undefined as Error | undefined,
   archiveMetaRunError: undefined as Error | undefined,
@@ -50,6 +54,18 @@ vi.mock("../../src/cli/archive.js", () => ({
   }),
 }));
 
+vi.mock("../../src/cli/archive-index.js", () => ({
+  runArchiveIndexCommand: vi.fn((args: unknown) => {
+    mainMockState.archiveIndexRunCalls.push(args);
+
+    if (mainMockState.archiveIndexRunError !== undefined) {
+      return Promise.reject(mainMockState.archiveIndexRunError);
+    }
+
+    return Promise.resolve();
+  }),
+}));
+
 vi.mock("../../src/cli/convert.js", () => ({
   runConvertCommand: vi.fn((args: unknown) => {
     mainMockState.convertRunCalls.push(args);
@@ -69,6 +85,18 @@ vi.mock("../../src/cli/status.js", () => ({
 
     if (mainMockState.statusRunError !== undefined) {
       return Promise.reject(mainMockState.statusRunError);
+    }
+
+    return Promise.resolve();
+  }),
+}));
+
+vi.mock("../../src/cli/gc.js", () => ({
+  runGcCommand: vi.fn((args: unknown) => {
+    mainMockState.gcRunCalls.push(args);
+
+    if (mainMockState.gcRunError !== undefined) {
+      return Promise.reject(mainMockState.gcRunError);
     }
 
     return Promise.resolve();
@@ -144,16 +172,20 @@ describe("cli/main", () => {
     };
     mainMockState.parseError = undefined;
     mainMockState.archiveRunCalls.length = 0;
+    mainMockState.archiveIndexRunCalls.length = 0;
     mainMockState.convertRunCalls.length = 0;
     mainMockState.statusRunCalls = 0;
     mainMockState.statusRunArgs.length = 0;
+    mainMockState.gcRunCalls.length = 0;
     mainMockState.archiveChapterRunCalls.length = 0;
     mainMockState.archiveCoverRunCalls.length = 0;
     mainMockState.archiveMetaRunCalls.length = 0;
     mainMockState.legacyRunCalls.length = 0;
     mainMockState.archiveRunError = undefined;
+    mainMockState.archiveIndexRunError = undefined;
     mainMockState.convertRunError = undefined;
     mainMockState.statusRunError = undefined;
+    mainMockState.gcRunError = undefined;
     mainMockState.archiveChapterRunError = undefined;
     mainMockState.archiveCoverRunError = undefined;
     mainMockState.archiveMetaRunError = undefined;
@@ -237,6 +269,28 @@ describe("cli/main", () => {
     expect(mainMockState.statusRunCalls).toBe(0);
     expect(stdoutChunks).toStrictEqual([]);
     expect(stderrChunks).toStrictEqual([]);
+    expect(process.exitCode).toBe(0);
+  });
+
+  it("runs the archive index command", async () => {
+    mainMockState.argsResult = {
+      args: {
+        action: "build",
+        archivePath: "/tmp/book.wikg",
+      },
+      help: false,
+      kind: "archive-index",
+    };
+
+    await main();
+
+    expect(mainMockState.archiveIndexRunCalls).toStrictEqual([
+      {
+        action: "build",
+        archivePath: "/tmp/book.wikg",
+      },
+    ]);
+    expect(mainMockState.archiveRunCalls).toHaveLength(0);
     expect(process.exitCode).toBe(0);
   });
 
@@ -332,6 +386,27 @@ describe("cli/main", () => {
       },
     ]);
     expect(mainMockState.archiveMetaRunCalls).toHaveLength(0);
+    expect(process.exitCode).toBe(0);
+  });
+
+  it("runs the gc command", async () => {
+    mainMockState.argsResult = {
+      args: {
+        dryRun: true,
+        force: true,
+        json: true,
+      },
+      help: false,
+      kind: "gc",
+    };
+
+    await main();
+
+    expect(mainMockState.gcRunCalls).toStrictEqual([
+      { dryRun: true, force: true, json: true },
+    ]);
+    expect(mainMockState.archiveRunCalls).toHaveLength(0);
+    expect(mainMockState.statusRunCalls).toBe(0);
     expect(process.exitCode).toBe(0);
   });
 

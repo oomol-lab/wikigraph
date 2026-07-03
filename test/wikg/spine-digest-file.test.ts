@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { DirectoryDocument } from "../../src/document/index.js";
 import { extractWikgArchive } from "../../src/wikg/archive.js";
-import { findArchiveObjects } from "../../src/archive/query/archive-view.js";
+import {
+  findArchiveObjects,
+  rebuildArchiveSearchIndex,
+} from "../../src/archive/query/archive-view.js";
 import { SpineDigest } from "../../src/facade/spine-digest.js";
 import { SpineDigestFile } from "../../src/wikg/spine-digest-file.js";
 import { WikgCoordinator } from "../../src/wikg/wikg-coordinator.js";
@@ -153,13 +156,15 @@ describe("wikg/spine-digest-file", () => {
           });
         });
 
-        await expect(readCoordinatorOverlays(path)).resolves.toStrictEqual([
-          expect.objectContaining({
-            archivePath,
-            entryPath: "database.db",
-            kind: "file",
-          }),
-        ]);
+        const overlays = await readCoordinatorOverlays(path);
+
+        expect(overlays).toHaveLength(1);
+        expect(overlays[0]).toMatchObject({
+          archivePath,
+          entryPath: "database.db",
+          kind: "file",
+        });
+        expect(overlays[0]?.workspacePath).toMatch(/\/database\.db$/u);
       } finally {
         restoreStateDir();
       }
@@ -208,10 +213,73 @@ describe("wikg/spine-digest-file", () => {
           });
         });
 
-        await expect(readCoordinatorOverlays(path)).resolves.toStrictEqual([]);
+        await expect(readCoordinatorOverlays(path)).resolves.toStrictEqual([
+          expect.objectContaining({
+            archivePath,
+            entryPath: "database.db",
+            kind: "file",
+          }),
+        ]);
 
         await expect(readArchivedTitle(path, archivePath)).resolves.toBe(
           "Flushed Title",
+        );
+      } finally {
+        restoreStateDir();
+      }
+    });
+  });
+
+  it("keeps sqlite cache when write sessions only read the database", async () => {
+    await withTempDir("spinedigest-facade-file-", async (path) => {
+      const restoreStateDir = useCoordinatorStateDir(`${path}/state`);
+      try {
+        const archivePath = await createSeedArchive(path);
+
+        await new SpineDigestFile(archivePath).readDocument(
+          async (document) => {
+            await expect(document.peekNextSerialId()).resolves.toBe(2);
+          },
+        );
+
+        await new SpineDigestFile(archivePath).write(async (document) => {
+          await expect(document.peekNextSerialId()).resolves.toBe(2);
+        });
+
+        await expect(readCoordinatorOverlays(path)).resolves.toStrictEqual([
+          expect.objectContaining({
+            archivePath,
+            entryPath: "database.db",
+            kind: "file",
+          }),
+        ]);
+      } finally {
+        restoreStateDir();
+      }
+    });
+  });
+
+  it("flushes sqlite cache when write sessions mutate the database", async () => {
+    await withTempDir("spinedigest-facade-file-", async (path) => {
+      const restoreStateDir = useCoordinatorStateDir(`${path}/state`);
+      try {
+        const archivePath = await createSeedArchive(path);
+
+        await new SpineDigestFile(archivePath).readDocument(
+          async (document) => {
+            await expect(document.peekNextSerialId()).resolves.toBe(2);
+          },
+        );
+
+        await new SpineDigestFile(archivePath).write(async (document) => {
+          await document.createSerial();
+        });
+
+        await expect(readCoordinatorOverlays(path)).resolves.toStrictEqual([]);
+        await new SpineDigestFile(archivePath).readDocument(
+          async (document) => {
+            await expect(document.peekNextSerialId()).resolves.toBe(3);
+          },
         );
       } finally {
         restoreStateDir();
@@ -225,6 +293,13 @@ describe("wikg/spine-digest-file", () => {
       try {
         const archivePath = await createSeedArchive(path);
 
+        await new SpineDigestFile(archivePath).write(
+          async (document) => {
+            await rebuildArchiveSearchIndex(document);
+          },
+          { searchIndexWritebackPolicy: "cache" },
+        );
+
         await new SpineDigestFile(archivePath).readDocument(
           async (document) => {
             await expect(
@@ -236,17 +311,23 @@ describe("wikg/spine-digest-file", () => {
         );
 
         await new SpineDigestFile(archivePath).write(async (document) => {
-          const meta = await document.readBookMeta();
-
-          if (meta === undefined) {
-            throw new Error("Missing test metadata.");
-          }
-
-          await document.replaceBookMeta({
-            ...meta,
-            title: "Fresh Cache Title",
+          await document.replaceToc({
+            items: [
+              {
+                children: [],
+                serialId: 1,
+                title: "Fresh Cache Title",
+              },
+            ],
+            version: 1,
           });
         });
+        await new SpineDigestFile(archivePath).write(
+          async (document) => {
+            await rebuildArchiveSearchIndex(document);
+          },
+          { searchIndexWritebackPolicy: "cache" },
+        );
 
         await new SpineDigestFile(archivePath).readDocument(
           async (document) => {
@@ -255,7 +336,7 @@ describe("wikg/spine-digest-file", () => {
                 archiveKey: archivePath,
               }),
             ).resolves.toMatchObject({
-              items: [expect.objectContaining({ id: "meta:root" })],
+              items: [expect.objectContaining({ id: "chapter:1" })],
             });
           },
         );
@@ -323,7 +404,13 @@ describe("wikg/spine-digest-file", () => {
           }),
         ).rejects.toThrow("stop before flush");
 
-        await expect(readCoordinatorOverlays(path)).resolves.toStrictEqual([]);
+        await expect(readCoordinatorOverlays(path)).resolves.toStrictEqual([
+          expect.objectContaining({
+            archivePath,
+            entryPath: "database.db",
+            kind: "file",
+          }),
+        ]);
         await expect(readArchivedTitle(path, archivePath)).resolves.toBe(
           "Unflushed Title",
         );
@@ -589,6 +676,7 @@ async function createSeedArchive(path: string): Promise<string> {
 
   try {
     await seedDocument(document);
+    await rebuildArchiveSearchIndex(document);
 
     const archivePath = `${path}/fixture/book.wikg`;
 
@@ -627,6 +715,7 @@ async function readCoordinatorOverlays(path: string): Promise<
     readonly archivePath: string;
     readonly entryPath: string;
     readonly kind: string;
+    readonly workspacePath?: string;
   }>
 > {
   try {
@@ -645,7 +734,7 @@ async function readCoordinatorOverlays(path: string): Promise<
   try {
     return await database.queryAll(
       `
-SELECT archive_path, entry_path, kind
+SELECT archive_path, entry_path, kind, workspace_path
 FROM entry_overlays
 ORDER BY archive_path, entry_path
 `,
@@ -654,6 +743,7 @@ ORDER BY archive_path, entry_path
         archivePath: expectString(row.archive_path),
         entryPath: expectString(row.entry_path),
         kind: expectString(row.kind),
+        ...expectOptionalStringProperty(row.workspace_path, "workspacePath"),
       }),
     );
   } finally {
@@ -843,4 +933,15 @@ function expectString(value: unknown): string {
   }
 
   return value;
+}
+
+function expectOptionalStringProperty(
+  value: unknown,
+  key: "workspacePath",
+): { readonly workspacePath?: string } {
+  if (value === null || value === undefined) {
+    return {};
+  }
+
+  return { [key]: expectString(value) };
 }

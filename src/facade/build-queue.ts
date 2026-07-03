@@ -1,10 +1,16 @@
 import { createHash, randomUUID } from "crypto";
 import { appendFile, mkdir, mkdtemp, readFile, rm } from "fs/promises";
-import { join, resolve } from "path";
+import { dirname, join, resolve } from "path";
 
 import { resolveWikiGraphStateDirectoryPath } from "../common/wiki-graph-dir.js";
 import { openSharedStateDatabase } from "../document/index.js";
 import type { Database } from "../document/index.js";
+import {
+  readPathSize,
+  removeDisposableChildDirectories,
+  removeDisposableDirectory,
+} from "../gc/files.js";
+import type { GcContext, GcJobResult } from "../gc/index.js";
 
 export const BUILD_JOB_STATES = [
   "queued",
@@ -46,6 +52,7 @@ export interface BuildJob {
   readonly eventsPath: string;
   readonly finishedAt?: number;
   readonly jobId: string;
+  readonly inputRevision?: number;
   readonly llmJSON?: string;
   readonly ownerId?: string;
   readonly ownerPid?: number;
@@ -175,6 +182,15 @@ export interface BuildJobProgressReporter {
   throwIfStopped(): Promise<void>;
 }
 
+export type BuildJobConflictScope =
+  | {
+      readonly kind: "archive";
+    }
+  | {
+      readonly chapterIds: readonly number[];
+      readonly kind: "chapter";
+    };
+
 const BUILD_QUEUE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS build_jobs (
   job_id TEXT PRIMARY KEY,
@@ -187,6 +203,7 @@ CREATE TABLE IF NOT EXISTS build_jobs (
   queue_rank INTEGER NOT NULL,
   workspace_path TEXT NOT NULL,
   events_path TEXT NOT NULL,
+  input_revision INTEGER,
   llm_json TEXT,
   prompt TEXT,
   owner_id TEXT,
@@ -298,6 +315,60 @@ INSERT INTO build_jobs (
   } finally {
     await state.close();
   }
+}
+
+export async function recordBuildJobInputRevision(input: {
+  readonly currentRevision: number;
+  readonly jobId: string;
+  readonly ownerId: string;
+}): Promise<BuildJob> {
+  const state = await openBuildQueueDatabase();
+
+  try {
+    await state.transaction(async () => {
+      await state.run(
+        `
+UPDATE build_jobs
+SET input_revision = ?,
+    updated_at = ?
+WHERE job_id = ?
+  AND owner_id = ?
+  AND state = 'running'
+`,
+        [input.currentRevision, Date.now(), input.jobId, input.ownerId],
+      );
+    });
+
+    return await requireBuildJobById(state, input.jobId);
+  } finally {
+    await state.close();
+  }
+}
+
+export async function assertBuildJobInputRevision(input: {
+  readonly currentRevision: number;
+  readonly jobId: string;
+  readonly ownerId: string;
+}): Promise<void> {
+  const job = await getBuildJob(input.jobId);
+
+  if (job.state !== "running" || job.ownerId !== input.ownerId) {
+    throw new BuildJobStoppedError(
+      `Job ${input.jobId} is ${job.state}. Stop current worker execution.`,
+    );
+  }
+  if (job.inputRevision === undefined) {
+    throw new Error(
+      `Job ${input.jobId} has no recorded chapter input revision. Requeue the job before committing build output.`,
+    );
+  }
+  if (job.inputRevision === input.currentRevision) {
+    return;
+  }
+
+  throw new Error(
+    `Chapter ${job.chapterId} changed while job ${job.jobId} was running. Requeue the job before committing build output.`,
+  );
 }
 
 export async function listBuildJobs(
@@ -601,7 +672,23 @@ export async function assertNoActiveBuildJobs(input: {
   readonly operation: string;
   readonly requiresTarget?: BuildJobTarget;
 }): Promise<void> {
-  if (input.chapterIds.length === 0) {
+  await assertNoActiveBuildJobConflicts({
+    archivePath: input.archivePath,
+    operation: input.operation,
+    ...(input.requiresTarget === undefined
+      ? {}
+      : { requiresTarget: input.requiresTarget }),
+    scope: { chapterIds: input.chapterIds, kind: "chapter" },
+  });
+}
+
+export async function assertNoActiveBuildJobConflicts(input: {
+  readonly archivePath: string;
+  readonly operation: string;
+  readonly requiresTarget?: BuildJobTarget;
+  readonly scope: BuildJobConflictScope;
+}): Promise<void> {
+  if (input.scope.kind === "chapter" && input.scope.chapterIds.length === 0) {
     return;
   }
 
@@ -610,11 +697,17 @@ export async function assertNoActiveBuildJobs(input: {
   try {
     await recoverStaleBuildJobs(state);
     const archiveKey = createArchiveKey(resolve(input.archivePath));
-    const placeholders = input.chapterIds.map(() => "?").join(", ");
-    const params: Array<number | string> = [archiveKey, ...input.chapterIds];
     const targetFilter =
       input.requiresTarget === undefined ? "" : "AND target = ?";
+    const params: Array<number | string> = [archiveKey];
+    let scopeFilter = "";
 
+    if (input.scope.kind === "chapter") {
+      const placeholders = input.scope.chapterIds.map(() => "?").join(", ");
+
+      scopeFilter = `AND chapter_id IN (${placeholders})`;
+      params.push(...input.scope.chapterIds);
+    }
     if (input.requiresTarget !== undefined) {
       params.push(input.requiresTarget);
     }
@@ -624,7 +717,7 @@ export async function assertNoActiveBuildJobs(input: {
 SELECT *
 FROM build_jobs
 WHERE archive_key = ?
-  AND chapter_id IN (${placeholders})
+  ${scopeFilter}
   AND state IN ('queued', 'running', 'canceling', 'paused')
   ${targetFilter}
 ORDER BY updated_at DESC
@@ -834,6 +927,58 @@ WHERE state IN (${placeholders})
     }
 
     return jobs.length;
+  } finally {
+    await state.close();
+  }
+}
+
+export async function runBuildQueueGc(
+  context: GcContext,
+): Promise<GcJobResult> {
+  const state = await openBuildQueueDatabase();
+  const cutoff = context.force
+    ? context.now
+    : context.now - 7 * 24 * 60 * 60 * 1000;
+
+  try {
+    const scanned = await state.queryOne(
+      "SELECT COUNT(*) AS count FROM build_jobs",
+      undefined,
+      (row) => getNumber(row, "count"),
+    );
+    const jobs = await state.queryAll(
+      `
+SELECT *
+FROM build_jobs
+WHERE state IN ('succeeded', 'failed', 'canceled')
+  AND updated_at <= ?
+`,
+      [cutoff],
+      mapBuildJob,
+    );
+    const childDirectories = context.dryRun
+      ? { freedBytes: 0, removed: 0, scanned: 0 }
+      : await removeDisposableChildDirectories(getBuildJobWorkspaceRootPath());
+    let freedBytes = 0;
+
+    for (const job of jobs) {
+      freedBytes += await readPathSize(job.workspacePath);
+      freedBytes += await readPathSize(job.eventsPath);
+      if (!context.dryRun) {
+        await rm(job.workspacePath, { force: true, recursive: true });
+        freedBytes += await removeDisposableDirectory(
+          dirname(job.workspacePath),
+        );
+        await rm(job.eventsPath, { force: true });
+        await state.run("DELETE FROM build_jobs WHERE job_id = ?", [job.jobId]);
+      }
+    }
+
+    return {
+      freedBytes: freedBytes + childDirectories.freedBytes,
+      removed: jobs.length + childDirectories.removed,
+      scanned: (scanned ?? 0) + childDirectories.scanned,
+    };
   } finally {
     await state.close();
   }
@@ -1324,36 +1469,67 @@ async function readMinQueueRank(state: Database): Promise<number> {
 }
 
 async function openBuildQueueDatabase(): Promise<Database> {
-  return await openSharedStateDatabase(
+  const database = await openSharedStateDatabase(
     getBuildQueueDatabasePath(),
     BUILD_QUEUE_SCHEMA_SQL,
   );
+
+  await migrateBuildQueueSchema(database);
+  return database;
 }
 
 async function openReadonlyBuildQueueDatabase(): Promise<Database> {
-  return await openSharedStateDatabase(
-    getBuildQueueDatabasePath(),
-    BUILD_QUEUE_SCHEMA_SQL,
-    { readonly: true },
-  );
+  return await openBuildQueueDatabase();
 }
 
 function getBuildQueueDatabasePath(): string {
   return join(getBuildQueueStateDirectoryPath(), "build-queue.sqlite");
 }
 
+async function migrateBuildQueueSchema(database: Database): Promise<void> {
+  if ((await listTableColumns(database, "build_jobs")).has("input_revision")) {
+    return;
+  }
+
+  await database.transaction(async () => {
+    const columns = await listTableColumns(database, "build_jobs");
+
+    if (columns.has("input_revision")) {
+      return;
+    }
+
+    await database.run(`
+      ALTER TABLE build_jobs
+      ADD COLUMN input_revision INTEGER
+    `);
+  });
+}
+
+async function listTableColumns(
+  database: Database,
+  table: string,
+): Promise<ReadonlySet<string>> {
+  const rows = await database.queryAll(
+    `PRAGMA table_info(${table})`,
+    undefined,
+    (row) => getString(row, "name"),
+  );
+
+  return new Set(rows);
+}
+
 async function createJobWorkspacePath(
   archiveKey: string,
   jobId: string,
 ): Promise<string> {
-  const rootPath = join(
-    getBuildQueueStateDirectoryPath(),
-    "build-jobs",
-    archiveKey,
-  );
+  const rootPath = join(getBuildJobWorkspaceRootPath(), archiveKey);
 
   await mkdir(rootPath, { recursive: true });
   return await mkdtemp(join(rootPath, `${jobId}-`));
+}
+
+function getBuildJobWorkspaceRootPath(): string {
+  return join(getBuildQueueStateDirectoryPath(), "build-jobs");
 }
 
 async function createJobEventsPath(jobId: string): Promise<string> {
@@ -1388,6 +1564,8 @@ function mapBuildJob(row: Record<string, unknown>): BuildJob {
   const finishedAt =
     row.finished_at === null ? undefined : getNumber(row, "finished_at");
   const errorJSON = getOptionalString(row, "error_json");
+  const inputRevision =
+    row.input_revision === null ? undefined : getNumber(row, "input_revision");
   const llmJSON = getOptionalString(row, "llm_json");
   const prompt = getOptionalString(row, "prompt");
 
@@ -1401,6 +1579,7 @@ function mapBuildJob(row: Record<string, unknown>): BuildJob {
     eventsPath: getString(row, "events_path"),
     ...(finishedAt === undefined ? {} : { finishedAt }),
     jobId: getString(row, "job_id"),
+    ...(inputRevision === undefined ? {} : { inputRevision }),
     ...(llmJSON === undefined ? {} : { llmJSON }),
     ...(ownerId === undefined ? {} : { ownerId }),
     ...(ownerPid === undefined ? {} : { ownerPid }),

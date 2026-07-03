@@ -6,6 +6,7 @@ import type { DirectoryDocument } from "../document/index.js";
 import {
   addChapter,
   applyChapterTree,
+  assertNoActiveBuildJobConflicts,
   assertNoActiveBuildJobs,
   getChapterTree,
   listChapters,
@@ -33,6 +34,11 @@ export async function runArchiveChapterCommand(
   switch (args.action) {
     case "add":
       await runEditableCommand(args.path, async (document) => {
+        await assertNoActiveBuildJobConflicts({
+          archivePath: args.path,
+          operation: "Adding chapter",
+          scope: { kind: "archive" },
+        });
         let details = await addChapter(document, {
           ...(args.parentChapterId === undefined
             ? {}
@@ -61,13 +67,10 @@ export async function runArchiveChapterCommand(
       return;
     case "move":
       await runEditableCommand(args.path, async (document) => {
-        await assertNoActiveBuildJobs({
+        await assertNoActiveBuildJobConflicts({
           archivePath: args.path,
-          chapterIds: collectChapterSubtreeIds(
-            await getChapterTree(document),
-            args.chapterId!,
-          ),
           operation: "Moving chapter",
+          scope: { kind: "archive" },
         });
         const details = await moveChapter(document, args.chapterId!, {
           ...(args.afterChapterId === undefined
@@ -89,16 +92,10 @@ export async function runArchiveChapterCommand(
       return;
     case "remove":
       await runEditableCommand(args.path, async (document) => {
-        await assertNoActiveBuildJobs({
+        await assertNoActiveBuildJobConflicts({
           archivePath: args.path,
-          chapterIds:
-            args.recursive === true
-              ? collectChapterSubtreeIds(
-                  await getChapterTree(document),
-                  args.chapterId!,
-                )
-              : [args.chapterId!],
           operation: "Removing chapter",
+          scope: { kind: "archive" },
         });
         await removeChapter(document, args.chapterId!, {
           recursive: args.recursive ?? false,
@@ -153,6 +150,11 @@ export async function runArchiveChapterCommand(
       return;
     case "set-title":
       await runEditableCommand(args.path, async (document) => {
+        await assertNoActiveBuildJobs({
+          archivePath: args.path,
+          chapterIds: [args.chapterId!],
+          operation: "Setting chapter title",
+        });
         const details = await setChapterTitle(
           document,
           args.chapterId!,
@@ -165,6 +167,13 @@ export async function runArchiveChapterCommand(
     case "tree":
       if (args.treeAction === "apply") {
         await runEditableCommand(args.path, async (document) => {
+          if (args.dryRun !== true) {
+            await assertNoActiveBuildJobConflicts({
+              archivePath: args.path,
+              operation: "Changing chapter tree",
+              scope: { kind: "archive" },
+            });
+          }
           await writeChapterTreeApplyResult(
             await applyChapterTree(
               document,
@@ -422,47 +431,4 @@ async function assertResetAllowed(
       });
       return;
   }
-}
-
-function collectChapterSubtreeIds(
-  tree: ChapterTree,
-  chapterId: number,
-): readonly number[] {
-  for (const node of tree.chapters) {
-    const ids = collectChapterSubtreeIdsFromNode(node, chapterId);
-
-    if (ids.length > 0) {
-      return ids;
-    }
-  }
-
-  return [chapterId];
-}
-
-function collectChapterSubtreeIdsFromNode(
-  node: ChapterTree["chapters"][number],
-  chapterId: number,
-): readonly number[] {
-  if (node.id === chapterId) {
-    return collectAllChapterIds(node);
-  }
-
-  for (const child of node.children) {
-    const ids = collectChapterSubtreeIdsFromNode(child, chapterId);
-
-    if (ids.length > 0) {
-      return ids;
-    }
-  }
-
-  return [];
-}
-
-function collectAllChapterIds(
-  node: ChapterTree["chapters"][number],
-): readonly number[] {
-  return [
-    node.id,
-    ...node.children.flatMap((child) => collectAllChapterIds(child)),
-  ];
 }

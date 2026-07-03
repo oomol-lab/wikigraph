@@ -7,6 +7,7 @@ import {
   renderArchiveCommandHelpText,
   renderArchiveMaintenanceChapterActionHelpText,
   renderArchiveMaintenanceCommandHelpText,
+  renderGcCommandHelpText,
   renderHelpMatrixText,
   renderHelpTopicText,
   renderLegacyCommandHelpText,
@@ -131,6 +132,103 @@ describe("cli/args", () => {
       help: false,
       kind: "config-status",
     });
+  });
+
+  it("parses gc commands", () => {
+    expect(parseCLIArguments(["gc"])).toStrictEqual({
+      args: {},
+      help: false,
+      kind: "gc",
+    });
+    expect(parseCLIArguments(["gc", "--json"])).toStrictEqual({
+      args: {
+        json: true,
+      },
+      help: false,
+      kind: "gc",
+    });
+    expect(parseCLIArguments(["gc", "--force", "--json"])).toStrictEqual({
+      args: {
+        force: true,
+        json: true,
+      },
+      help: false,
+      kind: "gc",
+    });
+    expect(parseCLIArguments(["gc", "--force", "--dry-run"])).toStrictEqual({
+      args: {
+        dryRun: true,
+        force: true,
+      },
+      help: false,
+      kind: "gc",
+    });
+    expect(parseCLIArguments(["gc", "--help"])).toStrictEqual({
+      help: true,
+      helpText: renderGcCommandHelpText(),
+      kind: "help",
+    });
+    expect(() => parseCLIArguments(["transform", "--force"])).toThrow(
+      "The --force option is only supported by `gc`.",
+    );
+    expect(() => parseCLIArguments(["gc", "--jsonl"])).toThrow(
+      "The `gc` command does not support --jsonl",
+    );
+  });
+
+  it("parses archive index object commands", () => {
+    expect(
+      parseCLIArguments(["wkg:///tmp/book.wikg/index", "build", "--json"]),
+    ).toStrictEqual({
+      args: {
+        action: "build",
+        archivePath: "/tmp/book.wikg",
+        json: true,
+      },
+      help: false,
+      kind: "archive-index",
+    });
+    expect(
+      parseCLIArguments(["wkg:///tmp/book.wikg/index", "external"]),
+    ).toStrictEqual({
+      args: {
+        action: "external",
+        archivePath: "/tmp/book.wikg",
+      },
+      help: false,
+      kind: "archive-index",
+    });
+    expect(
+      parseCLIArguments(["wkg:///tmp/book.wikg/index", "build", "--help"]),
+    ).toStrictEqual({
+      help: true,
+      helpText: renderHelpMatrixText({ kind: "object", object: "index" }),
+      kind: "help",
+    });
+    expect(parseCLIArguments(["help", "index"])).toStrictEqual({
+      help: true,
+      helpText: renderHelpMatrixText({ kind: "object", object: "index" }),
+      kind: "help",
+    });
+    expect(parseCLIArguments(["help", "build"])).toStrictEqual({
+      help: true,
+      helpText: renderHelpMatrixText({ kind: "verb", verb: "build" }),
+      kind: "help",
+    });
+    expect(() =>
+      parseCLIArguments(["wkg:///tmp/book.wikg/index", "clear", "--dry-run"]),
+    ).toThrow("The `clear` command does not support --dry-run.");
+    expect(() =>
+      parseCLIArguments(["wkg:///tmp/book.wikg/index", "clear", "--jsonl"]),
+    ).toThrow("The `clear` command does not support --jsonl.");
+    expect(() =>
+      parseCLIArguments([
+        "wkg:///tmp/book.wikg/index",
+        "clear",
+        "--title",
+        "x",
+      ]),
+    ).toThrow("The `clear` command does not support --title.");
   });
 
   it("parses queue commands", () => {

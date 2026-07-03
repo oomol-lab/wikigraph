@@ -14,7 +14,11 @@ import {
   type ReadonlySerialTextStream,
   type SerialTextStream,
 } from "./text-streams.js";
-import { initializeDocumentSchema, SCHEMA_SQL } from "./schema.js";
+import {
+  initializeDocumentSchema,
+  SCHEMA_SQL,
+  SEARCH_INDEX_SCHEMA_SQL,
+} from "./schema.js";
 import {
   ChunkStore,
   FragmentGroupStore,
@@ -47,11 +51,14 @@ export interface DocumentFileStore {
   deleteTree(path: string): Promise<void>;
   ensureDirectory(path: string): Promise<void>;
   initializeDatabaseSchema(): boolean;
+  markDatabaseDirty?(): void;
+  markSearchIndexDatabaseDirty?(): void;
   openDatabaseReadonly(): boolean;
   listFileContents?(path: string): Promise<ReadonlyMap<string, Uint8Array>>;
   listFiles(path: string): Promise<readonly string[]>;
   readFile(path: string): Promise<Uint8Array | undefined>;
   resolveDatabasePath(documentPath: string): Promise<string>;
+  resolveSearchIndexDatabasePath?(documentPath: string): Promise<string>;
   writeFile(
     path: string,
     content: string | Uint8Array,
@@ -71,6 +78,8 @@ const LOCAL_DOCUMENT_FILE_STORE: DocumentFileStore = {
     await mkdir(path, { recursive: true });
   },
   initializeDatabaseSchema: () => true,
+  markDatabaseDirty: () => undefined,
+  markSearchIndexDatabaseDirty: () => undefined,
   openDatabaseReadonly: () => false,
   listFiles: async (path) =>
     (await readdir(path, { withFileTypes: true }))
@@ -89,6 +98,8 @@ const LOCAL_DOCUMENT_FILE_STORE: DocumentFileStore = {
   },
   resolveDatabasePath: (documentPath) =>
     Promise.resolve(join(documentPath, "database.db")),
+  resolveSearchIndexDatabasePath: (documentPath) =>
+    Promise.resolve(join(documentPath, "fts.db")),
   writeFile: async (path, content, options) => {
     if (typeof content === "string") {
       await writeFile(path, content, {
@@ -128,6 +139,9 @@ export interface ReadonlyDocument {
     operation: (document: ReadonlyDocument) => Promise<T> | T,
   ): Promise<T>;
   readDatabase<T>(
+    operation: (database: DocumentDatabase) => Promise<T> | T,
+  ): Promise<T>;
+  readSearchIndexDatabase<T>(
     operation: (database: DocumentDatabase) => Promise<T> | T,
   ): Promise<T>;
   readBookMeta(): Promise<BookMeta | undefined>;
@@ -174,6 +188,9 @@ export interface Document extends ReadonlyDocument {
   writeCover(cover: SourceAsset): Promise<void>;
   writeSummary(serialId: number, summary: string): Promise<void>;
   writeToc(toc: TocFile): Promise<void>;
+  writeSearchIndexDatabase<T>(
+    operation: (database: DocumentDatabase) => Promise<T> | T,
+  ): Promise<T>;
 }
 
 export class DirectoryDocument implements Document {
@@ -234,7 +251,12 @@ export class DirectoryDocument implements Document {
       const database = await Database.open(
         databasePath,
         shouldInitializeDatabaseSchema ? SCHEMA_SQL : "",
-        { readonly: fileStore.openDatabaseReadonly() },
+        {
+          onWrite: () => {
+            fileStore.markDatabaseDirty?.();
+          },
+          readonly: fileStore.openDatabaseReadonly(),
+        },
       );
       if (shouldInitializeDatabaseSchema) {
         await initializeDocumentSchema(database);
@@ -356,6 +378,22 @@ export class DirectoryDocument implements Document {
     return await operation(this.#database);
   }
 
+  public async readSearchIndexDatabase<T>(
+    operation: (database: Database) => Promise<T> | T,
+  ): Promise<T> {
+    return await this.#openSearchIndexDatabase(true, operation);
+  }
+
+  public async writeSearchIndexDatabase<T>(
+    operation: (database: Database) => Promise<T> | T,
+  ): Promise<T> {
+    return await this.#openSearchIndexDatabase(false, operation);
+  }
+
+  public async deleteSearchIndexDatabase(): Promise<void> {
+    await this.#fileStore.deleteFile(join(this.path, "fts.db"));
+  }
+
   public async peekNextSerialId(): Promise<number> {
     return (await this.serials.getMaxId()) + 1;
   }
@@ -449,6 +487,32 @@ export class DirectoryDocument implements Document {
 
   public async close(): Promise<void> {
     await this.release();
+  }
+
+  async #openSearchIndexDatabase<T>(
+    readonly: boolean,
+    operation: (database: Database) => Promise<T> | T,
+  ): Promise<T> {
+    const databasePath =
+      this.#fileStore.resolveSearchIndexDatabasePath === undefined
+        ? join(this.path, "fts.db")
+        : await this.#fileStore.resolveSearchIndexDatabasePath(this.path);
+    const database = await Database.open(
+      databasePath,
+      readonly ? "" : SEARCH_INDEX_SCHEMA_SQL,
+      {
+        onWrite: () => {
+          this.#fileStore.markSearchIndexDatabaseDirty?.();
+        },
+        readonly,
+      },
+    );
+
+    try {
+      return await operation(database);
+    } finally {
+      await database.close();
+    }
   }
 
   async #rollbackContext(context: DirectoryDocumentContext): Promise<void> {

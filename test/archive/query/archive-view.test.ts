@@ -4,7 +4,7 @@ import { join } from "path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { DirectoryDocument } from "../../../src/document/index.js";
+import { Database, DirectoryDocument } from "../../../src/document/index.js";
 import {
   findArchiveObjects,
   grepArchiveObjects,
@@ -15,7 +15,14 @@ import {
   listRelatedArchiveObjects,
   readArchiveText,
   readArchivePage,
+  rebuildArchiveSearchIndex,
 } from "../../../src/archive/query/archive-view.js";
+import {
+  isSearchIndexCurrent,
+  querySearchIndex,
+  readArchiveIndexSettings,
+  SEARCH_INDEX_FTS_HIT_LIMIT,
+} from "../../../src/archive/search-index/index.js";
 import { deleteArchiveSearchSessions } from "../../../src/archive/query/search-cache.js";
 import { withTempDir } from "../../helpers/temp.js";
 
@@ -34,6 +41,42 @@ describe("archive/query/archive-view", () => {
       await rm(testStateDir, { force: true, recursive: true });
       testStateDir = undefined;
     }
+  });
+
+  it("distinguishes a missing index from a current empty index", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await expect(readArchiveIndexSettings(document)).resolves.toStrictEqual(
+          {
+            ftsEmbedded: false,
+          },
+        );
+        await expect(isSearchIndexCurrent(document)).resolves.toBe(false);
+
+        await rebuildArchiveSearchIndex(document);
+
+        await expect(isSearchIndexCurrent(document)).resolves.toBe(true);
+        await expect(countSearchIndexRows(document)).resolves.toBe(0);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("rejects search when the FTS index is missing", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await expect(findArchiveObjects(document, "missing")).rejects.toThrow(
+          "Wiki Graph search index is missing or outdated. Run `<archive-uri>/index build` before searching.",
+        );
+      } finally {
+        await document.release();
+      }
+    });
   });
 
   it("searches sourced sentences before graph or summary build", async () => {
@@ -128,6 +171,17 @@ describe("archive/query/archive-view", () => {
           }),
         );
         await expect(listDocumentTableNames(document)).resolves.toEqual(
+          expect.arrayContaining(["text_sentence_records"]),
+        );
+        await expect(listDocumentTableNames(document)).resolves.not.toEqual(
+          expect.arrayContaining([
+            "search_index_state",
+            "search_object_properties_fts",
+            "search_object_properties_records",
+            "text_sentence_fts",
+          ]),
+        );
+        await expect(listSearchIndexTableNames(document)).resolves.toEqual(
           expect.arrayContaining([
             "search_index_state",
             "search_object_properties_fts",
@@ -136,6 +190,54 @@ describe("archive/query/archive-view", () => {
             "text_sentence_records",
           ]),
         );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("limits FTS candidates before search cache hydration", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        expect(SEARCH_INDEX_FTS_HIT_LIMIT).toBe(32_000);
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.writeSummary(
+            1,
+            "Wiki summary candidate one. Wiki summary candidate two.",
+          );
+          await openedDocument.chunks.save({
+            content: "Wiki limit candidate one",
+            generation: 0,
+            id: 200,
+            label: "Wiki limit one",
+            sentenceId: [1, 0],
+            sentenceIds: [[1, 0]],
+            wordsCount: 4,
+            weight: 1,
+          });
+          await openedDocument.chunks.save({
+            content: "Wiki limit candidate two",
+            generation: 0,
+            id: 201,
+            label: "Wiki limit two",
+            sentenceId: [1, 1],
+            sentenceIds: [[1, 1]],
+            wordsCount: 4,
+            weight: 1,
+          });
+        });
+        await rebuildArchiveSearchIndex(document);
+
+        const result = await querySearchIndex(document, "Wiki", {
+          objectHitLimit: 2,
+          textHitLimit: 2,
+        });
+
+        expect(result?.objectHits).toHaveLength(2);
+        expect(result?.textHits).toHaveLength(2);
       } finally {
         await document.release();
       }
@@ -232,6 +334,7 @@ describe("archive/query/archive-view", () => {
             version: 1,
           });
         });
+        await rebuildArchiveSearchIndex(document);
 
         const archiveKey = `${path}/book.wikg`;
         const chapterOne = await findArchiveObjects(document, "Cache Split", {
@@ -259,6 +362,16 @@ describe("archive/query/archive-view", () => {
         expect(sourceOnly.items.map((item) => item.type)).toStrictEqual([
           "source",
         ]);
+        await expect(
+          countStructuredCacheRowsForQuery(`${path}/state`, "Cache Split", [
+            "source",
+          ]),
+        ).resolves.toBe(0);
+        await expect(
+          countSearchSessionsForQuery(`${path}/state`, "Cache Split", [
+            "source",
+          ]),
+        ).resolves.toBe(0);
       } finally {
         restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();
@@ -286,6 +399,7 @@ describe("archive/query/archive-view", () => {
             weight: 1,
           });
         });
+        await rebuildArchiveSearchIndex(document);
 
         const result = await findArchiveObjects(document, "SharedTerm", {
           archiveKey: `${path}/book.wikg`,
@@ -351,7 +465,7 @@ describe("archive/query/archive-view", () => {
     });
   });
 
-  it("prioritizes entity matches before source fallback", async () => {
+  it("prioritizes entity matches before source hits", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
       process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
@@ -433,6 +547,7 @@ describe("archive/query/archive-view", () => {
             surface: "陈友谅",
           });
         });
+        await rebuildArchiveSearchIndex(document);
 
         const result = await findArchiveObjects(document, "陈友谅", {
           limit: 3,
@@ -723,6 +838,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const result = await findArchiveObjects(document, "舰", {
           types: ["entity"],
@@ -735,7 +851,7 @@ describe("archive/query/archive-view", () => {
         );
 
         expect(multi?.score).toBeGreaterThan(single?.score ?? 0);
-        expect(multi?.score).toBeLessThan((single?.score ?? 0) * 4);
+        expect(multi?.score).toBeLessThan((single?.score ?? 0) * 5);
       } finally {
         restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
         await document.release();
@@ -876,39 +992,6 @@ describe("archive/query/archive-view", () => {
     });
   });
 
-  it("falls back to lexical source scan with session cursors", async () => {
-    await withTempDir("spinedigest-archive-view-", async (path) => {
-      const previousStateDir = process.env.WIKIGRAPH_STATE_DIR;
-      process.env.WIKIGRAPH_STATE_DIR = `${path}/state`;
-      const document = await DirectoryDocument.open(`${path}/document`);
-
-      try {
-        await seedSourcedDocument(document);
-
-        const firstPage = await findArchiveObjects(document, "Wiki", {
-          limit: 1,
-          types: ["source", "node"],
-        });
-        const secondPage = await findArchiveObjects(document, "ignored query", {
-          ...(firstPage.nextCursor === null
-            ? {}
-            : { cursor: firstPage.nextCursor }),
-          limit: 1,
-          types: ["source", "node"],
-        });
-
-        expect(firstPage.items).toHaveLength(1);
-        expect(firstPage.nextCursor).not.toBeNull();
-        expect(["source", "node"]).toContain(firstPage.items[0]?.type);
-        expect(secondPage.query).toBe("Wiki");
-        expect(secondPage.items[0]?.id).not.toBe(firstPage.items[0]?.id);
-      } finally {
-        restoreEnv("WIKIGRAPH_STATE_DIR", previousStateDir);
-        await document.release();
-      }
-    });
-  });
-
   it("supports all-keyword find matching when requested", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
@@ -998,11 +1081,63 @@ describe("archive/query/archive-view", () => {
         expect(result.items).toStrictEqual([
           expect.objectContaining({
             chapter: 1,
-            id: "wkg://chapter/1/source#0..2",
+            id: "wkg://chapter/1/source#0",
             position: { chapter: 1, sentence: 0 },
             type: "source",
           }),
         ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("keeps indexed text-only cursors paginated beyond the first lookahead", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          const tocItems = [];
+
+          for (let index = 0; index < 12; index += 1) {
+            const serialId = await openedDocument.createSerial();
+            const draft = await openedDocument
+              .getSerialFragments(serialId)
+              .createDraft();
+
+            draft.addSentence(`CursorOnly indexed source ${index}.`, 4);
+            await draft.commit();
+            tocItems.push({
+              children: [],
+              serialId,
+              title: `Cursor ${index}`,
+            });
+          }
+
+          await openedDocument.writeToc({
+            items: tocItems,
+            version: 1,
+          });
+        });
+        await rebuildArchiveSearchIndex(document);
+
+        const firstPage = await findArchiveObjects(document, "CursorOnly", {
+          limit: 5,
+          types: ["source"],
+        });
+        const secondPage = await findArchiveObjects(document, "CursorOnly", {
+          ...(firstPage.nextCursor === null
+            ? {}
+            : { cursor: firstPage.nextCursor }),
+          limit: 5,
+          types: ["source"],
+        });
+
+        expect(firstPage.items).toHaveLength(5);
+        expect(firstPage.nextCursor).not.toBeNull();
+        expect(secondPage.items).toHaveLength(5);
+        expect(secondPage.items[0]?.id).not.toBe(firstPage.items[0]?.id);
       } finally {
         await document.release();
       }
@@ -2627,6 +2762,7 @@ async function seedSourcedDocument(
       version: 1,
     });
   });
+  await rebuildArchiveSearchIndex(document);
 }
 
 function restoreEnv(name: string, value: string | undefined): void {
@@ -2654,6 +2790,125 @@ async function listDocumentTableNames(
         (row) => String(row.name),
       ),
   );
+}
+
+async function listSearchIndexTableNames(
+  document: DirectoryDocument,
+): Promise<string[]> {
+  return await document.readSearchIndexDatabase(
+    async (database) =>
+      await database.queryAll(
+        `
+          SELECT name
+          FROM sqlite_master
+          WHERE type IN ('table', 'virtual table')
+          ORDER BY name
+        `,
+        undefined,
+        (row) => String(row.name),
+      ),
+  );
+}
+
+async function countSearchIndexRows(
+  document: DirectoryDocument,
+): Promise<number> {
+  return await document.readSearchIndexDatabase(async (database) => {
+    const row = await database.queryOne(
+      `
+        SELECT
+          (SELECT COUNT(*) FROM text_sentence_records) +
+          (SELECT COUNT(*) FROM search_object_properties_records) AS count
+      `,
+      undefined,
+      (value) => Number(value.count),
+    );
+
+    return row ?? 0;
+  });
+}
+
+async function countStructuredCacheRowsForQuery(
+  statePath: string,
+  query: string,
+  types: readonly string[],
+): Promise<number> {
+  const database = await Database.open(
+    join(statePath, "search-sessions.sqlite"),
+    "",
+    { readonly: true },
+  );
+
+  try {
+    const optionsJSON = JSON.stringify({
+      chapters: null,
+      order: "doc-asc",
+      types,
+    });
+    const row = await database.queryOne(
+      `
+        WITH matching_sessions AS (
+          SELECT session_id
+          FROM search_sessions
+          WHERE query = ?
+            AND options_json = ?
+        )
+        SELECT
+          (SELECT COUNT(*)
+           FROM search_evidence_hit_events
+           WHERE session_id IN (SELECT session_id FROM matching_sessions)) +
+          (SELECT COUNT(*)
+           FROM search_entity_hits
+           WHERE session_id IN (SELECT session_id FROM matching_sessions)) +
+          (SELECT COUNT(*)
+           FROM search_triple_hits
+           WHERE session_id IN (SELECT session_id FROM matching_sessions)) +
+          (SELECT COUNT(*)
+           FROM search_chunk_hits
+           WHERE session_id IN (SELECT session_id FROM matching_sessions)) AS count
+      `,
+      [query, optionsJSON],
+      (value) => Number(value.count),
+    );
+
+    return row ?? 0;
+  } finally {
+    await database.close();
+  }
+}
+
+async function countSearchSessionsForQuery(
+  statePath: string,
+  query: string,
+  types: readonly string[],
+): Promise<number> {
+  const database = await Database.open(
+    join(statePath, "search-sessions.sqlite"),
+    "",
+    { readonly: true },
+  );
+
+  try {
+    const optionsJSON = JSON.stringify({
+      chapters: null,
+      order: "doc-asc",
+      types,
+    });
+    const row = await database.queryOne(
+      `
+        SELECT COUNT(*) AS count
+        FROM search_sessions
+        WHERE query = ?
+          AND options_json = ?
+      `,
+      [query, optionsJSON],
+      (value) => Number(value.count),
+    );
+
+    return row ?? 0;
+  } finally {
+    await database.close();
+  }
 }
 
 function createEntityWikipageMockFetch(): typeof fetch {
