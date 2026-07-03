@@ -819,19 +819,42 @@ function parseArchiveIndexUriArguments(
   }
   rejectArchiveExtraPositionals(action, tail, 0, helpRoute);
   rejectArchiveNonReadFlags(action, values, helpRoute);
+  rejectArchiveFlag(action, "--after", values.after, helpRoute);
   rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+  rejectArchiveFlag(action, "--before", values.before, helpRoute);
   rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
   rejectArchiveFlag(action, "--context", values.context, helpRoute);
   rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+  rejectArchiveFlag(action, "--digest-dir", values["digest-dir"], helpRoute);
   rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
   rejectArchiveFlag(action, "--from", values.from, helpRoute);
+  rejectArchiveFlag(action, "--json-input", values["json-input"], helpRoute);
   rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
+  rejectArchiveFlag(action, "--parent", values.parent, helpRoute);
+  rejectArchiveFlag(action, "--predicate", values.predicate, helpRoute);
   rejectArchiveFlag(action, "--role", values.role, helpRoute);
+  rejectArchiveFlag(action, "--stage", values.stage, helpRoute);
+  rejectArchiveFlag(action, "--task", values.task, helpRoute);
   rejectArchiveFlag(action, "--to", values.to, helpRoute);
+  rejectArchiveBooleanFlag(
+    action,
+    "--accept-cost",
+    values["accept-cost"],
+    helpRoute,
+  );
+  rejectArchiveBooleanFlag(action, "--active", values.active, helpRoute);
   rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
   rejectArchiveBooleanFlag(action, "--backlinks", values.backlinks, helpRoute);
+  rejectArchiveBooleanFlag(action, "--boost", values.boost, helpRoute);
+  rejectArchiveBooleanFlag(action, "--clear", values.clear, helpRoute);
   rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
   rejectArchiveBooleanFlag(action, "--dry-run", values["dry-run"], helpRoute);
+  rejectArchiveBooleanFlag(action, "--first", values.first, helpRoute);
+  rejectArchiveBooleanFlag(action, "--jsonl", values.jsonl, helpRoute);
+  rejectArchiveBooleanFlag(action, "--last", values.last, helpRoute);
+  rejectArchiveBooleanFlag(action, "--root", values.root, helpRoute);
+  rejectArchiveBooleanFlag(action, "--verbose", values.verbose, helpRoute);
+  rejectCommandMetaFlags(values, action, helpRoute);
 
   return {
     args: {

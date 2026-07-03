@@ -218,6 +218,17 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments(["wkg:///tmp/book.wikg/index", "clear", "--dry-run"]),
     ).toThrow("The `clear` command does not support --dry-run.");
+    expect(() =>
+      parseCLIArguments(["wkg:///tmp/book.wikg/index", "clear", "--jsonl"]),
+    ).toThrow("The `clear` command does not support --jsonl.");
+    expect(() =>
+      parseCLIArguments([
+        "wkg:///tmp/book.wikg/index",
+        "clear",
+        "--title",
+        "x",
+      ]),
+    ).toThrow("The `clear` command does not support --title.");
   });
 
   it("parses queue commands", () => {
