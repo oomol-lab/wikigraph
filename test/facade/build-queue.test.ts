@@ -251,7 +251,7 @@ describe("facade/build-queue", () => {
     });
   });
 
-  it("writes structured events and removes succeeded workspaces", async () => {
+  it("writes structured events and removes succeeded work", async () => {
     await withTempDir("spinedigest-build-queue-", async (path) => {
       useStateDir(`${path}/state`);
       const job = await addBuildJob({
@@ -558,7 +558,7 @@ describe("facade/build-queue", () => {
         concurrency: 1,
         executeJob: async () => {
           const lock = await lockSqliteDatabaseBriefly(
-            `${path}/state/build-queue.sqlite`,
+            `${path}/state/jobs/job.sqlite`,
           );
           releaseLockPromise = lock.released;
           throw new Error("planned failure");
@@ -583,7 +583,7 @@ describe("facade/build-queue", () => {
       });
 
       await forceRunningPid(
-        `${path}/state/build-queue.sqlite`,
+        `${path}/state/jobs/job.sqlite`,
         job.jobId,
         99999999,
       );

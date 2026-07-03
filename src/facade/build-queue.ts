@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "crypto";
 import { appendFile, mkdir, mkdtemp, readFile, rm } from "fs/promises";
 import { dirname, join, resolve } from "path";
 
-import { resolveWikiGraphStateDirectoryPath } from "../common/wiki-graph-dir.js";
+import { resolveWikiGraphJobsDirectoryPath } from "../common/wiki-graph-dir.js";
 import { openSharedStateDatabase } from "../document/index.js";
 import type { Database } from "../document/index.js";
 import {
@@ -1483,7 +1483,7 @@ async function openReadonlyBuildQueueDatabase(): Promise<Database> {
 }
 
 function getBuildQueueDatabasePath(): string {
-  return join(getBuildQueueStateDirectoryPath(), "build-queue.sqlite");
+  return join(getBuildQueueStateDirectoryPath(), "job.sqlite");
 }
 
 async function migrateBuildQueueSchema(database: Database): Promise<void> {
@@ -1529,24 +1529,18 @@ async function createJobWorkspacePath(
 }
 
 function getBuildJobWorkspaceRootPath(): string {
-  return join(getBuildQueueStateDirectoryPath(), "build-jobs");
+  return join(getBuildQueueStateDirectoryPath(), "work");
 }
 
 async function createJobEventsPath(jobId: string): Promise<string> {
-  const rootPath = join(getBuildQueueStateDirectoryPath(), "build-events");
+  const rootPath = join(getBuildQueueStateDirectoryPath(), "events");
 
   await mkdir(rootPath, { recursive: true });
   return join(rootPath, `${jobId}.ndjson`);
 }
 
 function getBuildQueueStateDirectoryPath(): string {
-  const stateDirectoryPath = process.env.WIKIGRAPH_STATE_DIR;
-
-  if (stateDirectoryPath !== undefined && stateDirectoryPath.trim() !== "") {
-    return resolve(stateDirectoryPath);
-  }
-
-  return resolveWikiGraphStateDirectoryPath();
+  return resolveWikiGraphJobsDirectoryPath();
 }
 
 function mapBuildJob(row: Record<string, unknown>): BuildJob {

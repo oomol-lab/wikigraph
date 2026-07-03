@@ -2864,7 +2864,7 @@ async function countStructuredCacheRowsForQuery(
   types: readonly string[],
 ): Promise<number> {
   const database = await Database.open(
-    join(statePath, "search-sessions.sqlite"),
+    join(statePath, "cache", "search-sessions.sqlite"),
     "",
     { readonly: true },
   );
@@ -2913,7 +2913,7 @@ async function countSearchSessionsForQuery(
   types: readonly string[],
 ): Promise<number> {
   const database = await Database.open(
-    join(statePath, "search-sessions.sqlite"),
+    join(statePath, "cache", "search-sessions.sqlite"),
     "",
     { readonly: true },
   );
