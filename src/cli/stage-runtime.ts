@@ -54,7 +54,7 @@ export async function loadRequiredStageConfig(options: {
   if (config.llm?.provider === undefined || config.llm.model === undefined) {
     throw new Error(
       withHelpRoute(
-        "Missing LLM configuration. Set --llm, `llm.provider` and `llm.model` in ~/.wikigraph/config.json, or the matching WIKIGRAPH_LLM_* environment variables.",
+        "Missing LLM configuration. Set --llm for one run, or configure `wikg://local/config/llm` with provider and model.",
         CLI_HELP_ROUTES.config,
       ),
     );

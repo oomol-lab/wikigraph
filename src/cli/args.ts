@@ -19,7 +19,6 @@ import {
   renderMainHelpText,
   renderQueueCommandHelpText,
   renderArchiveMaintenanceChapterActionHelpText,
-  renderStatusHelpText,
   renderTransformHelpText,
 } from "./help.js";
 import {
@@ -30,8 +29,6 @@ import {
   formatLocatedChapterResourceUri,
   formatLocatedChapterSourceCollectionUri,
   formatLocatedChapterUri,
-  LEGACY_WIKI_GRAPH_JOB_URI_PREFIX,
-  LEGACY_WIKI_GRAPH_URI_PREFIX,
   parseLocatedWikiGraphUri,
   WIKI_GRAPH_JOB_URI_PREFIX,
   WIKI_GRAPH_URI_PREFIX,
@@ -128,10 +125,6 @@ export interface CLIObjectMetadataArguments {
   readonly key?: string;
   readonly llmJSON?: string;
   readonly objectPath: string;
-}
-
-export interface CLIStatusArguments {
-  readonly llmJSON?: string;
 }
 
 export type CLILocalConfigAction =
@@ -406,20 +399,9 @@ export type ParsedCLIArguments =
       readonly kind: "gc";
     }
   | {
-      readonly args: CLIStatusArguments;
-      readonly help: false;
-      readonly kind: "config-status";
-    }
-  | {
       readonly args: CLILocalConfigArguments;
       readonly help: false;
       readonly kind: "local-config";
-    }
-  | {
-      readonly args: CLIStatusArguments;
-      readonly help: true;
-      readonly helpText: string;
-      readonly kind: "config-status";
     }
   | {
       readonly args: CLILegacyArguments;
@@ -642,10 +624,6 @@ export function parseCLIArguments(
 
   if (positionals[0] === "help") {
     return parseHelpArguments(positionals.slice(1), values);
-  }
-
-  if (positionals[0] === "config") {
-    return parseConfigArguments(positionals.slice(1), values);
   }
 
   if (positionals[0] === "gc") {
@@ -2215,35 +2193,6 @@ function parseTransformArguments(
     help: false,
     kind: "convert",
   };
-}
-
-function parseConfigArguments(
-  positionals: readonly string[],
-  values: ArchiveArgumentValues & ArchiveMetaFlagValues,
-): ParsedCLIArguments {
-  const action = positionals[0];
-
-  if (values.help === true && action === undefined) {
-    return {
-      args: {},
-      help: true,
-      helpText: renderStatusHelpText(),
-      kind: "config-status",
-    };
-  }
-
-  if (action !== "status") {
-    throw new Error(
-      withHelpRoute(
-        action === undefined
-          ? "Missing config action. Expected status."
-          : `Invalid config action: ${action}. Expected status.`,
-        "wikigraph config status --help",
-      ),
-    );
-  }
-
-  return parseConfigStatusArguments(positionals.slice(1), values);
 }
 
 function parseGcArguments(
@@ -3968,85 +3917,6 @@ function parseHelpArguments(
   };
 }
 
-function parseConfigStatusArguments(
-  positionals: readonly string[],
-  values: {
-    readonly author?: readonly string[];
-    readonly "clear-authors"?: boolean;
-    readonly "clear-description"?: boolean;
-    readonly "clear-identifier"?: boolean;
-    readonly "clear-language"?: boolean;
-    readonly "clear-published-at"?: boolean;
-    readonly "clear-publisher"?: boolean;
-    readonly "clear-title"?: boolean;
-    readonly description?: string;
-    readonly "digest-dir"?: string;
-    readonly help?: boolean;
-    readonly identifier?: string;
-    readonly input?: string;
-    readonly "input-format"?: string;
-    readonly json?: boolean;
-    readonly language?: string;
-    readonly limit?: string;
-    readonly llm?: string;
-    readonly output?: string;
-    readonly "output-format"?: string;
-    readonly "published-at"?: string;
-    readonly publisher?: string;
-    readonly prompt?: string;
-    readonly stage?: string;
-    readonly verbose?: boolean;
-  },
-): ParsedCLIArguments {
-  rejectStatusFlag("digest-dir", values["digest-dir"]);
-  rejectStatusFlag("input", values.input);
-  rejectStatusFlag("input-format", values["input-format"]);
-  rejectStatusFlag("json", values.json);
-  rejectStatusFlag("limit", values.limit);
-  rejectStatusFlag("output", values.output);
-  rejectStatusFlag("output-format", values["output-format"]);
-  rejectStatusFlag("prompt", values.prompt);
-  rejectStatusFlag("stage", values.stage);
-  rejectStatusMetaFlags(values);
-
-  if (values.verbose) {
-    throw new Error(
-      withHelpRoute(
-        "The `config status` command does not support --verbose.",
-        "wikigraph config status --help",
-      ),
-    );
-  }
-
-  if (positionals.length > 0) {
-    throw new Error(
-      withHelpRoute(
-        `Unexpected positional arguments: ${positionals.join(" ")}.`,
-        "wikigraph config status --help",
-      ),
-    );
-  }
-
-  const args = {
-    ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-  } satisfies CLIStatusArguments;
-
-  if (values.help ?? false) {
-    return {
-      args,
-      help: true,
-      helpText: renderStatusHelpText(),
-      kind: "config-status",
-    };
-  }
-
-  return {
-    args,
-    help: false,
-    kind: "config-status",
-  };
-}
-
 function parseSerialId(value: string, flag: string, helpRoute: string): number {
   const normalized = value.trim();
 
@@ -4391,17 +4261,6 @@ function rejectGcFlag(
   );
 }
 
-function rejectStatusMetaFlags(values: ArchiveMetaFlagValues): void {
-  for (const flag of listPresentMetaFlags(values)) {
-    throw new Error(
-      withHelpRoute(
-        `The \`config status\` command does not support ${flag}.`,
-        "wikigraph config status --help",
-      ),
-    );
-  }
-}
-
 function rejectTransformFlag(
   name: string,
   value: boolean | string | undefined,
@@ -4490,20 +4349,6 @@ function rejectHelpFlag(
   }
 }
 
-function rejectStatusFlag(
-  name: string,
-  value: boolean | string | undefined,
-): void {
-  if (value !== undefined) {
-    throw new Error(
-      withHelpRoute(
-        `The \`config status\` command does not support --${name}.`,
-        "wikigraph config status --help",
-      ),
-    );
-  }
-}
-
 function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
   return (
     value === "create" ||
@@ -4569,10 +4414,7 @@ function isUriFirstArchiveAction(
 }
 
 function isWikiGraphUri(value: string | undefined): boolean {
-  return (
-    value?.startsWith(WIKI_GRAPH_URI_PREFIX) === true ||
-    value?.startsWith(LEGACY_WIKI_GRAPH_URI_PREFIX) === true
-  );
+  return value?.startsWith(WIKI_GRAPH_URI_PREFIX) === true;
 }
 
 function stripObjectUriPrefix(objectUri: string): string {
@@ -4586,7 +4428,7 @@ function stripObjectUriPrefix(objectUri: string): string {
 }
 
 function isWikiGraphJobUri(value: string | undefined): boolean {
-  return isWikiGraphLocalJobUri(value) || isLegacyWikiGraphJobUri(value);
+  return isWikiGraphLocalJobUri(value);
 }
 
 function isWikiGraphLocalConfigUri(value: string | undefined): boolean {
@@ -4662,9 +4504,6 @@ function getWikiGraphUriPrefix(uri: string): string | undefined {
   if (uri.startsWith(WIKI_GRAPH_URI_PREFIX)) {
     return WIKI_GRAPH_URI_PREFIX;
   }
-  if (uri.startsWith(LEGACY_WIKI_GRAPH_URI_PREFIX)) {
-    return LEGACY_WIKI_GRAPH_URI_PREFIX;
-  }
 
   return undefined;
 }
@@ -4676,19 +4515,12 @@ function isWikiGraphLocalJobUri(value: string | undefined): boolean {
   );
 }
 
-function isLegacyWikiGraphJobUri(value: string | undefined): boolean {
-  return value?.startsWith(LEGACY_WIKI_GRAPH_JOB_URI_PREFIX) === true;
-}
-
 function parseWikiGraphJobUriBody(uri: string): string | undefined {
   if (uri === WIKI_GRAPH_JOB_URI_PREFIX) {
     return "";
   }
   if (uri.startsWith(`${WIKI_GRAPH_JOB_URI_PREFIX}/`)) {
     return uri.slice(WIKI_GRAPH_JOB_URI_PREFIX.length);
-  }
-  if (uri.startsWith(LEGACY_WIKI_GRAPH_JOB_URI_PREFIX)) {
-    return uri.slice(LEGACY_WIKI_GRAPH_JOB_URI_PREFIX.length);
   }
 
   return undefined;

@@ -14,11 +14,9 @@ const queueMockState = vi.hoisted(() => ({
   inputRevisionAssertions: [] as unknown[],
   inputRevisionRecords: [] as unknown[],
   cliConfig: {} as {
-    readonly queue?: {
-      readonly concurrent?: number;
-    };
-    readonly request?: {
-      readonly concurrent?: number;
+    readonly concurrent?: {
+      readonly job?: number;
+      readonly request?: number;
     };
   },
   revision: 1,
@@ -563,8 +561,8 @@ describe("cli/queue", () => {
 
   it("uses configured queue concurrency for worker slots", async () => {
     queueMockState.cliConfig = {
-      queue: {
-        concurrent: 5,
+      concurrent: {
+        job: 5,
       },
     };
 

@@ -61,10 +61,7 @@ import {
   type SearchIndexQueryResult,
   type SearchIndexTextHit,
 } from "../search-index/search-index.js";
-import {
-  LEGACY_WIKI_GRAPH_URI_PREFIX,
-  WIKI_GRAPH_URI_PREFIX,
-} from "../../common/wiki-graph-uri.js";
+import { WIKI_GRAPH_URI_PREFIX } from "../../common/wiki-graph-uri.js";
 
 export type ArchiveObjectType =
   | "chapter"
@@ -5240,16 +5237,11 @@ const GROUP_SCORE_MAX_EQUAL_EVIDENCE_BONUS = 0.3;
 const ARCHIVE_ROOT_ID = "meta:root";
 
 function isWikiGraphObjectUri(uri: string): boolean {
-  return (
-    uri.startsWith(WIKI_GRAPH_URI_PREFIX) ||
-    uri.startsWith(LEGACY_WIKI_GRAPH_URI_PREFIX)
-  );
+  return uri.startsWith(WIKI_GRAPH_URI_PREFIX);
 }
 
 function normalizeWikiGraphObjectUri(uri: string): string {
-  return uri.startsWith(LEGACY_WIKI_GRAPH_URI_PREFIX)
-    ? `${WIKI_GRAPH_URI_PREFIX}${uri.slice(LEGACY_WIKI_GRAPH_URI_PREFIX.length)}`
-    : uri;
+  return uri;
 }
 
 const BROAD_FIND_LENS_HINT = {

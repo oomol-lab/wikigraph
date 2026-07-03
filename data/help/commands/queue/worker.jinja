@@ -10,5 +10,5 @@ Usage:
 Notes:
   - Users normally do not run this directly.
   - Queue mutating commands start the worker when needed.
-  - Worker job concurrency follows `queue.concurrent` from configuration.
-  - LLM request concurrency inside jobs follows `request.concurrent`.
+  - Worker job concurrency follows `job` in `wikg://local/config/concurrent`.
+  - LLM request concurrency inside jobs follows `request` in `wikg://local/config/concurrent`.

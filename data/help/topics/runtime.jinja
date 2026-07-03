@@ -25,7 +25,7 @@ Queue behavior:
   - `queue add`, `wikg://local/job/<job-id> resume`, `wikg://local/job/<job-id> boost`, and `wikg://local/job/<job-id>/target set` try to start a transient worker.
   - The worker exits after idle time; it is not intended to be a permanent daemon.
   - `wikg://local/job/<job-id> watch --jsonl` is the stable agent-facing progress stream.
-  - `request.concurrent` in `~/.wikigraph/config.json` controls the worker slot count.
+  - `wikg://local/config/concurrent` controls job and LLM request concurrency.
 
 Progress and diagnostics:
   - Queue progress is recorded as durable events and exposed by `queue watch`.

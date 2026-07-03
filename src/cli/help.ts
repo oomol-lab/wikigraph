@@ -19,8 +19,6 @@ export const HELP_TOPICS = [
   "matrix",
   "format",
   "config",
-  "env",
-  "config-file",
   "runtime",
   "uri",
   "retrieval",
@@ -771,14 +769,6 @@ const HELP_TOPIC_METADATA: readonly {
     summary: "Configuration overview, precedence, and when each layer applies.",
   },
   {
-    name: "env",
-    summary: "Detailed environment variable reference.",
-  },
-  {
-    name: "config-file",
-    summary: "Detailed ~/.wikigraph/config.json reference.",
-  },
-  {
     name: "runtime",
     summary: "Exit behavior, streams, progress, and digest workspace rules.",
   },
@@ -831,8 +821,6 @@ const HELP_TOPIC_TEMPLATE_NAMES: Readonly<Record<HelpTopic, string>> = {
   matrix: "help/topics/matrix",
   format: "help/topics/format",
   config: "help/topics/config",
-  env: "help/topics/env",
-  "config-file": "help/topics/config-file",
   runtime: "help/topics/runtime",
   uri: "help/topics/uri",
   retrieval: "help/topics/retrieval",
@@ -856,10 +844,6 @@ let helpTemplateEnvironment: ReturnType<typeof createEnv> | undefined;
 
 export function renderMainHelpText(): string {
   return renderHelpTemplate("help/commands/root");
-}
-
-export function renderStatusHelpText(): string {
-  return renderHelpTemplate("help/commands/config-status");
 }
 
 export function renderTransformHelpText(): string {

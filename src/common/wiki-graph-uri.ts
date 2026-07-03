@@ -1,9 +1,7 @@
 import { resolve } from "path";
 
 export const WIKI_GRAPH_URI_PREFIX = "wikg://";
-export const LEGACY_WIKI_GRAPH_URI_PREFIX = "wkg://";
 export const WIKI_GRAPH_JOB_URI_PREFIX = "wikg://local/job";
-export const LEGACY_WIKI_GRAPH_JOB_URI_PREFIX = "wkg-job://";
 export const WIKI_GRAPH_ARCHIVE_EXTENSION = ".wikg";
 
 export interface LocatedWikiGraphUri {
@@ -16,10 +14,7 @@ export function isWikiGraphUri(value: string | undefined): value is string {
 }
 
 export function isWikiGraphJobUri(value: string | undefined): value is string {
-  return (
-    isWikiGraphLocalJobUri(value) ||
-    value?.startsWith(LEGACY_WIKI_GRAPH_JOB_URI_PREFIX) === true
-  );
+  return isWikiGraphLocalJobUri(value);
 }
 
 export function parseLocatedWikiGraphUri(uri: string): LocatedWikiGraphUri {
@@ -39,7 +34,7 @@ export function parseLocatedWikiGraphUri(uri: string): LocatedWikiGraphUri {
   );
 
   if (archiveIndex < 0) {
-    return { objectUri: normalizeWikiGraphUriPrefix(uri) };
+    return { objectUri: uri };
   }
 
   const archivePath = parts.slice(0, archiveIndex + 1).join("/");
@@ -189,18 +184,12 @@ function getWikiGraphUriPrefix(uri: string): string | undefined {
   if (uri.startsWith(WIKI_GRAPH_URI_PREFIX)) {
     return WIKI_GRAPH_URI_PREFIX;
   }
-  if (uri.startsWith(LEGACY_WIKI_GRAPH_URI_PREFIX)) {
-    return LEGACY_WIKI_GRAPH_URI_PREFIX;
-  }
 
   return undefined;
 }
 
 function isWikiGraphUriPrefix(value: string | undefined): value is string {
-  return (
-    value?.startsWith(WIKI_GRAPH_URI_PREFIX) === true ||
-    value?.startsWith(LEGACY_WIKI_GRAPH_URI_PREFIX) === true
-  );
+  return value?.startsWith(WIKI_GRAPH_URI_PREFIX) === true;
 }
 
 function isWikiGraphLocalJobUri(value: string | undefined): boolean {
@@ -208,10 +197,4 @@ function isWikiGraphLocalJobUri(value: string | undefined): boolean {
     value === WIKI_GRAPH_JOB_URI_PREFIX ||
     value?.startsWith(`${WIKI_GRAPH_JOB_URI_PREFIX}/`) === true
   );
-}
-
-function normalizeWikiGraphUriPrefix(uri: string): string {
-  return uri.startsWith(LEGACY_WIKI_GRAPH_URI_PREFIX)
-    ? `${WIKI_GRAPH_URI_PREFIX}${uri.slice(LEGACY_WIKI_GRAPH_URI_PREFIX.length)}`
-    : uri;
 }

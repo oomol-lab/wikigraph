@@ -13,7 +13,6 @@ import {
   renderLegacyCommandHelpText,
   renderMainHelpText,
   renderQueueCommandHelpText,
-  renderStatusHelpText,
   renderTransformHelpText,
 } from "../../src/cli/help.js";
 
@@ -120,18 +119,6 @@ describe("cli/args", () => {
     expect(recipeHelp.helpText).toContain(
       "cat chapter.txt | wikigraph transform --input-format txt --output-format markdown",
     );
-  });
-
-  it("parses --llm for runtime-configurable commands", () => {
-    expect(
-      parseCLIArguments(["config", "status", "--llm", '{"model":"cli-model"}']),
-    ).toStrictEqual({
-      args: {
-        llmJSON: '{"model":"cli-model"}',
-      },
-      help: false,
-      kind: "config-status",
-    });
   });
 
   it("parses local config URI commands", () => {
@@ -478,18 +465,6 @@ describe("cli/args", () => {
         "reading-summary",
       ]),
     ).toThrow("is not supported");
-
-    expect(
-      parseCLIArguments(["wkg-job://job-1", "get", "--json"]),
-    ).toStrictEqual({
-      args: {
-        action: "status",
-        jobId: "job-1",
-        json: true,
-      },
-      help: false,
-      kind: "queue",
-    });
 
     expect(parseCLIArguments(["queue", "--help"])).toStrictEqual({
       help: true,
@@ -1542,42 +1517,16 @@ describe("cli/args", () => {
     });
   });
 
-  it("parses config status and prints config status help text", () => {
-    expect(parseCLIArguments(["config", "status"])).toStrictEqual({
-      args: {},
-      help: false,
-      kind: "config-status",
-    });
-
-    expect(parseCLIArguments(["config", "status", "--help"])).toStrictEqual({
-      args: {},
-      help: true,
-      helpText: renderStatusHelpText(),
-      kind: "config-status",
-    });
-
-    expect(parseCLIArguments(["search", "--help"])).toStrictEqual({
-      help: true,
-      helpText: renderArchiveCommandHelpText("search"),
-      kind: "help",
-    });
-  });
-
   it("prints help topic pages", () => {
     expect(parseCLIArguments(["help", "runtime"])).toStrictEqual({
       help: true,
       helpText: renderHelpTopicText("runtime"),
       kind: "help",
     });
-    expect(parseCLIArguments(["help", "env"])).toStrictEqual({
-      help: true,
-      helpText: renderHelpTopicText("env"),
+    expect(parseCLIArguments(["search", "--help"])).toStrictEqual({
       kind: "help",
-    });
-    expect(parseCLIArguments(["help", "config-file"])).toStrictEqual({
       help: true,
-      helpText: renderHelpTopicText("config-file"),
-      kind: "help",
+      helpText: renderArchiveCommandHelpText("search"),
     });
     expect(parseCLIArguments(["help", "object"])).toStrictEqual({
       help: true,
@@ -1720,7 +1669,7 @@ describe("cli/args", () => {
 
   it("rejects invalid help usage", () => {
     expect(() => parseCLIArguments(["help", "unknown"])).toThrow(
-      "Invalid help topic: unknown. Expected one of overview, task, command, object, verb, matrix, format, config, env, config-file, runtime, uri, retrieval, recipe, troubleshoot, ai.\nSee: wikigraph --help",
+      "Invalid help topic: unknown. Expected one of overview, task, command, object, verb, matrix, format, config, runtime, uri, retrieval, recipe, troubleshoot, ai.\nSee: wikigraph --help",
     );
     expect(() =>
       parseCLIArguments(["help", "object", "entity", "extra"]),
@@ -1740,17 +1689,6 @@ describe("cli/args", () => {
     );
   });
 
-  it("rejects invalid config status usage", () => {
-    expect(() =>
-      parseCLIArguments(["config", "status", "--input", "book.epub"]),
-    ).toThrow(
-      "The `config status` command does not support --input.\nSee: wikigraph config status --help",
-    );
-    expect(() => parseCLIArguments(["status", "book.wikg"])).toThrow(
-      "Unknown command: status.",
-    );
-  });
-
   it("documents the layered help contract", () => {
     const rootHelpText = renderMainHelpText();
     const commandHelpText = renderHelpTopicText("command");
@@ -1762,8 +1700,6 @@ describe("cli/args", () => {
     );
     expect(rootHelpText).toContain("wikigraph help overview");
     expect(rootHelpText).toContain("wikigraph help uri");
-    expect(rootHelpText).toContain("wikigraph help env");
-    expect(rootHelpText).toContain("wikigraph help config-file");
     expect(rootHelpText).toContain("wikigraph <archive-uri> get");
     expect(rootHelpText).toContain(
       "wikigraph <archive-uri>/chapter/tree get|set",
@@ -1784,7 +1720,7 @@ describe("cli/args", () => {
     expect(rootHelpText).toContain("wikigraph help matrix");
     expect(rootHelpText).toContain("Queue generation tasks call an LLM");
     expect(renderHelpTopicText("runtime")).toContain("Runtime Behavior");
-    expect(renderHelpTopicText("config")).toContain("Configuration Overview");
+    expect(renderHelpTopicText("config")).toContain("Configuration");
     expect(renderHelpTopicText("command")).toContain(
       "wikigraph <located-wkg-uri> search",
     );
@@ -1834,30 +1770,12 @@ describe("cli/args", () => {
     expect(commandHelpText).toContain("wikigraph <archive-uri> export");
     expect(commandHelpText).toContain("wikigraph transform");
     expect(commandHelpText).not.toContain("wikigraph ls");
-    expect(renderHelpTopicText("config")).toContain("wikigraph help env");
-    expect(renderHelpTopicText("config")).toContain("Inline LLM JSON");
+    expect(renderHelpTopicText("config")).toContain("wikg://local/config/llm");
+    expect(renderHelpTopicText("config")).toContain(
+      "wikg://local/config/concurrent",
+    );
+    expect(renderHelpTopicText("config")).toContain("One-run overrides");
     expect(renderHelpTopicText("config")).toContain("baseUrl");
-    expect(renderHelpTopicText("env")).toContain("WIKIGRAPH_LLM_MODEL");
-    expect(renderHelpTopicText("env")).toContain("WIKIGRAPH_REQUEST_STREAM");
-    expect(renderHelpTopicText("env")).toContain(
-      "positive number or JSON number array such as `0.2` or `[0.2, 0.4]`",
-    );
-    expect(renderHelpTopicText("env")).toContain(
-      "non-empty string (typically a URL) such as `https://api.example/v1`",
-    );
-    expect(renderHelpTopicText("config-file")).toContain(
-      "~/.wikigraph/config.json",
-    );
-    expect(renderHelpTopicText("config-file")).toContain("llm.provider");
-    expect(renderHelpTopicText("config-file")).toContain(
-      'JSON string such as `"https://api.example/v1"`',
-    );
-    expect(renderHelpTopicText("config-file")).toContain(
-      "positive number or JSON number array such as `0.9` or `[0.85, 0.9]`",
-    );
-    expect(renderHelpTopicText("config-file")).toContain(
-      "JSON boolean, either `true` or `false`",
-    );
     expect(
       renderArchiveMaintenanceChapterActionHelpText("set-summary"),
     ).toContain("The chapter must be `reading-graph`");

@@ -5,10 +5,6 @@ export function resolveWikiGraphHomeDirectoryPath(): string {
   return join(homedir(), ".wikigraph");
 }
 
-export function resolveWikiGraphConfigFilePath(): string {
-  return join(resolveWikiGraphHomeDirectoryPath(), "config.json");
-}
-
 export function resolveWikiGraphStateDirectoryPath(): string {
   return join(resolveWikiGraphHomeDirectoryPath(), "state");
 }

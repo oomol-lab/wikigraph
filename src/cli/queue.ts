@@ -163,7 +163,7 @@ async function runQueueWorker(): Promise<void> {
   const config = await loadCLIConfig();
 
   await runBuildJobWorker({
-    concurrency: config.queue?.concurrent ?? DEFAULT_QUEUE_CONCURRENCY,
+    concurrency: config.concurrent?.job ?? DEFAULT_QUEUE_CONCURRENCY,
     executeJob: async (job, reporter, context) => {
       await executeBuildJob(job, reporter, context);
     },
