@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "crypto";
+import { appendFileSync, mkdirSync } from "fs";
 import { appendFile, mkdir, mkdtemp, readFile, rm } from "fs/promises";
 import { join, resolve } from "path";
 
@@ -144,8 +145,13 @@ export interface BuildJobWorkerOptions {
   readonly executeJob: (
     job: BuildJob,
     reporter: BuildJobProgressReporter,
+    context: BuildJobExecutionContext,
   ) => Promise<void>;
   readonly idleTimeoutMs?: number;
+}
+
+export interface BuildJobExecutionContext {
+  readonly signal: AbortSignal;
 }
 
 export interface BuildJobProgressReporter {
@@ -226,6 +232,7 @@ const ACTIVE_JOB_STATES = new Set<BuildJobState>([
   "paused",
 ]);
 const WORKER_HEARTBEAT_INTERVAL_MS = 5_000;
+const WORKER_MEMORY_SNAPSHOT_INTERVAL_MS = 5_000;
 
 export async function addBuildJob(
   options: AddBuildJobOptions,
@@ -652,21 +659,74 @@ export async function runBuildJobWorker(
   let busySlotCount = 0;
   let idleSince = Date.now();
 
-  const stop = (): void => {
+  const stop = (signal: NodeJS.Signals): void => {
     stopping = true;
+    appendBuildWorkerLog({
+      event: "signal",
+      memory: getWorkerMemorySnapshot(),
+      ownerId,
+      signal,
+    });
+  };
+  const logUncaughtException = (error: Error, origin: string): void => {
+    appendBuildWorkerLog({
+      error: formatErrorEvent(error),
+      event: "uncaught_exception",
+      memory: getWorkerMemorySnapshot(),
+      origin,
+      ownerId,
+    });
+  };
+  const logUnhandledRejection = (reason: unknown): void => {
+    appendBuildWorkerLog({
+      error: formatErrorEvent(reason),
+      event: "unhandled_rejection",
+      memory: getWorkerMemorySnapshot(),
+      ownerId,
+    });
+  };
+  const logExit = (code: number): void => {
+    appendBuildWorkerLog({
+      code,
+      event: "exit",
+      memory: getWorkerMemorySnapshot(),
+      ownerId,
+    });
   };
 
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
+  process.on("uncaughtExceptionMonitor", logUncaughtException);
+  process.on("unhandledRejection", logUnhandledRejection);
+  process.once("exit", logExit);
 
   const heartbeat = setInterval(() => {
     void heartbeatBuildWorker(ownerId).catch(() => undefined);
   }, WORKER_HEARTBEAT_INTERVAL_MS);
+  const memorySnapshot = setInterval(() => {
+    appendBuildWorkerLog({
+      busySlotCount,
+      event: "memory_snapshot",
+      memory: getWorkerMemorySnapshot(),
+      ownerId,
+    });
+  }, WORKER_MEMORY_SNAPSHOT_INTERVAL_MS);
 
   try {
+    appendBuildWorkerLog({
+      concurrency,
+      event: "worker_started",
+      memory: getWorkerMemorySnapshot(),
+      ownerId,
+    });
     const acquired = await acquireBuildWorkerLease(state, ownerId);
 
     if (!acquired) {
+      appendBuildWorkerLog({
+        event: "worker_lease_skipped",
+        memory: getWorkerMemorySnapshot(),
+        ownerId,
+      });
       return;
     }
 
@@ -712,10 +772,19 @@ export async function runBuildJobWorker(
     );
   } finally {
     clearInterval(heartbeat);
+    clearInterval(memorySnapshot);
     process.removeListener("SIGINT", stop);
     process.removeListener("SIGTERM", stop);
+    process.removeListener("uncaughtExceptionMonitor", logUncaughtException);
+    process.removeListener("unhandledRejection", logUnhandledRejection);
+    process.removeListener("exit", logExit);
     await releaseBuildWorkerLease(state, ownerId);
     await state.close();
+    appendBuildWorkerLog({
+      event: "worker_stopped",
+      memory: getWorkerMemorySnapshot(),
+      ownerId,
+    });
   }
 }
 
@@ -725,8 +794,21 @@ async function executeClaimedBuildJob(
   options: BuildJobWorkerOptions,
 ): Promise<void> {
   const reporter = new BuildJobProgressAccumulator(job, ownerId);
+  const abortController = new AbortController();
+  const stopWatcher = setInterval(() => {
+    void abortJobWhenStopped(job, ownerId, abortController).catch(
+      () => undefined,
+    );
+  }, 500);
 
   try {
+    appendBuildWorkerLog({
+      event: "job_started",
+      jobId: job.jobId,
+      memory: getWorkerMemorySnapshot(),
+      ownerId,
+      target: job.target,
+    });
     await appendBuildJobEvent(job, {
       at: Date.now(),
       jobId: job.jobId,
@@ -734,16 +816,68 @@ async function executeClaimedBuildJob(
       state: "running",
       type: "started",
     });
-    await options.executeJob(job, reporter);
+    await options.executeJob(job, reporter, {
+      signal: abortController.signal,
+    });
+    await reporter.throwIfStopped();
     await markBuildJobSucceeded(job.jobId, ownerId);
+    appendBuildWorkerLog({
+      event: "job_succeeded",
+      jobId: job.jobId,
+      memory: getWorkerMemorySnapshot(),
+      ownerId,
+      target: job.target,
+    });
   } catch (error) {
-    if (error instanceof BuildJobStoppedError) {
+    if (
+      error instanceof BuildJobStoppedError ||
+      abortController.signal.aborted
+    ) {
       await markBuildJobStopped(job.jobId, ownerId);
+      appendBuildWorkerLog({
+        event: "job_stopped",
+        jobId: job.jobId,
+        memory: getWorkerMemorySnapshot(),
+        ownerId,
+        target: job.target,
+      });
       return;
     }
 
     await markBuildJobFailed(job.jobId, ownerId, error);
+    appendBuildWorkerLog({
+      error: formatErrorEvent(error),
+      event: "job_failed",
+      jobId: job.jobId,
+      memory: getWorkerMemorySnapshot(),
+      ownerId,
+      target: job.target,
+    });
+  } finally {
+    clearInterval(stopWatcher);
   }
+}
+
+async function abortJobWhenStopped(
+  job: BuildJob,
+  ownerId: string,
+  abortController: AbortController,
+): Promise<void> {
+  if (abortController.signal.aborted) {
+    return;
+  }
+
+  const latest = await readBuildJobForStopCheck(job.jobId);
+
+  if (latest.state === "running" && latest.ownerId === ownerId) {
+    return;
+  }
+
+  abortController.abort(
+    new BuildJobStoppedError(
+      `Job ${job.jobId} is ${latest.state}. Stop current worker execution.`,
+    ),
+  );
 }
 
 export async function readBuildJobEvents(
@@ -1301,6 +1435,10 @@ function getBuildQueueDatabasePath(): string {
   return join(getBuildQueueStateDirectoryPath(), "build-queue.sqlite");
 }
 
+function getBuildWorkerLogPath(): string {
+  return join(getBuildQueueStateDirectoryPath(), "build-worker.ndjson");
+}
+
 async function createJobWorkspacePath(
   archiveKey: string,
   jobId: string,
@@ -1330,6 +1468,43 @@ function getBuildQueueStateDirectoryPath(): string {
   }
 
   return resolveWikiGraphStateDirectoryPath();
+}
+
+function appendBuildWorkerLog(
+  event: Record<string, unknown> & { readonly event: string },
+): void {
+  try {
+    mkdirSync(getBuildQueueStateDirectoryPath(), { recursive: true });
+    appendFileSync(
+      getBuildWorkerLogPath(),
+      `${JSON.stringify({
+        at: Date.now(),
+        pid: process.pid,
+        ...event,
+      })}\n`,
+      "utf8",
+    );
+  } catch {
+    return;
+  }
+}
+
+function getWorkerMemorySnapshot(): {
+  readonly arrayBuffers: number;
+  readonly external: number;
+  readonly heapTotal: number;
+  readonly heapUsed: number;
+  readonly rss: number;
+} {
+  const memory = process.memoryUsage();
+
+  return {
+    arrayBuffers: memory.arrayBuffers,
+    external: memory.external,
+    heapTotal: memory.heapTotal,
+    heapUsed: memory.heapUsed,
+    rss: memory.rss,
+  };
 }
 
 function mapBuildJob(row: Record<string, unknown>): BuildJob {
