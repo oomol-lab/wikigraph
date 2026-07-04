@@ -27,6 +27,8 @@ export const DEFAULT_KNOWLEDGE_GRAPH_RECALL_PROMPT = [
 export function createStageLLM(
   config: CLIConfig,
   options?: {
+    readonly cacheDirPath?: string;
+    readonly logDirPath?: string;
     readonly onStreamProgress?: LLMStreamProgressCallback;
     readonly onTokenUsage?: LLMTokenUsageCallback;
   },
@@ -42,6 +44,12 @@ export function createStageLLM(
       ...(llmOptions.topP === undefined ? {} : { topP: llmOptions.topP }),
     }),
     ...llmOptions,
+    ...(options?.cacheDirPath === undefined
+      ? {}
+      : { cacheDirPath: options.cacheDirPath }),
+    ...(options?.logDirPath === undefined
+      ? {}
+      : { logDirPath: options.logDirPath }),
     ...(options?.onStreamProgress === undefined
       ? {}
       : { onStreamProgress: options.onStreamProgress }),

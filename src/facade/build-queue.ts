@@ -1,15 +1,11 @@
 import { createHash, randomUUID } from "crypto";
-import { appendFile, mkdir, mkdtemp, readFile, rm } from "fs/promises";
-import { dirname, join, resolve } from "path";
+import { appendFile, mkdir, readFile, rm } from "fs/promises";
+import { join, resolve } from "path";
 
 import { resolveWikiGraphJobsDirectoryPath } from "../common/wiki-graph-dir.js";
 import { openSharedStateDatabase } from "../document/index.js";
 import type { Database } from "../document/index.js";
-import {
-  readPathSize,
-  removeDisposableChildDirectories,
-  removeDisposableDirectory,
-} from "../gc/files.js";
+import { readPathSize, removeDisposableChildDirectories } from "../gc/files.js";
 import type { GcContext, GcJobResult } from "../gc/index.js";
 
 export const BUILD_JOB_STATES = [
@@ -58,6 +54,7 @@ export interface BuildJobTokenUsage {
 export interface BuildJob {
   readonly archiveKey: string;
   readonly archivePath: string;
+  readonly cachePath: string;
   readonly chapterId: number;
   readonly createdAt: number;
   readonly currentStep?: BuildJobTarget;
@@ -66,6 +63,7 @@ export interface BuildJob {
   readonly finishedAt?: number;
   readonly jobId: string;
   readonly inputRevision?: number;
+  readonly logPath: string;
   readonly llmJSON?: string;
   readonly ownerId?: string;
   readonly ownerPid?: number;
@@ -207,6 +205,8 @@ CREATE TABLE IF NOT EXISTS build_jobs (
   state TEXT NOT NULL,
   queue_rank INTEGER NOT NULL,
   workspace_path TEXT NOT NULL,
+  cache_path TEXT NOT NULL,
+  log_path TEXT NOT NULL,
   events_path TEXT NOT NULL,
   input_revision INTEGER,
   llm_json TEXT,
@@ -276,7 +276,9 @@ export async function addBuildJob(
       }
 
       const jobId = options.jobId ?? randomUUID();
-      const workspacePath = await createJobWorkspacePath(archiveKey, jobId);
+      const workspacePath = await createJobWorkspacePath(jobId);
+      const cachePath = await createJobCachePath(jobId);
+      const logPath = await createJobLogPath(jobId);
       const eventsPath = await createJobEventsPath(jobId);
       const queueRank =
         options.boost === true
@@ -287,8 +289,9 @@ export async function addBuildJob(
         `
 INSERT INTO build_jobs (
   job_id, archive_key, archive_path, chapter_id, target, state, queue_rank,
-  workspace_path, events_path, llm_json, prompt, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?)
+  workspace_path, cache_path, log_path, events_path, llm_json, prompt,
+  created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `,
         [
           jobId,
@@ -298,6 +301,8 @@ INSERT INTO build_jobs (
           options.target,
           queueRank,
           workspacePath,
+          cachePath,
+          logPath,
           eventsPath,
           options.llmJSON ?? null,
           options.prompt ?? null,
@@ -927,6 +932,8 @@ WHERE state IN (${placeholders})
 
     for (const job of jobs) {
       await rm(job.workspacePath, { force: true, recursive: true });
+      await rm(job.cachePath, { force: true, recursive: true });
+      await rm(job.logPath, { force: true, recursive: true });
       await rm(job.eventsPath, { force: true });
       await state.run("DELETE FROM build_jobs WHERE job_id = ?", [job.jobId]);
     }
@@ -968,12 +975,13 @@ WHERE state IN ('succeeded', 'failed', 'canceled')
 
     for (const job of jobs) {
       freedBytes += await readPathSize(job.workspacePath);
+      freedBytes += await readPathSize(job.cachePath);
+      freedBytes += await readPathSize(job.logPath);
       freedBytes += await readPathSize(job.eventsPath);
       if (!context.dryRun) {
         await rm(job.workspacePath, { force: true, recursive: true });
-        freedBytes += await removeDisposableDirectory(
-          dirname(job.workspacePath),
-        );
+        await rm(job.cachePath, { force: true, recursive: true });
+        await rm(job.logPath, { force: true, recursive: true });
         await rm(job.eventsPath, { force: true });
         await state.run("DELETE FROM build_jobs WHERE job_id = ?", [job.jobId]);
       }
@@ -1474,13 +1482,10 @@ async function readMinQueueRank(state: Database): Promise<number> {
 }
 
 async function openBuildQueueDatabase(): Promise<Database> {
-  const database = await openSharedStateDatabase(
+  return await openSharedStateDatabase(
     getBuildQueueDatabasePath(),
     BUILD_QUEUE_SCHEMA_SQL,
   );
-
-  await migrateBuildQueueSchema(database);
-  return database;
 }
 
 async function openReadonlyBuildQueueDatabase(): Promise<Database> {
@@ -1491,50 +1496,37 @@ function getBuildQueueDatabasePath(): string {
   return join(getBuildQueueStateDirectoryPath(), "job.sqlite");
 }
 
-async function migrateBuildQueueSchema(database: Database): Promise<void> {
-  if ((await listTableColumns(database, "build_jobs")).has("input_revision")) {
-    return;
-  }
+async function createJobWorkspacePath(jobId: string): Promise<string> {
+  const workspacePath = join(getBuildJobWorkspaceRootPath(), jobId);
 
-  await database.transaction(async () => {
-    const columns = await listTableColumns(database, "build_jobs");
-
-    if (columns.has("input_revision")) {
-      return;
-    }
-
-    await database.run(`
-      ALTER TABLE build_jobs
-      ADD COLUMN input_revision INTEGER
-    `);
-  });
-}
-
-async function listTableColumns(
-  database: Database,
-  table: string,
-): Promise<ReadonlySet<string>> {
-  const rows = await database.queryAll(
-    `PRAGMA table_info(${table})`,
-    undefined,
-    (row) => getString(row, "name"),
-  );
-
-  return new Set(rows);
-}
-
-async function createJobWorkspacePath(
-  archiveKey: string,
-  jobId: string,
-): Promise<string> {
-  const rootPath = join(getBuildJobWorkspaceRootPath(), archiveKey);
-
-  await mkdir(rootPath, { recursive: true });
-  return await mkdtemp(join(rootPath, `${jobId}-`));
+  await mkdir(workspacePath, { recursive: true });
+  return workspacePath;
 }
 
 function getBuildJobWorkspaceRootPath(): string {
   return join(getBuildQueueStateDirectoryPath(), "work");
+}
+
+async function createJobCachePath(jobId: string): Promise<string> {
+  const cachePath = join(getBuildJobCacheRootPath(), jobId);
+
+  await mkdir(cachePath, { recursive: true });
+  return cachePath;
+}
+
+function getBuildJobCacheRootPath(): string {
+  return join(getBuildQueueStateDirectoryPath(), "cache");
+}
+
+async function createJobLogPath(jobId: string): Promise<string> {
+  const logPath = join(getBuildJobLogRootPath(), jobId);
+
+  await mkdir(logPath, { recursive: true });
+  return logPath;
+}
+
+function getBuildJobLogRootPath(): string {
+  return join(getBuildQueueStateDirectoryPath(), "logs");
 }
 
 async function createJobEventsPath(jobId: string): Promise<string> {
@@ -1571,6 +1563,7 @@ function mapBuildJob(row: Record<string, unknown>): BuildJob {
   return {
     archiveKey: getString(row, "archive_key"),
     archivePath: getString(row, "archive_path"),
+    cachePath: getString(row, "cache_path"),
     chapterId: getNumber(row, "chapter_id"),
     createdAt: getNumber(row, "created_at"),
     ...(currentStep === undefined ? {} : { currentStep }),
@@ -1579,6 +1572,7 @@ function mapBuildJob(row: Record<string, unknown>): BuildJob {
     ...(finishedAt === undefined ? {} : { finishedAt }),
     jobId: getString(row, "job_id"),
     ...(inputRevision === undefined ? {} : { inputRevision }),
+    logPath: getString(row, "log_path"),
     ...(llmJSON === undefined ? {} : { llmJSON }),
     ...(ownerId === undefined ? {} : { ownerId }),
     ...(ownerPid === undefined ? {} : { ownerPid }),

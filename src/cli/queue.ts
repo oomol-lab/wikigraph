@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 
 import { SpineDigestScope } from "../common/llm-scope.js";
+import { withLoggingContext } from "../common/logging.js";
 import {
   addBuildJob,
   assertBuildJobInputRevision,
@@ -231,10 +232,28 @@ async function executeBuildJob(
   reporter: BuildJobProgressReporter,
   context: BuildJobExecutionContext,
 ): Promise<void> {
+  await withLoggingContext(
+    {
+      logDirPath: job.logPath,
+      operation: "build-job",
+    },
+    async () => {
+      await executeBuildJobWithLogging(job, reporter, context);
+    },
+  );
+}
+
+async function executeBuildJobWithLogging(
+  job: BuildJob,
+  reporter: BuildJobProgressReporter,
+  context: BuildJobExecutionContext,
+): Promise<void> {
   const config = await loadRequiredStageConfig({
     ...(job.llmJSON === undefined ? {} : { llmJSON: job.llmJSON }),
   });
   const llm = createStageLLM(config, {
+    cacheDirPath: job.cachePath,
+    logDirPath: job.logPath,
     onStreamProgress: async (event) => {
       await reporter.addOutputCharacters(event.outputCharacters);
     },
@@ -633,6 +652,8 @@ async function writeJobStatus(
       `Target: ${job.target}`,
       `Step: ${job.currentStep ?? "-"}`,
       `Workspace: ${job.workspacePath}`,
+      `Cache: ${job.cachePath}`,
+      `Logs: ${job.logPath}`,
       ...(job.errorJSON === undefined ? [] : [`Error: ${job.errorJSON}`]),
     ].join("\n") + "\n",
   );
@@ -642,6 +663,7 @@ function formatJobJSON(job: BuildJob): unknown {
   return {
     archiveKey: job.archiveKey,
     archivePath: job.archivePath,
+    cachePath: job.cachePath,
     chapterId: job.chapterId,
     createdAt: job.createdAt,
     ...(job.currentStep === undefined ? {} : { currentStep: job.currentStep }),
@@ -649,6 +671,7 @@ function formatJobJSON(job: BuildJob): unknown {
     eventsPath: job.eventsPath,
     ...(job.finishedAt === undefined ? {} : { finishedAt: job.finishedAt }),
     jobId: job.jobId,
+    logPath: job.logPath,
     ...(job.llmJSON === undefined ? {} : { llmJSON: job.llmJSON }),
     ...(job.ownerId === undefined ? {} : { ownerId: job.ownerId }),
     ...(job.ownerPid === undefined ? {} : { ownerPid: job.ownerPid }),

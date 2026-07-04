@@ -35,9 +35,10 @@ Progress and diagnostics:
 Workspace behavior:
   - Archive creation from URL or stdin uses temporary workspaces.
   - `transform --digest-dir <path>` uses the provided digest workspace for source digest runs.
-  - Queue jobs use workspaces under `~/.wikigraph/jobs/work`.
+  - Queue jobs use per-job directories under `~/.wikigraph/jobs/work`, `~/.wikigraph/jobs/cache`, and `~/.wikigraph/jobs/logs`.
   - Succeeded jobs delete their workspace by default.
   - Failed and canceled jobs keep their workspace for debugging until cleanup.
+  - Job events, logs, and LLM cache are kept until the job record is cleaned.
 
 In-place archive edits:
   - Mutating `.wikg` commands go through the archive coordinator.
