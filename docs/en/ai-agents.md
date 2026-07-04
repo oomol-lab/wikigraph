@@ -34,7 +34,7 @@ Choose a search lens explicitly in the URI: `/chunk` for Reading Graph structure
 
 When the user asks for source passages mentioning, grounding, or supporting a known entity, start from the entity URI: `<archive-uri>/entity/<qid> evidence`. Do not use source search by the entity label as the primary method; labels may have aliases, translations, variants, and grounded mentions that do not match the label text. Use source search only as a secondary literal-text check.
 
-When investigating a known entity, chunk, or triple under a specific aspect, consider passing the aspect as the optional query to `evidence` or `related` first. This filters and re-ranks candidates while keeping the current object anchor:
+When investigating a known entity, chunk, or triple under a specific aspect, consider passing the aspect as the optional query to `evidence` or `related` first. This uses the current FTS index to filter and rank candidates while keeping the current object anchor:
 
 ```bash
 wikigraph <archive-uri>/entity/Q830077 evidence "objectivity"

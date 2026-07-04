@@ -79,6 +79,73 @@ describe("archive/query/archive-view", () => {
     });
   });
 
+  it("rejects evidence and related queries when the FTS index is missing", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          draft.addSentence("Alpha relates to beta.", 4);
+          await draft.commit();
+          await openedDocument.writeToc({
+            items: [{ children: [], serialId: 1, title: "Missing index" }],
+            version: 1,
+          });
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              id: "missing-index-source",
+              qid: "Q1",
+              rangeEnd: 5,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Alpha",
+            },
+            {
+              chapterId: 1,
+              id: "missing-index-target",
+              qid: "Q2",
+              rangeEnd: 20,
+              rangeStart: 17,
+              sentenceIndex: 0,
+              surface: "beta",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 0]],
+            id: "missing-index-link",
+            predicate: "relates",
+            sourceMentionId: "missing-index-source",
+            targetMentionId: "missing-index-target",
+          });
+        });
+
+        await expect(
+          listArchiveEvidence(document, "wikg://entity/Q1", {
+            query: "Alpha",
+          }),
+        ).rejects.toThrow(
+          "Wiki Graph search index is missing or outdated. Run `<archive-uri>/index build` before searching.",
+        );
+        await expect(
+          listRelatedArchiveObjects(document, "wikg://entity/Q1", {
+            query: "beta",
+            role: "subject",
+          }),
+        ).rejects.toThrow(
+          "Wiki Graph search index is missing or outdated. Run `<archive-uri>/index build` before searching.",
+        );
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("searches sourced sentences before graph or summary build", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
@@ -1948,6 +2015,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const related = await listRelatedArchiveObjects(
           document,
@@ -2027,6 +2095,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const related = await listRelatedArchiveObjects(
           document,
@@ -2131,6 +2200,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const related = await listRelatedArchiveObjects(
           document,
@@ -2139,9 +2209,100 @@ describe("archive/query/archive-view", () => {
         );
 
         expect(related.items.map((item) => item.id)).toStrictEqual([
-          "wikg://triple/Q1/mentions/Q3",
           "wikg://triple/Q1/mentions/Q2",
+          "wikg://triple/Q1/mentions/Q3",
         ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("does not match entity related query against the anchor mention surface", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          draft.addSentence("Alpha appears as the anchor mention.", 6);
+          draft.addSentence("The relationship evidence omits that name.", 6);
+          await draft.commit();
+          await openedDocument.writeToc({
+            items: [{ children: [], serialId: 1, title: "Related" }],
+            version: 1,
+          });
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              id: "anchor-surface-source",
+              qid: "Q1",
+              rangeEnd: 5,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Alpha",
+            },
+            {
+              chapterId: 1,
+              id: "anchor-surface-target",
+              qid: "Q2",
+              rangeEnd: 15,
+              rangeStart: 10,
+              sentenceIndex: 1,
+              surface: "Beta",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 1]],
+            id: "anchor-surface-link",
+            predicate: "relates",
+            sourceMentionId: "anchor-surface-source",
+            targetMentionId: "anchor-surface-target",
+          });
+        });
+        await rebuildArchiveSearchIndex(document);
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wikg://entity/Q1",
+          { query: "Alpha", role: "subject" },
+        );
+
+        expect(related.items).toStrictEqual([]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("filters chunk related results through chunk property FTS", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.readingEdges.save({
+            fromId: 100,
+            toId: 101,
+            weight: 1,
+          });
+        });
+
+        const related = await listRelatedArchiveObjects(
+          document,
+          "wikg://chunk/100",
+          { query: "Source search" },
+        );
+
+        expect(related.items.map((item) => item.id)).toStrictEqual([
+          "node:101",
+        ]);
+        expect(related.items[0]?.score).toBeGreaterThan(0);
       } finally {
         await document.release();
       }
@@ -2635,6 +2796,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const evidence = await listArchiveEvidence(
           document,
@@ -2646,6 +2808,70 @@ describe("archive/query/archive-view", () => {
           "wikg://chapter/1/source#0..2",
         ]);
         expect(evidence.items[0]?.score).toBeGreaterThan(0);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("does not match triple evidence query against endpoint mention sentences", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          draft.addSentence("Alpha appears only in the endpoint mention.", 7);
+          draft.addSentence(
+            "The relation evidence omits that endpoint name.",
+            7,
+          );
+          await draft.commit();
+          await openedDocument.writeToc({
+            items: [{ children: [], serialId: 1, title: "Triple evidence" }],
+            version: 1,
+          });
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              id: "triple-endpoint-source",
+              qid: "Q1",
+              rangeEnd: 5,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Alpha",
+            },
+            {
+              chapterId: 1,
+              id: "triple-endpoint-target",
+              qid: "Q2",
+              rangeEnd: 13,
+              rangeStart: 10,
+              sentenceIndex: 1,
+              surface: "Beta",
+            },
+          ]);
+          await openedDocument.mentionLinks.save({
+            evidenceSentenceIds: [[1, 1]],
+            id: "triple-endpoint-link",
+            predicate: "relates",
+            sourceMentionId: "triple-endpoint-source",
+            targetMentionId: "triple-endpoint-target",
+          });
+        });
+        await rebuildArchiveSearchIndex(document);
+
+        const evidence = await listArchiveEvidence(
+          document,
+          "wikg://triple/Q1/relates/Q2",
+          { query: "Alpha" },
+        );
+
+        expect(evidence.items).toStrictEqual([]);
       } finally {
         await document.release();
       }
@@ -2692,6 +2918,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const evidence = await listArchiveEvidence(
           document,

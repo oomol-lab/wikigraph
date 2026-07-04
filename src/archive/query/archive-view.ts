@@ -1162,6 +1162,20 @@ async function findArchiveObjectsIndexed(
       };
 }
 
+async function queryRequiredSearchIndex(
+  document: ReadonlyDocument,
+  query: string,
+  options: Parameters<typeof querySearchIndex>[2],
+): Promise<SearchIndexQueryResult | undefined> {
+  if (!(await isSearchIndexCurrent(document))) {
+    throw new Error(
+      "Wiki Graph search index is missing or outdated. Run `<archive-uri>/index build` before searching.",
+    );
+  }
+
+  return await querySearchIndex(document, query, options);
+}
+
 async function hydrateSearchIndexHits(
   document: ReadonlyDocument,
   result: SearchIndexQueryResult,
@@ -1797,17 +1811,18 @@ export async function listRelatedArchiveObjects(
   rejectRelatedRole(options.role, id);
 
   const { chapterId } = await requireNode(document, reference.id);
+  const items = sortGraphNeighborsByListMode(
+    await listGraphNeighbors(document, chapterId, reference.id),
+  ).map((neighbor) => ({
+    id: formatNodeId(neighbor.node.id),
+    label: neighbor.node.label,
+    summary: neighbor.node.content,
+    type: "node" as const,
+  }));
 
   return await hydrateRelatedItemsEvidence(
     document,
-    sortGraphNeighborsByListMode(
-      await listGraphNeighbors(document, chapterId, reference.id),
-    ).map((neighbor) => ({
-      id: formatNodeId(neighbor.node.id),
-      label: neighbor.node.label,
-      summary: neighbor.node.content,
-      type: "node" as const,
-    })),
+    await filterAndSortChunkRelatedItemsByQuery(document, items, options.query),
     options,
   );
 }
@@ -1821,6 +1836,7 @@ async function listRelatedWikiGraphObjects(
 
   switch (reference.type) {
     case "chapter": {
+      rejectRelatedQuery(options.query, uri);
       const chapter = await requireChapter(document, reference.chapterId);
       const items: ArchiveListItem[] = [
         {
@@ -1855,20 +1871,27 @@ async function listRelatedWikiGraphObjects(
         throw new Error(`Chunk ${uri} was not found in this archive.`);
       }
 
+      const items = sortGraphNeighborsByListMode(
+        await listGraphNeighbors(document, chapterId, reference.id),
+      ).map((neighbor) => ({
+        id: formatNodeId(neighbor.node.id),
+        label: neighbor.node.label,
+        summary: neighbor.node.content,
+        type: "node" as const,
+      }));
+
       return await hydrateRelatedItemsEvidence(
         document,
-        sortGraphNeighborsByListMode(
-          await listGraphNeighbors(document, chapterId, reference.id),
-        ).map((neighbor) => ({
-          id: formatNodeId(neighbor.node.id),
-          label: neighbor.node.label,
-          summary: neighbor.node.content,
-          type: "node" as const,
-        })),
+        await filterAndSortChunkRelatedItemsByQuery(
+          document,
+          items,
+          options.query,
+        ),
         options,
       );
     }
     case "text-stream": {
+      rejectRelatedQuery(options.query, uri);
       rejectRelatedRole(options.role, uri);
       const chapter = await requireChapter(document, reference.chapterId);
 
@@ -1895,6 +1918,7 @@ async function listRelatedWikiGraphObjects(
     case "entity-wikipage":
     case "meta":
     case "chapter-state":
+      rejectRelatedQuery(options.query, uri);
       rejectRelatedRole(options.role, uri);
       return paginateRelatedItems([], options);
   }
@@ -2039,8 +2063,236 @@ async function listRelatedEntityObjects(
 
   return await hydrateRelatedItemsEvidence(
     document,
-    sortRelatedItemsByListMode([...triplesById.values()]),
+    await filterAndSortEntityRelatedTriplesByQuery(
+      document,
+      sortRelatedItemsByListMode([...triplesById.values()]),
+      reference.qid,
+      options.query,
+    ),
     options,
+  );
+}
+
+async function filterAndSortChunkRelatedItemsByQuery(
+  document: ReadonlyDocument,
+  items: readonly ArchiveListItem[],
+  query: string | undefined,
+): Promise<readonly ArchiveListItem[]> {
+  if (query === undefined) {
+    return items;
+  }
+
+  const indexResult = await queryRequiredSearchIndex(document, query, {
+    types: ["node"],
+  });
+
+  if (indexResult === undefined) {
+    return [];
+  }
+
+  const scoresByChunkId = new Map<number, number[]>();
+  const allowedChunkIds = new Set(
+    items.flatMap((item) => {
+      if (item.type !== "node") {
+        return [];
+      }
+      const reference = parseArchiveReference(item.id);
+
+      return reference.type === "node" ? [reference.id] : [];
+    }),
+  );
+
+  for (const hit of indexResult.objectHits) {
+    if (
+      hit.ownerKind !== SEARCH_OBJECT_PROPERTY_OWNER_KIND.chunk ||
+      !allowedChunkIds.has(Number(hit.ownerId))
+    ) {
+      continue;
+    }
+
+    const chunkId = Number(hit.ownerId);
+    const scores = scoresByChunkId.get(chunkId) ?? [];
+
+    scores.push(hit.score);
+    scoresByChunkId.set(chunkId, scores);
+  }
+
+  return items
+    .flatMap((item) => {
+      if (item.type !== "node") {
+        return [];
+      }
+      const reference = parseArchiveReference(item.id);
+
+      if (reference.type !== "node") {
+        return [];
+      }
+      const scores = scoresByChunkId.get(reference.id);
+
+      return scores === undefined
+        ? []
+        : [{ ...item, score: aggregateEvidenceScores(scores) }];
+    })
+    .sort(compareRelatedQueryItems);
+}
+
+async function filterAndSortEntityRelatedTriplesByQuery(
+  document: ReadonlyDocument,
+  items: readonly ArchiveListItem[],
+  anchorQid: string,
+  query: string | undefined,
+): Promise<readonly ArchiveListItem[]> {
+  if (query === undefined) {
+    return items;
+  }
+  const scope = await createEntityRelatedQueryScope(document, items, anchorQid);
+
+  const indexResult = await queryRequiredSearchIndex(document, query, {
+    chapters: [...scope.chapterIds],
+    types: ["entity", "source"],
+  });
+
+  if (indexResult === undefined) {
+    return [];
+  }
+
+  const sentenceScores = new Map(
+    indexResult.textHits
+      .filter((hit) => hit.kind === TEXT_SENTENCE_KIND.source)
+      .map(
+        (hit) =>
+          [
+            createSentenceHitKey(hit.chapterId, hit.sentenceIndex),
+            hit.score,
+          ] as const,
+      ),
+  );
+  const endpointScoresByKey = new Map<string, number[]>();
+
+  for (const hit of indexResult.objectHits) {
+    if (
+      hit.ownerKind !== SEARCH_OBJECT_PROPERTY_OWNER_KIND.entity ||
+      hit.ownerId === anchorQid ||
+      hit.chapterId === undefined
+    ) {
+      continue;
+    }
+
+    const key = createEntityRelatedEndpointKey(hit.ownerId, hit.chapterId);
+    const scores = endpointScoresByKey.get(key) ?? [];
+
+    scores.push(hit.score);
+    endpointScoresByKey.set(key, scores);
+  }
+
+  return items
+    .flatMap((item) => {
+      if (item.type !== "triple") {
+        return [];
+      }
+
+      const scores = [
+        ...[...(scope.endpointKeysByTripleId.get(item.id) ?? [])].flatMap(
+          (key) => endpointScoresByKey.get(key) ?? [],
+        ),
+        ...(item.evidenceLinks ?? []).flatMap((link) =>
+          link.evidenceSentenceIds.flatMap(([chapterId, sentenceIndex]) => {
+            const score = sentenceScores.get(
+              createSentenceHitKey(chapterId, sentenceIndex),
+            );
+
+            return score === undefined ? [] : [score];
+          }),
+        ),
+      ];
+
+      return scores.length === 0
+        ? []
+        : [{ ...item, score: aggregateEvidenceScores(scores) }];
+    })
+    .sort(compareRelatedQueryItems);
+}
+
+async function createEntityRelatedQueryScope(
+  document: ReadonlyDocument,
+  items: readonly ArchiveListItem[],
+  anchorQid: string,
+): Promise<{
+  readonly chapterIds: ReadonlySet<number>;
+  readonly endpointKeysByTripleId: ReadonlyMap<string, ReadonlySet<string>>;
+}> {
+  const chapterIds = new Set<number>();
+  const endpointKeysByTripleId = new Map<string, Set<string>>();
+  const mentionCache = new Map<string, MentionRecord | undefined>();
+
+  for (const item of items) {
+    if (item.type !== "triple") {
+      continue;
+    }
+
+    const endpointKeys = new Set<string>();
+
+    for (const link of item.evidenceLinks ?? []) {
+      for (const [chapterId] of link.evidenceSentenceIds) {
+        chapterIds.add(chapterId);
+      }
+
+      const [source, target] = await Promise.all([
+        getCachedMention(document, mentionCache, link.sourceMentionId),
+        getCachedMention(document, mentionCache, link.targetMentionId),
+      ]);
+
+      for (const mention of [source, target]) {
+        if (mention === undefined || mention.qid === anchorQid) {
+          continue;
+        }
+
+        chapterIds.add(mention.chapterId);
+        endpointKeys.add(
+          createEntityRelatedEndpointKey(mention.qid, mention.chapterId),
+        );
+      }
+    }
+
+    endpointKeysByTripleId.set(item.id, endpointKeys);
+  }
+
+  return { chapterIds, endpointKeysByTripleId };
+}
+
+async function getCachedMention(
+  document: ReadonlyDocument,
+  cache: Map<string, MentionRecord | undefined>,
+  mentionId: string,
+): Promise<MentionRecord | undefined> {
+  if (!cache.has(mentionId)) {
+    cache.set(mentionId, await document.mentions.getById(mentionId));
+  }
+
+  return cache.get(mentionId);
+}
+
+function createEntityRelatedEndpointKey(
+  qid: string,
+  chapterId: number,
+): string {
+  return `${qid}:${chapterId}`;
+}
+
+function compareRelatedQueryItems(
+  left: ArchiveListItem,
+  right: ArchiveListItem,
+): number {
+  const scoreComparison = (right.score ?? 0) - (left.score ?? 0);
+
+  if (scoreComparison !== 0) {
+    return scoreComparison;
+  }
+
+  return compareListHits(
+    createFindHitFromListItem(left),
+    createFindHitFromListItem(right),
+    "doc-asc",
   );
 }
 
@@ -2154,17 +2406,20 @@ function rejectRelatedRole(
   }
 }
 
+function rejectRelatedQuery(query: string | undefined, id: string): void {
+  if (query !== undefined) {
+    throw new Error(
+      `Related query is only available for chunk and entity: ${id}`,
+    );
+  }
+}
+
 async function hydrateRelatedItemsEvidence(
   document: ReadonlyDocument,
   items: readonly ArchiveListItem[],
   options: ArchiveRelatedOptions,
 ): Promise<ArchiveRelatedResult> {
-  const filteredItems = await filterAndSortRelatedItemsByQuery(
-    document,
-    items,
-    options.query,
-  );
-  const page = paginateRelatedItems(filteredItems, options);
+  const page = paginateRelatedItems(items, options);
 
   if (options.evidenceLimit === undefined) {
     return {
@@ -2252,86 +2507,6 @@ function parseRelatedCursor(cursor: string | undefined): number {
   }
 
   return Number(cursor);
-}
-
-async function filterAndSortRelatedItemsByQuery(
-  document: ReadonlyDocument,
-  items: readonly ArchiveListItem[],
-  queryText: string | undefined,
-): Promise<readonly ArchiveListItem[]> {
-  const query =
-    queryText === undefined ? undefined : createLexicalQuery(queryText);
-
-  if (query === undefined) {
-    return items;
-  }
-  const context = createEvidenceReadContext();
-
-  const matched = await Promise.all(
-    items.map(async (item) => {
-      const match = scoreLexicalText(
-        await createRelatedItemSearchText(document, item, context),
-        query,
-      );
-
-      return match === undefined ? undefined : { item, match };
-    }),
-  );
-
-  return matched
-    .filter(isDefined)
-    .sort((left, right) => {
-      const scoreComparison = right.match.score - left.match.score;
-
-      if (scoreComparison !== 0) {
-        return scoreComparison;
-      }
-
-      return compareListHits(
-        createFindHitFromListItem(left.item),
-        createFindHitFromListItem(right.item),
-        "doc-asc",
-      );
-    })
-    .map(({ item, match }) => ({ ...item, score: match.score }));
-}
-
-async function createRelatedItemSearchText(
-  document: ReadonlyDocument,
-  item: ArchiveListItem,
-  context: EvidenceReadContext,
-): Promise<string> {
-  if (item.type !== "triple") {
-    return `${item.label}\n${item.summary}`;
-  }
-
-  return [
-    item.label,
-    item.summary,
-    item.subjectLabel,
-    item.subjectQid,
-    item.predicate,
-    item.objectLabel,
-    item.objectQid,
-    ...(item.evidenceLinks ?? []).map((link) => link.note ?? ""),
-    ...(await readMentionLinkEvidenceTexts(
-      document,
-      item.evidenceLinks ?? [],
-      context,
-    )),
-  ].join("\n");
-}
-
-async function readMentionLinkEvidenceTexts(
-  document: ReadonlyDocument,
-  links: readonly MentionLinkRecord[],
-  context: EvidenceReadContext,
-): Promise<readonly string[]> {
-  return await Promise.all(
-    createMentionLinkEvidenceRanges(document, links).map(
-      async (range) => await readEvidenceRangeText(document, range, context),
-    ),
-  );
 }
 
 export async function listArchiveEvidence(
@@ -4438,11 +4613,10 @@ async function createSourceEvidencePage(
   const context = createEvidenceReadContext();
   const limit = options.limit ?? DEFAULT_FIND_LIMIT;
   const start = decodeFindCursor(options.cursor);
-  const evidenceRanges = await filterAndSortSourceEvidenceRangesByQuery(
+  const evidenceRanges = await filterAndSortSourceEvidenceRangesByFtsQuery(
     document,
     ranges,
     options.query,
-    context,
   );
   const displayRanges = await createExpandedSourceEvidenceRanges(
     document,
@@ -4474,48 +4648,77 @@ async function createSourceEvidencePage(
   };
 }
 
-async function filterAndSortSourceEvidenceRangesByQuery(
+async function filterAndSortSourceEvidenceRangesByFtsQuery(
   document: ReadonlyDocument,
   ranges: readonly SourceEvidenceRange[],
   queryText: string | undefined,
-  context: EvidenceReadContext,
 ): Promise<readonly SourceEvidenceRange[]> {
-  const query =
-    queryText === undefined ? undefined : createLexicalQuery(queryText);
-
-  if (query === undefined) {
+  if (queryText === undefined) {
     return mergeSourceEvidenceRanges(ranges);
   }
 
-  const scored = await Promise.all(
-    ranges.map(async (range) => {
-      const text = await readEvidenceRangeText(document, range, context);
-      const match = scoreLexicalText(text, query);
+  const indexResult = await queryRequiredSearchIndex(document, queryText, {
+    chapters: [...new Set(ranges.map((range) => range.chapterId))],
+    types: ["source"],
+  });
 
-      return match === undefined
-        ? undefined
-        : { match, range: { ...range, score: match.score } };
-    }),
-  );
+  if (indexResult === undefined) {
+    return [];
+  }
 
-  return scored
-    .filter(isDefined)
-    .filter(
-      ({ range }, index, values) =>
-        values.findIndex((item) =>
-          areSourceEvidenceRangesEqual(item.range, range),
-        ) === index,
-    )
+  const matchedRanges = new Map<string, SourceEvidenceRange>();
+  const rangesByChapterId = new Map<number, SourceEvidenceRange[]>();
+
+  for (const range of ranges) {
+    const chapterRanges = rangesByChapterId.get(range.chapterId) ?? [];
+
+    chapterRanges.push(range);
+    rangesByChapterId.set(range.chapterId, chapterRanges);
+  }
+
+  for (const hit of indexResult.textHits) {
+    if (hit.kind !== TEXT_SENTENCE_KIND.source) {
+      continue;
+    }
+
+    for (const range of rangesByChapterId.get(hit.chapterId) ?? []) {
+      if (
+        hit.sentenceIndex < range.startSentenceIndex ||
+        hit.sentenceIndex > range.endSentenceIndex
+      ) {
+        continue;
+      }
+
+      const key = formatSourceEvidenceRangeKey(range);
+      const current = matchedRanges.get(key);
+
+      matchedRanges.set(key, {
+        ...range,
+        score: Math.max(current?.score ?? 0, hit.score),
+      });
+    }
+  }
+
+  return [...matchedRanges.values()]
     .sort((left, right) => {
-      const scoreComparison = right.match.score - left.match.score;
+      const scoreComparison = (right.score ?? 0) - (left.score ?? 0);
 
       if (scoreComparison !== 0) {
         return scoreComparison;
       }
 
-      return compareSourceEvidenceRanges(left.range, right.range);
+      return compareSourceEvidenceRanges(left, right);
     })
-    .map(({ range }) => range);
+    .filter(
+      (range, index, values) =>
+        values.findIndex((item) =>
+          areSourceEvidenceRangesEqual(item, range),
+        ) === index,
+    );
+}
+
+function formatSourceEvidenceRangeKey(range: SourceEvidenceRange): string {
+  return `${range.chapterId}:${range.startSentenceIndex}:${range.endSentenceIndex}`;
 }
 
 function areSourceEvidenceRangesEqual(
@@ -4527,23 +4730,6 @@ function areSourceEvidenceRangesEqual(
     left.startSentenceIndex === right.startSentenceIndex &&
     left.endSentenceIndex === right.endSentenceIndex
   );
-}
-
-async function readEvidenceRangeText(
-  document: ReadonlyDocument,
-  range: SourceEvidenceRange,
-  context: EvidenceReadContext,
-): Promise<string> {
-  return (
-    await readTextStreamRange(
-      document,
-      range.chapterId,
-      "source",
-      range.startSentenceIndex,
-      range.endSentenceIndex,
-      context,
-    )
-  ).text;
 }
 
 function compareSourceEvidenceRanges(
