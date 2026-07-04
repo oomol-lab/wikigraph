@@ -19,7 +19,7 @@ Returns:
 
 Notes:
   - `related` starts from a known URI; `search` starts from query text.
-  - Optional `query` filters and re-sorts only the related objects that would otherwise be returned.
+  - Optional `query` uses the current FTS index to filter and rank only the related objects that would otherwise be returned; run `<archive-uri>/index build` first if the index is missing or outdated.
   - `--role` only applies to entity URIs. Default is `any`.
   - Add `--evidence` or `--evidence <n>` to include source evidence previews where available.
   - Evidence previews include 2 nearby sentences before and after by default. Use `--context 0` for exact cited ranges.

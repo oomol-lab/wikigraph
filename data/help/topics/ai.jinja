@@ -53,7 +53,7 @@ When a user asks for source passages mentioning, grounding, or supporting a know
 
 Do not use source search by the entity label as the primary method. Entity labels may have aliases, translations, variants, and grounded mentions that do not match the label text. Use source search only as a secondary literal-text check.
 
-When investigating a known entity, chunk, or triple under a specific aspect, consider passing the aspect as the optional query to `evidence` or `related` first. This filters and re-ranks candidates while keeping the current object anchor.
+When investigating a known entity, chunk, or triple under a specific aspect, consider passing the aspect as the optional query to `evidence` first. Use `related` queries only for chunk and entity URIs. Both paths use the current FTS index to filter and rank candidates while keeping the current object anchor.
   wikigraph <archive-uri>/entity/Q830077 evidence "objectivity"
   wikigraph <archive-uri>/entity/Q830077 related "objectivity" --evidence 2
 
