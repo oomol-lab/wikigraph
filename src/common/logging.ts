@@ -49,7 +49,7 @@ export async function withLoggingContext<T>(
     verbose: input.verbose ?? false,
     ...(runDirPath === undefined
       ? {}
-      : { eventLogPath: join(runDirPath, "events.log") }),
+      : { eventLogPath: join(runDirPath, "run.log") }),
   });
 
   return await loggingContext.run(

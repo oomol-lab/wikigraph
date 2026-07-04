@@ -1,4 +1,4 @@
-import { access } from "fs/promises";
+import { access, writeFile } from "fs/promises";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -251,7 +251,7 @@ describe("facade/build-queue", () => {
     });
   });
 
-  it("writes structured events and removes succeeded work", async () => {
+  it("writes structured events and keeps job cache and logs after removing succeeded work", async () => {
     await withTempDir("spinedigest-build-queue-", async (path) => {
       useStateDir(`${path}/state`);
       const job = await addBuildJob({
@@ -260,9 +260,18 @@ describe("facade/build-queue", () => {
         target: "reading-graph",
       });
 
+      expect(job.workspacePath).toBe(`${path}/state/jobs/work/${job.jobId}`);
+      expect(job.cachePath).toBe(`${path}/state/jobs/cache/${job.jobId}`);
+      expect(job.logPath).toBe(`${path}/state/jobs/logs/${job.jobId}`);
+      expect(job.eventsPath).toBe(
+        `${path}/state/jobs/events/${job.jobId}.ndjson`,
+      );
+
       await runBuildJobWorker({
         concurrency: 1,
-        executeJob: async (_job, reporter) => {
+        executeJob: async (runningJob, reporter) => {
+          await writeFile(`${runningJob.cachePath}/request.txt`, "cache");
+          await writeFile(`${runningJob.logPath}/run.log`, "log");
           await reporter.setTotals({ totalGraphWords: 100 });
           await reporter.stepStarted("reading-graph");
           await reporter.updateWords({ graphWords: 50 });
@@ -278,6 +287,9 @@ describe("facade/build-queue", () => {
       expect(updated.state).toBe("succeeded");
       expect(events.map((event) => event.type)).toContain("succeeded");
       await expect(access(job.workspacePath)).rejects.toThrow();
+      await expect(access(job.cachePath)).resolves.toBeUndefined();
+      await expect(access(job.logPath)).resolves.toBeUndefined();
+      await expect(access(job.eventsPath)).resolves.toBeUndefined();
     });
   });
 
@@ -336,6 +348,7 @@ describe("facade/build-queue", () => {
       await runBuildJobWorker({
         concurrency: 1,
         executeJob: async (_job, reporter) => {
+          await reporter.setTotals({ totalGraphWords: 4888 });
           await reporter.stepStarted("knowledge-graph");
           await reporter.updatePhase({
             done: 3,
@@ -352,6 +365,9 @@ describe("facade/build-queue", () => {
       );
       const latest = snapshots.at(-1);
 
+      expect(latest?.counters.some((counter) => counter.name === "words")).toBe(
+        false,
+      );
       expect(latest).toMatchObject({
         counters: [
           {

@@ -11,6 +11,7 @@ const queueMockState = vi.hoisted(() => ({
   commitGraphCalls: [] as unknown[],
   commitKnowledgeGraphCalls: [] as unknown[],
   commitSummaryCalls: [] as unknown[],
+  createStageLLMCalls: [] as unknown[],
   inputRevisionAssertions: [] as unknown[],
   inputRevisionRecords: [] as unknown[],
   cliConfig: {} as {
@@ -32,9 +33,11 @@ const queueMockState = vi.hoisted(() => ({
     | "summarized",
   job: {
     archivePath: "book.wikg",
+    cachePath: "/tmp/job-cache",
     chapterId: 12,
     eventsPath: "events.ndjson",
     jobId: "job-1",
+    logPath: "/tmp/job-logs",
     state: "succeeded",
     target: "reading-summary",
     workspacePath: "/tmp/job-workspace",
@@ -247,7 +250,10 @@ vi.mock("../../src/cli/config.js", () => ({
 }));
 
 vi.mock("../../src/cli/stage-runtime.js", () => ({
-  createStageLLM: vi.fn(() => ({})),
+  createStageLLM: vi.fn((_config: unknown, options: unknown) => {
+    queueMockState.createStageLLMCalls.push(options);
+    return {};
+  }),
   loadRequiredStageConfig: vi.fn((options: unknown) => {
     queueMockState.loadRequiredStageConfigCalls.push(options);
     if (queueMockState.loadRequiredStageConfigError !== undefined) {
@@ -282,6 +288,7 @@ describe("cli/queue", () => {
     queueMockState.commitGraphCalls.length = 0;
     queueMockState.commitKnowledgeGraphCalls.length = 0;
     queueMockState.commitSummaryCalls.length = 0;
+    queueMockState.createStageLLMCalls.length = 0;
     queueMockState.events = [];
     queueMockState.getJobIds.length = 0;
     queueMockState.inputRevisionAssertions.length = 0;
@@ -293,10 +300,12 @@ describe("cli/queue", () => {
     queueMockState.job = {
       archiveKey: "archive-key",
       archivePath: "book.wikg",
+      cachePath: "/tmp/job-cache",
       chapterId: 12,
       createdAt: 1,
       eventsPath: "events.ndjson",
       jobId: "job-1",
+      logPath: "/tmp/job-logs",
       ownerId: "owner-1",
       queueRank: 10,
       state: "succeeded",
@@ -551,6 +560,10 @@ describe("cli/queue", () => {
     expect(queueMockState.buildSummaryCalls[0]).toMatchObject({
       snapshotPath: "/tmp/job-workspace/summary-input.json",
       workspacePath: "/tmp/job-workspace",
+    });
+    expect(queueMockState.createStageLLMCalls[0]).toMatchObject({
+      cacheDirPath: "/tmp/job-cache",
+      logDirPath: "/tmp/job-logs",
     });
     expect(queueMockState.buildSummaryCalls[0]).not.toHaveProperty(
       "sourceDocumentPath",
@@ -822,6 +835,59 @@ describe("cli/queue", () => {
       "reading-summary words 4520/4520 [tokens input: 1200 / output: 200]\n",
       "succeeded\n",
     ]);
+  });
+
+  it("prints knowledge graph step plan in execution order", async () => {
+    queueMockState.events = [
+      {
+        at: 1,
+        jobId: "job-1",
+        seq: 1,
+        step: "knowledge-graph",
+        type: "step_started",
+      },
+    ];
+
+    await runQueueCommand({
+      action: "watch",
+      from: "beginning",
+      jobId: "job-1",
+      jsonl: false,
+    });
+
+    expect(queueMockState.textWrites).toStrictEqual([
+      "knowledge-graph started\nsteps: matching -> screening -> enrichment -> grounding -> relation-discovery -> committing\n",
+    ]);
+  });
+
+  it("prints committing phase progress in human watch output", async () => {
+    queueMockState.events = [
+      {
+        at: 1,
+        counters: [
+          {
+            done: 1,
+            name: "items",
+            total: 1,
+            unit: "item",
+          },
+        ],
+        jobId: "job-1",
+        phase: "committing",
+        seq: 1,
+        step: "knowledge-graph",
+        type: "status_snapshot",
+      },
+    ];
+
+    await runQueueCommand({
+      action: "watch",
+      from: "beginning",
+      jobId: "job-1",
+      jsonl: false,
+    });
+
+    expect(queueMockState.textWrites).toStrictEqual(["committing items 1/1\n"]);
   });
 
   it("prints knowledge graph phase progress without word counters", async () => {

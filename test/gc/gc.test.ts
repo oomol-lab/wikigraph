@@ -26,7 +26,6 @@ describe("gc", () => {
       const tmpPath = await createOldTmpDirectory();
       const sqliteCachePath = await createOldCoordinatorSqliteCache(path);
       const sqliteCacheParentPath = dirname(sqliteCachePath);
-      const jobParentPath = dirname(job.workspacePath);
 
       const report = await tryRunWikiGraphGc();
 
@@ -42,7 +41,8 @@ describe("gc", () => {
       await expect(stat(sqliteCacheParentPath)).rejects.toThrow();
       await expect(stat(tmpPath)).rejects.toThrow();
       await expect(stat(job.workspacePath)).rejects.toThrow();
-      await expect(stat(jobParentPath)).rejects.toThrow();
+      await expect(stat(job.cachePath)).rejects.toThrow();
+      await expect(stat(job.logPath)).rejects.toThrow();
       await expect(stat(job.eventsPath)).rejects.toThrow();
       await expect(
         countRows("cache/search-sessions.sqlite", "search_sessions"),
@@ -97,7 +97,7 @@ describe("gc", () => {
     });
   });
 
-  it("removes stale empty workspace bucket directories", async () => {
+  it("removes stale empty workspace directories", async () => {
     await withTempDir("spinedigest-gc-", async (path) => {
       process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
       const workspaceBucketPath = join(
@@ -107,13 +107,7 @@ describe("gc", () => {
         "work",
         "archive-key",
       );
-      const buildJobBucketPath = join(
-        path,
-        "state",
-        "jobs",
-        "work",
-        "archive-key",
-      );
+      const buildJobBucketPath = join(path, "state", "jobs", "work", "job-id");
 
       await mkdir(workspaceBucketPath, { recursive: true });
       await mkdir(buildJobBucketPath, { recursive: true });
@@ -204,6 +198,50 @@ describe("gc", () => {
     });
   });
 
+  it("removes empty coordinator workspace descendants", async () => {
+    await withTempDir("spinedigest-gc-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
+      const workspaceBucketPath = join(
+        path,
+        "state",
+        "staging",
+        "work",
+        "archive-key",
+      );
+      const referencedPath = join(workspaceBucketPath, "fts.db");
+      const sourceDirectoryPath = join(workspaceBucketPath, "texts", "source");
+      const summaryDirectoryPath = join(
+        workspaceBucketPath,
+        "texts",
+        "summary",
+      );
+
+      await mkdir(sourceDirectoryPath, { recursive: true });
+      await mkdir(summaryDirectoryPath, { recursive: true });
+      await writeFile(referencedPath, "referenced", "utf8");
+      await writeFile(join(summaryDirectoryPath, ".DS_Store"), "finder");
+      await createCoordinatorOverlay(path, {
+        archiveKey: "archive-key",
+        entryPath: "fts.db",
+        workspacePath: referencedPath,
+      });
+
+      const report = await tryRunWikiGraphGc();
+
+      expect(report.skipped).toBe(false);
+      const wikgCoordinatorJob = report.jobs.find(
+        (item) => item.name === "wikg-coordinator",
+      );
+
+      expect(wikgCoordinatorJob?.removed).toBeGreaterThanOrEqual(2);
+      await expect(stat(referencedPath)).resolves.toBeDefined();
+      await expect(stat(sourceDirectoryPath)).rejects.toThrow();
+      await expect(stat(summaryDirectoryPath)).rejects.toThrow();
+      await expect(stat(join(workspaceBucketPath, "texts"))).rejects.toThrow();
+      await expect(stat(workspaceBucketPath)).resolves.toBeDefined();
+    });
+  });
+
   it("keeps fresh terminal build jobs during normal GC", async () => {
     await withTempDir("spinedigest-gc-", async (path) => {
       process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
@@ -219,6 +257,8 @@ describe("gc", () => {
         report.jobs.find((item) => item.name === "build-queue"),
       ).toMatchObject({ removed: 0 });
       await expect(stat(job.workspacePath)).resolves.toBeDefined();
+      await expect(stat(job.cachePath)).resolves.toBeDefined();
+      await expect(stat(job.logPath)).resolves.toBeDefined();
       await expect(countRows("jobs/job.sqlite", "build_jobs")).resolves.toBe(1);
     });
   });
@@ -238,6 +278,8 @@ describe("gc", () => {
         report.jobs.find((item) => item.name === "build-queue"),
       ).toMatchObject({ removed: 1 });
       await expect(stat(job.workspacePath)).rejects.toThrow();
+      await expect(stat(job.cachePath)).rejects.toThrow();
+      await expect(stat(job.logPath)).rejects.toThrow();
       await expect(countRows("jobs/job.sqlite", "build_jobs")).resolves.toBe(0);
     });
   });
@@ -382,7 +424,9 @@ async function createExpiredSearchSession(): Promise<void> {
 }
 
 async function createCompletedOldJob(path: string): Promise<{
+  readonly cachePath: string;
   readonly eventsPath: string;
+  readonly logPath: string;
   readonly workspacePath: string;
 }> {
   return await createCompletedJob(path, {
@@ -398,7 +442,9 @@ async function createCompletedJob(
     readonly state: "canceled" | "failed" | "succeeded";
   },
 ): Promise<{
+  readonly cachePath: string;
   readonly eventsPath: string;
+  readonly logPath: string;
   readonly workspacePath: string;
 }> {
   const job = await addBuildJob({
@@ -408,7 +454,8 @@ async function createCompletedJob(
   });
   await mkdir(job.workspacePath, { recursive: true });
   await writeFile(join(job.workspacePath, "artifact.txt"), "artifact", "utf8");
-  await writeFile(join(dirname(job.workspacePath), ".DS_Store"), "finder");
+  await writeFile(join(job.cachePath, "request.txt"), "cache", "utf8");
+  await writeFile(join(job.logPath, "run.log"), "log", "utf8");
   await writeFile(job.eventsPath, "event\n", "utf8");
 
   const database = await openStateDatabase("jobs/job.sqlite");

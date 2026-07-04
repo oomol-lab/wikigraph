@@ -445,10 +445,10 @@ async function buildSummaryFromSnapshot(
 
   const document = new SummaryInputSnapshotDocument(snapshot);
   const fragments = document.getSerialFragments(chapterId);
-  const fragmentIds = await fragments.listFragmentIds();
+  const sentenceStartIndexes = await fragments.listFragmentIds();
 
-  if (fragmentIds.length <= 1) {
-    return await readPassthroughSummary(fragments, fragmentIds);
+  if (sentenceStartIndexes.length <= 1) {
+    return await readPassthroughSummary(fragments, sentenceStartIndexes);
   }
 
   const summaryParts: string[] = [];
@@ -499,10 +499,10 @@ async function buildSummaryFromDocument(
   }
 
   const fragments = document.getSerialFragments(chapterId);
-  const fragmentIds = await fragments.listFragmentIds();
+  const sentenceStartIndexes = await fragments.listFragmentIds();
 
-  if (fragmentIds.length <= 1) {
-    return await readPassthroughSummary(fragments, fragmentIds);
+  if (sentenceStartIndexes.length <= 1) {
+    return await readPassthroughSummary(fragments, sentenceStartIndexes);
   }
 
   const summaryParts: string[] = [];
@@ -538,15 +538,16 @@ async function buildSummaryFromDocument(
 
 async function readPassthroughSummary(
   fragments: ReadonlySerialFragments,
-  fragmentIds: readonly number[],
+  sentenceStartIndexes: readonly number[],
 ): Promise<string> {
-  if (fragmentIds.length === 0) {
+  if (sentenceStartIndexes.length === 0) {
     return "";
   }
 
   const records = await Promise.all(
-    fragmentIds.map(
-      async (fragmentId) => await fragments.getFragment(fragmentId),
+    sentenceStartIndexes.map(
+      async (startSentenceIndex) =>
+        await fragments.getFragment(startSentenceIndex),
     ),
   );
 
@@ -655,7 +656,7 @@ class SummaryInputSnapshotDocument implements ReadonlyDocument {
   public constructor(snapshot: SummaryInputSnapshotData) {
     const serialId = snapshot.serial.id;
 
-    this.chunks = new SnapshotChunkStore(snapshot.chunks);
+    this.chunks = new SnapshotChunkStore(snapshot.chunks, snapshot.fragments);
     this.fragmentGroups = new SnapshotFragmentGroupStore(
       snapshot.fragmentGroups,
     );
@@ -920,10 +921,19 @@ class SnapshotSerialFragments implements ReadonlySerialFragments {
 class SnapshotChunkStore implements ReadonlyChunkStore {
   readonly #chunks: readonly ChunkRecord[];
   readonly #chunksById: Map<number, ChunkRecord>;
+  readonly #fragmentStartIndexesBySerialId: ReadonlyMap<
+    number,
+    readonly number[]
+  >;
 
-  public constructor(chunks: readonly ChunkRecord[]) {
+  public constructor(
+    chunks: readonly ChunkRecord[],
+    fragments: readonly FragmentRecord[],
+  ) {
     this.#chunks = [...chunks].sort(compareChunkById);
     this.#chunksById = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+    this.#fragmentStartIndexesBySerialId =
+      createFragmentStartIndexesBySerialId(fragments);
   }
 
   public getById(chunkId: number): Promise<ChunkRecord | undefined> {
@@ -938,17 +948,24 @@ class SnapshotChunkStore implements ReadonlyChunkStore {
     return Promise.resolve([...this.#chunks]);
   }
 
-  public listByFragments(
+  public listBySentenceStartIndexes(
     serialId: number,
-    fragmentIds: readonly number[],
+    sentenceStartIndexes: readonly number[],
   ): Promise<ChunkRecord[]> {
-    const fragmentIdSet = new Set(fragmentIds);
+    const segmentRanges = createSegmentRanges(
+      this.#fragmentStartIndexesBySerialId.get(serialId) ?? [],
+      sentenceStartIndexes,
+    );
 
     return Promise.resolve(
       this.#chunks.filter(
         (chunk) =>
           chunk.sentenceId[0] === serialId &&
-          fragmentIdSet.has(chunk.sentenceId[1]),
+          segmentRanges.some(
+            (range) =>
+              chunk.sentenceId[1] >= range.startSentenceIndex &&
+              chunk.sentenceId[1] <= range.endSentenceIndex,
+          ),
       ),
     );
   }
@@ -1331,6 +1348,53 @@ async function collectReaderText(
 
 function compareNumber(left: number, right: number): number {
   return left - right;
+}
+
+function createFragmentStartIndexesBySerialId(
+  fragments: readonly FragmentRecord[],
+): ReadonlyMap<number, readonly number[]> {
+  const indexesBySerialId = new Map<number, number[]>();
+
+  for (const fragment of fragments) {
+    const indexes = indexesBySerialId.get(fragment.serialId) ?? [];
+
+    indexes.push(fragment.fragmentId);
+    indexesBySerialId.set(fragment.serialId, indexes);
+  }
+
+  return new Map(
+    [...indexesBySerialId.entries()].map(
+      ([serialId, indexes]) => [serialId, indexes.sort(compareNumber)] as const,
+    ),
+  );
+}
+
+function createSegmentRanges(
+  allStartIndexes: readonly number[],
+  selectedStartIndexes: readonly number[],
+): Array<{
+  readonly endSentenceIndex: number;
+  readonly startSentenceIndex: number;
+}> {
+  const selected = new Set(selectedStartIndexes);
+
+  return allStartIndexes.flatMap((startSentenceIndex, index) => {
+    if (!selected.has(startSentenceIndex)) {
+      return [];
+    }
+
+    const nextStartSentenceIndex = allStartIndexes[index + 1];
+
+    return [
+      {
+        endSentenceIndex:
+          nextStartSentenceIndex === undefined
+            ? Infinity
+            : nextStartSentenceIndex - 1,
+        startSentenceIndex,
+      },
+    ];
+  });
 }
 
 function compareChunkById(left: ChunkRecord, right: ChunkRecord): number {

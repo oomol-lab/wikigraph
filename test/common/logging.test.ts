@@ -53,7 +53,7 @@ describe("common/logging", () => {
       expect(artifactPath).toContain("/artifacts/llm/request.log");
       expect(artifactPath).not.toContain("/runs/");
       const content = await readFile(artifactPath, "utf8");
-      const eventLog = await readFile(`${runDirPath}/events.log`, "utf8");
+      const eventLog = await readFile(`${runDirPath}/run.log`, "utf8");
 
       expect(content).toBe("request log");
       expect(eventLog).toContain("INFO");

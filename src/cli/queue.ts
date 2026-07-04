@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 
 import { SpineDigestScope } from "../common/llm-scope.js";
+import { withLoggingContext } from "../common/logging.js";
 import {
   addBuildJob,
   assertBuildJobInputRevision,
@@ -46,7 +47,7 @@ import { formatCLIJSON } from "./json.js";
 import {
   ProgressOutputWriter,
   type ProgressCounter,
-  type ProgressTokens,
+  type ProgressMetricGroup,
 } from "./progress-output.js";
 import {
   createStageLLM,
@@ -231,10 +232,28 @@ async function executeBuildJob(
   reporter: BuildJobProgressReporter,
   context: BuildJobExecutionContext,
 ): Promise<void> {
+  await withLoggingContext(
+    {
+      logDirPath: job.logPath,
+      operation: "build-job",
+    },
+    async () => {
+      await executeBuildJobWithLogging(job, reporter, context);
+    },
+  );
+}
+
+async function executeBuildJobWithLogging(
+  job: BuildJob,
+  reporter: BuildJobProgressReporter,
+  context: BuildJobExecutionContext,
+): Promise<void> {
   const config = await loadRequiredStageConfig({
     ...(job.llmJSON === undefined ? {} : { llmJSON: job.llmJSON }),
   });
   const llm = createStageLLM(config, {
+    cacheDirPath: job.cachePath,
+    logDirPath: job.logPath,
     onStreamProgress: async (event) => {
       await reporter.addOutputCharacters(event.outputCharacters);
     },
@@ -307,10 +326,22 @@ async function executeBuildJob(
         }),
     );
 
+    await reporter.updatePhase({
+      done: 0,
+      phase: "committing",
+      total: 1,
+      unit: "item",
+    });
     await new SpineDigestFile(job.archivePath).write(async (document) => {
       assertJobStillRunning(await getBuildJob(job.jobId));
       await assertCurrentBuildInputRevision(job, document);
       await commitChapterKnowledgeGraphArtifact(document, artifact);
+    });
+    await reporter.updatePhase({
+      done: 1,
+      phase: "committing",
+      total: 1,
+      unit: "item",
     });
     await reporter.stepCompleted("knowledge-graph");
     assertJobStillRunning(await getBuildJob(job.jobId));
@@ -337,6 +368,12 @@ async function executeBuildJob(
         },
       },
     });
+    await reporter.updatePhase({
+      done: 0,
+      phase: "committing",
+      total: 1,
+      unit: "item",
+    });
     details = await new SpineDigestFile(job.archivePath).write(
       async (document) => {
         assertJobStillRunning(await getBuildJob(job.jobId));
@@ -344,6 +381,12 @@ async function executeBuildJob(
         return await commitChapterGraphArtifact(document, artifact);
       },
     );
+    await reporter.updatePhase({
+      done: 1,
+      phase: "committing",
+      total: 1,
+      unit: "item",
+    });
     const nextBuildInput = await new SpineDigestFile(
       job.archivePath,
     ).readDocument(
@@ -392,6 +435,12 @@ async function executeBuildJob(
     snapshotPath: summaryInput.filePath,
     workspacePath: job.workspacePath,
   });
+  await reporter.updatePhase({
+    done: 0,
+    phase: "committing",
+    total: 1,
+    unit: "item",
+  });
   details = await new SpineDigestFile(job.archivePath).write(
     async (document) => {
       assertJobStillRunning(await getBuildJob(job.jobId));
@@ -403,6 +452,12 @@ async function executeBuildJob(
       );
     },
   );
+  await reporter.updatePhase({
+    done: 1,
+    phase: "committing",
+    total: 1,
+    unit: "item",
+  });
   await reporter.updateWords({ readingSummaryWords: details.words });
   await reporter.stepCompleted("reading-summary");
   assertJobStillRunning(await getBuildJob(job.jobId));
@@ -479,13 +534,13 @@ async function watchBuildJob(
 function formatWatchOutputEvent(event: BuildJobEvent) {
   switch (event.type) {
     case "status_snapshot": {
-      const tokens = formatProgressTokens(event.tokens);
+      const tokenMetrics = formatProgressTokenMetrics(event.tokens);
       return {
         counters: event.counters.map(formatProgressCounter),
         json: event,
         kind: "status" as const,
+        ...(tokenMetrics === undefined ? {} : { metricGroups: [tokenMetrics] }),
         phase: event.phase ?? event.step ?? "status",
-        ...(tokens === undefined ? {} : { tokens }),
       };
     }
     case "target_changed":
@@ -524,7 +579,7 @@ function formatWatchOutputEvent(event: BuildJobEvent) {
 function formatStepPlan(step: string): string {
   switch (step) {
     case "knowledge-graph":
-      return "screening -> matching -> enrichment -> relation-discovery -> grounding";
+      return "matching -> screening -> enrichment -> grounding -> relation-discovery -> committing";
     case "reading-summary":
       return "reading-graph -> summarizing -> committing";
     case "reading-graph":
@@ -549,6 +604,8 @@ function formatProgressUnit(unit: string): string {
   switch (unit) {
     case "candidate":
       return "candidates";
+    case "item":
+      return "items";
     case "page":
       return "pages";
     case "qid":
@@ -566,25 +623,29 @@ function formatProgressUnit(unit: string): string {
   }
 }
 
-function formatProgressTokens(
+function formatProgressTokenMetrics(
   tokens: Extract<
     BuildJobEvent,
     { readonly type: "status_snapshot" }
   >["tokens"],
-): ProgressTokens | undefined {
+): ProgressMetricGroup | undefined {
   if (tokens === undefined) {
     return undefined;
   }
 
-  return {
+  const metrics = [
+    ...(tokens.inputTokens === undefined
+      ? []
+      : [{ name: "input", value: tokens.inputTokens }]),
     ...(tokens.cacheReadTokens === undefined
-      ? {}
-      : { cache: tokens.cacheReadTokens }),
-    ...(tokens.inputTokens === undefined ? {} : { input: tokens.inputTokens }),
+      ? []
+      : [{ name: "cache", value: tokens.cacheReadTokens }]),
     ...(tokens.outputTokens === undefined
-      ? {}
-      : { output: tokens.outputTokens }),
-  };
+      ? []
+      : [{ name: "output", value: tokens.outputTokens }]),
+  ];
+
+  return metrics.length === 0 ? undefined : { metrics, name: "tokens" };
 }
 
 async function writeJobList(
@@ -633,6 +694,8 @@ async function writeJobStatus(
       `Target: ${job.target}`,
       `Step: ${job.currentStep ?? "-"}`,
       `Workspace: ${job.workspacePath}`,
+      `Cache: ${job.cachePath}`,
+      `Logs: ${job.logPath}`,
       ...(job.errorJSON === undefined ? [] : [`Error: ${job.errorJSON}`]),
     ].join("\n") + "\n",
   );
@@ -642,6 +705,7 @@ function formatJobJSON(job: BuildJob): unknown {
   return {
     archiveKey: job.archiveKey,
     archivePath: job.archivePath,
+    cachePath: job.cachePath,
     chapterId: job.chapterId,
     createdAt: job.createdAt,
     ...(job.currentStep === undefined ? {} : { currentStep: job.currentStep }),
@@ -649,6 +713,7 @@ function formatJobJSON(job: BuildJob): unknown {
     eventsPath: job.eventsPath,
     ...(job.finishedAt === undefined ? {} : { finishedAt: job.finishedAt }),
     jobId: job.jobId,
+    logPath: job.logPath,
     ...(job.llmJSON === undefined ? {} : { llmJSON: job.llmJSON }),
     ...(job.ownerId === undefined ? {} : { ownerId: job.ownerId }),
     ...(job.ownerPid === undefined ? {} : { ownerPid: job.ownerPid }),
