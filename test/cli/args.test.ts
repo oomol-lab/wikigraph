@@ -991,6 +991,18 @@ describe("cli/args", () => {
       parseCLIArguments(["wikg://book.wikg", "inspect", "--evidence"]),
     ).toThrow("The `inspect` command does not support --evidence.");
     expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "inspect", "--query", "agent"]),
+    ).toThrow("The `inspect` command does not support --query.");
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "inspect", "--chapter", "2"]),
+    ).toThrow("The `inspect` command does not support --chapter.");
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "inspect", "--from", "1"]),
+    ).toThrow("The `inspect` command does not support --from.");
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "inspect", "--cursor", "c_1"]),
+    ).toThrow("The `inspect` command does not support --cursor.");
+    expect(() =>
       parseCLIArguments(["wikg://book.wikg", "index", "--evidence"]),
     ).toThrow("The URI-first form does not support `index`.");
     expect(() => parseCLIArguments(["wikg://book.wikg", "status"])).toThrow(
@@ -1098,6 +1110,9 @@ describe("cli/args", () => {
       help: false,
       kind: "archive",
     });
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg/chapter/12", "get"]),
+    ).toThrow("`chapter/<id>` is a scope URI.");
     expect(
       parseCLIArguments(["wikg://book.wikg/chapter/12/title"]),
     ).toStrictEqual({

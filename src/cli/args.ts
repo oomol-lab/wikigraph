@@ -1643,11 +1643,11 @@ function parseSingleChapterUriArguments(
         helpRoute,
       );
     case "get":
-      return parseArchiveArguments(
-        "get",
-        [formatLocatedChapterUri(archivePath, chapterId), ...tail],
-        values,
-        helpRoute,
+      throw new Error(
+        withHelpRoute(
+          "`chapter/<id>` is a scope URI. Use `chapter/<id>/title` or `chapter/<id>/state` to read a concrete chapter object.",
+          "wikigraph help uri",
+        ),
       );
     case "inspect":
       return parseArchiveArguments(
@@ -2895,8 +2895,12 @@ function parseArchiveArguments(
       rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
+      rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--context", values.context, helpRoute);
+      rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+      rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      rejectArchiveFlag(action, "--query", values.query, helpRoute);
       rejectArchiveFlag(action, "--stage", values.stage, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
