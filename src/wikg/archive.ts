@@ -37,7 +37,6 @@ const WIKG_ARCHIVE_PATTERNS = [
   /^manifest\.json$/u,
   /^database\.db$/u,
   /^fts\.db$/u,
-  /^book-meta\.json$/u,
   /^toc\.json$/u,
   /^cover\/(?:data\.bin|info\.json)$/u,
   /^texts\/(?:source|summary)\/\d+\.txt$/u,

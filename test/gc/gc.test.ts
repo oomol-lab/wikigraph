@@ -168,7 +168,7 @@ describe("gc", () => {
         "work",
         "archive-key",
       );
-      const referencedPath = join(workspaceBucketPath, "book-meta.json");
+      const referencedPath = join(workspaceBucketPath, "database.db");
       const orphanedPath = join(
         workspaceBucketPath,
         "texts",
@@ -181,7 +181,7 @@ describe("gc", () => {
       await writeFile(orphanedPath, "orphaned", "utf8");
       await createCoordinatorOverlay(path, {
         archiveKey: "archive-key",
-        entryPath: "book-meta.json",
+        entryPath: "database.db",
         workspacePath: referencedPath,
       });
 

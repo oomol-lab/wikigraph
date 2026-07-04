@@ -164,20 +164,6 @@ async function seedLegacyDocument(documentPath: string): Promise<void> {
   await mkdir(`${documentPath}/summaries`, { recursive: true });
   await mkdir(`${documentPath}/cover`, { recursive: true });
   await writeTextFile(
-    `${documentPath}/book-meta.json`,
-    JSON.stringify({
-      authors: ["Author"],
-      description: null,
-      identifier: null,
-      language: "en",
-      publishedAt: null,
-      publisher: null,
-      sourceFormat: "txt",
-      title: "Legacy Book",
-      version: 1,
-    }),
-  );
-  await writeTextFile(
     `${documentPath}/toc.json`,
     JSON.stringify({
       items: [{ children: [], serialId: 1, title: "Chapter 1" }],
@@ -296,7 +282,6 @@ async function writeLegacyArchive(
     );
   }
   zipFile.addFile(`${documentPath}/database.db`, "database.db");
-  zipFile.addFile(`${documentPath}/book-meta.json`, "book-meta.json");
   zipFile.addFile(`${documentPath}/toc.json`, "toc.json");
   zipFile.addFile(
     `${documentPath}/summaries/serial-1.txt`,

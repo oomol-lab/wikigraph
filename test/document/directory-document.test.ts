@@ -135,7 +135,7 @@ describe("document/directory-document", () => {
     });
   });
 
-  it("replaces existing book metadata", async () => {
+  it("replaces existing archive metadata", async () => {
     await withTempDir("spinedigest-document-", async (path) => {
       const document = await DirectoryDocument.open(path);
 

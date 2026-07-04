@@ -763,7 +763,7 @@ function parseArchiveUriTargetArguments(
   if (containsMetadataKeySuffix(objectUri)) {
     throw new Error(
       withHelpRoute(
-        "Metadata keys are not addressed in the URI. Use `<object>/meta get` and process the JSON output, or use `<object>/meta put <key> ...`.",
+        "Metadata keys are not addressed in the URI. Use `<object>/meta get` and filter the output, or use `<object>/meta put <key> ...`.",
         "wikigraph help object meta",
       ),
     );
@@ -986,7 +986,6 @@ function rejectMetadataFlags(
   if (action === "clear" || action === "delete") {
     rejectMetaCommandFlag("input", values.input, helpRoute);
     rejectMetaCommandFlag("json-input", values["json-input"], helpRoute);
-    rejectMetaCommandBooleanFlag("json", values.json, helpRoute);
   }
 }
 

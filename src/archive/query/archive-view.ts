@@ -646,7 +646,7 @@ export async function listArchiveCollection(
         field: "metadata",
         id: ARCHIVE_ROOT_ID,
         snippet: formatMetaSummary(meta),
-        title: meta.title ?? "Book metadata",
+        title: meta.title ?? "Archive metadata",
         type: "meta",
       });
     }
@@ -4088,7 +4088,7 @@ function findMeta(
       id: ARCHIVE_ROOT_ID,
       ...createFindMatchFields(contentMatch),
       snippet: createSnippet(content, getSnippetNeedle(contentMatch)),
-      title: meta.title ?? "Book metadata",
+      title: meta.title ?? "Archive metadata",
       type: "meta",
     },
   ];
@@ -5931,7 +5931,7 @@ function formatMetaSummary(meta: BookMeta | undefined): string {
 }
 
 function formatMetaTitle(meta: BookMeta | undefined): string {
-  return meta?.title ?? "Book metadata";
+  return meta?.title ?? "Archive metadata";
 }
 
 function createMetaPage(meta: BookMeta | undefined): {

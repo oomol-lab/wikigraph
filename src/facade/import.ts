@@ -323,7 +323,7 @@ async function assertImportTargetIsEmpty(document: Document): Promise<void> {
   ]);
 
   if (bookMeta !== undefined) {
-    throw new Error("Document book meta already exists");
+    throw new Error("Archive metadata already exists");
   }
   if (cover !== undefined) {
     throw new Error("Document cover already exists");

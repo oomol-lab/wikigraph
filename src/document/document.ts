@@ -43,7 +43,7 @@ import {
   SnakeEdgeStore,
   SnakeStore,
 } from "./stores.js";
-import type { SentenceId } from "./types.js";
+import { ObjectMetadataKind, type SentenceId } from "./types.js";
 
 export interface DocumentFileStore {
   close(): Promise<void>;
@@ -399,9 +399,11 @@ export class DirectoryDocument implements Document {
   }
 
   public async readBookMeta(): Promise<BookMeta | undefined> {
-    return await this.#readJsonFile(this.#getBookMetaPath(), (value) =>
-      bookMetaSchema.parse(value),
-    );
+    const map = await this.metadata.getMap("");
+
+    return Object.keys(map).length === 0
+      ? undefined
+      : bookMetaSchema.parse(map);
   }
 
   public async readCover(): Promise<SourceAsset | undefined> {
@@ -438,13 +440,23 @@ export class DirectoryDocument implements Document {
   }
 
   public async writeBookMeta(meta: BookMeta): Promise<void> {
-    await this.#writeJsonFile(this.#getBookMetaPath(), meta);
+    if (Object.keys(await this.metadata.getMap("")).length > 0) {
+      throw new Error("Archive metadata already exists.");
+    }
+
+    await this.replaceBookMeta(meta);
   }
 
   public async replaceBookMeta(meta: BookMeta): Promise<void> {
-    await this.#writeJsonFile(this.#getBookMetaPath(), meta, {
-      overwrite: true,
-    });
+    await this.metadata.replaceMap(
+      {
+        kind: ObjectMetadataKind.Archive,
+        objectPath: "",
+      },
+      {
+        ...meta,
+      },
+    );
   }
 
   public async writeCover(cover: SourceAsset): Promise<void> {
@@ -740,10 +752,6 @@ export class DirectoryDocument implements Document {
     if (options.overwrite !== true) {
       this.#contextScope.getStore()?.registerCreatedFile(path);
     }
-  }
-
-  #getBookMetaPath(): string {
-    return join(this.path, "book-meta.json");
   }
 
   #getCoverDataPath(): string {

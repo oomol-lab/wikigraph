@@ -21,6 +21,7 @@ export async function runObjectMetadataCommand(
         async (document) => {
           await writeMetadataMap(
             await document.metadata.getMap(args.objectPath),
+            args.json ?? false,
           );
         },
       );
@@ -31,7 +32,10 @@ export async function runObjectMetadataCommand(
 
       await new SpineDigestFile(args.archivePath).write(async (document) => {
         await document.metadata.replaceMap(target, map);
-        await writeMetadataMap(await document.metadata.getMap(args.objectPath));
+        await writeMetadataMap(
+          await document.metadata.getMap(args.objectPath),
+          args.json ?? false,
+        );
       });
       return;
     }
@@ -41,7 +45,10 @@ export async function runObjectMetadataCommand(
 
       await new SpineDigestFile(args.archivePath).write(async (document) => {
         await document.metadata.put(target, key, value);
-        await writeMetadataMap(await document.metadata.getMap(args.objectPath));
+        await writeMetadataMap(
+          await document.metadata.getMap(args.objectPath),
+          args.json ?? false,
+        );
       });
       return;
     }
@@ -51,13 +58,19 @@ export async function runObjectMetadataCommand(
           args.objectPath,
           normalizeMetadataKey(args.key),
         );
-        await writeMetadataMap(await document.metadata.getMap(args.objectPath));
+        await writeMetadataMap(
+          await document.metadata.getMap(args.objectPath),
+          args.json ?? false,
+        );
       });
       return;
     case "clear":
       await new SpineDigestFile(args.archivePath).write(async (document) => {
         await document.metadata.clear(args.objectPath);
-        await writeMetadataMap(await document.metadata.getMap(args.objectPath));
+        await writeMetadataMap(
+          await document.metadata.getMap(args.objectPath),
+          args.json ?? false,
+        );
       });
       return;
   }
@@ -136,8 +149,33 @@ function normalizeMetadataKey(key: string | undefined): string {
 
 function writeMetadataMap(
   map: Readonly<Record<string, unknown>>,
+  json: boolean,
 ): Promise<void> {
-  return writeTextToStdout(formatCLIJSON(map));
+  if (json) {
+    return writeTextToStdout(formatCLIJSON(map));
+  }
+
+  return writeTextToStdout(formatMetadataText(map));
+}
+
+function formatMetadataText(map: Readonly<Record<string, unknown>>): string {
+  const lines = Object.entries(map).map(
+    ([key, value]) => `${key}: ${formatMetadataTextValue(value)}`,
+  );
+
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatMetadataTextValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).join(" ");
+  }
+
+  return String(value);
 }
 
 function parseObjectMetadataTarget(objectPath: string): ObjectMetadataTarget {

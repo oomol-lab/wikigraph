@@ -1,4 +1,4 @@
-import { access, readFile } from "fs/promises";
+import { access } from "fs/promises";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -220,13 +220,6 @@ describe("facade/digest", () => {
           });
         },
       );
-
-      await expect(access(`${documentDirPath}/book-meta.json`)).resolves.toBe(
-        undefined,
-      );
-      expect(
-        await readFile(`${documentDirPath}/book-meta.json`, "utf8"),
-      ).toContain('"sourceFormat": "markdown"');
     });
   });
 
@@ -364,15 +357,6 @@ describe("facade/digest", () => {
         userLanguage: undefined,
       });
       expect(digestMockState.importCalls[2]?.documentPath).toContain("/txt");
-      await expect(access(`${path}/epub/book-meta.json`)).resolves.toBe(
-        undefined,
-      );
-      await expect(access(`${path}/markdown/book-meta.json`)).resolves.toBe(
-        undefined,
-      );
-      await expect(access(`${path}/txt/book-meta.json`)).resolves.toBe(
-        undefined,
-      );
     });
   }, 15_000);
 });

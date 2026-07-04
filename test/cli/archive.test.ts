@@ -1531,7 +1531,7 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).not.toContain("-- evidence");
   });
 
-  it("gets archive metadata from a root object URI", async () => {
+  it("gets the archive root object URI", async () => {
     await runArchiveCommand({
       action: "get",
       archivePath: "wikg:///tmp/book.wikg",
@@ -1539,17 +1539,22 @@ describe("cli/archive", () => {
       objectId: "wikg:///tmp/book.wikg/",
     });
 
-    expect(readArchivePage).toHaveBeenCalledWith({}, "wikg://", {});
-    expect(archiveMockState.textWrites[0]).toBe(
-      [
-        "uri: wikg://",
-        "title: Archive Fixture",
-        "authors: Archive Author",
-        "publisher: Archive Press",
-        "description: Archive description.",
-        "",
-      ].join("\n"),
-    );
+    expect(readArchivePage).not.toHaveBeenCalled();
+    expect(archiveMockState.textWrites[0]).toBe("<archive>\n");
+  });
+
+  it("prints the archive root object URI as json", async () => {
+    await runArchiveCommand({
+      action: "get",
+      archivePath: "wikg:///tmp/book.wikg",
+      format: "json",
+      objectId: "wikg:///tmp/book.wikg/",
+    });
+
+    expect(readArchivePage).not.toHaveBeenCalled();
+    expect(JSON.parse(archiveMockState.textWrites[0] ?? "")).toStrictEqual({
+      uri: "wikg:///tmp/book.wikg",
+    });
   });
 
   it("gets an entity by Wiki Graph URI", async () => {

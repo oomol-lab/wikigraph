@@ -238,6 +238,10 @@ export async function runArchiveCommand(
       );
       return;
     case "get":
+      if (isArchiveRootGet(args)) {
+        await writeArchiveRoot(args);
+        return;
+      }
       await readArchiveDocument(
         getArchivePath(args.archivePath),
         async (document) => {
@@ -945,6 +949,26 @@ function getObjectUri(uri: string): string {
   const parsed = requireLocatedObjectOrArchiveUri(uri);
 
   return parsed.objectUri ?? "wikg://";
+}
+
+function isArchiveRootGet(args: CLIArchiveArguments): boolean {
+  return (
+    args.objectId !== undefined &&
+    requireLocatedObjectOrArchiveUri(args.objectId).objectUri === undefined
+  );
+}
+
+async function writeArchiveRoot(args: CLIArchiveArguments): Promise<void> {
+  const archivePath = getArchivePath(args.objectId!);
+
+  if (args.format === "json") {
+    await writeTextToStdout(
+      formatCLIJSON({ uri: formatLocatedWikiGraphUri(archivePath) }),
+    );
+    return;
+  }
+
+  await writeTextToStdout("<archive>\n");
 }
 
 function parseChapterScope(uri: string): number | undefined {

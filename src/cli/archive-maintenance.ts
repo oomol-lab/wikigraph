@@ -55,7 +55,7 @@ async function updateArchiveMeta(
     const meta = await document.readBookMeta();
 
     if (meta === undefined) {
-      throw new Error("Document book meta is missing.");
+      throw new Error("Archive metadata is missing.");
     }
 
     const updatedMeta = applyArchiveMetaPatch(meta, patch);

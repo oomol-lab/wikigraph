@@ -170,7 +170,7 @@ describe("output/epub/book", () => {
     });
   });
 
-  it("throws when book meta is missing", async () => {
+  it("throws when archive metadata is missing", async () => {
     await withTempDir("spinedigest-epub-book-", async (path) => {
       const document = await DirectoryDocument.open(path);
 
@@ -183,7 +183,7 @@ describe("output/epub/book", () => {
         });
 
         await expect(buildEpubBook(document)).rejects.toThrow(
-          "Document book meta is missing",
+          "Archive metadata is missing",
         );
       } finally {
         await document.release();

@@ -117,7 +117,7 @@ describe("cli/archive maintenance", () => {
     setStdoutTTY(originalStdoutIsTTY);
   });
 
-  it("renders book metadata", async () => {
+  it("renders archive metadata", async () => {
     await runArchiveMetaCommand({
       inputPath: "/tmp/book.wikg",
     });
@@ -140,7 +140,7 @@ describe("cli/archive maintenance", () => {
     ]);
   });
 
-  it("renders book metadata as JSON", async () => {
+  it("renders archive metadata as JSON", async () => {
     await runArchiveMetaCommand({
       inputPath: "/tmp/book.wikg",
       json: true,
@@ -160,7 +160,7 @@ describe("cli/archive maintenance", () => {
     });
   });
 
-  it("updates book metadata in place and prints the result", async () => {
+  it("updates archive metadata in place and prints the result", async () => {
     await runArchiveMetaCommand({
       inputPath: "/tmp/book.wikg",
       metaPatch: {

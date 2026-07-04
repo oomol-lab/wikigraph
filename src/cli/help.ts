@@ -119,13 +119,12 @@ const HELP_OBJECTS: readonly HelpObjectEntry[] = [
     verbs: [
       {
         command: "wikigraph wikg://book.wikg get --json",
-        note: "Read archive metadata as an object.",
+        note: "Read the archive root object.",
         verb: "get",
       },
       {
-        command:
-          'wikigraph wikg://book.wikg/meta set --json \'{"title":"New Title"}\'',
-        note: "Replace archive-level object metadata.",
+        command: 'wikigraph wikg://book.wikg/meta put title "New Title"',
+        note: "Edit archive-level object metadata.",
         verb: "set",
       },
       {
@@ -810,7 +809,7 @@ const ARCHIVE_MAINTENANCE_COMMAND_METADATA: readonly {
   },
   {
     name: "meta",
-    summary: "Read or edit book metadata stored in the archive.",
+    summary: "Read or edit metadata attached to an object.",
   },
   {
     name: "chapter",

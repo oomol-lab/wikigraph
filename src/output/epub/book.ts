@@ -18,7 +18,7 @@ export async function buildEpubBook(
   ]);
 
   if (meta === undefined) {
-    throw new Error("Document book meta is missing");
+    throw new Error("Archive metadata is missing");
   }
   if (toc === undefined) {
     throw new Error("Document TOC is missing");

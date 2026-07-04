@@ -18,6 +18,7 @@ Returns:
 
 Notes:
   - `get` is for readable archive objects such as chunks, source chapters or ranges, and summaries.
+  - Archive root `get` returns only the root object marker; use `<archive-uri>/meta get` for archive metadata.
   - When a located readable object URI is passed without a verb, `get` is implied.
   - Collection and lens URIs still require an explicit verb such as `list` or `search`.
   - Entity and triple `get` output includes up to 3 evidence sources by default.

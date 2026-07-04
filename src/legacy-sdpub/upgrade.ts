@@ -18,7 +18,6 @@ import { isNodeError } from "../utils/node-error.js";
 const LEGACY_SDPUB_PATTERNS = [
   /^manifest\.json$/u,
   /^database\.db$/u,
-  /^book-meta\.json$/u,
   /^toc\.json$/u,
   /^cover\/(?:data\.bin|info\.json)$/u,
   /^summaries\/serial-\d+\.txt$/u,

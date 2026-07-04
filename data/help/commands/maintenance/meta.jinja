@@ -4,7 +4,7 @@ Command: wikigraph <object-uri>/meta
 meta
 
 Purpose:
-  Read or edit JSON metadata attached to any Wiki Graph object.
+  Read or edit metadata attached to any Wiki Graph object.
 
 Usage:
   wikigraph <object-uri>/meta get [--json] [--help|-h]
@@ -13,8 +13,8 @@ Usage:
   wikigraph <object-uri>/meta put <key> <value> [--help|-h]
   wikigraph <object-uri>/meta put <key> --json <value> [--help|-h]
   wikigraph <object-uri>/meta put <key> --input <path> [--help|-h]
-  wikigraph <object-uri>/meta delete <key> [--help|-h]
-  wikigraph <object-uri>/meta clear [--help|-h]
+  wikigraph <object-uri>/meta delete <key> [--json] [--help|-h]
+  wikigraph <object-uri>/meta clear [--json] [--help|-h]
 
 Input:
   - `set` replaces the whole metadata map and requires a JSON object.
@@ -27,13 +27,18 @@ Input:
 Behavior:
   - Archive-level metadata is addressed as `wikg://book.wikg/meta`.
   - Object metadata is addressed as `<object-uri>/meta`, for example `wikg://book.wikg/entity/Q42/meta`.
-  - `<object-uri>/meta/<key>` is rejected. Use `get --json` and a JSON tool to read one key.
+  - Without `--json`, output is one `<key>: <value>` line per metadata entry.
+  - Array values are printed as space-joined item strings in text output.
+  - Add `--json` for a stable machine-readable metadata map.
+  - `--jsonl` is not supported.
+  - `<object-uri>/meta/<key>` is rejected. Use `get` or `get --json` and filter the result.
   - Deleting an object may remove metadata attached to that object.
   - This command does not call an LLM provider.
 
 Examples:
+  wikigraph wikg://book.wikg/meta get
   wikigraph wikg://book.wikg/meta get --json
-  wikigraph wikg://book.wikg/meta set --json '{"title":"New Title"}'
+  wikigraph wikg://book.wikg/meta put title "New Title"
   wikigraph wikg://book.wikg/entity/Q42/meta put note "reviewed"
   wikigraph wikg://book.wikg/entity/Q42/meta put rank --json 7
   wikigraph wikg://book.wikg/entity/Q42/meta delete note

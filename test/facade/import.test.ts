@@ -600,7 +600,7 @@ describe("facade/import", () => {
           });
         },
         sourceDocument,
-        "Document book meta already exists",
+        "Archive metadata already exists",
       );
       await expectImportError(
         `${path}/cover`,

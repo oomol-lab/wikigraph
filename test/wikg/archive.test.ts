@@ -30,11 +30,7 @@ describe("wikg/archive", () => {
       await mkdir(`${sourceDir}/texts/summary`, { recursive: true });
       await writeFile(`${sourceDir}/database.db`, "sqlite", "utf8");
       await writeFile(`${sourceDir}/database.db-journal`, "journal", "utf8");
-      await writeFile(
-        `${sourceDir}/book-meta.json`,
-        '{"title":"Book"}',
-        "utf8",
-      );
+      await writeFile(`${sourceDir}/ignored-meta.json`, "ignored", "utf8");
       await writeFile(`${sourceDir}/toc.json`, '{"items":[]}', "utf8");
       await writeFile(
         `${sourceDir}/cover/info.json`,
@@ -59,9 +55,6 @@ describe("wikg/archive", () => {
       expect(await readFile(`${extractDir}/database.db`, "utf8")).toBe(
         "sqlite",
       );
-      expect(await readFile(`${extractDir}/book-meta.json`, "utf8")).toContain(
-        '"title":"Book"',
-      );
       expect(await readFile(`${extractDir}/toc.json`, "utf8")).toContain(
         '"items":[]',
       );
@@ -76,6 +69,9 @@ describe("wikg/archive", () => {
       );
       await expect(
         readFile(`${extractDir}/database.db-journal`, "utf8"),
+      ).rejects.toThrow();
+      await expect(
+        readFile(`${extractDir}/ignored-meta.json`, "utf8"),
       ).rejects.toThrow();
       await expect(
         readFile(`${extractDir}/alpha.txt`, "utf8"),
@@ -204,7 +200,7 @@ describe("wikg/archive", () => {
 
       await writeWikgArchiveWithOverlays(archivePath, rewrittenPath, [
         {
-          entryPath: "book-meta.json",
+          entryPath: "toc.json",
           kind: "file",
           workspacePath: `${sourceDir}/database.db`,
         },
