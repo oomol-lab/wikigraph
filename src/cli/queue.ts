@@ -587,6 +587,8 @@ function formatFallbackStatusPhase(step: BuildJobTarget | undefined): string {
       return "knowledge-graph";
     case undefined:
       return "status";
+    default:
+      return "status";
   }
 }
 

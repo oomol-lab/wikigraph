@@ -4699,37 +4699,19 @@ async function filterAndSortSourceEvidenceRangesByFtsQuery(
     }
   }
 
-  return [...matchedRanges.values()]
-    .sort((left, right) => {
-      const scoreComparison = (right.score ?? 0) - (left.score ?? 0);
+  return [...matchedRanges.values()].sort((left, right) => {
+    const scoreComparison = (right.score ?? 0) - (left.score ?? 0);
 
-      if (scoreComparison !== 0) {
-        return scoreComparison;
-      }
+    if (scoreComparison !== 0) {
+      return scoreComparison;
+    }
 
-      return compareSourceEvidenceRanges(left, right);
-    })
-    .filter(
-      (range, index, values) =>
-        values.findIndex((item) =>
-          areSourceEvidenceRangesEqual(item, range),
-        ) === index,
-    );
+    return compareSourceEvidenceRanges(left, right);
+  });
 }
 
 function formatSourceEvidenceRangeKey(range: SourceEvidenceRange): string {
   return `${range.chapterId}:${range.startSentenceIndex}:${range.endSentenceIndex}`;
-}
-
-function areSourceEvidenceRangesEqual(
-  left: SourceEvidenceRange,
-  right: SourceEvidenceRange,
-): boolean {
-  return (
-    left.chapterId === right.chapterId &&
-    left.startSentenceIndex === right.startSentenceIndex &&
-    left.endSentenceIndex === right.endSentenceIndex
-  );
 }
 
 function compareSourceEvidenceRanges(
