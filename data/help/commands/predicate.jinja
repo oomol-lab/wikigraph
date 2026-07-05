@@ -208,16 +208,12 @@ Notes:
 {% elif "/wikispine" in uri %}
 Schema:
   {
-    "provider": "fetch|cli",
-    "endpoint": "https://...",
-    "command": "wikispine",
-    "dataDir": "/path/to/data"
+    "provider": "fetch|cli"
   }
 
 Notes:
-  - `fetch` uses an HTTP endpoint.
-  - `cli` runs a local command and may use a local data directory.
-  - `endpoint` must be a valid URL when present.
+  - `fetch` uses the built-in WikiSpine service endpoint.
+  - `cli` runs the local `wikispine` command from PATH.
 {% elif "/concurrent" in uri %}
 Schema:
   {
@@ -236,8 +232,8 @@ Examples:
   wikigraph {{ uri }} set --json-input '{"provider":"openai-compatible","model":"model-name"}'
   wikigraph {{ uri }} set '{"provider":"google","model":"gemini-2.5-pro"}' --json
 {% elif "/wikispine" in uri %}
-  wikigraph {{ uri }} set '{"provider":"fetch","endpoint":"https://example.com"}'
-  wikigraph {{ uri }} set '{"provider":"cli","command":"wikispine"}'
+  wikigraph {{ uri }} set '{"provider":"fetch"}'
+  wikigraph {{ uri }} set '{"provider":"cli"}'
 {% elif "/concurrent" in uri %}
   wikigraph {{ uri }} set '{"job":3,"request":6}'
   wikigraph {{ uri }} set --json-input '{"job":2,"request":4}'
@@ -373,9 +369,6 @@ Keys:
 {% elif "/wikispine" in uri %}
 Keys:
   - provider: fetch or cli
-  - endpoint: URL for provider fetch
-  - command: local command for provider cli
-  - dataDir: local data directory for provider cli
 {% elif "/concurrent" in uri %}
 Keys:
   - job: positive integer
@@ -412,7 +405,7 @@ Usage:
 
 Notes:
   - For `llm`, this sends a small request to the configured model.
-  - For `wikispine`, this checks the configured fetch endpoint or local command.
+  - For `wikispine`, this checks the built-in fetch service or local `wikispine` command.
   - Text success output is intentionally short.
   - With `--json`, success and failure both return `{ "ok": true|false, ... }`; failures set a non-zero exit code.
   - Without `--json`, failures print the command error. Use `wikigraph help readiness` and `wikigraph help config` to recover.

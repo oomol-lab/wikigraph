@@ -4,7 +4,10 @@ import { tmpdir } from "os";
 
 import { describe, expect, it } from "vitest";
 
-import { matchWikispineSentenceCandidates } from "../../src/wikimatch/index.js";
+import {
+  DEFAULT_WIKISPINE_FETCH_ENDPOINT,
+  matchWikispineSentenceCandidates,
+} from "../../src/wikimatch/index.js";
 
 describe("wikimatch/wikispine", () => {
   it("matches each sentence separately and converts sentence offsets to document ranges", async () => {
@@ -146,6 +149,60 @@ describe("wikimatch/wikispine", () => {
           text: "北京大学",
         },
         url: "https://wikispine.example/match",
+      },
+    ]);
+  });
+
+  it("uses the default fetch endpoint when none is configured", async () => {
+    const requests: Array<{ readonly url: string }> = [];
+    const fetchMock: typeof fetch = (input) => {
+      requests.push({
+        url:
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url,
+      });
+
+      return Promise.resolve(
+        new Response(
+          [
+            JSON.stringify({
+              match: {
+                end: 4,
+                qids: [{ disambiguation: false, qid: "Q16952" }],
+                start: 0,
+                surface_id: 1,
+              },
+              type: "match",
+            }),
+            JSON.stringify({ stats: { matches: 1 }, type: "done" }),
+          ].join("\n"),
+          {
+            headers: {
+              "content-type": "application/x-ndjson",
+            },
+            status: 200,
+          },
+        ),
+      );
+    };
+
+    await matchWikispineSentenceCandidates({
+      fetch: fetchMock,
+      provider: "fetch",
+      sentences: [
+        {
+          range: { end: 4, start: 0 },
+          text: "北京大学",
+        },
+      ],
+    });
+
+    expect(requests).toStrictEqual([
+      {
+        url: `${DEFAULT_WIKISPINE_FETCH_ENDPOINT}/match`,
       },
     ]);
   });
