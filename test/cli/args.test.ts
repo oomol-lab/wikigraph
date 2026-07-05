@@ -1910,6 +1910,27 @@ describe("cli/args", () => {
     expect(renderHelpTopicText("recipe")).toContain("Answering questions:");
     expect(renderHelpTopicText("recipe")).toContain("When to read deeper:");
     expect(renderHelpTopicText("recipe")).toContain(
+      "Read the chapter object and use Unix pipes or redirection.",
+    );
+    expect(renderHelpTopicText("recipe")).toContain(
+      "wikigraph wikg://book.wikg/chapter/3/source > chapter-3-source.md",
+    );
+    expect(renderHelpTopicText("recipe")).toContain(
+      'wikigraph wikg://book.wikg/entity --query "朱元璋" --evidence 2',
+    );
+    expect(renderHelpTopicText("recipe")).toContain(
+      'wikigraph wikg://book.wikg/triple --query "婴儿洗礼" --evidence 2',
+    );
+    expect(renderHelpTopicText("recipe")).toContain(
+      'wikigraph wikg://book.wikg/chunk --query "婴儿洗礼" --evidence 2',
+    );
+    expect(renderHelpTopicText("recipe")).toContain(
+      'wikigraph wikg://book.wikg/entity/Q8018 related --query "aspect"',
+    );
+    expect(renderHelpTopicText("recipe")).toContain(
+      "wikigraph wikg://book.wikg/chapter/3/entity --jsonl",
+    );
+    expect(renderHelpTopicText("recipe")).toContain(
       "If Reading Graph data is missing",
     );
     expect(renderHelpTopicText("recipe")).toContain(
