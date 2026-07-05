@@ -35,6 +35,7 @@ import {
 } from "../archive/search-index/index.js";
 import {
   formatLocatedWikiGraphUri,
+  formatWikiGraphCommandUri,
   parseLocatedWikiGraphUri,
   requireLocatedObjectOrArchiveUri,
   SpineDigestFile,
@@ -1015,7 +1016,7 @@ async function writeArchiveInspectReport(
   document: ReadonlyDocument,
   args: CLIArchiveArguments,
 ): Promise<void> {
-  const archiveUri = formatLocatedWikiGraphUri(args.archivePath);
+  const archiveUri = formatWikiGraphCommandUri(args.archivePath);
   const scopeUri =
     args.chapterId === undefined
       ? archiveUri
@@ -2168,7 +2169,7 @@ function appendEntityNextSteps(
   if (!isEntityOutputUri(uri)) {
     return text;
   }
-  const entityUri = formatLocatedWikiGraphUri(
+  const entityUri = formatWikiGraphCommandUri(
     archivePath,
     uri.replace(/\/$/u, ""),
   );
@@ -2596,7 +2597,7 @@ function formatOpenShortUriHint(
     return "";
   }
 
-  return `\n\nOpen short URIs with the archive locator, for example:\n  wikigraph ${formatLocatedWikiGraphUri(context.archivePath, shortUri)}`;
+  return `\n\nOpen short URIs with the archive locator, for example:\n  wikigraph ${formatWikiGraphCommandUri(context.archivePath, shortUri)}`;
 }
 
 function isShortOutputUri(uri: string): boolean {
