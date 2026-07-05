@@ -2041,6 +2041,16 @@ describe("cli/args", () => {
     );
     expect(renderHelpTopicText("config")).toContain("One-run overrides");
     expect(renderHelpTopicText("config")).toContain("baseUrl");
+    expect(renderHelpTopicText("config")).toContain(
+      "job-local LLM object is stored with the job",
+    );
+    expect(
+      renderUriPredicateHelpText(
+        "job-collection-scope",
+        "add",
+        "wikg://local/job",
+      ),
+    ).toContain("does not update `wikg://local/config/llm`");
     expect(
       renderArchiveMaintenanceChapterActionHelpText("set-summary"),
     ).toContain("The chapter must be `reading-graph`");

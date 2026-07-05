@@ -60,6 +60,8 @@ One-run overrides:
   `--llm <json>` can provide an LLM object for one invocation.
   It accepts direct LLM objects and common OpenAI-compatible aliases such as `baseUrl`.
   A base URL implies `openai-compatible` when `provider` is omitted.
+  Generation jobs may also receive `--llm <json>` at `wikigraph wikg://local/job add`;
+  that job-local LLM object is stored with the job and does not appear in `wikg://local/config/llm`.
 
 Examples:
   wikigraph wikg://local/config/llm put provider openai

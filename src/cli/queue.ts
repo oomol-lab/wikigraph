@@ -757,7 +757,9 @@ function formatJobJSON(job: BuildJob): unknown {
     ...(job.finishedAt === undefined ? {} : { finishedAt: job.finishedAt }),
     jobId: job.jobId,
     logPath: job.logPath,
-    ...(job.llmJSON === undefined ? {} : { llmJSON: job.llmJSON }),
+    ...(job.llmJSON === undefined
+      ? {}
+      : { llm: formatJobLLMJSON(job.llmJSON) }),
     ...(job.ownerId === undefined ? {} : { ownerId: job.ownerId }),
     ...(job.ownerPid === undefined ? {} : { ownerPid: job.ownerPid }),
     ...(job.prompt === undefined ? {} : { prompt: job.prompt }),
@@ -770,6 +772,62 @@ function formatJobJSON(job: BuildJob): unknown {
     updatedAt: job.updatedAt,
     workspacePath: job.workspacePath,
   };
+}
+
+function formatJobLLMJSON(value: string): unknown {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return {
+      configured: true,
+      invalid: true,
+    };
+  }
+
+  const llm = readJobLLMObject(parsed);
+
+  return {
+    configured: true,
+    ...(readOptionalString(llm, "provider") === undefined
+      ? {}
+      : { provider: readOptionalString(llm, "provider") }),
+    ...(readOptionalString(llm, "model") === undefined
+      ? {}
+      : { model: readOptionalString(llm, "model") }),
+    ...(readOptionalString(llm, "name") === undefined
+      ? {}
+      : { name: readOptionalString(llm, "name") }),
+    hasApiKey: readOptionalString(llm, "apiKey") !== undefined,
+    hasBaseURL:
+      readOptionalString(llm, "baseURL") !== undefined ||
+      readOptionalString(llm, "baseUrl") !== undefined ||
+      readOptionalString(llm, "chatCompletionsUrl") !== undefined,
+  };
+}
+
+function readJobLLMObject(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const nested = value.llm;
+
+  return isRecord(nested) ? nested : value;
+}
+
+function readOptionalString(
+  value: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const field = value[key];
+
+  return typeof field === "string" && field !== "" ? field : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 async function writeJobSummary(

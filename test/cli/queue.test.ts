@@ -551,6 +551,12 @@ describe("cli/queue", () => {
         createdAt: 1,
         eventsPath: "events.ndjson",
         jobId: "job-1-full",
+        llmJSON: JSON.stringify({
+          apiKey: "secret-key",
+          baseUrl: "https://example.test/v1",
+          model: "example-model",
+          provider: "openai-compatible",
+        }),
         queueRank: 1,
         state: "queued",
         target: "reading-graph",
@@ -564,6 +570,11 @@ describe("cli/queue", () => {
       json: true,
     });
 
+    expect(queueMockState.textWrites.join("")).not.toContain("secret-key");
+    expect(queueMockState.textWrites.join("")).not.toContain("baseUrl");
+    expect(queueMockState.textWrites.join("")).not.toContain(
+      "https://example.test/v1",
+    );
     expect(JSON.parse(queueMockState.textWrites.join(""))).toStrictEqual({
       items: [
         {
@@ -573,6 +584,13 @@ describe("cli/queue", () => {
           createdAt: 1,
           eventsPath: "events.ndjson",
           jobId: "job-1-full",
+          llm: {
+            configured: true,
+            hasApiKey: true,
+            hasBaseURL: true,
+            model: "example-model",
+            provider: "openai-compatible",
+          },
           queueRank: 1,
           state: "queued",
           target: "reading-graph",
@@ -584,6 +602,18 @@ describe("cli/queue", () => {
   });
 
   it("prints queue status json after resolving short job ids", async () => {
+    queueMockState.job = {
+      ...queueMockState.job,
+      llmJSON: JSON.stringify({
+        apiKey: "secret-key",
+        llm: {
+          baseURL: "https://nested.example.test/v1",
+          model: "nested-model",
+          provider: "openai-compatible",
+        },
+      }),
+    };
+
     await runQueueCommand({
       action: "status",
       jobId: "job-1-short",
@@ -591,9 +621,20 @@ describe("cli/queue", () => {
     });
 
     expect(queueMockState.resolveJobIds).toStrictEqual(["job-1-short"]);
+    expect(queueMockState.textWrites.join("")).not.toContain("secret-key");
+    expect(queueMockState.textWrites.join("")).not.toContain(
+      "https://nested.example.test/v1",
+    );
     expect(JSON.parse(queueMockState.textWrites.join(""))).toMatchObject({
       archiveKey: "archive-key",
       jobId: "job-1",
+      llm: {
+        configured: true,
+        hasApiKey: false,
+        hasBaseURL: true,
+        model: "nested-model",
+        provider: "openai-compatible",
+      },
       state: "succeeded",
     });
   });
