@@ -5,8 +5,8 @@ Troubleshooting
 
 No search results:
   Try fewer keywords, use a broader URI, or inspect chapter readiness and structure with:
-    wikigraph <archive-uri>/chapter list
-    wikigraph <archive-uri>/chapter/tree get
+    wikigraph <archive-uri>/chapter
+    wikigraph <archive-uri>/chapter/tree
 
 Missing generated objects:
   Queue the relevant generation task for the chapter:
@@ -24,6 +24,6 @@ URI rejected:
     wikg:///Users/me/book.wikg/entity/Q8018
 
 Help did not appear:
-  Append `--help` after the verb you are trying to inspect:
-    wikigraph wikg://book.wikg/chapter list --help
-    wikigraph wikg://book.wikg/entity/Q8018 get --help
+  Append `--help` to the URI or command you are trying to inspect:
+    wikigraph wikg://book.wikg/chapter --help
+    wikigraph wikg://book.wikg/entity/Q8018 --help

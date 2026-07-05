@@ -16,9 +16,9 @@ It is not a one-shot book-to-summary converter. Summaries, EPUB, Markdown, and J
 
 There are three main ways to explore a `.wikg` archive:
 
-- **Search mode:** use `search` to discover URI-addressable source, summary, chunk, entity, and triple objects.
-- **Structure mode:** use `wkg://.../chapter/tree get --json` for the table-of-contents hierarchy, then `list` or scoped `search` to inspect local object collections.
-- **Reading mode:** use `get` on source, chapter, summary, chunk, entity, or triple URIs after selecting the relevant object.
+- **Search mode:** use scope URIs with `--query` to discover URI-addressable source, summary, chunk, entity, and triple objects.
+- **Structure mode:** use `wikg://.../chapter/tree --json` for the table-of-contents hierarchy, then use scope URIs directly or with `--query` to inspect local object collections.
+- **Reading mode:** pass source, chapter, summary, chunk, entity, or triple URIs directly after selecting the relevant object.
 
 Together, these modes let long documents behave like navigable knowledge bases: start with structure, locate relevant content, then return to source text and knowledge nodes for deeper reading.
 
@@ -63,43 +63,43 @@ SpineDigest's primary object is `.wikg`: a CLI-managed knowledge-base archive, n
 Create a knowledge base from source material:
 
 ```bash
-wikigraph wkg://book.wikg create ./book.epub
-cat ./article.md | wikigraph wkg://article.wikg create --input-format markdown
+wikigraph wikg://book.wikg create ./book.epub
+cat ./article.md | wikigraph wikg://article.wikg create --input-format markdown
 ```
 
 Inspect before expensive work:
 
 ```bash
-wikigraph wkg://book.wikg/state get
-wikigraph wkg://book.wikg/chapter/tree get --json
-wikigraph wkg://book.wikg inspect
+wikigraph wikg://book.wikg/state
+wikigraph wikg://book.wikg/chapter/tree --json
+wikigraph wikg://book.wikg inspect
 ```
 
 Build derived knowledge when you intend to spend LLM time:
 
 ```bash
-wikigraph wkg://book.wikg/chapter/12 queue add --task reading-graph --accept-cost
-wikigraph wkg-job://<job-id> watch --jsonl
+wikigraph wikg://book.wikg/chapter/12 queue add --task reading-graph --accept-cost
+wikigraph wikg://local/job/<job-id> watch --jsonl
 ```
 
 Search, browse, and read through the knowledge-base interface:
 
 ```bash
-wikigraph wkg://book.wikg/chapter/tree get --json
-wikigraph wkg://book.wikg/chunk search "RAG"
-wikigraph wkg://book.wikg/chapter/12/source search "exact source phrase"
-wikigraph wkg://book.wikg/chapter/12 get
-wikigraph wkg://book.wikg/chunk/84 get
-wikigraph wkg://book.wikg/chunk/84 related
-wikigraph wkg://book.wikg/chunk/84 evidence
-wikigraph wkg://book.wikg/chunk/84 pack --budget 5000
+wikigraph wikg://book.wikg/chapter/tree --json
+wikigraph wikg://book.wikg/chunk --query "RAG"
+wikigraph wikg://book.wikg/chapter/12/source --query "exact source phrase"
+wikigraph wikg://book.wikg/chapter/12
+wikigraph wikg://book.wikg/chunk/84
+wikigraph wikg://book.wikg/chunk/84 related
+wikigraph wikg://book.wikg/chunk/84 evidence
+wikigraph wikg://book.wikg/chunk/84 pack --budget 5000
 ```
 
 Output a projection only when you need a portable view. For example, read one chapter into Markdown text, or export the full archive as an EPUB:
 
 ```bash
-wikigraph wkg://book.wikg/chapter/12/source get > ./chapter-12.md
-wikigraph wkg://book.wikg export --output-format epub --output ./digest.epub
+wikigraph wikg://book.wikg/chapter/12/source > ./chapter-12.md
+wikigraph wikg://book.wikg export --output-format epub --output ./digest.epub
 ```
 
 Cost rule:
@@ -108,7 +108,7 @@ Cost rule:
 Create is cheap.
 Inspect before queueing Reading Graph, Reading Summary, or Knowledge Graph jobs.
 Queue Reading Graph, Reading Summary, or Knowledge Graph jobs only when the cost and wait time are acceptable.
-Search, get, related, evidence, pack, and export are cheap after build.
+Search, read, related, evidence, pack, and export are cheap after build.
 ```
 
 Full flag reference: [CLI Reference](./docs/en/cli.md).
@@ -146,11 +146,11 @@ Your intent still runs through the whole process. During build, the prompt influ
 With that archive on hand, you can search and navigate the knowledge structure directly:
 
 ```bash
-wikigraph wkg://book.wikg/chapter/tree get --json
-wikigraph wkg://book.wikg/chapter/12/chunk list
-wikigraph wkg://book.wikg/chunk search "central argument"
-wikigraph wkg://book.wikg/chapter/12 get
-wikigraph wkg://book.wikg/chapter/12/source get
+wikigraph wikg://book.wikg/chapter/tree --json
+wikigraph wikg://book.wikg/chapter/12/chunk
+wikigraph wikg://book.wikg/chunk --query "central argument"
+wikigraph wikg://book.wikg/chapter/12
+wikigraph wikg://book.wikg/chapter/12/source
 ```
 
 Markdown, EPUB, txt, and JSON-style outputs are projections of the archive. They are useful for portability and reading, but they do not replace the `.wikg` object when graph links and source fragments matter.
@@ -184,12 +184,12 @@ SpineDigest also exposes a programmatic API for embedding lower-level import, bu
 SpineDigest's CLI-first design exposes `.wikg` as a managed LLM Wiki archive.
 
 - **Treat `.wikg` as the primary object.** Use archive commands before unpacking or inspecting internals.
-- **Choose an exploration mode first.** For synthesis and structural understanding, start with `wkg://.../chapter/tree get --json`; use `search` for candidate discovery and exact wording; use `get` for continuous prose after selecting the relevant URI.
+- **Choose an exploration mode first.** For synthesis and structural understanding, start with `wikg://.../chapter/tree --json`; use scope URIs with `--query` for candidate discovery and exact wording; pass a selected URI directly for continuous prose.
 - **Use help as the discovery surface.** Start with `wikigraph --help` as the root page, then follow `wikigraph help overview`, `wikigraph help ai`, topic pages, or command-specific `--help` before guessing behavior.
 - **Prefer `--json`.** Use it when composing with tools.
 - **Inspect before queueing jobs.** Do not queue broad Reading Graph, Reading Summary, or Knowledge Graph work without `wikigraph <archive-uri> inspect`.
 - **Check exit codes.** Success returns `0`; failure returns non-zero with a plain-text error on `stderr`.
-- **Do not inspect `database.db` routinely.** Use `search`, `list`, `get`, and graph navigation commands instead.
+- **Do not inspect `database.db` routinely.** Use URI-first reads, scope queries, and graph navigation commands instead.
 
 Useful help entry points:
 

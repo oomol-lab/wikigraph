@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 
 import { parseCLIArguments } from "../../src/cli/args.js";
 import {
-  renderArchiveCommandHelpText,
   renderArchiveMaintenanceChapterActionHelpText,
   renderArchiveMaintenanceCommandHelpText,
   renderGcCommandHelpText,
@@ -98,10 +97,10 @@ describe("cli/args", () => {
       kind: "legacy",
     });
     expect(() => parseCLIArguments(["book.sdpub"])).toThrow(
-      "Legacy .sdpub archives must be migrated first.\nSee: wikigraph legacy migrate --help",
+      "Unknown command: book.sdpub.",
     );
     expect(() => parseCLIArguments(["search", "book.sdpub", "query"])).toThrow(
-      "Legacy .sdpub archives must be migrated first.\nSee: wikigraph legacy migrate --help",
+      "Unknown command: search.",
     );
   });
 
@@ -614,13 +613,7 @@ describe("cli/args", () => {
     );
 
     expect(
-      parseCLIArguments([
-        "wikg://book.wikg/chunk",
-        "search",
-        "--query",
-        "RAG",
-        "--json",
-      ]),
+      parseCLIArguments(["wikg://book.wikg/chunk", "--query", "RAG", "--json"]),
     ).toStrictEqual({
       args: {
         action: "search",
@@ -636,7 +629,6 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments([
         "wikg://book.wikg/chapter/11/source",
-        "search",
         "--query",
         "exact phrase",
         "--all",
@@ -648,11 +640,9 @@ describe("cli/args", () => {
         "2",
         "--jsonl",
       ]),
-    ).toThrow("The chapter source resource does not support `search`.");
+    ).toThrow("`--query` requires a scope URI");
 
-    expect(
-      parseCLIArguments(["wikg://book.wikg/entity", "list"]),
-    ).toStrictEqual({
+    expect(parseCLIArguments(["wikg://book.wikg/entity"])).toStrictEqual({
       args: {
         action: "list",
         archivePath: "wikg://book.wikg/entity",
@@ -717,7 +707,7 @@ describe("cli/args", () => {
     });
 
     expect(
-      parseCLIArguments(["wikg://book.wikg/triple/Q1/_/Q2", "list"]),
+      parseCLIArguments(["wikg://book.wikg/triple/Q1/_/Q2"]),
     ).toStrictEqual({
       args: {
         action: "list",
@@ -733,9 +723,7 @@ describe("cli/args", () => {
       kind: "archive",
     });
 
-    expect(
-      parseCLIArguments(["wikg://book.wikg/triple/Q1", "list"]),
-    ).toMatchObject({
+    expect(parseCLIArguments(["wikg://book.wikg/triple/Q1"])).toMatchObject({
       args: {
         action: "list",
         kinds: ["triple"],
@@ -750,7 +738,6 @@ describe("cli/args", () => {
     expect(
       parseCLIArguments([
         "wikg://book.wikg/chapter/12/triple/_/_/Q2",
-        "search",
         "--query",
         "agent",
       ]),
@@ -772,7 +759,6 @@ describe("cli/args", () => {
     expect(
       parseCLIArguments([
         "wikg:///Users/me/book.wikg",
-        "search",
         "--query",
         "RAG",
         "--limit",
@@ -794,7 +780,6 @@ describe("cli/args", () => {
     expect(
       parseCLIArguments([
         "wikg:///Users/me/book.wikg",
-        "list",
         "--limit",
         "10",
         "--json",
@@ -810,18 +795,6 @@ describe("cli/args", () => {
       kind: "archive",
     });
 
-    expect(
-      parseCLIArguments(["wikg://book.wikg/chunk/1", "get"]),
-    ).toStrictEqual({
-      args: {
-        action: "get",
-        archivePath: "wikg://book.wikg/chunk/1",
-        format: "text",
-        objectId: "wikg://book.wikg/chunk/1",
-      },
-      help: false,
-      kind: "archive",
-    });
     expect(parseCLIArguments(["wikg://book.wikg/chunk/1"])).toStrictEqual({
       args: {
         action: "get",
@@ -949,7 +922,7 @@ describe("cli/args", () => {
       parseCLIArguments(["search", "wikg://book.wikg", "RAG"]),
     ).toThrow("Unknown command: search.");
     expect(() => parseCLIArguments(["wikg://book.wikg", "search"])).toThrow(
-      "`wikigraph search` requires --query.",
+      "Do not use `search` as a command.",
     );
     expect(() =>
       parseCLIArguments([
@@ -1061,7 +1034,6 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments([
         "wikg://book.wikg",
-        "search",
         "--query",
         "RAG",
         "--role",
@@ -1131,7 +1103,7 @@ describe("cli/args", () => {
     });
     expect(() =>
       parseCLIArguments(["wikg://book.wikg/chapter/12", "get"]),
-    ).toThrow("`chapter/<id>` is a scope URI.");
+    ).toThrow("Do not use `get` as a command.");
     expect(
       parseCLIArguments(["wikg://book.wikg/chapter/12/title"]),
     ).toStrictEqual({
@@ -1182,7 +1154,6 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments([
         "wikg://book.wikg",
-        "search",
         "--query",
         "RAG",
         "--evidence",
@@ -1192,7 +1163,6 @@ describe("cli/args", () => {
     expect(() =>
       parseCLIArguments([
         "wikg://book.wikg",
-        "search",
         "--query",
         "RAG",
         "--context",
@@ -1200,12 +1170,7 @@ describe("cli/args", () => {
       ]),
     ).toThrow("--context must be a non-negative integer.");
     expect(
-      parseCLIArguments([
-        "wikg://book.wikg/entity/Q1",
-        "get",
-        "--evidence",
-        "0",
-      ]),
+      parseCLIArguments(["wikg://book.wikg/entity/Q1", "--evidence", "0"]),
     ).toStrictEqual({
       args: {
         action: "get",
@@ -1220,18 +1185,6 @@ describe("cli/args", () => {
   });
 
   it("parses archive metadata and cover commands", () => {
-    expect(
-      parseCLIArguments(["wikg://book.wikg/", "get", "--json"]),
-    ).toStrictEqual({
-      args: {
-        action: "get",
-        archivePath: "wikg://book.wikg/",
-        format: "json",
-        objectId: "wikg://book.wikg/",
-      },
-      help: false,
-      kind: "archive",
-    });
     expect(parseCLIArguments(["wikg://book.wikg/"])).toStrictEqual({
       args: {
         action: "list",
@@ -1302,9 +1255,9 @@ describe("cli/args", () => {
       kind: "object-metadata",
     });
     expect(() =>
-      parseCLIArguments(["wikg://book.wikg/entity/Q42/meta/note", "get"]),
+      parseCLIArguments(["wikg://book.wikg/entity/Q42/meta/note"]),
     ).toThrow("Metadata keys are not addressed in the URI");
-    expect(parseCLIArguments(["wikg://book.wikg/cover", "get"])).toStrictEqual({
+    expect(parseCLIArguments(["wikg://book.wikg/cover"])).toStrictEqual({
       args: {
         inputPath: archivePath,
       },
@@ -1475,7 +1428,7 @@ describe("cli/args", () => {
       kind: "chapter",
     });
     expect(
-      parseCLIArguments(["wikg://book.wikg/chapter/tree", "get", "--json"]),
+      parseCLIArguments(["wikg://book.wikg/chapter/tree", "--json"]),
     ).toStrictEqual({
       args: {
         action: "tree",
@@ -1487,13 +1440,13 @@ describe("cli/args", () => {
       kind: "chapter",
     });
     expect(
-      parseCLIArguments(["wikg://book.wikg/chapter", "list", "--help"]),
+      parseCLIArguments(["wikg://book.wikg/chapter", "--help"]),
     ).toMatchObject({
       help: true,
       kind: "help",
     });
     expect(
-      parseCLIArguments(["wikg://book.wikg/chapter", "list", "--json"]),
+      parseCLIArguments(["wikg://book.wikg/chapter", "--json"]),
     ).toStrictEqual({
       args: {
         action: "list",
@@ -1505,7 +1458,7 @@ describe("cli/args", () => {
       kind: "archive",
     });
     expect(
-      parseCLIArguments(["wikg://book.wikg/chapter/12/state", "get"]),
+      parseCLIArguments(["wikg://book.wikg/chapter/12/state"]),
     ).toStrictEqual({
       args: {
         action: "get",
@@ -1519,7 +1472,6 @@ describe("cli/args", () => {
     expect(
       parseCLIArguments([
         "wikg://book.wikg/chapter/12/state/reading-graph",
-        "get",
         "--json",
       ]),
     ).toStrictEqual({
@@ -1533,7 +1485,7 @@ describe("cli/args", () => {
       kind: "archive",
     });
     expect(
-      parseCLIArguments(["wikg://book.wikg/chapter/12/entity", "list"]),
+      parseCLIArguments(["wikg://book.wikg/chapter/12/entity"]),
     ).toStrictEqual({
       args: {
         action: "list",
@@ -1663,11 +1615,9 @@ describe("cli/args", () => {
       helpText: renderHelpTopicText("runtime"),
       kind: "help",
     });
-    expect(parseCLIArguments(["search", "--help"])).toStrictEqual({
-      kind: "help",
-      help: true,
-      helpText: renderArchiveCommandHelpText("search"),
-    });
+    expect(() => parseCLIArguments(["search", "--help"])).toThrow(
+      "Unknown command: search.",
+    );
     expect(parseCLIArguments(["help", "object"])).toStrictEqual({
       help: true,
       helpText: renderHelpMatrixText({ kind: "object" }),
@@ -1683,16 +1633,29 @@ describe("cli/args", () => {
       helpText: renderHelpMatrixText({ kind: "object", object: "entity" }),
       kind: "help",
     });
-    expect(parseCLIArguments(["help", "verb", "get"])).toStrictEqual({
+    expect(
+      parseCLIArguments(["wikg://book.wikg/chunk", "--help"]),
+    ).toStrictEqual({
       help: true,
-      helpText: renderHelpMatrixText({ kind: "verb", verb: "get" }),
+      helpText: renderHelpMatrixText({ kind: "object", object: "chunk" }),
       kind: "help",
     });
-    expect(parseCLIArguments(["help", "get"])).toStrictEqual({
+    expect(
+      parseCLIArguments(["wikg://book.wikg/chapter/tree", "--help"]),
+    ).toStrictEqual({
       help: true,
-      helpText: renderHelpMatrixText({ kind: "verb", verb: "get" }),
+      helpText: renderHelpMatrixText({
+        kind: "object",
+        object: "chapter-tree",
+      }),
       kind: "help",
     });
+    expect(() => parseCLIArguments(["help", "verb", "get"])).toThrow(
+      "Invalid help verb: get.",
+    );
+    expect(() => parseCLIArguments(["help", "get"])).toThrow(
+      "Invalid help topic: get.",
+    );
     expect(parseCLIArguments(["help", "matrix"])).toStrictEqual({
       help: true,
       helpText: renderHelpMatrixText({ kind: "matrix" }),
@@ -1771,14 +1734,14 @@ describe("cli/args", () => {
       ]),
     ).toThrow("archive URI form does not support `set`");
     expect(() =>
-      parseCLIArguments(["wikg://book.wikg/cover", "get", "--json"]),
+      parseCLIArguments(["wikg://book.wikg/cover", "--json"]),
     ).toThrow("The `cover` command does not support --json.");
     expect(() =>
       parseCLIArguments(["wikg://book.wikg/chapter/x/source", "set"]),
     ).toThrow(
       "Use `wikigraph help object` to inspect valid object/verb pairs.",
     );
-    expect(() => parseCLIArguments(["wikg://entity/Q9957", "get"])).toThrow(
+    expect(() => parseCLIArguments(["wikg://entity/Q9957"])).toThrow(
       "Short object URIs from output are archive-relative handles.",
     );
     expect(() =>

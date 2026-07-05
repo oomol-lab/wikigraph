@@ -1,13 +1,13 @@
 Help Type: command
-Command: wikigraph <archive-uri>/chapter list
+Command: wikigraph <archive-uri>/chapter
 
-chapter list
+chapter collection
 
 Purpose:
   List every chapter and its stored artifact readiness.
 
 Usage:
-  wikigraph <archive-uri>/chapter list [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl] [--llm <json>] [--help|-h]
+  wikigraph <archive-uri>/chapter [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl] [--llm <json>] [--help|-h]
 
 Output shape:
   wikg://chapter/<id>  <title-or-[untitled]>  source:<ready|missing> reading-graph:<ready|missing> reading-summary:<ready|missing> knowledge-graph:<ready|missing>
@@ -24,8 +24,8 @@ Behavior:
 
 Use this before mutation:
   Discover ids and missing generated artifacts with:
-    wikigraph <archive-uri>/chapter list
+    wikigraph <archive-uri>/chapter
 
 See also:
-  - wikigraph wikg://book.wikg/chapter/3/state get --help
+  - wikigraph wikg://book.wikg/chapter/3/state --help
   - wikigraph help command

@@ -23,7 +23,7 @@ Inference rules:
   - Stdin requires an explicit `--input-format`.
   - Stdout text export requires an explicit or inferable output format.
 
-Object commands operate on `.wikg` archives. `search` and `related` return URI-addressable objects, `get` opens one object, `evidence` returns source evidence items, and `pack` returns packed context for chunk and entity objects.
+Object commands operate on `.wikg` archives. Scope URIs return URI-addressable objects, scope URIs with `--query` narrow retrieval, object URIs open one object, `evidence` returns source evidence items, and `pack` returns packed context for chunk and entity objects.
 
 Use `export` when a projection file is needed:
   wikigraph wikg://book.wikg export --output-format markdown --output out.md

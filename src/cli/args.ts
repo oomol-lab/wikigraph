@@ -681,7 +681,7 @@ export function parseCLIArguments(
   }
 
   if (
-    isArchiveAction(positionals[0]) &&
+    isPublicArchiveCommandHelpAction(positionals[0]) &&
     values.help === true &&
     positionals.length === 1
   ) {
@@ -690,9 +690,6 @@ export function parseCLIArguments(
 
   if (positionals.length === 0) {
     throw new Error(withHelpRoute("Missing command.", CLI_HELP_ROUTES.command));
-  }
-  if (positionals.some((positional) => looksLikeSdpubPath(positional))) {
-    throw new Error(formatLegacySdpubPathMessage());
   }
   throw new Error(formatUnknownCommandMessage(positionals[0]!));
 }
@@ -710,6 +707,23 @@ function parseArchiveUriFirstArguments(
 
   const action =
     explicitAction ?? resolveImplicitArchiveUriAction(uri, values.query);
+
+  if (isRemovedImplicitArchiveAction(explicitAction)) {
+    throw new Error(
+      withHelpRoute(
+        `Do not use \`${explicitAction}\` as a command. Pass the URI directly, or add --query to a scope URI.`,
+        "wikigraph help uri",
+      ),
+    );
+  }
+
+  if (values.help === true && explicitAction === undefined) {
+    return {
+      help: true,
+      helpText: renderArchiveUriHelpText(uri),
+      kind: "help",
+    };
+  }
 
   if (!isArchiveUriAction(action)) {
     throw new Error(
@@ -781,6 +795,53 @@ function classifyArchiveUri(objectUri: string | undefined): ArchiveUriKind {
   }
 
   return "object";
+}
+
+function renderArchiveUriHelpText(uri: string): string {
+  const parsed = parseLocatedWikiGraphUri(uri);
+  const objectUri = parsed.objectUri;
+
+  if (objectUri === undefined) {
+    return renderHelpMatrixText({ kind: "object", object: "archive" });
+  }
+
+  const path = stripObjectUriPrefix(objectUri);
+
+  if (path === "cover") {
+    return renderHelpMatrixText({ kind: "object", object: "cover" });
+  }
+  if (path === "index") {
+    return renderHelpMatrixText({ kind: "object", object: "index" });
+  }
+  if (path === "chapter" || /^chapter\/[1-9][0-9]*$/u.test(path)) {
+    return renderHelpMatrixText({ kind: "object", object: "chapter" });
+  }
+  if (path === "chapter/tree") {
+    return renderHelpMatrixText({ kind: "object", object: "chapter-tree" });
+  }
+  if (/^chapter\/[1-9][0-9]*\/state(?:\/.+)?$/u.test(path)) {
+    return renderHelpMatrixText({ kind: "object", object: "chapter-state" });
+  }
+  if (/^chapter\/[1-9][0-9]*\/source(?:#.*)?$/u.test(path)) {
+    return renderHelpMatrixText({ kind: "object", object: "chapter-source" });
+  }
+  if (/^chapter\/[1-9][0-9]*\/summary(?:#.*)?$/u.test(path)) {
+    return renderHelpMatrixText({ kind: "object", object: "chapter-summary" });
+  }
+  if (/^chapter\/[1-9][0-9]*\/title$/u.test(path)) {
+    return renderHelpMatrixText({ kind: "object", object: "chapter-title" });
+  }
+  if (/^(?:chapter\/[1-9][0-9]*\/)?chunk(?:\/.+)?$/u.test(path)) {
+    return renderHelpMatrixText({ kind: "object", object: "chunk" });
+  }
+  if (/^(?:chapter\/[1-9][0-9]*\/)?entity(?:\/.+)?$/u.test(path)) {
+    return renderHelpMatrixText({ kind: "object", object: "entity" });
+  }
+  if (/^(?:chapter\/[1-9][0-9]*\/)?triple(?:\/.*)?$/u.test(path)) {
+    return renderHelpMatrixText({ kind: "object", object: "triple" });
+  }
+
+  return renderHelpMatrixText({ kind: "object" });
 }
 
 function parseArchiveUriTargetArguments(
@@ -3222,9 +3283,6 @@ function validateArchiveCommandUriInput(
     return;
   }
 
-  if (looksLikeSdpubPath(value)) {
-    throw new Error(formatLegacySdpubPathMessage());
-  }
   if (!looksLikeWikgPath(value)) {
     return;
   }
@@ -3333,31 +3391,11 @@ function getRelatedObjectUriType(
 }
 
 function formatUnknownCommandMessage(command: string): string {
-  if (looksLikeSdpubPath(command)) {
-    return formatLegacySdpubPathMessage();
-  }
   if (looksLikeWikgPath(command)) {
     return formatPathAsUriMessage(command);
   }
 
   return withHelpRoute(`Unknown command: ${command}.`, CLI_HELP_ROUTES.command);
-}
-
-function formatLegacySdpubPathMessage(): string {
-  return withHelpRoute(
-    "Legacy .sdpub archives must be migrated first.",
-    "wikigraph legacy migrate --help",
-  );
-}
-
-function looksLikeSdpubPath(value: string): boolean {
-  const normalized = normalizeWikgPathSeparators(value);
-
-  return (
-    normalized.endsWith(".sdpub") ||
-    normalized.includes(".sdpub/") ||
-    normalized.includes(".sdpub#")
-  );
 }
 
 function looksLikeWikgPath(value: string): boolean {
@@ -3985,7 +4023,7 @@ function parseHelpArguments(
     };
   }
 
-  if (isArchiveAction(positionals[0])) {
+  if (isPublicArchiveCommandHelpAction(positionals[0])) {
     return {
       help: true,
       helpText: renderArchiveCommandHelpText(positionals[0]),
@@ -4445,6 +4483,23 @@ function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
     value === "related" ||
     value === "search"
   );
+}
+
+function isPublicArchiveCommandHelpAction(
+  value: string | undefined,
+): value is Exclude<CLIArchiveAction, "get" | "list" | "search"> {
+  return (
+    isArchiveAction(value) &&
+    value !== "get" &&
+    value !== "list" &&
+    value !== "search"
+  );
+}
+
+function isRemovedImplicitArchiveAction(
+  value: string | undefined,
+): value is "get" | "list" | "search" {
+  return value === "get" || value === "list" || value === "search";
 }
 
 function isArchiveUriAction(

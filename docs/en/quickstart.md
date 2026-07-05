@@ -31,8 +31,8 @@ npx spinedigest --help
 ## 3. Create A Knowledge Base
 
 ```bash
-wikigraph wkg://book.wikg create ./book.epub
-cat ./article.md | wikigraph wkg://article.wikg create --input-format markdown
+wikigraph wikg://book.wikg create ./book.epub
+cat ./article.md | wikigraph wikg://article.wikg create --input-format markdown
 ```
 
 Create creates or replaces a `.wikg` archive at source stage. The archive now contains normalized source data, but generated Reading Graph, Reading Summary, and Knowledge Graph data are still absent.
@@ -40,9 +40,9 @@ Create creates or replaces a `.wikg` archive at source stage. The archive now co
 ## 4. Inspect
 
 ```bash
-wikigraph wkg://book.wikg/chapter
-wikigraph wkg://book.wikg/chapter/tree
-wikigraph wkg://book.wikg inspect
+wikigraph wikg://book.wikg/chapter
+wikigraph wikg://book.wikg/chapter/tree
+wikigraph wikg://book.wikg inspect
 ```
 
 Use inspect before queueing broad Reading Graph, Reading Summary, or Knowledge Graph work.
@@ -50,28 +50,28 @@ Use inspect before queueing broad Reading Graph, Reading Summary, or Knowledge G
 ## 5. Build Knowledge
 
 ```bash
-wikigraph wkg://book.wikg/chapter/3 queue add --task reading-graph --accept-cost
-wikigraph wkg-job://<job-id> watch --jsonl
+wikigraph wikg://book.wikg/chapter/3 queue add --task reading-graph --accept-cost
+wikigraph wikg://local/job/<job-id> watch --jsonl
 ```
 
 For Reading Summary work:
 
 ```bash
-wikigraph wkg://book.wikg/chapter/3 queue add --task reading-summary --accept-cost
-wikigraph wkg-job:// list --input wkg://book.wikg
+wikigraph wikg://book.wikg/chapter/3 queue add --task reading-summary --accept-cost
+wikigraph wikg://local/job list --input wikg://book.wikg
 ```
 
 ## 6. Search, Browse, And Read
 
 ```bash
-wikigraph wkg://book.wikg/chapter/tree get
-wikigraph wkg://book.wikg/index build
-wikigraph wkg://book.wikg/chunk --query "central argument"
-wikigraph wkg://book.wikg/chapter/3
-wikigraph wkg://book.wikg/chunk/84
-wikigraph wkg://book.wikg/chunk/84 related
-wikigraph wkg://book.wikg/chunk/84 evidence
-wikigraph wkg://book.wikg/chunk/84 pack --budget 5000
+wikigraph wikg://book.wikg/chapter/tree
+wikigraph wikg://book.wikg/index build
+wikigraph wikg://book.wikg/chunk --query "central argument"
+wikigraph wikg://book.wikg/chapter/3
+wikigraph wikg://book.wikg/chunk/84
+wikigraph wikg://book.wikg/chunk/84 related
+wikigraph wikg://book.wikg/chunk/84 evidence
+wikigraph wikg://book.wikg/chunk/84 pack --budget 5000
 ```
 
 Use URI lenses to choose a scope or object target. Scope URIs such as `<archive-uri>/chunk`, `<archive-uri>/entity`, and `<archive-uri>/triple` list by default and search with `--query`; object URIs such as `<chapter-uri>/source`, `<chapter-uri>/source#0..8`, and `<chapter-uri>/summary` read by default.
@@ -85,8 +85,8 @@ Read `wikigraph help retrieval` when choosing scope, pagination, or machine-read
 Use projections when you need a portable view. For example, read one chapter into Markdown text, or export the full archive as an EPUB:
 
 ```bash
-wikigraph wkg://book.wikg/chapter/3/source > ./chapter-3.md
-wikigraph wkg://book.wikg export --output-format epub --output ./digest.epub
+wikigraph wikg://book.wikg/chapter/3/source > ./chapter-3.md
+wikigraph wikg://book.wikg export --output-format epub --output ./digest.epub
 ```
 
 ## 8. Configure LLM Builds

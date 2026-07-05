@@ -18,7 +18,7 @@ Returns:
   - Related full `wikg://...` URIs with labels or summaries.
 
 Notes:
-  - `related` starts from a known URI; `search` starts from query text.
+  - `related` starts from a known URI; scope URI retrieval with `--query` starts from query text.
   - Optional `--query` uses the current FTS index to filter and rank only the related objects that would otherwise be returned; run `<archive-uri>/index build` first if the index is missing or outdated.
   - `--role` only applies to entity URIs. Default is `any`.
   - Add `--evidence` or `--evidence <n>` to include source evidence previews where available.

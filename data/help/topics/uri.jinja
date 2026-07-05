@@ -41,9 +41,9 @@ Located object URIs:
     wikg:///books/book.wikg/chapter/3/source#4..8
     wikg://book.wikg/entity/Q8018
   Returned short URIs are archive-relative handles, not complete command targets. Prepend the archive locator before passing them back to object commands.
-  Located readable object URIs can omit the `get` verb:
+  Located readable object URIs are read directly:
     wikigraph wikg://book.wikg/entity/Q8018
-  Scope URIs can omit list/search verbs:
+  Scope URIs enumerate directly, and search when `--query` is present:
     wikigraph wikg://book.wikg/entity
     wikigraph wikg://book.wikg/entity --query "keyword"
 

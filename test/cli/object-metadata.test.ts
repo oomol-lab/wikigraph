@@ -201,7 +201,7 @@ describe("cli/object metadata", () => {
       kind: "object-metadata",
     });
     expect(() =>
-      parseCLIArguments(["wikg://book.wikg/entity/Q42/meta", "get", "--jsonl"]),
+      parseCLIArguments(["wikg://book.wikg/entity/Q42/meta", "--jsonl"]),
     ).toThrow("The `meta` command does not support --jsonl.");
   });
 });

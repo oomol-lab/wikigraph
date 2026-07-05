@@ -31,8 +31,8 @@ npx spinedigest --help
 ## 3. 创建知识库
 
 ```bash
-wikigraph wkg://book.wikg create ./book.epub
-cat ./article.md | wikigraph wkg://article.wikg create --input-format markdown
+wikigraph wikg://book.wikg create ./book.epub
+cat ./article.md | wikigraph wikg://article.wikg create --input-format markdown
 ```
 
 create 会创建或替换 source 阶段的 `.wikg` 归档。此时归档已经包含规范化源数据，但还不表示已经完成 graph 构建或 summary 构建。
@@ -40,9 +40,9 @@ create 会创建或替换 source 阶段的 `.wikg` 归档。此时归档已经�
 ## 4. 查看和估算
 
 ```bash
-wikigraph wkg://book.wikg/chapter list
-wikigraph wkg://book.wikg/chapter/tree get
-wikigraph wkg://book.wikg inspect
+wikigraph wikg://book.wikg/chapter
+wikigraph wikg://book.wikg/chapter/tree
+wikigraph wikg://book.wikg inspect
 ```
 
 整份归档的 graph 或 summary 构建之前，先运行 inspect。
@@ -50,28 +50,28 @@ wikigraph wkg://book.wikg inspect
 ## 5. 构建知识
 
 ```bash
-wikigraph wkg://book.wikg/chapter/3 queue add --task reading-graph --accept-cost
-wikigraph wkg-job://<job-id> watch --jsonl
+wikigraph wikg://book.wikg/chapter/3 queue add --task reading-graph --accept-cost
+wikigraph wikg://local/job/<job-id> watch --jsonl
 ```
 
 如果需要 summary：
 
 ```bash
-wikigraph wkg://book.wikg/chapter/3 queue add --task reading-summary --accept-cost
-wikigraph wkg-job:// list --input wkg://book.wikg
+wikigraph wikg://book.wikg/chapter/3 queue add --task reading-summary --accept-cost
+wikigraph wikg://local/job list --input wikg://book.wikg
 ```
 
 ## 6. 搜索、浏览和阅读
 
 ```bash
-wikigraph wkg://book.wikg/chapter/tree get
-wikigraph wkg://book.wikg/index build
-wikigraph wkg://book.wikg/chunk search "central argument"
-wikigraph wkg://book.wikg/chapter/3 get
-wikigraph wkg://book.wikg/chunk/84 get
-wikigraph wkg://book.wikg/chunk/84 related
-wikigraph wkg://book.wikg/chunk/84 evidence
-wikigraph wkg://book.wikg/chunk/84 pack --budget 5000
+wikigraph wikg://book.wikg/chapter/tree
+wikigraph wikg://book.wikg/index build
+wikigraph wikg://book.wikg/chunk --query "central argument"
+wikigraph wikg://book.wikg/chapter/3
+wikigraph wikg://book.wikg/chunk/84
+wikigraph wikg://book.wikg/chunk/84 related
+wikigraph wikg://book.wikg/chunk/84 evidence
+wikigraph wikg://book.wikg/chunk/84 pack --budget 5000
 ```
 
 使用 URI lens 选择搜索对象：`<archive-uri>/chunk` 用于 Reading Graph 结构，`<archive-uri>/summary` 用于快速概览，`<archive-uri>/source` 用于原文措辞，`<archive-uri>/entity` 和 `<archive-uri>/triple` 用于 Knowledge Graph 对象。
@@ -85,8 +85,8 @@ Object command 使用 Wiki Graph URI。手动构造 URI 时，先读 `wikigraph 
 只有需要便携视图时再输出 projection。比如只需要某一章的 `.md` 文本，可以读取该章；需要完整电子书视图时再导出 EPUB：
 
 ```bash
-wikigraph wkg://book.wikg/chapter/3/source get > ./chapter-3.md
-wikigraph wkg://book.wikg export --output-format epub --output ./digest.epub
+wikigraph wikg://book.wikg/chapter/3/source > ./chapter-3.md
+wikigraph wikg://book.wikg export --output-format epub --output ./digest.epub
 ```
 
 ## 8. 配置 LLM 构建

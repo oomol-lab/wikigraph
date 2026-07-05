@@ -7,7 +7,7 @@ Purpose:
   Read or edit metadata attached to any Wiki Graph object.
 
 Usage:
-  wikigraph <object-uri>/meta get [--json] [--help|-h]
+  wikigraph <object-uri>/meta [--json] [--help|-h]
   wikigraph <object-uri>/meta set --json <object> [--help|-h]
   wikigraph <object-uri>/meta set --json --input <path> [--help|-h]
   wikigraph <object-uri>/meta put <key> <value> [--help|-h]
@@ -31,13 +31,13 @@ Behavior:
   - Array values are printed as space-joined item strings in text output.
   - Add `--json` for a stable machine-readable metadata map.
   - `--jsonl` is not supported.
-  - `<object-uri>/meta/<key>` is rejected. Use `get` or `get --json` and filter the result.
+  - `<object-uri>/meta/<key>` is rejected. Read the metadata object and filter the result.
   - Deleting an object may remove metadata attached to that object.
   - This command does not call an LLM provider.
 
 Examples:
-  wikigraph wikg://book.wikg/meta get
-  wikigraph wikg://book.wikg/meta get --json
+  wikigraph wikg://book.wikg/meta
+  wikigraph wikg://book.wikg/meta --json
   wikigraph wikg://book.wikg/meta put title "New Title"
   wikigraph wikg://book.wikg/entity/Q42/meta put note "reviewed"
   wikigraph wikg://book.wikg/entity/Q42/meta put rank --json 7
@@ -46,6 +46,6 @@ Examples:
 
 Where to go next:
   - Need chapter tree editing:
-    wikigraph wikg://book.wikg/chapter/tree get --help
+    wikigraph wikg://book.wikg/chapter/tree --help
   - Need archive-vs-source mental model:
     wikigraph help command
