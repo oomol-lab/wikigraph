@@ -1788,7 +1788,7 @@ describe("cli/args", () => {
 
   it("rejects invalid help usage", () => {
     expect(() => parseCLIArguments(["help", "unknown"])).toThrow(
-      "Invalid help topic: unknown. Expected one of task, format, config, runtime, uri, recipe, troubleshoot, ai.\nSee: wikigraph --help",
+      "Invalid help topic: unknown. Expected one of format, config, runtime, uri, recipe, ai.\nSee: wikigraph --help",
     );
     expect(() =>
       parseCLIArguments(["help", "object", "entity", "extra"]),
@@ -1797,7 +1797,7 @@ describe("cli/args", () => {
       "Unexpected positional arguments: get extra.",
     );
     expect(() =>
-      parseCLIArguments(["help", "task", "--input", "book.epub"]),
+      parseCLIArguments(["help", "recipe", "--input", "book.epub"]),
     ).toThrow(
       "The `help` command does not support --input.\nSee: wikigraph --help",
     );
@@ -1815,7 +1815,7 @@ describe("cli/args", () => {
     expect(rootHelpText).toContain("wikigraph help [topic]");
     expect(rootHelpText).toContain("wikigraph <scope-uri> --query <query>");
     expect(rootHelpText).toContain("wikigraph <object-uri>");
-    expect(rootHelpText).toContain("wikigraph help task");
+    expect(rootHelpText).not.toContain("wikigraph help task");
     expect(rootHelpText).toContain("wikigraph help uri");
     expect(rootHelpText).toContain("wikigraph <archive-uri> [--json|--jsonl]");
     expect(rootHelpText).toContain("wikigraph <archive-uri>/chapter/tree set");
@@ -1863,9 +1863,9 @@ describe("cli/args", () => {
       "Choose the narrowest URI scope that can answer the task.",
     );
     expect(uriHelpText).toContain("Avoid `--all | head` as a preview pattern.");
-    expect(renderHelpTopicText("task")).toContain(
-      'wikigraph wikg:///Users/me/book.wikg --query "keyword"',
-    );
+    expect(uriHelpText).toContain("Recovery hints:");
+    expect(uriHelpText).toContain("No search results:");
+    expect(uriHelpText).toContain("Missing generated objects:");
     expect(renderHelpTopicText("recipe")).toContain(
       'wikigraph wikg:///Users/me/book.wikg --query "恩典 婴儿洗礼"',
     );

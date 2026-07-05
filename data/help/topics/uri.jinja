@@ -54,6 +54,9 @@ Common command shapes:
   wikigraph wikg://local/job
   wikigraph wikg://local/job add --input <chapter-uri> --task <reading-graph|reading-summary|knowledge-graph> --accept-cost
   wikigraph wikg://local/job/<job-id>
+  wikigraph <object-uri> related
+  wikigraph <object-uri> evidence
+  wikigraph <object-uri> pack --budget 5000
 
 Scope URIs:
   Scope URIs enumerate objects by default. With `--query <query>`, they search within that scope.
@@ -141,6 +144,16 @@ Pagination and object result format:
   - `--jsonl` is only an output format; it does not imply `--all`.
   - Avoid `--all` without `--jsonl` for large results because text and JSON output are buffered before printing.
   - Avoid `--all | head` as a preview pattern. Shell truncation only limits what you read.
+
+Recovery hints:
+  - No search results: try fewer keywords, use a broader scope URI, or inspect chapter readiness and structure.
+    wikigraph <archive-uri>/chapter
+    wikigraph <archive-uri>/chapter/tree
+  - Missing generated objects: start the relevant generation job for the chapter.
+    wikigraph wikg://local/job add --input <chapter-uri> --task reading-graph --accept-cost
+    wikigraph wikg://local/job add --input <chapter-uri> --task reading-summary --accept-cost
+  - URI rejected: convert bare filesystem paths to Wiki Graph URIs, and prepend the archive locator to short object URIs.
+  - Help did not appear: append `--help` to the URI or URI-bound predicate you are trying to inspect.
 
 Job URIs:
   Local jobs use the `wikg://local/job/` scheme and do not contain `.wikg` locators:

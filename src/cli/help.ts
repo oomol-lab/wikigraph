@@ -10,13 +10,11 @@ import type {
 } from "./args.js";
 
 export const HELP_TOPICS = [
-  "task",
   "format",
   "config",
   "runtime",
   "uri",
   "recipe",
-  "troubleshoot",
   "ai",
 ] as const;
 
@@ -145,10 +143,6 @@ const HELP_TOPIC_METADATA: readonly {
   readonly summary: string;
 }[] = [
   {
-    name: "task",
-    summary: "Task-oriented entry points for common workflows.",
-  },
-  {
     name: "format",
     summary: "Supported formats, inference rules, and IO constraints.",
   },
@@ -168,10 +162,6 @@ const HELP_TOPIC_METADATA: readonly {
   {
     name: "recipe",
     summary: "Short copyable command examples.",
-  },
-  {
-    name: "troubleshoot",
-    summary: "Common failure modes and what to check first.",
   },
   {
     name: "ai",
@@ -198,13 +188,11 @@ const ARCHIVE_MAINTENANCE_COMMAND_METADATA: readonly {
 ] as const;
 
 const HELP_TOPIC_TEMPLATE_NAMES: Readonly<Record<HelpTopic, string>> = {
-  task: "help/topics/task",
   format: "help/topics/format",
   config: "help/topics/config",
   runtime: "help/topics/runtime",
   uri: "help/topics/uri",
   recipe: "help/topics/recipe",
-  troubleshoot: "help/topics/troubleshoot",
   ai: "help/topics/ai",
 };
 
