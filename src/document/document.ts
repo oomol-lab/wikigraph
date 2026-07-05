@@ -178,6 +178,7 @@ export interface Document extends ReadonlyDocument {
   clearSerialGraph(serialId: number): Promise<void>;
   clearSerialSource(serialId: number): Promise<void>;
   deleteSerial(serialId: number): Promise<void>;
+  deleteSearchIndexDatabase(): Promise<void>;
   deleteSummary(serialId: number): Promise<void>;
   flush(): Promise<void>;
   openSession<T>(operation: (document: Document) => Promise<T> | T): Promise<T>;

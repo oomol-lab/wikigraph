@@ -29,10 +29,8 @@ import {
   type ChapterEntry,
   type ContinuationCursor,
 } from "../facade/index.js";
-import {
-  isSearchIndexCurrent,
-  readArchiveIndexSettings,
-} from "../archive/search-index/index.js";
+import { readArchiveIndexSettings } from "../archive/search-index/index.js";
+import { isArchiveSearchIndexCurrent } from "../archive/query/index.js";
 import {
   formatLocatedWikiGraphUri,
   formatWikiGraphCommandUri,
@@ -1040,7 +1038,7 @@ async function writeArchiveInspectReport(
     await Promise.all([
       readInspectChapters(document, args.chapterId),
       readSummaryWords(document, args.chapterId),
-      isSearchIndexCurrent(document),
+      isArchiveSearchIndexCurrent(document),
       readArchiveIndexSettings(document),
       loadCLIConfig(),
     ]);

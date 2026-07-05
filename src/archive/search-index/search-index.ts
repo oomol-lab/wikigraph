@@ -86,6 +86,8 @@ export type SearchIndexProgressReporter = (
   event: SearchIndexProgressEvent,
 ) => void | Promise<void>;
 
+export type SearchIndexStatus = "current" | "dirty" | "missing";
+
 export interface SearchIndexTextHit {
   readonly chapterId: number;
   readonly kind: TextSentenceKind;
@@ -156,30 +158,34 @@ export async function setFtsIndexEmbedded(
 
 export async function isSearchIndexCurrent(
   document: ReadonlyDocument,
+  input?: SearchIndexInput,
 ): Promise<boolean> {
-  const chaptersRevision = await document.serials.getChaptersRevision();
+  return (await readSearchIndexStatus(document, input)) === "current";
+}
+
+export async function readSearchIndexStatus(
+  document: ReadonlyDocument,
+  input?: SearchIndexInput,
+): Promise<SearchIndexStatus> {
+  const fingerprint =
+    input === undefined ? undefined : createSearchIndexFingerprint(input);
 
   try {
     return await document.readSearchIndexDatabase(async (database) => {
-      const current = await database.queryAll(
-        `
-          SELECT key, value
-          FROM search_index_state
-          WHERE key IN ('version', 'chaptersRevision')
-        `,
-        undefined,
-        (row) => [String(row.key), String(row.value)] as const,
-      );
-      const state = new Map(current);
+      const indexedFingerprint =
+        await readSearchIndexFingerprintFromDatabase(database);
 
-      return (
-        state.get("version") === SEARCH_INDEX_VERSION &&
-        state.get("chaptersRevision") === String(chaptersRevision)
-      );
+      if (indexedFingerprint === undefined) {
+        return "dirty";
+      }
+
+      return fingerprint === undefined || indexedFingerprint === fingerprint
+        ? "current"
+        : "dirty";
     });
   } catch (error) {
     if (isMissingSearchIndexError(error)) {
-      return false;
+      return "missing";
     }
 
     throw error;
@@ -195,22 +201,10 @@ export async function ensureSearchIndex(
 
   await document.writeSearchIndexDatabase(async (database) => {
     const fingerprint = createSearchIndexFingerprint(input);
-    const current = await database.queryAll(
-      `
-        SELECT key, value
-        FROM search_index_state
-        WHERE key IN ('version', 'fingerprint', 'chaptersRevision')
-      `,
-      undefined,
-      (row) => [String(row.key), String(row.value)] as const,
-    );
-    const state = new Map(current);
+    const indexedFingerprint =
+      await readSearchIndexFingerprintFromDatabase(database);
 
-    if (
-      state.get("version") === SEARCH_INDEX_VERSION &&
-      state.get("fingerprint") === fingerprint &&
-      state.get("chaptersRevision") === String(chaptersRevision)
-    ) {
+    if (indexedFingerprint === fingerprint) {
       return;
     }
 
@@ -641,7 +635,7 @@ async function insertFtsRecord(
   );
 }
 
-function createSearchIndexFingerprint(input: SearchIndexInput): string {
+export function createSearchIndexFingerprint(input: SearchIndexInput): string {
   const hash = createHash("sha256");
 
   for (const record of input.textSentences) {
@@ -673,6 +667,20 @@ function createSearchIndexFingerprint(input: SearchIndexInput): string {
   }
 
   return hash.digest("hex");
+}
+
+export async function readSearchIndexFingerprintFromDatabase(
+  database: Database,
+): Promise<string | undefined> {
+  return await database.queryOne(
+    `
+      SELECT value
+      FROM search_index_state
+      WHERE key = 'fingerprint'
+    `,
+    undefined,
+    (row) => String(row.value),
+  );
 }
 
 function isMissingSearchIndexError(error: unknown): boolean {

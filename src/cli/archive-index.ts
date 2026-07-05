@@ -1,9 +1,9 @@
 import {
   deleteArchiveSearchSessions,
+  isArchiveSearchIndexCurrent,
   rebuildArchiveSearchIndex,
 } from "../archive/query/index.js";
 import {
-  isSearchIndexCurrent,
   readArchiveIndexSettings,
   setFtsIndexEmbedded,
 } from "../archive/search-index/index.js";
@@ -49,7 +49,7 @@ async function readIndexSettings(
 
     await writeIndexOutput(args, {
       ftsEmbedded: settings.ftsEmbedded,
-      ftsCurrent: await isSearchIndexCurrent(document),
+      ftsCurrent: await isArchiveSearchIndexCurrent(document),
     });
   });
 }
@@ -73,7 +73,7 @@ async function buildIndex(args: CLIArchiveIndexArguments): Promise<void> {
         phase: "checking",
       });
 
-      if (await isSearchIndexCurrent(document)) {
+      if (await isArchiveSearchIndexCurrent(document)) {
         await writer.write({
           json: { type: "already-current" },
           kind: "lifecycle",
@@ -126,7 +126,7 @@ async function embedIndex(args: CLIArchiveIndexArguments): Promise<void> {
   await new SpineDigestFile(args.archivePath).write(
     async (document) => {
       await setFtsIndexEmbedded(document, true);
-      if (await isSearchIndexCurrent(document)) {
+      if (await isArchiveSearchIndexCurrent(document)) {
         await document.writeSearchIndexDatabase(async (database) => {
           await database.run(
             "UPDATE search_index_state SET value = value WHERE key = 'version'",
@@ -139,7 +139,7 @@ async function embedIndex(args: CLIArchiveIndexArguments): Promise<void> {
       await writeIndexOutput(args, {
         built,
         ftsEmbedded: true,
-        ftsCurrent: await isSearchIndexCurrent(document),
+        ftsCurrent: await isArchiveSearchIndexCurrent(document),
       });
     },
     { searchIndexWritebackPolicy: "archive" },

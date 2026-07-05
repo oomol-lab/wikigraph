@@ -557,11 +557,14 @@ vi.mock("../../src/facade/index.js", () => ({
 }));
 
 vi.mock("../../src/archive/search-index/index.js", () => ({
-  isSearchIndexCurrent: vi.fn(() =>
-    Promise.resolve(archiveMockState.ftsCurrent),
-  ),
   readArchiveIndexSettings: vi.fn(() =>
     Promise.resolve({ ftsEmbedded: archiveMockState.ftsEmbedded }),
+  ),
+}));
+
+vi.mock("../../src/archive/query/index.js", () => ({
+  isArchiveSearchIndexCurrent: vi.fn(() =>
+    Promise.resolve(archiveMockState.ftsCurrent),
   ),
 }));
 

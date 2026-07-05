@@ -8,6 +8,7 @@ import { Database, DirectoryDocument } from "../../../src/document/index.js";
 import {
   findArchiveObjects,
   grepArchiveObjects,
+  isArchiveSearchIndexCurrent,
   listArchiveCollection,
   listArchiveEvidence,
   listArchiveObjects,
@@ -59,6 +60,46 @@ describe("archive/query/archive-view", () => {
 
         await expect(isSearchIndexCurrent(document)).resolves.toBe(true);
         await expect(countSearchIndexRows(document)).resolves.toBe(0);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("marks the FTS index outdated when indexed content changes without a chapters revision bump", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          draft.addSentence("Original indexed sentence.", 3);
+          await draft.commit();
+          await openedDocument.writeToc({
+            items: [{ children: [], serialId: 1, title: "Indexed" }],
+            version: 1,
+          });
+        });
+        await rebuildArchiveSearchIndex(document);
+
+        await expect(isArchiveSearchIndexCurrent(document)).resolves.toBe(true);
+
+        await document.openSession(async (openedDocument) => {
+          const draft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          draft.addSentence("New sentence after index build.", 5);
+          await draft.commit();
+        });
+
+        await expect(isArchiveSearchIndexCurrent(document)).resolves.toBe(
+          false,
+        );
       } finally {
         await document.release();
       }
@@ -623,6 +664,7 @@ describe("archive/query/archive-view", () => {
             surface: "Invalidate Me",
           });
         });
+        await rebuildArchiveSearchIndex(document);
         await deleteArchiveSearchSessions(archiveKey);
         const second = await findArchiveObjects(document, "Invalidate Me", {
           archiveKey,
@@ -672,6 +714,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const result = await findArchiveObjects(document, "Augustine", {
           evidenceLimit: 3,
@@ -773,6 +816,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const firstPage = await findArchiveObjects(document, "Wiki Source", {
           evidenceLimit: 3,
@@ -847,6 +891,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const firstPage = await findArchiveObjects(document, "Wiki Source", {
           limit: 1,
@@ -916,6 +961,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const result = await findArchiveObjects(document, "战舰", {
           evidenceLimit: 3,
@@ -964,6 +1010,7 @@ describe("archive/query/archive-view", () => {
             },
           ]);
         });
+        await rebuildArchiveSearchIndex(document);
 
         const result = await findArchiveObjects(document, "战舰", {
           evidenceLimit: 3,
@@ -1075,6 +1122,7 @@ describe("archive/query/archive-view", () => {
             targetMentionId: "triple-target",
           });
         });
+        await rebuildArchiveSearchIndex(document);
 
         const result = await findArchiveObjects(document, "Wiki", {
           evidenceLimit: 3,
@@ -1152,6 +1200,7 @@ describe("archive/query/archive-view", () => {
             })),
           );
         });
+        await rebuildArchiveSearchIndex(document);
 
         const result = await findArchiveObjects(document, "舰", {
           types: ["triple"],
@@ -2349,6 +2398,7 @@ describe("archive/query/archive-view", () => {
             targetMentionId: "sentence-query-target",
           });
         });
+        await rebuildArchiveSearchIndex(document);
 
         const related = await listRelatedArchiveObjects(
           document,
@@ -2403,6 +2453,7 @@ describe("archive/query/archive-view", () => {
             targetMentionId: "evidence-related-target",
           });
         });
+        await rebuildArchiveSearchIndex(document);
 
         const related = await listRelatedArchiveObjects(
           document,

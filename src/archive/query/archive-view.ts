@@ -50,9 +50,10 @@ import {
   type SearchTripleHitInput,
 } from "./search-cache.js";
 import {
+  createSearchIndexFingerprint,
   ensureSearchIndex,
-  isSearchIndexCurrent,
   querySearchIndex,
+  readSearchIndexStatus,
   SEARCH_OBJECT_PROPERTY_KIND,
   SEARCH_OBJECT_PROPERTY_OWNER_KIND,
   TEXT_SENTENCE_KIND,
@@ -1046,11 +1047,42 @@ export async function rebuildArchiveSearchIndex(
   document: Document,
   progress?: SearchIndexProgressReporter,
 ): Promise<void> {
-  await ensureSearchIndex(
+  const input = await createSearchIndexRecords(document, progress);
+
+  if ((await readSearchIndexStatus(document, input)) === "dirty") {
+    await document.deleteSearchIndexDatabase();
+  }
+
+  await ensureSearchIndex(document, input, progress);
+}
+
+export async function isArchiveSearchIndexCurrent(
+  document: ReadonlyDocument,
+): Promise<boolean> {
+  return (await readArchiveSearchIndexStatus(document)) === "current";
+}
+
+export async function readArchiveSearchIndexStatus(
+  document: ReadonlyDocument,
+): Promise<"current" | "dirty" | "missing"> {
+  return await readSearchIndexStatus(
     document,
-    await createSearchIndexRecords(document, progress),
-    progress,
+    await createSearchIndexRecords(document),
   );
+}
+
+export async function clearDirtyArchiveSearchIndex(
+  document: Document,
+): Promise<void> {
+  if ((await readArchiveSearchIndexStatus(document)) === "dirty") {
+    await document.deleteSearchIndexDatabase();
+  }
+}
+
+export async function createArchiveSearchIndexFingerprint(
+  document: ReadonlyDocument,
+): Promise<string> {
+  return createSearchIndexFingerprint(await createSearchIndexRecords(document));
 }
 
 export async function grepArchiveObjects(
@@ -1096,7 +1128,7 @@ async function findArchiveObjectsIndexed(
     }
   | undefined
 > {
-  if (!(await isSearchIndexCurrent(document))) {
+  if (!(await isArchiveSearchIndexCurrent(document))) {
     throw new Error(
       "Wiki Graph search index is missing or outdated. Run `<archive-uri>/index build` before searching.",
     );
@@ -1125,7 +1157,7 @@ async function queryRequiredSearchIndex(
   query: string,
   options: Parameters<typeof querySearchIndex>[2],
 ): Promise<SearchIndexQueryResult | undefined> {
-  if (!(await isSearchIndexCurrent(document))) {
+  if (!(await isArchiveSearchIndexCurrent(document))) {
     throw new Error(
       "Wiki Graph search index is missing or outdated. Run `<archive-uri>/index build` before searching.",
     );

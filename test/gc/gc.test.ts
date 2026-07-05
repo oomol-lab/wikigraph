@@ -1,13 +1,18 @@
-import { mkdir, stat, utimes, writeFile } from "fs/promises";
+import { mkdir, rm, stat, utimes, writeFile } from "fs/promises";
 import { dirname, join } from "path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createWikiGraphTempDirectory } from "../../src/common/wiki-graph-temp.js";
-import { Database } from "../../src/document/index.js";
+import { Database, DirectoryDocument } from "../../src/document/index.js";
 import { addBuildJob } from "../../src/facade/index.js";
 import { tryRunWikiGraphGc } from "../../src/gc/index.js";
-import { createSearchSession } from "../../src/archive/query/index.js";
+import {
+  createSearchSession,
+  rebuildArchiveSearchIndex,
+} from "../../src/archive/query/index.js";
+import { writeWikgArchive } from "../../src/wikg/archive.js";
+import { SpineDigestFile } from "../../src/wikg/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
@@ -132,7 +137,7 @@ describe("gc", () => {
     });
   });
 
-  it("keeps external fts sqlite cache during normal GC and removes it during forced GC", async () => {
+  it("removes dirty external fts sqlite cache during normal GC", async () => {
     await withTempDir("spinedigest-gc-", async (path) => {
       process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
       const sqliteCachePath = await createCoordinatorSqliteCache(path, {
@@ -143,18 +148,72 @@ describe("gc", () => {
       const normalReport = await tryRunWikiGraphGc();
 
       expect(normalReport.skipped).toBe(false);
-      await expect(stat(sqliteCachePath)).resolves.toBeDefined();
-
-      const forcedReport = await tryRunWikiGraphGc({ force: true });
-
-      expect(forcedReport.skipped).toBe(false);
       expect(
-        forcedReport.jobs.find((item) => item.name === "wikg-coordinator"),
+        normalReport.jobs.find((item) => item.name === "wikg-coordinator"),
       ).toMatchObject({
         removed: 1,
         scanned: 1,
       });
       await expect(stat(sqliteCachePath)).rejects.toThrow();
+    });
+  });
+
+  it("keeps current external fts sqlite cache during normal GC and removes it during forced GC", async () => {
+    await withTempDir("spinedigest-gc-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
+      const { ftsPath } = await createArchiveWithExternalSearchIndex(path);
+
+      await makeCoordinatorOverlayOld("fts.db");
+      const normalReport = await tryRunWikiGraphGc();
+
+      expect(normalReport.skipped).toBe(false);
+      await expect(stat(ftsPath)).resolves.toBeDefined();
+      const forcedReport = await tryRunWikiGraphGc({ force: true });
+
+      expect(forcedReport.skipped).toBe(false);
+      expect(
+        forcedReport.jobs.find((item) => item.name === "wikg-coordinator")
+          ?.removed,
+      ).toBeGreaterThanOrEqual(1);
+      await expect(stat(ftsPath)).rejects.toThrow();
+    });
+  });
+
+  it("removes external fts sqlite cache when the source archive is missing", async () => {
+    await withTempDir("spinedigest-gc-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
+      const { archivePath, ftsPath } =
+        await createArchiveWithExternalSearchIndex(path);
+
+      await rm(archivePath, { force: true });
+      const report = await tryRunWikiGraphGc();
+
+      expect(report.skipped).toBe(false);
+      await expect(stat(ftsPath)).rejects.toThrow();
+    });
+  });
+
+  it("removes external fts sqlite cache when the archive fingerprint changes", async () => {
+    await withTempDir("spinedigest-gc-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
+      const { archivePath, ftsPath } =
+        await createArchiveWithExternalSearchIndex(path);
+
+      await new SpineDigestFile(archivePath).write(async (document) => {
+        await document.openSession(async (openedDocument) => {
+          const draft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          draft.addSentence("Changed archive content.", 3);
+          await draft.commit();
+        });
+      });
+
+      const report = await tryRunWikiGraphGc();
+
+      expect(report.skipped).toBe(false);
+      await expect(stat(ftsPath)).rejects.toThrow();
     });
   });
 
@@ -208,7 +267,7 @@ describe("gc", () => {
         "work",
         "archive-key",
       );
-      const referencedPath = join(workspaceBucketPath, "fts.db");
+      const referencedPath = join(workspaceBucketPath, "database.db");
       const sourceDirectoryPath = join(workspaceBucketPath, "texts", "source");
       const summaryDirectoryPath = join(
         workspaceBucketPath,
@@ -222,7 +281,7 @@ describe("gc", () => {
       await writeFile(join(summaryDirectoryPath, ".DS_Store"), "finder");
       await createCoordinatorOverlay(path, {
         archiveKey: "archive-key",
-        entryPath: "fts.db",
+        entryPath: "database.db",
         workspacePath: referencedPath,
       });
 
@@ -289,6 +348,87 @@ async function createOldCoordinatorSqliteCache(path: string): Promise<string> {
   return await createCoordinatorSqliteCache(path, {
     updatedAt: Date.now() - 2 * 60 * 60 * 1000,
   });
+}
+
+async function createArchiveWithExternalSearchIndex(path: string): Promise<{
+  readonly archivePath: string;
+  readonly ftsPath: string;
+}> {
+  const documentPath = join(path, "document");
+  const archivePath = join(path, "book.wikg");
+  const document = await DirectoryDocument.open(documentPath);
+
+  try {
+    await document.openSession(async (openedDocument) => {
+      await openedDocument.createSerial();
+      const draft = await openedDocument.getSerialFragments(1).createDraft();
+
+      draft.addSentence("Indexed source sentence.", 3);
+      await draft.commit();
+      await openedDocument.writeToc({
+        items: [{ children: [], serialId: 1, title: "Indexed" }],
+        version: 1,
+      });
+    });
+  } finally {
+    await document.release();
+  }
+
+  await writeWikgArchive(documentPath, archivePath);
+  await new SpineDigestFile(archivePath).write(
+    async (openedDocument) => {
+      await rebuildArchiveSearchIndex(openedDocument);
+    },
+    { searchIndexWritebackPolicy: "cache" },
+  );
+
+  const ftsPath = await readCoordinatorWorkspacePath("fts.db");
+
+  if (ftsPath === undefined) {
+    throw new Error("Expected external fts cache overlay.");
+  }
+
+  return { archivePath, ftsPath };
+}
+
+async function readCoordinatorWorkspacePath(
+  entryPath: string,
+): Promise<string | undefined> {
+  const database = await openStateDatabase("staging/staging.sqlite");
+
+  try {
+    return await database.queryOne(
+      `
+SELECT workspace_path
+FROM entry_overlays
+WHERE entry_path = ?
+ORDER BY updated_at DESC
+LIMIT 1
+`,
+      [entryPath],
+      (row) =>
+        typeof row.workspace_path === "string" ? row.workspace_path : undefined,
+    );
+  } finally {
+    await database.close();
+  }
+}
+
+async function makeCoordinatorOverlayOld(entryPath: string): Promise<void> {
+  const database = await openStateDatabase("staging/staging.sqlite");
+
+  try {
+    await database.run(
+      `
+UPDATE entry_overlays
+SET updated_at = ?
+WHERE entry_path = ?
+`,
+      [Date.now() - 2 * 60 * 60 * 1000, entryPath],
+    );
+  } finally {
+    await database.close();
+  }
 }
 
 async function createCoordinatorSqliteCache(

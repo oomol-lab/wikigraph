@@ -22,9 +22,15 @@ import {
 
 import { resolveWikiGraphStagingDirectoryPath } from "../common/wiki-graph-dir.js";
 import { createWikiGraphTempDirectory } from "../common/wiki-graph-temp.js";
-import { openSharedStateDatabase } from "../document/index.js";
+import {
+  Database as DocumentDatabase,
+  DirectoryDocument,
+  openSharedStateDatabase,
+} from "../document/index.js";
 import type { Database } from "../document/index.js";
 import type { DocumentFileStore } from "../document/document.js";
+import { createArchiveSearchIndexFingerprint } from "../archive/query/index.js";
+import { readSearchIndexFingerprintFromDatabase } from "../archive/search-index/index.js";
 import {
   isDisposableDirectoryEntry,
   readPathSize,
@@ -476,34 +482,105 @@ async function canRemoveSqliteCacheOverlay(
   ) {
     return false;
   }
+  if (overlay.workspacePath === undefined) {
+    return false;
+  }
+
+  if (await isSqliteCacheOverlayDirty(overlay)) {
+    return true;
+  }
+  if (!context.force && context.now - overlay.updatedAt < SQLITE_CACHE_TTL_MS) {
+    return false;
+  }
   if (
     overlay.entryPath === SEARCH_INDEX_DATABASE_ENTRY_PATH &&
     !context.force
   ) {
     return false;
   }
-  if (!context.force && context.now - overlay.updatedAt < SQLITE_CACHE_TTL_MS) {
-    return false;
-  }
-  if (overlay.workspacePath === undefined) {
-    return false;
-  }
-
-  const workspaceExists = await pathExists(overlay.workspacePath);
-
-  if (!workspaceExists) {
-    return true;
-  }
-
-  await createArchiveSignature(overlay.archivePath).catch((error: unknown) => {
-    if (isNodeError(error) && error.code === "ENOENT") {
-      return undefined;
-    }
-
-    throw error;
-  });
 
   return true;
+}
+
+async function isSqliteCacheOverlayDirty(
+  overlay: EntryOverlay,
+): Promise<boolean> {
+  if (overlay.workspacePath === undefined) {
+    return true;
+  }
+  if (!(await pathExists(overlay.workspacePath))) {
+    return true;
+  }
+  if (!(await pathExists(overlay.archivePath))) {
+    return true;
+  }
+  if (overlay.entryPath !== SEARCH_INDEX_DATABASE_ENTRY_PATH) {
+    return false;
+  }
+
+  return (await readSearchIndexCacheStatus(overlay)) !== "current";
+}
+
+async function readSearchIndexCacheStatus(
+  overlay: EntryOverlay,
+): Promise<"current" | "dirty" | "missing"> {
+  if (overlay.workspacePath === undefined) {
+    return "missing";
+  }
+  if (!(await pathExists(overlay.workspacePath))) {
+    return "missing";
+  }
+  if (!(await pathExists(overlay.archivePath))) {
+    return "dirty";
+  }
+
+  try {
+    const [indexedFingerprint, currentFingerprint] = await Promise.all([
+      readSearchIndexCacheFingerprint(overlay.workspacePath),
+      createCurrentArchiveSearchIndexFingerprint(overlay.archivePath),
+    ]);
+
+    if (indexedFingerprint === undefined) {
+      return "dirty";
+    }
+
+    return indexedFingerprint === currentFingerprint ? "current" : "dirty";
+  } catch {
+    return "dirty";
+  }
+}
+
+async function readSearchIndexCacheFingerprint(
+  databasePath: string,
+): Promise<string | undefined> {
+  const database = await DocumentDatabase.open(databasePath, "", {
+    readonly: true,
+  });
+
+  try {
+    return await readSearchIndexFingerprintFromDatabase(database);
+  } finally {
+    await database.close();
+  }
+}
+
+async function createCurrentArchiveSearchIndexFingerprint(
+  archivePath: string,
+): Promise<string> {
+  const directoryPath = await createWikiGraphTempDirectory("archive-open");
+
+  try {
+    await extractWikgArchive(archivePath, directoryPath);
+    const document = await DirectoryDocument.open(directoryPath);
+
+    try {
+      return await createArchiveSearchIndexFingerprint(document);
+    } finally {
+      await document.release();
+    }
+  } finally {
+    await rm(directoryPath, { force: true, recursive: true });
+  }
 }
 
 async function hasActiveArchiveOwnerOrSqliteLease(

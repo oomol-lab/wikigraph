@@ -367,7 +367,7 @@ describe("wikg/spine-digest-file", () => {
         await expect(readArchivedTitle(archivePath)).resolves.toBe(
           "Fresh Title",
         );
-        await expect(readCoordinatorOverlays(path)).resolves.toContainEqual(
+        await expect(readCoordinatorOverlays(path)).resolves.not.toContainEqual(
           expect.objectContaining({
             archivePath: `${path}/missing/book.wikg`,
             entryPath: "database.db",
