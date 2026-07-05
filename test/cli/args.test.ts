@@ -1814,15 +1814,17 @@ describe("cli/args", () => {
 
     expect(rootHelpText).toContain("wikigraph help [topic]");
     expect(rootHelpText).toContain("wikigraph help recipe");
-    expect(rootHelpText).toContain("wikigraph <scope-uri> --query <query>");
-    expect(rootHelpText).toContain("wikigraph <object-uri>");
+    expect(rootHelpText).toContain("Core concepts:");
+    expect(rootHelpText).toContain("Scope: a URI target");
+    expect(rootHelpText).toContain("Object: a URI target");
+    expect(rootHelpText).toContain("Predicate: an operation bound to a URI");
     expect(rootHelpText).not.toContain("wikigraph help task");
     expect(rootHelpText).toContain("wikigraph help uri");
     expect(rootHelpText).toContain("wikigraph <archive-uri> inspect");
-    expect(rootHelpText).toContain("wikigraph <archive-uri>/index build");
     expect(rootHelpText).toContain("wikigraph transform");
     expect(rootHelpText).not.toContain("wikigraph import");
-    expect(rootHelpText).toContain("wikigraph wikg://local/job add");
+    expect(rootHelpText).not.toContain("wikigraph wikg://local/job add");
+    expect(rootHelpText).not.toContain("wikigraph <archive-uri>/index build");
     expect(rootHelpText).toContain("Use `wikigraph <uri> --help`");
     expect(rootHelpText).toContain("Treat `wikigraph --help` as the root");
     expect(rootHelpText).toContain("Wiki Graph CLI");
@@ -1830,7 +1832,8 @@ describe("cli/args", () => {
     expect(rootHelpText).not.toContain("wikigraph help retrieval");
     expect(rootHelpText).not.toContain("wikigraph help command");
     expect(rootHelpText).toContain("wikigraph <uri> <predicate> --help");
-    expect(rootHelpText).toContain("Objects to recognize:");
+    expect(rootHelpText).toContain("Important object families:");
+    expect(rootHelpText).toContain("What to learn where:");
     expect(renderHelpTopicText("runtime")).toContain(
       "Runtime and Debug Behavior",
     );
