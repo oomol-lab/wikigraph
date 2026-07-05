@@ -11,12 +11,10 @@ import type {
 
 export const HELP_TOPICS = [
   "task",
-  "command",
   "format",
   "config",
   "runtime",
   "uri",
-  "retrieval",
   "recipe",
   "troubleshoot",
   "ai",
@@ -151,10 +149,6 @@ const HELP_TOPIC_METADATA: readonly {
     summary: "Task-oriented entry points for common workflows.",
   },
   {
-    name: "command",
-    summary: "Top-level commands, flags, and command family boundaries.",
-  },
-  {
     name: "format",
     summary: "Supported formats, inference rules, and IO constraints.",
   },
@@ -168,11 +162,8 @@ const HELP_TOPIC_METADATA: readonly {
   },
   {
     name: "uri",
-    summary: "Wiki Graph URI grammar, archive locators, scopes, and objects.",
-  },
-  {
-    name: "retrieval",
-    summary: "Scope, lens, pagination, and output format choices.",
+    summary:
+      "URI grammar, command routing, scopes, objects, and retrieval strategy.",
   },
   {
     name: "recipe",
@@ -208,12 +199,10 @@ const ARCHIVE_MAINTENANCE_COMMAND_METADATA: readonly {
 
 const HELP_TOPIC_TEMPLATE_NAMES: Readonly<Record<HelpTopic, string>> = {
   task: "help/topics/task",
-  command: "help/topics/command",
   format: "help/topics/format",
   config: "help/topics/config",
   runtime: "help/topics/runtime",
   uri: "help/topics/uri",
-  retrieval: "help/topics/retrieval",
   recipe: "help/topics/recipe",
   troubleshoot: "help/topics/troubleshoot",
   ai: "help/topics/ai",

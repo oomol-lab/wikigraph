@@ -3,13 +3,14 @@ Topic: format
 
 Format Rules
 
-`.wikg` is the managed Wiki Graph archive format.
-
-Source formats for archive creation:
-  epub, txt, markdown
+Purpose:
+  File format rules apply at archive boundaries: create, export, transform, stdin, and stdout.
 
 Managed archive format:
   wikg
+
+Source formats for archive creation:
+  epub, txt, markdown
 
 Export formats:
   txt, markdown
@@ -22,8 +23,10 @@ Inference rules:
   - File paths use their extension when the format flag is omitted.
   - Stdin requires an explicit `--input-format`.
   - Stdout text export requires an explicit or inferable output format.
+  - `transform --stage` is only valid when creating `.wikg` from source input.
 
-Object commands operate on `.wikg` archives. Scope URIs return URI-addressable objects, scope URIs with `--query` narrow retrieval, object URIs open one object, `evidence` returns source evidence items, and `pack` returns packed context for chunk and entity objects.
-
-Use `export` when a projection file is needed:
+Examples:
+  wikigraph wikg://book.wikg create ./book.epub
+  cat chapter.md | wikigraph wikg://book.wikg create --input-format markdown
   wikigraph wikg://book.wikg export --output-format markdown --output out.md
+  cat chapter.txt | wikigraph transform --input-format txt --output-format markdown

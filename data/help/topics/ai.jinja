@@ -55,7 +55,7 @@ When investigating a known entity, chunk, or triple under a specific aspect, con
   wikigraph <archive-uri>/entity/Q830077 evidence --query "objectivity"
   wikigraph <archive-uri>/entity/Q830077 related --query "objectivity" --evidence 2
 
-Use scope URIs without `--query` when recall or completeness matters more than narrowing. Read `wikigraph help retrieval` before choosing pagination or output format flags.
+Use scope URIs without `--query` when recall or completeness matters more than narrowing. Read `wikigraph help uri` before choosing pagination or object result format flags.
 
 When investigating an entity:
   1. `wikigraph <archive-uri>/entity/<qid>`
@@ -67,6 +67,6 @@ When investigating an entity:
 Do not infer Wikipedia URLs from entity labels or Wikidata QIDs. Use `/entity/<qid>/wikipage` to retrieve canonical mapped pages.
 
 Retrieval strategy:
-  Read `wikigraph help retrieval` for scope, lens, pagination, `--limit`, `--all`, `--json`, and `--jsonl` choices.
+  Read `wikigraph help uri` for scope, lens, pagination, `--limit`, `--all`, `--json`, and `--jsonl` choices.
 
 Source search hits and evidence previews include nearby source context by default. Use `--context 0` when the user needs exact cited ranges, and adjust `--context <n>` instead of switching to full source output when a small window is enough.
