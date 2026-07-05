@@ -12,11 +12,13 @@ const EMPTY_DELTA: ReaderGraphDelta = {
   edges: [],
 };
 
-const { compressTextMock, readerSegmentMock } = vi.hoisted(() => ({
-  compressTextMock: vi.fn(),
-  readerSegmentMock:
-    vi.fn<(stream: ReaderTextStream) => AsyncIterable<ReaderSegment>>(),
-}));
+const { compressTextMock, readerFragmentSummaryMock, readerSegmentMock } =
+  vi.hoisted(() => ({
+    compressTextMock: vi.fn(),
+    readerFragmentSummaryMock: vi.fn<() => string>(),
+    readerSegmentMock:
+      vi.fn<(stream: ReaderTextStream) => AsyncIterable<ReaderSegment>>(),
+  }));
 
 vi.mock("../src/editor/index.js", () => ({
   compressText: compressTextMock,
@@ -37,7 +39,7 @@ vi.mock("../src/reader/index.js", () => ({
     }> {
       return Promise.resolve({
         delta: EMPTY_DELTA,
-        fragmentSummary: "",
+        fragmentSummary: readerFragmentSummaryMock(),
       });
     }
 
@@ -54,7 +56,8 @@ vi.mock("../src/reader/index.js", () => ({
       readonly getSuccessorChunkIds: (chunkId: number) => readonly number[];
     }): void {}
   },
-  segmentTextStream: (stream: ReaderTextStream): ReaderTextStream => stream,
+  segmentTextStream: (stream: ReaderTextStream): AsyncIterable<ReaderSegment> =>
+    readerSegmentMock(stream),
 }));
 
 vi.mock("../src/topology/index.js", () => ({
@@ -68,14 +71,16 @@ vi.mock("../src/topology/index.js", () => ({
 }));
 
 import { DirectoryDocument } from "../src/document/index.js";
-import { SerialGeneration } from "../src/serial.js";
+import { SerialGeneration, writeSerialSource } from "../src/serial.js";
 import { withTempDir } from "./helpers/temp.js";
 
 describe("serial", () => {
   beforeEach(() => {
     compressTextMock.mockReset();
+    readerFragmentSummaryMock.mockReset();
     readerSegmentMock.mockReset();
     compressTextMock.mockResolvedValue("");
+    readerFragmentSummaryMock.mockReturnValue("");
   });
 
   it("emits advance for a single fragment before completion", async () => {
@@ -245,7 +250,8 @@ describe("serial", () => {
         });
 
         await document.serials.createWithId(1);
-        await generation.buildTopologyInto(1, [], {
+        await writeSerialSource(document, 1, []);
+        await generation.buildTopologyInto(1, {
           extractionPrompt: "Keep key beats",
         });
 
@@ -309,7 +315,8 @@ describe("serial", () => {
         });
 
         await document.serials.createWithId(1);
-        await generation.buildTopologyInto(1, [], {
+        await writeSerialSource(document, 1, []);
+        await generation.buildTopologyInto(1, {
           extractionPrompt: "Keep key beats",
         });
         await document.writeSummary(1, "Existing summary");
@@ -318,6 +325,42 @@ describe("serial", () => {
 
         expect(serial.getSummary()).toBe("Existing summary");
         expect(compressTextMock).not.toHaveBeenCalled();
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("does not write reader fragment summaries into source text", async () => {
+    await withTempDir("spinedigest-serial-", async (path) => {
+      const document = await DirectoryDocument.open(path);
+
+      readerSegmentMock.mockReturnValueOnce(
+        createSentenceStream([
+          {
+            offset: 0,
+            text: "朱元璋面对张士诚。",
+            wordsCount: 3,
+          },
+        ]),
+      );
+      readerFragmentSummaryMock.mockReturnValueOnce(
+        "朱元璋即将面向最后一个真正的敌人。",
+      );
+
+      try {
+        await document.serials.createWithId(1);
+        await writeSerialSource(document, 1, []);
+        const before = await document.getSerialFragments(1).readText();
+
+        await new SerialGeneration({
+          document,
+          llm: {} as never,
+        }).buildTopologyInto(1, {
+          extractionPrompt: "Keep key beats",
+        });
+
+        expect(await document.getSerialFragments(1).readText()).toBe(before);
       } finally {
         await document.release();
       }

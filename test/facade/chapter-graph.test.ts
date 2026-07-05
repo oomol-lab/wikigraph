@@ -19,7 +19,6 @@ vi.mock("../../src/serial.js", () => ({
 
     public async buildTopologyInto(
       serialId: number,
-      stream: AsyncIterable<string> | Iterable<string>,
       _options: unknown,
       progressTracker?: {
         advance(wordsCount: number): Promise<void>;
@@ -27,12 +26,13 @@ vi.mock("../../src/serial.js", () => ({
     ): Promise<void> {
       const fragments = this.#document.getSerialFragments(serialId);
 
-      for await (const chunk of stream) {
-        const wordsCount = countWords(chunk);
-        const draft = await fragments.createDraft();
+      for (const fragmentId of await fragments.listFragmentIds()) {
+        const fragment = await fragments.getFragment(fragmentId);
+        const wordsCount = fragment.sentences.reduce(
+          (sum, sentence) => sum + sentence.wordsCount,
+          0,
+        );
 
-        draft.addSentence(chunk, wordsCount);
-        await draft.commit();
         await progressTracker?.advance(wordsCount);
       }
 
@@ -141,6 +141,11 @@ describe("facade/chapter graph", () => {
           workspacePath: `${path}/job-workspace`,
         });
 
+        await expect(
+          access(
+            `${artifact.documentPath}/fragments/serial-${chapter.chapterId}/fragment_0.json`,
+          ),
+        ).resolves.toBeUndefined();
         await commitChapterGraphArtifact(document, artifact);
 
         await expect(

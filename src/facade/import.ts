@@ -205,12 +205,16 @@ async function generatePlannedSerials(
               await options.document.serials.createWithId(
                 plannedSection.serialId,
               );
+              await writeSerialSource(
+                options.document,
+                plannedSection.serialId,
+                await plannedSection.section.open(),
+              );
               await requireSerialGeneration(
                 options.generation,
                 options.targetStage,
               ).buildTopologyInto(
                 plannedSection.serialId,
-                await plannedSection.section.open(),
                 {
                   extractionPrompt: options.extractionPrompt,
                   ...(options.userLanguage === undefined

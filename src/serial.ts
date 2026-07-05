@@ -170,12 +170,11 @@ export class SerialGeneration {
     options: GenerateSerialOptions,
     progressTracker?: SerialProgressSink,
   ): Promise<Serial> {
-    return await this.#generatePrepared(
-      await this.#createSerialId(),
-      stream,
-      options,
-      progressTracker,
-    );
+    const serialId = await this.#createSerialId();
+    await writeSerialSource(this.#document, serialId, stream, {
+      ...(this.#segmenter === undefined ? {} : { segmenter: this.#segmenter }),
+    });
+    return await this.#generatePrepared(serialId, options, progressTracker);
   }
 
   public async create(
@@ -192,23 +191,19 @@ export class SerialGeneration {
     progressTracker?: SerialProgressSink,
   ): Promise<Serial> {
     await this.#createExplicitSerialId(serialId);
-    return await this.#generatePrepared(
-      serialId,
-      stream,
-      options,
-      progressTracker,
-    );
+    await writeSerialSource(this.#document, serialId, stream, {
+      ...(this.#segmenter === undefined ? {} : { segmenter: this.#segmenter }),
+    });
+    return await this.#generatePrepared(serialId, options, progressTracker);
   }
 
   public async buildTopologyInto(
     serialId: number,
-    stream: ReaderTextStream,
     options: BuildSerialTopologyOptions,
     progressTracker?: SerialProgressSink,
   ): Promise<void> {
     await this.#buildTopology(
       serialId,
-      stream,
       options.extractionPrompt,
       options.userLanguage,
       progressTracker,
@@ -226,13 +221,11 @@ export class SerialGeneration {
 
   async #generatePrepared(
     serialId: number,
-    stream: ReaderTextStream,
     options: GenerateSerialOptions,
     progressTracker?: SerialProgressSink,
   ): Promise<Serial> {
     await this.#buildTopology(
       serialId,
-      stream,
       options.extractionPrompt,
       options.userLanguage,
       progressTracker,
@@ -306,7 +299,6 @@ export class SerialGeneration {
 
   async #buildTopology(
     serialId: number,
-    stream: ReaderTextStream,
     extractionPrompt: string,
     userLanguage: Language | undefined,
     progressTracker?: SerialProgressSink,
@@ -339,15 +331,18 @@ export class SerialGeneration {
     );
     const allChunks: ReaderChunk[] = [];
     const successorIdsByChunkId = createNumberListRecord();
-    for await (const fragment of streamFragments({
-      maxWordsCount: this.#fragmentWordsCount,
-      stream: reader.segment(stream),
-    })) {
+    const serialFragments = this.#document.getSerialFragments(serialId);
+
+    for (const fragment of await listSerialProcessingFragments(
+      serialFragments,
+      this.#fragmentWordsCount,
+    )) {
       const wordsCount = countFragmentWords(fragment.sentences);
 
       await this.#processFragment({
         allChunks,
         fragment: {
+          startSentenceIndex: fragment.startSentenceIndex,
           sentences: fragment.sentences,
         },
         reader,
@@ -362,12 +357,14 @@ export class SerialGeneration {
     await this.#writeSemaphore.use(async () => {
       await topology.finalize();
       await this.#serials.setTopologyReady(serialId);
+      await this.#serials.bumpRevision(serialId);
     });
   }
 
   async #processFragment(input: {
     readonly allChunks: ReaderChunk[];
     readonly fragment: {
+      readonly startSentenceIndex: number;
       readonly sentences: ReadonlyArray<{
         readonly text: string;
         readonly wordsCount: number;
@@ -378,10 +375,11 @@ export class SerialGeneration {
     readonly successorIdsByChunkId: Record<string, number[] | undefined>;
     readonly topology: Topology;
   }): Promise<void> {
-    const serialFragments = this.#getSerialFragments(input.serialId);
-    const fragmentDraft = await serialFragments.createDraft();
-    const sentences = input.fragment.sentences.map((sentence) => ({
-      sentenceId: fragmentDraft.addSentence(sentence.text, sentence.wordsCount),
+    const sentences = input.fragment.sentences.map((sentence, index) => ({
+      sentenceId: [
+        input.serialId,
+        input.fragment.startSentenceIndex + index,
+      ] as const,
       text: sentence.text,
       wordsCount: sentence.wordsCount,
     }));
@@ -391,18 +389,12 @@ export class SerialGeneration {
       text: fragmentText,
     });
 
-    if (userFocused.fragmentSummary.trim() !== "") {
-      fragmentDraft.setSummary(userFocused.fragmentSummary);
-    }
-
     const bookCoherence = await input.reader.extractBookCoherence({
       sentences,
       text: fragmentText,
       userFocusedChunks: userFocused.delta.chunks,
     });
 
-    await fragmentDraft.commit();
-    await this.#serials.bumpRevision(input.serialId);
     saveDelta(
       input.allChunks,
       input.successorIdsByChunkId,
@@ -674,6 +666,89 @@ async function* streamFragments(input: {
       sentences: currentSentences,
     };
   }
+}
+
+async function listSerialProcessingFragments(
+  fragments: ReadonlySerialFragments,
+  maxWordsCount: number,
+): Promise<
+  ReadonlyArray<{
+    readonly startSentenceIndex: number;
+    readonly sentences: ReadonlyArray<{
+      readonly text: string;
+      readonly wordsCount: number;
+    }>;
+  }>
+> {
+  const sentences =
+    fragments.listSentences === undefined
+      ? await listFragmentSentences(fragments)
+      : await fragments.listSentences();
+  const batches: Array<{
+    startSentenceIndex: number;
+    sentences: Array<{
+      readonly text: string;
+      readonly wordsCount: number;
+    }>;
+  }> = [];
+  let currentSentences: Array<{
+    readonly text: string;
+    readonly wordsCount: number;
+  }> = [];
+  let currentStartSentenceIndex = 0;
+  let currentWordsCount = 0;
+
+  for (let index = 0; index < sentences.length; index += 1) {
+    const sentence = sentences[index];
+
+    if (sentence === undefined || sentence.text.trim() === "") {
+      continue;
+    }
+    if (
+      currentSentences.length > 0 &&
+      currentWordsCount + sentence.wordsCount > maxWordsCount
+    ) {
+      batches.push({
+        startSentenceIndex: currentStartSentenceIndex,
+        sentences: currentSentences,
+      });
+      currentSentences = [];
+      currentWordsCount = 0;
+    }
+    if (currentSentences.length === 0) {
+      currentStartSentenceIndex = index;
+    }
+    currentSentences.push(sentence);
+    currentWordsCount += sentence.wordsCount;
+  }
+
+  if (currentSentences.length > 0) {
+    batches.push({
+      startSentenceIndex: currentStartSentenceIndex,
+      sentences: currentSentences,
+    });
+  }
+
+  return batches;
+}
+
+async function listFragmentSentences(
+  fragments: ReadonlySerialFragments,
+): Promise<
+  ReadonlyArray<{
+    readonly text: string;
+    readonly wordsCount: number;
+  }>
+> {
+  const records = await Promise.all(
+    (await fragments.listFragmentIds()).map(
+      async (fragmentId) => await fragments.getFragment(fragmentId),
+    ),
+  );
+
+  return records
+    .sort((left, right) => left.fragmentId - right.fragmentId)
+    .flatMap((fragment) => fragment.sentences);
 }
 
 function countFragmentWords(

@@ -297,15 +297,10 @@ export async function generateChapterGraph(
         ? {}
         : { logDirPath: options.logDirPath }),
     });
-    const sourceText = await collectReaderText(
-      readChapterSource(openedDocument, chapterId),
-    );
-
-    await openedDocument.clearSerialSource(chapterId);
+    await openedDocument.clearSerialGraph(chapterId);
 
     await generation.buildTopologyInto(
       chapterId,
-      sourceText,
       createTopologyOptions(options),
       options.progressTracker,
     );
@@ -1431,33 +1426,6 @@ function createTopologyOptions(
       ? {}
       : { userLanguage: options.userLanguage }),
   };
-}
-
-async function* readChapterSource(
-  document: ReadonlyDocument,
-  chapterId: number,
-): ReaderTextStream {
-  const fragments = document.getSerialFragments(chapterId);
-
-  for (const fragmentId of await fragments.listFragmentIds()) {
-    const fragment = await fragments.getFragment(fragmentId);
-
-    for (const sentence of fragment.sentences) {
-      yield sentence.text;
-    }
-  }
-}
-
-async function collectReaderText(
-  stream: ReaderTextStream,
-): Promise<readonly string[]> {
-  const text: string[] = [];
-
-  for await (const chunk of stream) {
-    text.push(chunk);
-  }
-
-  return text;
 }
 
 function normalizeTitle(title: string | null | undefined): string | undefined {

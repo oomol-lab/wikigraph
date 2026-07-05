@@ -119,9 +119,13 @@ export async function digestTextStreamSession<T>(
 
         if (targetStage === "graphed") {
           await openedDocument.serials.createWithId(serialId);
+          await writeSerialSource(openedDocument, serialId, options.stream, {
+            ...(options.segmenter === undefined
+              ? {}
+              : { segmenter: options.segmenter }),
+          });
           await generation.buildTopologyInto(
             serialId,
-            options.stream,
             {
               extractionPrompt: options.extractionPrompt,
               ...(options.userLanguage === undefined
