@@ -403,10 +403,12 @@ async function createArchive(args: CLIArchiveArguments): Promise<void> {
   if (args.sourcePath === undefined) {
     if (args.inputFormat === undefined) {
       await new SpineDigestFile(args.archivePath).write(async () => {});
+      await writeCreatedArchive(args);
       return;
     }
 
     await createArchiveFromStdin(args);
+    await writeCreatedArchive(args);
     return;
   }
 
@@ -424,6 +426,7 @@ async function createArchive(args: CLIArchiveArguments): Promise<void> {
       targetStage: "sourced",
       verbose: false,
     });
+    await writeCreatedArchive(args);
     return;
   }
 
@@ -453,9 +456,21 @@ async function createArchive(args: CLIArchiveArguments): Promise<void> {
       targetStage: "sourced",
       verbose: false,
     });
+    await writeCreatedArchive(args);
   } finally {
     await rm(temporaryDirectoryPath, { force: true, recursive: true });
   }
+}
+
+async function writeCreatedArchive(args: CLIArchiveArguments): Promise<void> {
+  if (args.json === true) {
+    await writeTextToStdout(
+      formatCLIJSON({ uri: formatLocatedWikiGraphUri(args.archivePath) }),
+    );
+    return;
+  }
+
+  await writeTextToStdout("<archive>\n");
 }
 
 async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {

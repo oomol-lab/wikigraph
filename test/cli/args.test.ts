@@ -612,6 +612,20 @@ describe("cli/args", () => {
       help: false,
       kind: "archive",
     });
+    expect(
+      parseCLIArguments(["wikg://book.wikg", "create", "--json"]),
+    ).toStrictEqual({
+      args: {
+        action: "create",
+        archivePath: archivePath,
+        json: true,
+      },
+      help: false,
+      kind: "archive",
+    });
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "create", "--jsonl"]),
+    ).toThrow("The `create` command does not support --jsonl.");
 
     expect(() => parseCLIArguments(["build", "book.wikg"])).toThrow(
       "Unknown command: build.",
