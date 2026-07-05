@@ -5,7 +5,7 @@ Purpose:
   Create generation tasks for one `.wikg` chapter or every buildable chapter in an archive.
 
 Usage:
-  wikigraph wikg://local/job add --input <chapter-uri|archive-uri> --task <reading-graph|reading-summary|knowledge-graph> --accept-cost [--boost] [--llm <json>] [--prompt <text>]
+  wikigraph wikg://local/job add --input <chapter-uri|archive-uri> --task <reading-graph|reading-summary|knowledge-graph> --accept-cost [--boost] [--llm <json>] [--prompt <text>] [--json]
 
 Options:
   --input <uri>        Chapter URI for one job, or archive URI for all buildable chapters.
@@ -14,6 +14,7 @@ Options:
   --boost              Insert the new job at the front of the queued jobs.
   --llm <json>         Override LLM configuration for this job.
   --prompt <text>      Override extraction prompt for this job.
+  --json               Print created jobs as JSON.
 
 Task choices:
   reading-graph        Build the reading-oriented chunk graph from sourced text.

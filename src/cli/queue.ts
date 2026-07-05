@@ -83,7 +83,9 @@ export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
       if (args.chapterId === undefined) {
         await addArchiveJobs(args);
       } else {
-        await writeJobSummary(await addChapterJob(args, args.chapterId));
+        await writeJobSummary(await addChapterJob(args, args.chapterId), {
+          json: args.json ?? false,
+        });
       }
 
       tryStartQueueWorker();
@@ -198,7 +200,7 @@ async function addArchiveJobs(args: CLIQueueArguments): Promise<void> {
     },
   );
 
-  await writeArchiveAddSummary({ created, skipped });
+  await writeArchiveAddSummary({ created, json: args.json ?? false, skipped });
 }
 
 async function assertQueueAddReady(args: CLIQueueArguments): Promise<void> {
@@ -770,7 +772,15 @@ function formatJobJSON(job: BuildJob): unknown {
   };
 }
 
-async function writeJobSummary(job: BuildJob): Promise<void> {
+async function writeJobSummary(
+  job: BuildJob,
+  options: { readonly json: boolean } = { json: false },
+): Promise<void> {
+  if (options.json) {
+    await writeTextToStdout(formatCLIJSON(formatJobJSON(job)));
+    return;
+  }
+
   await writeTextToStdout(
     `Job ${job.jobId} ${job.state} ${job.target} chapter ${job.chapterId} ${job.archivePath}\n`,
   );
@@ -778,11 +788,22 @@ async function writeJobSummary(job: BuildJob): Promise<void> {
 
 async function writeArchiveAddSummary(input: {
   readonly created: readonly BuildJob[];
+  readonly json: boolean;
   readonly skipped: readonly {
     readonly chapterId: number;
     readonly reason: string;
   }[];
 }): Promise<void> {
+  if (input.json) {
+    await writeTextToStdout(
+      formatCLIJSON({
+        created: input.created.map(formatJobJSON),
+        skipped: input.skipped,
+      }),
+    );
+    return;
+  }
+
   const lines = [
     `Created: ${input.created.length}`,
     `Skipped: ${input.skipped.length}`,

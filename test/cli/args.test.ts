@@ -394,12 +394,14 @@ describe("cli/args", () => {
         "wikg://book.wikg",
         "--task",
         "knowledge-graph",
+        "--json",
       ]),
     ).toStrictEqual({
       args: {
         action: "add",
         archivePath,
         inputPath: "wikg://book.wikg",
+        json: true,
         target: "knowledge-graph",
       },
       help: false,

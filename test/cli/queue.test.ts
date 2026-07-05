@@ -8,6 +8,10 @@ const queueMockState = vi.hoisted(() => ({
   buildKnowledgeGraphCalls: [] as unknown[],
   buildSummaryCalls: [] as unknown[],
   chapterStage: "sourced" as "planned" | "sourced" | "graphed" | "summarized",
+  chapters: [] as Array<{
+    readonly chapterId: number;
+    readonly stage: "planned" | "sourced" | "graphed" | "summarized";
+  }>,
   commitGraphCalls: [] as unknown[],
   commitKnowledgeGraphCalls: [] as unknown[],
   commitSummaryCalls: [] as unknown[],
@@ -207,6 +211,7 @@ vi.mock("../../src/facade/index.js", () => ({
     },
   ),
   listBuildJobs: vi.fn(() => Promise.resolve(queueMockState.jobs)),
+  listChapters: vi.fn(() => Promise.resolve(queueMockState.chapters)),
   pauseBuildJob: vi.fn(),
   readBuildJobEvents: vi.fn(() => Promise.resolve(queueMockState.events)),
   recordBuildJobInputRevision: vi.fn((input: unknown) => {
@@ -292,6 +297,7 @@ describe("cli/queue", () => {
     queueMockState.buildSummaryCalls.length = 0;
     queueMockState.buildInputStage = "sourced";
     queueMockState.chapterStage = "sourced";
+    queueMockState.chapters = [];
     queueMockState.commitGraphCalls.length = 0;
     queueMockState.commitKnowledgeGraphCalls.length = 0;
     queueMockState.commitSummaryCalls.length = 0;
@@ -410,6 +416,63 @@ describe("cli/queue", () => {
     ]);
     expect(queueMockState.loadRequiredStageConfigCalls).toStrictEqual([{}]);
     expect(queueMockState.textWrites.join("")).toContain("Job job-1 queued");
+  });
+
+  it("prints a created chapter job as json", async () => {
+    await runQueueCommand({
+      acceptCost: true,
+      action: "add",
+      archivePath: "book.wikg",
+      chapterId: 12,
+      json: true,
+      target: "reading-graph",
+    });
+
+    expect(JSON.parse(queueMockState.textWrites.join(""))).toMatchObject({
+      archivePath: "book.wikg",
+      chapterId: 12,
+      jobId: "job-1",
+      state: "queued",
+      target: "reading-summary",
+    });
+  });
+
+  it("prints archive job add results as json", async () => {
+    queueMockState.chapters = [
+      {
+        chapterId: 11,
+        stage: "planned",
+      },
+      {
+        chapterId: 12,
+        stage: "sourced",
+      },
+    ];
+
+    await runQueueCommand({
+      acceptCost: true,
+      action: "add",
+      archivePath: "book.wikg",
+      json: true,
+      target: "reading-graph",
+    });
+
+    expect(JSON.parse(queueMockState.textWrites.join(""))).toMatchObject({
+      created: [
+        {
+          archivePath: "book.wikg",
+          chapterId: 12,
+          jobId: "job-1",
+          state: "queued",
+        },
+      ],
+      skipped: [
+        {
+          chapterId: 11,
+          reason: "planned",
+        },
+      ],
+    });
   });
 
   it("rejects job add before enqueueing when llm config is missing", async () => {

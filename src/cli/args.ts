@@ -2488,7 +2488,6 @@ function parseQueueAddArguments(
 ): ParsedCLIArguments {
   const action = "add";
 
-  rejectQueueJSONFlag(action, values.json, helpRoute);
   rejectQueueJSONLFlag(action, values.jsonl, helpRoute);
   rejectQueueFlag(action, "--stage", values.stage, helpRoute);
   rejectQueueFlag(action, "--to", values.to, helpRoute);
@@ -2510,6 +2509,7 @@ function parseQueueAddArguments(
       ...(values.boost === undefined ? {} : { boost: values.boost }),
       ...(input.chapterId === undefined ? {} : { chapterId: input.chapterId }),
       inputPath: values.input,
+      ...(values.json === undefined ? {} : { json: values.json }),
       ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       ...(values.prompt === undefined ? {} : { prompt: values.prompt }),
       target: parseBuildJobTarget(values.task),
