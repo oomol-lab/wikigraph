@@ -10,7 +10,6 @@ import type {
 } from "./args.js";
 
 export const HELP_TOPICS = [
-  "overview",
   "task",
   "command",
   "format",
@@ -148,10 +147,6 @@ const HELP_TOPIC_METADATA: readonly {
   readonly summary: string;
 }[] = [
   {
-    name: "overview",
-    summary: "Mental model, processing paths, and when LLM access is needed.",
-  },
-  {
     name: "task",
     summary: "Task-oriented entry points for common workflows.",
   },
@@ -212,7 +207,6 @@ const ARCHIVE_MAINTENANCE_COMMAND_METADATA: readonly {
 ] as const;
 
 const HELP_TOPIC_TEMPLATE_NAMES: Readonly<Record<HelpTopic, string>> = {
-  overview: "help/topics/overview",
   task: "help/topics/task",
   command: "help/topics/command",
   format: "help/topics/format",

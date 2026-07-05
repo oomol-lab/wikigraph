@@ -1788,7 +1788,7 @@ describe("cli/args", () => {
 
   it("rejects invalid help usage", () => {
     expect(() => parseCLIArguments(["help", "unknown"])).toThrow(
-      "Invalid help topic: unknown. Expected one of overview, task, command, format, config, runtime, uri, retrieval, recipe, troubleshoot, ai.\nSee: wikigraph --help",
+      "Invalid help topic: unknown. Expected one of task, command, format, config, runtime, uri, retrieval, recipe, troubleshoot, ai.\nSee: wikigraph --help",
     );
     expect(() =>
       parseCLIArguments(["help", "object", "entity", "extra"]),
@@ -1802,7 +1802,7 @@ describe("cli/args", () => {
       "The `help` command does not support --input.\nSee: wikigraph --help",
     );
     expect(() =>
-      parseCLIArguments(["help", "overview", "--llm", '{"model":"cli-model"}']),
+      parseCLIArguments(["help", "ai", "--llm", '{"model":"cli-model"}']),
     ).toThrow(
       "The `help` command does not support --llm.\nSee: wikigraph --help",
     );
@@ -1815,7 +1815,7 @@ describe("cli/args", () => {
     expect(rootHelpText).toContain("wikigraph help [topic]");
     expect(rootHelpText).toContain("wikigraph <scope-uri> --query <query>");
     expect(rootHelpText).toContain("wikigraph <object-uri>");
-    expect(rootHelpText).toContain("wikigraph help overview");
+    expect(rootHelpText).toContain("wikigraph help task");
     expect(rootHelpText).toContain("wikigraph help uri");
     expect(rootHelpText).toContain("wikigraph <archive-uri> [--json|--jsonl]");
     expect(rootHelpText).toContain("wikigraph <archive-uri>/chapter/tree set");
@@ -1824,9 +1824,7 @@ describe("cli/args", () => {
     expect(rootHelpText).toContain("wikigraph wikg://local/job add");
     expect(rootHelpText).toContain("Use `wikigraph <uri> --help`");
     expect(rootHelpText).toContain("Treat `wikigraph --help` as the root");
-    expect(rootHelpText).toContain(
-      "Read `wikigraph help overview` for the URI-first archive mental model.",
-    );
+    expect(rootHelpText).not.toContain("wikigraph help overview");
     expect(rootHelpText).toContain("wikigraph help retrieval");
     expect(rootHelpText).toContain("wikigraph <uri> <predicate> --help");
     expect(rootHelpText).toContain("Generation jobs call an LLM");
@@ -1904,7 +1902,7 @@ describe("cli/args", () => {
   it("supports a first-contact recovery chain from root help to parse failures", () => {
     const rootHelpText = renderMainHelpText();
 
-    expect(rootHelpText).toContain("wikigraph help overview");
+    expect(rootHelpText).not.toContain("wikigraph help overview");
     expect(rootHelpText).toContain("wikigraph help command");
     expect(() =>
       parseCLIArguments([
