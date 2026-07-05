@@ -519,7 +519,7 @@ describe("cli/queue", () => {
       },
       {
         chapterId: 12,
-        stage: "sourced",
+        stage: "graphed",
         words: 800,
       },
     ];
@@ -536,8 +536,61 @@ describe("cli/queue", () => {
       "Work: reading-summary over 2 chapters / 1200 words",
     );
     expect(queueMockState.textWrites.join("")).toContain(
+      "Includes prerequisite Reading Graph work where missing.",
+    );
+    expect(queueMockState.textWrites.join("")).toContain(
       "Command: wikigraph wikg://local/config/concurrent put job 4",
     );
+  });
+
+  it("includes prerequisite work in archive job add json estimates", async () => {
+    queueMockState.chapters = [
+      {
+        chapterId: 11,
+        stage: "sourced",
+        words: 400,
+      },
+      {
+        chapterId: 12,
+        stage: "graphed",
+        words: 800,
+      },
+    ];
+
+    await runQueueCommand({
+      acceptCost: true,
+      action: "add",
+      archivePath: "book.wikg",
+      json: true,
+      target: "reading-summary",
+    });
+
+    expect(JSON.parse(queueMockState.textWrites.join(""))).toMatchObject({
+      estimate: {
+        includesPrerequisites: true,
+        steps: [
+          {
+            chapters: 1,
+            prerequisite: true,
+            task: "reading-graph",
+            words: 400,
+          },
+          {
+            chapters: 2,
+            prerequisite: false,
+            task: "reading-summary",
+            words: 1200,
+          },
+        ],
+        target: "reading-summary",
+        tokens: {
+          cacheableInput: 62000,
+          input: 76000,
+          output: 6400,
+        },
+        words: 1200,
+      },
+    });
   });
 
   it("rejects job add before enqueueing when llm config is missing", async () => {
