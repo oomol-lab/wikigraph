@@ -86,7 +86,7 @@ const URI_HELP_TARGETS: readonly UriHelpTarget[] = [
     predicates: ["inspect", "move", "remove", "reset"],
   },
   { name: "chapter-source-object", predicates: ["set"] },
-  { name: "chapter-summary-object", predicates: ["evidence", "set"] },
+  { name: "chapter-summary-object", predicates: ["set"] },
   { name: "chapter-title-object", predicates: ["clear", "set"] },
   { name: "chapter-tree-object", predicates: ["set"] },
   { name: "chapter-state-object", predicates: [] },
@@ -113,7 +113,7 @@ const URI_HELP_TARGETS: readonly UriHelpTarget[] = [
     name: "local-config-section",
     predicates: ["clear", "delete", "put", "set", "test"],
   },
-  { name: "summary-object", predicates: ["evidence"] },
+  { name: "summary-object", predicates: [] },
   { name: "triple-scope", predicates: [] },
   { name: "triple-object", predicates: ["evidence"] },
 ] as const;

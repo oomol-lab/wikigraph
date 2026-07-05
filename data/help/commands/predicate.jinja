@@ -216,4 +216,15 @@ Usage:
 Related help:
   - wikigraph {{ uri }} --help
   - wikigraph help uri
-  - wikigraph help uri
+{% if predicate == "related" or predicate == "evidence" or predicate == "pack" or predicate == "build" or predicate == "embed" or predicate == "external" or target.name == "index-object" or target.name == "job-collection-scope" %}
+  - wikigraph help readiness
+{% endif %}
+{% if predicate == "create" or predicate == "export" %}
+  - wikigraph help format
+{% endif %}
+{% if target.name == "job-collection-scope" or target.name == "job-object" or target.name == "job-target-object" %}
+  - wikigraph help runtime
+{% endif %}
+{% if target.name == "local-config-section" %}
+  - wikigraph help config
+{% endif %}

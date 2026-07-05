@@ -1606,6 +1606,16 @@ describe("cli/args", () => {
       ),
       kind: "help",
     });
+    expect(() =>
+      parseCLIArguments([
+        "wikg://book.wikg/chapter/12/summary",
+        "evidence",
+        "--help",
+      ]),
+    ).toThrow("does not support `evidence`");
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg/chapter/12/summary", "evidence"]),
+    ).toThrow("wikigraph <chapter-uri>/summary --help");
     expect(() => parseCLIArguments(["chapter", "set-title", "--help"])).toThrow(
       "Use concrete chapter resource URIs",
     );
@@ -1875,7 +1885,7 @@ describe("cli/args", () => {
     expect(renderHelpTopicText("readiness")).toContain("provider fetch");
     expect(uriHelpText).toContain("wikigraph <scope-uri> --query <query>");
     expect(uriHelpText).toContain(
-      "wikigraph <entity|triple|summary|chunk-uri> evidence",
+      "wikigraph <entity|triple|chunk-uri> evidence",
     );
     expect(() => parseCLIArguments(["help", "ai"])).toThrow(
       "Invalid help topic: ai.",

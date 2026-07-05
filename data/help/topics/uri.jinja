@@ -44,7 +44,7 @@ Common command shapes:
   wikigraph <scope-uri> --query <query>
   wikigraph <object-uri>
   wikigraph <chunk-uri|entity-uri> related
-  wikigraph <entity|triple|summary|chunk-uri> evidence
+  wikigraph <entity|triple|chunk-uri> evidence
   wikigraph <located-chunk-uri|located-entity-uri> pack
   wikigraph next <cursor>
   wikigraph <archive-uri> create [source]
@@ -103,8 +103,8 @@ Object boundaries:
   - `chapter/<id>` is a scope, not an object.
   - `chapter/<id>/title` is the searchable chapter title object.
   - `source` and `summary` are readable text objects, not collection scopes.
-  - `source` is the evidence endpoint. `evidence` is not available for source or chapter scope URIs.
-  - `summary`, `chunk`, `entity`, and `triple` can return source-backed evidence.
+  - Source text is the grounding material. `evidence` is not available for source, summary, or chapter scope URIs.
+  - `chunk`, `entity`, and `triple` can return source-backed evidence.
 
 Retrieval order:
   1. Choose the narrowest URI scope that can answer the task.
@@ -149,9 +149,12 @@ Recovery hints:
   - No search results: try fewer keywords, use a broader scope URI, or inspect chapter readiness and structure.
     wikigraph <archive-uri>/chapter
     wikigraph <archive-uri>/chapter/tree
+    wikigraph help readiness
   - Missing generated objects: start the relevant generation job for the chapter.
     wikigraph wikg://local/job add --input <chapter-uri> --task reading-graph --accept-cost
     wikigraph wikg://local/job add --input <chapter-uri> --task reading-summary --accept-cost
+    wikigraph help readiness
+    wikigraph help runtime
   - URI rejected: convert bare filesystem paths to Wiki Graph URIs, and prepend the archive locator to short object URIs.
   - Help did not appear: append `--help` to the URI or URI-bound predicate you are trying to inspect.
 
@@ -163,3 +166,11 @@ Job URIs:
 
 Archive internals:
   Do not unzip `.wikg` or read internal SQLite for routine retrieval. Use URI commands.
+
+Related help:
+  - Search index, generated data, and provider prerequisites:
+    wikigraph help readiness
+  - Stdin/stdout, create/import, export, and transform formats:
+    wikigraph help format
+  - Local jobs, cache, logs, and runtime debugging:
+    wikigraph help runtime

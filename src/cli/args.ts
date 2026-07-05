@@ -776,7 +776,7 @@ function resolveImplicitArchiveUriAction(
     throw new Error(
       withHelpRoute(
         "`--query` requires a scope URI, or an explicit `related` or `evidence` command for supported object URIs.",
-        "wikigraph help uri",
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
@@ -949,8 +949,8 @@ function parseArchiveUriTargetArguments(
   if (uriKind === "object" && (action === "list" || action === "search")) {
     throw new Error(
       withHelpRoute(
-        `The object URI ${uri} does not support \`${action}\`. Use a scope URI for list or search.`,
-        "wikigraph help uri",
+        `The object URI ${uri} does not support \`${action}\`. Use a scope URI directly, or add --query to a scope URI.`,
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
@@ -958,7 +958,7 @@ function parseArchiveUriTargetArguments(
     throw new Error(
       withHelpRoute(
         `The scope URI ${uri} does not support \`get\`. Use a concrete object URI.`,
-        "wikigraph help uri",
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
@@ -997,8 +997,8 @@ function parseArchiveIndexUriArguments(
   if (!isArchiveIndexAction(action)) {
     throw new Error(
       withHelpRoute(
-        `The index object does not support \`${action}\`. Expected get, build, embed, external, or clear.`,
-        "wikigraph help uri",
+        `The index object does not support \`${action}\`. Read the index object directly, or use build, embed, external, or clear.`,
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
@@ -1068,7 +1068,7 @@ function parseMetadataUriArguments(
   if (!isMetadataAction(action)) {
     throw new Error(
       withHelpRoute(
-        `The metadata object does not support \`${action}\`. Expected get, set, put, delete, or clear.`,
+        `The metadata object does not support \`${action}\`. Read it directly, or use set, put, delete, or clear.`,
         "wikigraph <object-uri>/meta --help",
       ),
     );
@@ -1241,7 +1241,7 @@ function parseArchiveCoverUriArguments(
   if (action !== "get") {
     throw new Error(
       withHelpRoute(
-        `The cover object does not support \`${action}\`. Expected get.`,
+        `The cover object does not support \`${action}\`. Read the cover URI directly.`,
         "wikigraph <cover-uri> --help",
       ),
     );
@@ -1631,7 +1631,7 @@ function parseChapterCollectionUriArguments(
   if (action !== "add") {
     throw new Error(
       withHelpRoute(
-        `The chapter collection does not support \`${action}\`. Expected add, list, or search.`,
+        `The chapter collection does not support \`${action}\`. Read it directly, add --query, or use add.`,
         "wikigraph <chapter-uri> --help",
       ),
     );
@@ -1657,7 +1657,7 @@ function parseArchiveLensUriArguments(
   if (action !== "list" && action !== "search") {
     throw new Error(
       withHelpRoute(
-        `The ${lens} collection does not support \`${action}\`. Expected list or search.`,
+        `The ${lens} collection does not support \`${action}\`. Read it directly, or add --query.`,
         `wikigraph <scope-uri> --help`,
       ),
     );
@@ -1679,7 +1679,7 @@ function parseArchiveTriplePatternLensUriArguments(
   if (action !== "list" && action !== "search") {
     throw new Error(
       withHelpRoute(
-        `The triple pattern collection does not support \`${action}\`. Expected list or search.`,
+        `The triple pattern collection does not support \`${action}\`. Read it directly, or add --query.`,
         "wikigraph <triple-uri> --help",
       ),
     );
@@ -1701,7 +1701,7 @@ function parseChapterTreeUriArguments(
   if (action !== "get" && action !== "set") {
     throw new Error(
       withHelpRoute(
-        `The chapter tree does not support \`${action}\`. Expected get or set.`,
+        `The chapter tree does not support \`${action}\`. Read it directly, or use set.`,
         "wikigraph <archive-uri>/chapter/tree --help",
       ),
     );
@@ -1738,7 +1738,7 @@ function parseSingleChapterUriArguments(
       throw new Error(
         withHelpRoute(
           "`chapter/<id>` is a scope URI. Use `chapter/<id>/title` or `chapter/<id>/state` to read a concrete chapter object.",
-          "wikigraph help uri",
+          CLI_HELP_ROUTES.uri,
         ),
       );
     case "inspect":
@@ -1780,7 +1780,7 @@ function parseChapterLensUriArguments(
   if (action !== "list" && action !== "search") {
     throw new Error(
       withHelpRoute(
-        `The chapter ${lens} collection does not support \`${action}\`. Expected list or search.`,
+        `The chapter ${lens} collection does not support \`${action}\`. Read it directly, or add --query.`,
         `wikigraph <scope-uri> --help`,
       ),
     );
@@ -1807,7 +1807,7 @@ function parseChapterTriplePatternLensUriArguments(
   if (action !== "list" && action !== "search") {
     throw new Error(
       withHelpRoute(
-        `The chapter triple pattern collection does not support \`${action}\`. Expected list or search.`,
+        `The chapter triple pattern collection does not support \`${action}\`. Read it directly, or add --query.`,
         "wikigraph <triple-uri> --help",
       ),
     );
@@ -1832,7 +1832,7 @@ function parseChapterStateUriArguments(
   if (action !== "get") {
     throw new Error(
       withHelpRoute(
-        `The chapter state object does not support \`${action}\`. Expected get.`,
+        `The chapter state object does not support \`${action}\`. Read the state URI directly.`,
         "wikigraph <chapter-uri>/state --help",
       ),
     );
@@ -1850,11 +1850,13 @@ function parseChapterResourceUriArguments(
   values: ArchiveArgumentValues,
   helpRoute: string,
 ): ParsedCLIArguments {
+  const resourceHelpRoute = `wikigraph <chapter-uri>/${resource} --help`;
+
   if (action === "list" || action === "search") {
     throw new Error(
       withHelpRoute(
         `The chapter ${resource} resource does not support \`${action}\`.`,
-        `wikigraph <chapter-uri> --help-${resource}`,
+        resourceHelpRoute,
       ),
     );
   }
@@ -1862,8 +1864,8 @@ function parseChapterResourceUriArguments(
   if (action !== "set" && action !== "get" && action !== "clear") {
     throw new Error(
       withHelpRoute(
-        `The chapter ${resource} resource does not support \`${action}\`. Expected get or set.`,
-        `wikigraph <chapter-uri> --help-${resource}`,
+        `The chapter ${resource} resource does not support \`${action}\`. Read it directly, or use set.`,
+        resourceHelpRoute,
       ),
     );
   }
@@ -1871,7 +1873,7 @@ function parseChapterResourceUriArguments(
     throw new Error(
       withHelpRoute(
         `The chapter ${resource} resource does not support clear.`,
-        `wikigraph <chapter-uri> --help-${resource}`,
+        resourceHelpRoute,
       ),
     );
   }
@@ -1879,7 +1881,7 @@ function parseChapterResourceUriArguments(
     throw new Error(
       withHelpRoute(
         `The chapter ${resource} set command does not support --clear. Use \`clear\`.`,
-        `wikigraph <chapter-uri> --help-${resource}`,
+        resourceHelpRoute,
       ),
     );
   }
@@ -2159,7 +2161,7 @@ function parseLocalConfigUriFirstArguments(
     throw new Error(
       withHelpRoute(
         "Expected a local config section URI such as wikg://local/config/llm.",
-        "wikigraph help config",
+        CLI_HELP_ROUTES.config,
       ),
     );
   }
@@ -2827,7 +2829,7 @@ function parseArchiveMaintenanceArguments(
       if (!isArchiveChapterAction(action)) {
         throw new Error(
           withHelpRoute(
-            `Invalid chapter action: ${action}. Expected one of list, add, move, remove, reset, or tree. Use concrete chapter resource URIs such as /source, /summary, or /title for set operations.`,
+            `Invalid chapter action: ${action}. Use the chapter collection URI directly, add --query, or use add, move, remove, reset, or tree. Use concrete chapter resource URIs such as /source, /summary, or /title for set operations.`,
             CLI_HELP_ROUTES.command,
           ),
         );
@@ -3224,6 +3226,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      validateEvidenceTargetUri(archivePath, helpRoute);
       return {
         args: {
           action,
@@ -3371,7 +3374,7 @@ function validatePackTargetUri(uri: string, helpRoute: string): void {
   }
   if (parsed.objectUri === undefined) {
     throw new Error(
-      withHelpRoute(formatPackObjectMismatchMessage(uri), "wikigraph help uri"),
+      withHelpRoute(formatPackObjectMismatchMessage(uri), CLI_HELP_ROUTES.uri),
     );
   }
   if (!isPackableObjectUri(parsed.objectUri)) {
@@ -3396,7 +3399,7 @@ function validateRelatedTargetUri(
     throw new Error(
       withHelpRoute(
         `Related requires a chunk or entity URI: ${uri}`,
-        "wikigraph help uri",
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
@@ -3412,6 +3415,33 @@ function validateRelatedTargetUri(
   }
 
   return targetType;
+}
+
+function validateEvidenceTargetUri(uri: string, helpRoute: string): void {
+  const parsed = parseLocatedWikiGraphUri(uri);
+
+  if (parsed.archivePath === undefined) {
+    throw new Error(
+      withHelpRoute(formatMissingArchiveLocatorMessage(uri), helpRoute),
+    );
+  }
+  if (
+    parsed.objectUri === undefined ||
+    !isEvidenceObjectUri(parsed.objectUri)
+  ) {
+    throw new Error(
+      withHelpRoute(
+        `Evidence is only available for chunk, entity, and triple objects: ${uri}`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function isEvidenceObjectUri(objectUri: string): boolean {
+  return /^(?:chapter\/[1-9][0-9]*\/)?(?:chunk\/.+|entity\/.+|triple\/.+)$/u.test(
+    stripObjectUriPrefix(objectUri),
+  );
 }
 
 function isPackableObjectUri(objectUri: string): boolean {
@@ -4542,7 +4572,7 @@ function formatRemovedImplicitVerbMessage(
 ): string {
   return withHelpRoute(
     `Do not use \`${action}\` as a command. Pass the URI directly, or add --query to a scope URI.`,
-    "wikigraph help uri",
+    CLI_HELP_ROUTES.uri,
   );
 }
 
