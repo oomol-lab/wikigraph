@@ -1716,6 +1716,9 @@ describe("cli/archive", () => {
       "Tokens: 10000 input / 8000 cacheable input / 1600 output",
     );
     expect(archiveMockState.textWrites[0]).toContain("Wait:");
+    expect(archiveMockState.textWrites[0]).toContain(
+      "Readiness details: wikigraph help readiness",
+    );
     expect(archiveMockState.textWrites[0]).not.toContain("Calls:");
     expect(archiveMockState.textWrites[0]).not.toContain("Cost: $");
   });

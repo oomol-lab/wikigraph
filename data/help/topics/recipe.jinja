@@ -46,15 +46,19 @@ After inspect:
   - If inspect reports missing or unavailable index support, inspect the index target before building anything.
     wikigraph <archive-uri>/index --help
     wikigraph <archive-uri>/index build --help
+    Read readiness before deciding whether to keep the index local or embed it:
+      wikigraph help readiness
 
   - If Reading Graph data is missing, chunk search, related expansion, and pack may be unavailable or incomplete.
     Inspect job help before starting generated work.
       wikigraph wikg://local/job --help
       wikigraph wikg://local/job add --help
+      wikigraph help readiness
 
   - If Knowledge Graph data is missing, entity and triple retrieval may be unavailable or incomplete.
     Knowledge Graph generation needs configuration and may require WikiSpine provider setup.
       wikigraph help config
+      wikigraph help readiness
 
   - If summaries are missing, summary reads and summary-based exports may be incomplete.
     Check the chapter or archive readiness before relying on summaries.
@@ -137,5 +141,7 @@ When to read deeper:
     wikigraph help format
   - LLM, concurrency, and WikiSpine provider setup:
     wikigraph help config
+  - Search index, LLM, WikiSpine, and generated-data prerequisites:
+    wikigraph help readiness
   - Workers, cache, logs, workspaces, failures, and JSONL progress:
     wikigraph help runtime

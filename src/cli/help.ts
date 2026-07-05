@@ -15,6 +15,7 @@ export const HELP_TOPICS = [
   "runtime",
   "uri",
   "recipe",
+  "readiness",
 ] as const;
 
 export type HelpTopic = (typeof HELP_TOPICS)[number];
@@ -162,6 +163,10 @@ const HELP_TOPIC_METADATA: readonly {
     name: "recipe",
     summary: "Recommended workflow and best practices after root help.",
   },
+  {
+    name: "readiness",
+    summary: "Search index, LLM, WikiSpine, and generated-data prerequisites.",
+  },
 ] as const;
 
 const ARCHIVE_MAINTENANCE_COMMAND_METADATA: readonly {
@@ -188,6 +193,7 @@ const HELP_TOPIC_TEMPLATE_NAMES: Readonly<Record<HelpTopic, string>> = {
   runtime: "help/topics/runtime",
   uri: "help/topics/uri",
   recipe: "help/topics/recipe",
+  readiness: "help/topics/readiness",
 };
 
 let helpTemplateEnvironment: ReturnType<typeof createEnv> | undefined;

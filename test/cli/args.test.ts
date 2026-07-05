@@ -1788,7 +1788,7 @@ describe("cli/args", () => {
 
   it("rejects invalid help usage", () => {
     expect(() => parseCLIArguments(["help", "unknown"])).toThrow(
-      "Invalid help topic: unknown. Expected one of format, config, runtime, uri, recipe.\nSee: wikigraph --help",
+      "Invalid help topic: unknown. Expected one of format, config, runtime, uri, recipe, readiness.\nSee: wikigraph --help",
     );
     expect(() =>
       parseCLIArguments(["help", "object", "entity", "extra"]),
@@ -1814,6 +1814,7 @@ describe("cli/args", () => {
 
     expect(rootHelpText).toContain("wikigraph help [topic]");
     expect(rootHelpText).toContain("wikigraph help recipe");
+    expect(rootHelpText).toContain("wikigraph help readiness");
     expect(rootHelpText).toContain("Core concepts:");
     expect(rootHelpText).toContain("knowledge-base archives");
     expect(rootHelpText).toContain("Do not edit archive internals:");
@@ -1859,6 +1860,19 @@ describe("cli/args", () => {
       "Runtime and Debug Behavior",
     );
     expect(renderHelpTopicText("config")).toContain("Configuration");
+    expect(renderHelpTopicText("readiness")).toContain("Search readiness:");
+    expect(renderHelpTopicText("readiness")).toContain(
+      "Without a current index",
+    );
+    expect(renderHelpTopicText("readiness")).toContain(
+      "built as local cache outside the `.wikg` archive",
+    );
+    expect(renderHelpTopicText("readiness")).toContain(
+      "wikigraph <archive-uri>/index embed --help",
+    );
+    expect(renderHelpTopicText("readiness")).toContain("LLM readiness:");
+    expect(renderHelpTopicText("readiness")).toContain("WikiSpine readiness:");
+    expect(renderHelpTopicText("readiness")).toContain("provider fetch");
     expect(uriHelpText).toContain("wikigraph <scope-uri> --query <query>");
     expect(uriHelpText).toContain(
       "wikigraph <entity|triple|summary|chunk-uri> evidence",
@@ -1913,6 +1927,7 @@ describe("cli/args", () => {
       "grep/find with Google-like keyword input",
     );
     expect(renderHelpTopicText("recipe")).toContain("When to read deeper:");
+    expect(renderHelpTopicText("recipe")).toContain("wikigraph help readiness");
     expect(renderHelpTopicText("recipe")).toContain(
       "Read the chapter object and use Unix pipes or redirection.",
     );

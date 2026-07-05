@@ -1103,7 +1103,11 @@ async function writeArchiveInspectReport(
       "Improvements",
       ...(improvements.length === 0
         ? ["No immediate improvements recommended."]
-        : improvements.flatMap(formatInspectImprovement)),
+        : [
+            ...improvements.flatMap(formatInspectImprovement),
+            "",
+            "Readiness details: wikigraph help readiness",
+          ]),
     ].join("\n") + "\n",
   );
 }
