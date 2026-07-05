@@ -1883,10 +1883,21 @@ describe("cli/args", () => {
     expect(renderHelpTopicText("readiness")).toContain("LLM readiness:");
     expect(renderHelpTopicText("readiness")).toContain("WikiSpine readiness:");
     expect(renderHelpTopicText("readiness")).toContain("provider fetch");
+    expect(renderTransformHelpText()).toContain(
+      "This is not a plain file-format converter",
+    );
+    expect(renderTransformHelpText()).toContain(
+      "Source inputs (`epub`, `txt`, `markdown`) call an LLM",
+    );
     expect(uriHelpText).toContain("wikigraph <scope-uri> --query <query>");
     expect(uriHelpText).toContain(
       "wikigraph <entity|triple|chunk-uri> evidence",
     );
+    expect(uriHelpText).toContain(
+      "wikigraph wikg://local/job add --input <archive-uri|chapter-uri>",
+    );
+    expect(uriHelpText).toContain("JSONL contains object records");
+    expect(uriHelpText).toContain('"type":"page"');
     expect(() => parseCLIArguments(["help", "ai"])).toThrow(
       "Invalid help topic: ai.",
     );
@@ -1966,6 +1977,9 @@ describe("cli/args", () => {
     );
     expect(renderHelpTopicText("recipe")).toContain(
       "wikigraph wikg://book.wikg/chapter/3/entity --jsonl",
+    );
+    expect(renderHelpTopicText("recipe")).toContain(
+      "JSONL contains object records",
     );
     expect(renderHelpTopicText("recipe")).toContain(
       "If Reading Graph data is missing",

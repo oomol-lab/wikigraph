@@ -830,6 +830,12 @@ describe("cli/archive", () => {
     );
     expect(archiveMockState.textWrites[0]).toContain("wikg://entity/Q1");
     expect(archiveMockState.textWrites[0]).toContain("RAG");
+    expect(archiveMockState.textWrites[0]).toContain(
+      "Open short URIs with the archive locator",
+    );
+    expect(archiveMockState.textWrites[0]).toContain(
+      "wikigraph wikg:///tmp/book.wikg/entity/Q1",
+    );
   });
 
   it("passes backlinks to listed source objects", async () => {

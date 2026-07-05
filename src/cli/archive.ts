@@ -1521,7 +1521,7 @@ async function writeList(
   }
 
   await writeTextToStdout(
-    `${objects.map(formatFindObject).join(getListObjectSeparator(objects))}${formatNextCursor(nextCursor)}\n`,
+    `${objects.map(formatFindObject).join(getListObjectSeparator(objects))}${formatOpenShortUriHint(objects, context)}${formatNextCursor(nextCursor)}\n`,
   );
 }
 
@@ -1698,7 +1698,7 @@ async function writeFindHits(
       .map((object) => formatFindObject(object))
       .join(
         getListObjectSeparator(outputObjects),
-      )}${formatNextCursor(nextCursor)}${formatFindLensHint(result)}\n`,
+      )}${formatOpenShortUriHint(outputObjects, context)}${formatNextCursor(nextCursor)}${formatFindLensHint(result)}\n`,
   );
 }
 
@@ -2584,6 +2584,26 @@ function formatFindObject(object: ArchiveOutputObject): string {
   }
 
   return lines.join("\n");
+}
+
+function formatOpenShortUriHint(
+  objects: readonly ArchiveOutputObject[],
+  context: ArchiveOutputContext,
+): string {
+  const shortUri = objects.find((object) => isShortOutputUri(object.uri))?.uri;
+
+  if (shortUri === undefined) {
+    return "";
+  }
+
+  return `\n\nOpen short URIs with the archive locator, for example:\n  wikigraph ${formatLocatedWikiGraphUri(context.archivePath, shortUri)}`;
+}
+
+function isShortOutputUri(uri: string): boolean {
+  return (
+    uri.startsWith("wikg://") &&
+    parseLocatedWikiGraphUri(uri).archivePath === undefined
+  );
 }
 
 function formatScoredLines(

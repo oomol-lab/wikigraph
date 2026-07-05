@@ -84,10 +84,11 @@ Purpose:
   Add a local generation job.
 
 Usage:
-  wikigraph {{ uri }} add --input <chapter-uri> --task reading-graph|reading-summary|knowledge-graph --accept-cost [--boost] [--llm <json>] [--prompt <text>]
+  wikigraph {{ uri }} add --input <archive-uri|chapter-uri> --task reading-graph|reading-summary|knowledge-graph --accept-cost [--boost] [--llm <json>] [--prompt <text>]
 
 Notes:
   - Generation jobs may call an LLM provider and incur cost.
+  - Archive input adds jobs for all eligible chapters; chapter input adds one job.
 {% elif predicate == "move" %}
 Purpose:
   Move this chapter in the chapter tree.
