@@ -64,7 +64,7 @@ export async function runConvertCommand(args: CLIArguments): Promise<void> {
     throw new Error(
       withHelpRoute(
         "--stage is only supported when output format is wikg.",
-        CLI_HELP_ROUTES.command,
+        CLI_HELP_ROUTES.format,
       ),
     );
   }
@@ -74,7 +74,7 @@ export async function runConvertCommand(args: CLIArguments): Promise<void> {
     throw new Error(
       withHelpRoute(
         "--stage is only supported when creating .wikg from source input.",
-        CLI_HELP_ROUTES.command,
+        CLI_HELP_ROUTES.format,
       ),
     );
   }

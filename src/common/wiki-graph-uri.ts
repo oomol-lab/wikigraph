@@ -1,4 +1,5 @@
 import { resolve } from "path";
+import { homedir } from "os";
 
 export const WIKI_GRAPH_URI_PREFIX = "wikg://";
 export const WIKI_GRAPH_JOB_URI_PREFIX = "wikg://local/job";
@@ -45,7 +46,7 @@ export function parseLocatedWikiGraphUri(uri: string): LocatedWikiGraphUri {
   }
 
   return {
-    archivePath: resolve(archivePath),
+    archivePath: resolveArchivePath(archivePath),
     ...(objectPath === ""
       ? {}
       : {
@@ -55,6 +56,14 @@ export function parseLocatedWikiGraphUri(uri: string): LocatedWikiGraphUri {
           ),
         }),
   };
+}
+
+function resolveArchivePath(archivePath: string): string {
+  if (archivePath.startsWith("~/")) {
+    return resolve(homedir(), archivePath.slice(2));
+  }
+
+  return resolve(archivePath);
 }
 
 export function formatLocatedWikiGraphUri(

@@ -1,0 +1,93 @@
+Help Type: topic
+Topic: readiness
+
+Readiness
+
+Purpose:
+  Use this when `inspect` reports missing `--query` support, generated data, or provider configuration.
+  Readiness explains what must exist before `--query`, Reading Graph, summaries, and Knowledge Graph retrieval can work.
+
+Start with inspect:
+  wikigraph <archive-uri> inspect
+
+FTS readiness:
+  `--query` uses the archive FTS index. Without a current index, keyword retrieval is unavailable for scopes, evidence, and related results.
+
+  Default behavior:
+    The FTS index is built as local cache outside the `.wikg` archive.
+    This keeps the archive smaller, but the index does not travel with copied archive files.
+    If another user receives the `.wikg`, they usually need to build their own local index.
+
+  Portable behavior:
+    You can embed the built index into the `.wikg` archive.
+    This makes the archive more self-contained, but increases file size.
+    If you are unsure, build the local index first and embed only when distribution convenience matters.
+
+  Commands:
+    wikigraph <archive-uri>/index
+    wikigraph <archive-uri>/index build --help
+    wikigraph <archive-uri>/index embed --help
+    wikigraph <archive-uri>/index external --help
+
+Generation readiness:
+  Reading Graph, Reading Summary, and Knowledge Graph data are generated artifacts.
+  They do not appear just because source text exists.
+
+  All generation jobs require LLM configuration:
+    wikigraph wikg://local/config/llm
+    wikigraph wikg://local/config/llm test
+
+  Inspect job commands before starting expensive work:
+    wikigraph wikg://local/job --help
+    wikigraph wikg://local/job add --help
+
+LLM readiness:
+  `wikg://local/config/llm` is required for generating:
+  - Reading Graph
+  - Reading Summary
+  - Knowledge Graph
+
+  Minimum configuration:
+    provider
+    model
+    provider credentials when required
+
+  Common path:
+    wikigraph wikg://local/config/llm put provider openai
+    wikigraph wikg://local/config/llm put model gpt-4.1
+    wikigraph wikg://local/config/llm put apiKey --secret
+    wikigraph wikg://local/config/llm test
+
+WikiSpine readiness:
+  Knowledge Graph generation also requires WikiSpine.
+  WikiSpine provides entity candidate lookup for Knowledge Graph construction.
+
+  Provider choices:
+  - `fetch`: use an HTTP endpoint. This is usually easier for Agents and hosted setups when a service URL is available.
+  - `cli`: run a local `wikispine` command. This is useful for offline or locally controlled environments, but requires local runtime setup and data.
+
+  Configure one provider, then test it:
+    wikigraph wikg://local/config/wikispine put provider fetch
+    wikigraph wikg://local/config/wikispine put endpoint https://example.com
+    wikigraph wikg://local/config/wikispine test
+
+    wikigraph wikg://local/config/wikispine put provider cli
+    wikigraph wikg://local/config/wikispine put command wikispine
+    wikigraph wikg://local/config/wikispine test
+
+How to choose:
+  - Need keyword retrieval on this machine: build local index.
+  - Need to send a more self-contained `.wikg`: consider embedding the index after it is built.
+  - Need generated Reading Graph or summaries: configure LLM and use local jobs.
+  - Need Knowledge Graph: configure LLM and WikiSpine, then use local jobs.
+  - Not sure whether to embed index or generate missing data: keep the archive external/local first, inspect again, and decide later.
+
+Where to go next:
+  - Normal workflow:
+    wikigraph help recipe
+  - Exact config fields and secret handling:
+    wikigraph help config
+  - Job runtime, logs, cache, and failures:
+    wikigraph help runtime
+  - URI and predicate help for index/job/config targets:
+    wikigraph <uri> --help

@@ -446,7 +446,7 @@ describe("cli/convert", () => {
         verbose: false,
       }),
     ).rejects.toThrow(
-      "--stage is only supported when output format is wikg.\nSee: wikigraph help command",
+      "--stage is only supported when output format is wikg.\nSee: wikigraph help format",
     );
 
     await expect(
@@ -458,7 +458,7 @@ describe("cli/convert", () => {
         verbose: false,
       }),
     ).rejects.toThrow(
-      "--stage is only supported when creating .wikg from source input.\nSee: wikigraph help command",
+      "--stage is only supported when creating .wikg from source input.\nSee: wikigraph help format",
     );
   });
 

@@ -42,9 +42,10 @@ import type {
 import type { LLMessage } from "../llm/index.js";
 
 import type { CLIQueueArguments } from "./args.js";
-import { loadCLIConfig } from "./config.js";
+import { loadCLIConfig, type CLIConfig } from "./config.js";
 import { writeTextToStdout } from "./io.js";
 import { formatCLIJSON } from "./json.js";
+import { CLI_HELP_ROUTES, withHelpRoute } from "./errors.js";
 import {
   ProgressOutputWriter,
   type ProgressCounter,
@@ -72,14 +73,19 @@ export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
         await assertQueueAddReady(args);
       }
       assertBuildCostAccepted(args);
-      await loadRequiredStageConfig({
+      const config = await loadRequiredStageConfig({
         ...(args.llmJSON === undefined ? {} : { llmJSON: args.llmJSON }),
       });
+      if (args.target === "knowledge-graph") {
+        requireKnowledgeGraphWikispineConfig(config);
+      }
 
       if (args.chapterId === undefined) {
         await addArchiveJobs(args);
       } else {
-        await writeJobSummary(await addChapterJob(args, args.chapterId));
+        await writeJobSummary(await addChapterJob(args, args.chapterId), {
+          json: args.json ?? false,
+        });
       }
 
       tryStartQueueWorker();
@@ -194,7 +200,7 @@ async function addArchiveJobs(args: CLIQueueArguments): Promise<void> {
     },
   );
 
-  await writeArchiveAddSummary({ created, skipped });
+  await writeArchiveAddSummary({ created, json: args.json ?? false, skipped });
 }
 
 async function assertQueueAddReady(args: CLIQueueArguments): Promise<void> {
@@ -316,6 +322,8 @@ async function executeBuildJobWithLogging(
     );
   }
   if (job.target === "knowledge-graph") {
+    const wikispine = requireKnowledgeGraphWikispineConfig(config);
+
     await reporter.stepStarted("knowledge-graph");
     const artifact = await new SpineDigestFile(job.archivePath).readDocument(
       async (document) =>
@@ -323,6 +331,7 @@ async function executeBuildJobWithLogging(
           policyPrompt: knowledgeGraphRecallPrompt,
           progressTracker: reporter,
           request,
+          wikispine,
           workspacePath: job.workspacePath,
         }),
     );
@@ -462,6 +471,24 @@ async function executeBuildJobWithLogging(
   await reporter.updateWords({ readingSummaryWords: details.words });
   await reporter.stepCompleted("reading-summary");
   assertJobStillRunning(await getBuildJob(job.jobId));
+}
+
+function requireKnowledgeGraphWikispineConfig(
+  config: CLIConfig,
+): NonNullable<CLIConfig["wikispine"]> {
+  if (config.wikispine?.provider !== undefined) {
+    return config.wikispine;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      [
+        "Knowledge Graph requires WikiSpine.",
+        "Configure `wikg://local/config/wikispine` with provider `cli` or `fetch`, then run `wikigraph wikg://local/config/wikispine test`.",
+      ].join(" "),
+      CLI_HELP_ROUTES.config,
+    ),
+  );
 }
 
 function assertJobStillRunning(job: BuildJob): void {
@@ -745,7 +772,15 @@ function formatJobJSON(job: BuildJob): unknown {
   };
 }
 
-async function writeJobSummary(job: BuildJob): Promise<void> {
+async function writeJobSummary(
+  job: BuildJob,
+  options: { readonly json: boolean } = { json: false },
+): Promise<void> {
+  if (options.json) {
+    await writeTextToStdout(formatCLIJSON(formatJobJSON(job)));
+    return;
+  }
+
   await writeTextToStdout(
     `Job ${job.jobId} ${job.state} ${job.target} chapter ${job.chapterId} ${job.archivePath}\n`,
   );
@@ -753,11 +788,22 @@ async function writeJobSummary(job: BuildJob): Promise<void> {
 
 async function writeArchiveAddSummary(input: {
   readonly created: readonly BuildJob[];
+  readonly json: boolean;
   readonly skipped: readonly {
     readonly chapterId: number;
     readonly reason: string;
   }[];
 }): Promise<void> {
+  if (input.json) {
+    await writeTextToStdout(
+      formatCLIJSON({
+        created: input.created.map(formatJobJSON),
+        skipped: input.skipped,
+      }),
+    );
+    return;
+  }
+
   const lines = [
     `Created: ${input.created.length}`,
     `Skipped: ${input.skipped.length}`,

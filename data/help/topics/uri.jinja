@@ -4,49 +4,61 @@ Topic: uri
 Wiki Graph URIs
 
 Purpose:
-  Wiki Graph commands use URIs as their address format. Every Wiki Graph URI form is explicitly classified as either a scope URI or an object URI.
-  This classification is part of the CLI contract; do not infer it from path length.
+  URI targets are the address and routing layer for Wiki Graph commands.
+  Use this page to choose a target, understand scope/object behavior, select retrieval shape, and choose object result format.
 
 Archive locator:
   - Archive/object command URIs must contain a `.wikg` locator.
   - Do not pass a bare filesystem path as a command target.
-    Use a Wiki Graph URI instead:
     /Users/me/book.wikg -> wikg:///Users/me/book.wikg
     ./book.wikg -> wikg://book.wikg
     C:\Users\me\book.wikg -> wikg://C:/Users/me/book.wikg
   - URI paths use `/` separators, including on Windows.
-  - Absolute archive locators use `wikg:///`:
-    wikg:///books/book.wikg
-  - Relative archive locators use `wikg://`:
-    wikg://book.wikg
-    wikg://books/book.wikg
+  - Absolute archive locators use `wikg:///`, for example `wikg:///books/book.wikg`.
+  - Relative archive locators use `wikg://`, for example `wikg://book.wikg`.
+  - Home archive locators may start with `wikg://~/`; `~` is expanded only in that leading form.
   - The first path segment ending in `.wikg` is the archive/object boundary.
 
-Short object URIs:
-  Commands return short object URIs without local file paths:
+Short and located URIs:
+  Commands may return short object URIs without local file paths:
     wikg://chapter/3/title
-    wikg://chapter/3/source
     wikg://chapter/3/source#4..8
-    wikg://chapter/3/summary
     wikg://chunk/12
     wikg://entity/Q8018
     wikg://triple/Q8018/discusses/Q123
-    wikg://triple/Q8018/_/Q123
-
-Located object URIs:
-  Add an archive locator before the object path when passing a URI to a command:
-    wikg:///books/book.wikg/chapter/3
-    wikg:///books/book.wikg/chapter/3/source#4..8
+  Returned short URIs are archive-relative handles, not complete command targets.
+  Add the archive locator before passing them back to commands:
     wikg://book.wikg/entity/Q8018
-  Returned short URIs are archive-relative handles, not complete command targets. Prepend the archive locator before passing them back to object commands.
-  Located readable object URIs can omit the `get` verb:
-    wikigraph wikg://book.wikg/entity/Q8018
-  Scope URIs can omit list/search verbs:
-    wikigraph wikg://book.wikg/entity
-    wikigraph wikg://book.wikg/entity --query "keyword"
+    wikg:///books/book.wikg/chapter/3/source#4..8
 
-URI kind contract:
-  Scope URIs enumerate objects by default. With `--query <query>`, they search within that scope.
+Command routing:
+  - `wikigraph <scope-uri>` enumerates objects.
+  - `wikigraph <scope-uri> --query <query>` applies keyword retrieval within that scope.
+  - `wikigraph <object-uri>` reads one object.
+  - `wikigraph <uri> --help` explains that URI target and its supported predicates.
+  - `wikigraph <uri> <predicate> --help` explains a URI-bound predicate.
+
+Common command shapes:
+  wikigraph <scope-uri>
+  wikigraph <scope-uri> --query <query>
+  wikigraph <object-uri>
+  wikigraph <chunk-uri|entity-uri> related
+  wikigraph <entity|triple|chunk-uri> evidence
+  wikigraph <located-chunk-uri|located-entity-uri> pack
+  wikigraph next <cursor>
+  wikigraph <archive-uri> create [source]
+  wikigraph <archive-uri> export --output-format <format>
+  wikigraph <archive-uri> inspect
+  wikigraph transform [options]
+  wikigraph wikg://local/job
+  wikigraph wikg://local/job add --input <chapter-uri> --task <reading-graph|reading-summary|knowledge-graph> --accept-cost
+  wikigraph wikg://local/job/<job-id>
+  wikigraph <object-uri> related
+  wikigraph <object-uri> evidence
+  wikigraph <object-uri> pack --budget 5000
+
+Scope URIs:
+  Scope URIs enumerate objects by default. With `--query <query>`, they apply keyword retrieval within that scope.
     wikg://book.wikg
     wikg://book.wikg/chapter
     wikg://book.wikg/chapter/3
@@ -59,6 +71,8 @@ URI kind contract:
     wikg://book.wikg/triple/Q8018
     wikg://book.wikg/triple/Q8018/discusses
     wikg://book.wikg/triple/Q8018/_/Q123
+
+Object URIs:
   Object URIs read one object by default.
     wikg://book.wikg/chapter/3/title
     wikg://book.wikg/chapter/3/state
@@ -74,7 +88,7 @@ URI kind contract:
     wikg://book.wikg/entity/Q8018/wikipage
     wikg://book.wikg/triple/Q8018/discusses/Q123
 
-Triple pattern lenses:
+Triple pattern scopes:
   Use `_` as an any-value placeholder for subject, predicate, or object:
     wikg://book.wikg/triple/Q8018/_/Q123
     wikg://book.wikg/triple/_/_/Q123
@@ -84,40 +98,78 @@ Triple pattern lenses:
   Any triple URI with `_` or omitted trailing subject/predicate/object parts is a scope URI.
   A complete triple URI with concrete subject, predicate, and object is an object URI.
 
-Object command examples:
-  Search an absolute local archive:
-    wikigraph wikg:///Users/me/book.wikg/entity --query "keyword"
-  Open an object inside an absolute local archive:
-    wikigraph wikg:///Users/me/book.wikg/entity/Q8018
-  Open mapped Wikipedia pages for an entity:
-    wikigraph wikg:///Users/me/book.wikg/entity/Q8018/wikipage
-
-Archive command examples:
-  Create or inspect an archive:
-    wikigraph wikg://book.wikg create ./book.md
-    wikigraph wikg://book.wikg/chapter
-    wikigraph wikg://book.wikg/chapter/tree
-
-Job URIs:
-  Queue jobs use the `wikg://local/job/` scheme and do not contain `.wikg` locators:
-    wikigraph wikg://local/job list
-    wikigraph wikg://local/job/<job-id> get --json
-    wikigraph wikg://local/job/<job-id> watch --jsonl
-
-Scopes:
-  - `wikg:///book.wikg` addresses the whole archive.
-  - `wikg:///book.wikg/` is the same archive target; a trailing slash does not create a separate object.
-  - `wikg:///book.wikg/chapter/3` scopes enumeration and search to chapter 3.
-  - `wikg:///book.wikg/entity` searches or lists archive-wide entities.
-  - `wikg:///book.wikg/chapter/3/entity` searches or lists entities scoped to chapter 3 only.
-  - `wikg://chapter/3/entity/Q8018` is the entity object whose evidence must appear in chapter 3.
-
 Object boundaries:
   - `chapter/<id>` is a scope, not an object.
-  - `chapter/<id>/title` is the searchable chapter title object.
-  - `source` and `summary` are readable text objects; they are not list scopes.
-  - `source` is the evidence endpoint. `evidence` is not available for source or chapter scope URIs.
-  - `summary`, `chunk`, `entity`, and `triple` can return source-backed evidence.
+  - `chapter/<id>/title` is the queryable chapter title object.
+  - `source` and `summary` are readable text objects, not collection scopes.
+  - Source text is the grounding material. `evidence` is not available for source, summary, or chapter scope URIs.
+  - `chunk`, `entity`, and `triple` can return source-backed evidence.
 
-Retrieval strategy:
-  Read `wikigraph help retrieval` before choosing scope, lens, pagination, or output format flags.
+Retrieval order:
+  1. Choose the narrowest URI scope that can answer the task.
+  2. Choose the object lens that matches the question.
+  3. Start with a bounded page.
+  4. Choose object result format by how the result will be consumed.
+  5. Use `--all` only for an intentional full export or bounded inventory.
+
+Lens selection:
+  - Use `<archive-uri>` when the whole archive is the right retrieval scope.
+  - Use `<chapter-uri>` when a known chapter is enough.
+  - Use `<chapter-uri>/<lens>` when both chapter and object kind are known.
+  - `/chunk` targets Reading Graph chunks.
+  - `/entity` targets grounded entities.
+  - `/triple` targets Knowledge Graph relations.
+  - `chapter/<id>` is a scope; `--query` over chapter titles returns `chapter/<id>/title` objects.
+
+Literal source passages:
+  Use `--query` on the narrowest useful scope when the task is to find source wording or passages mentioning a literal term:
+    wikigraph <archive-uri> --query "term"
+    wikigraph <archive-uri>/chapter/<id> --query "term"
+    wikigraph <archive-uri>/chapter/<id>/source#20..30
+
+Entity-grounded evidence:
+  Use entity evidence when you already have an entity URI or QID and need grounded mentions, aliases, translations, variants, or source-backed support:
+    wikigraph <archive-uri>/entity/<qid> evidence
+    wikigraph <archive-uri>/entity/<qid> related --query "aspect" --evidence 2
+
+Pagination and object result format:
+  - Use default paging or `--limit <n>` while exploring.
+  - Use `wikigraph next <cursor>` to continue a paged result.
+  - Use `--all` only when you intentionally need every item from the selected scope.
+  - Prefer the narrowest scope before using `--all`.
+  - Default text is for reading and inspection.
+  - `--json` is for one stable machine-readable page.
+  - `--jsonl` is for streamed records, shell pipelines, or full exports.
+  - `--jsonl` is only an output format; it does not imply `--all`.
+  - Avoid `--all` without `--jsonl` for large results because text and JSON output are buffered before printing.
+  - Avoid `--all | head` as a preview pattern. Shell truncation only limits what you read.
+
+Recovery hints:
+  - No `--query` results: try fewer keywords, use a broader scope URI, or inspect chapter readiness and structure.
+    wikigraph <archive-uri>/chapter
+    wikigraph <archive-uri>/chapter/tree
+    wikigraph help readiness
+  - Missing generated objects: start the relevant generation job for the chapter.
+    wikigraph wikg://local/job add --input <chapter-uri> --task reading-graph --accept-cost
+    wikigraph wikg://local/job add --input <chapter-uri> --task reading-summary --accept-cost
+    wikigraph help readiness
+    wikigraph help runtime
+  - URI rejected: convert bare filesystem paths to Wiki Graph URIs, and prepend the archive locator to short object URIs.
+  - Help did not appear: append `--help` to the URI or URI-bound predicate you are trying to inspect.
+
+Job URIs:
+  Local jobs use the `wikg://local/job/` scheme and do not contain `.wikg` locators:
+    wikigraph wikg://local/job
+    wikigraph wikg://local/job/<job-id> --json
+    wikigraph wikg://local/job/<job-id> watch --jsonl
+
+Archive internals:
+  Do not unzip `.wikg` or read internal SQLite for routine retrieval. Use URI commands.
+
+Related help:
+  - Search index, generated data, and provider prerequisites:
+    wikigraph help readiness
+  - Stdin/stdout, create/import, export, and transform formats:
+    wikigraph help format
+  - Local jobs, cache, logs, and runtime debugging:
+    wikigraph help runtime

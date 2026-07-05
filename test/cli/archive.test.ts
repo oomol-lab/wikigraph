@@ -1716,6 +1716,9 @@ describe("cli/archive", () => {
       "Tokens: 10000 input / 8000 cacheable input / 1600 output",
     );
     expect(archiveMockState.textWrites[0]).toContain("Wait:");
+    expect(archiveMockState.textWrites[0]).toContain(
+      "Readiness details: wikigraph help readiness",
+    );
     expect(archiveMockState.textWrites[0]).not.toContain("Calls:");
     expect(archiveMockState.textWrites[0]).not.toContain("Cost: $");
   });
@@ -1878,7 +1881,7 @@ describe("cli/archive", () => {
         "Next:",
         "  wikigraph wikg:///tmp/book.wikg/entity/Q1 evidence",
         "  wikigraph wikg:///tmp/book.wikg/entity/Q1 related",
-        "  wikigraph wikg:///tmp/book.wikg/entity/Q1/wikipage get",
+        "  wikigraph wikg:///tmp/book.wikg/entity/Q1/wikipage",
         "",
       ].join("\n"),
     );
@@ -1939,7 +1942,7 @@ describe("cli/archive", () => {
         "Next:",
         "  wikigraph wikg:///tmp/book.wikg/entity/Q1 evidence",
         "  wikigraph wikg:///tmp/book.wikg/entity/Q1 related",
-        "  wikigraph wikg:///tmp/book.wikg/entity/Q1/wikipage get",
+        "  wikigraph wikg:///tmp/book.wikg/entity/Q1/wikipage",
       ].join("\n"),
     );
   });

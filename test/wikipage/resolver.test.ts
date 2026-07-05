@@ -263,7 +263,7 @@ describe("wikipage/resolver", () => {
     });
   });
 
-  it("migrates legacy language-insensitive cache entries once", async () => {
+  it("migrates language-insensitive cache entries once", async () => {
     await withTempDir("spinedigest-wikipage-", async (path) => {
       const cacheDatabasePath = `${path}/cache.sqlite`;
       const database = await Database.open(

@@ -8,6 +8,10 @@ const queueMockState = vi.hoisted(() => ({
   buildKnowledgeGraphCalls: [] as unknown[],
   buildSummaryCalls: [] as unknown[],
   chapterStage: "sourced" as "planned" | "sourced" | "graphed" | "summarized",
+  chapters: [] as Array<{
+    readonly chapterId: number;
+    readonly stage: "planned" | "sourced" | "graphed" | "summarized";
+  }>,
   commitGraphCalls: [] as unknown[],
   commitKnowledgeGraphCalls: [] as unknown[],
   commitSummaryCalls: [] as unknown[],
@@ -18,6 +22,12 @@ const queueMockState = vi.hoisted(() => ({
     readonly concurrent?: {
       readonly job?: number;
       readonly request?: number;
+    };
+    readonly wikispine?: {
+      readonly command?: string;
+      readonly dataDir?: string;
+      readonly endpoint?: string;
+      readonly provider?: "cli" | "fetch";
     };
   },
   loadRequiredStageConfigCalls: [] as unknown[],
@@ -201,6 +211,7 @@ vi.mock("../../src/facade/index.js", () => ({
     },
   ),
   listBuildJobs: vi.fn(() => Promise.resolve(queueMockState.jobs)),
+  listChapters: vi.fn(() => Promise.resolve(queueMockState.chapters)),
   pauseBuildJob: vi.fn(),
   readBuildJobEvents: vi.fn(() => Promise.resolve(queueMockState.events)),
   recordBuildJobInputRevision: vi.fn((input: unknown) => {
@@ -261,6 +272,7 @@ vi.mock("../../src/cli/stage-runtime.js", () => ({
     }
 
     return Promise.resolve({
+      ...queueMockState.cliConfig,
       prompt: "Keep key beats",
     });
   }),
@@ -285,6 +297,7 @@ describe("cli/queue", () => {
     queueMockState.buildSummaryCalls.length = 0;
     queueMockState.buildInputStage = "sourced";
     queueMockState.chapterStage = "sourced";
+    queueMockState.chapters = [];
     queueMockState.commitGraphCalls.length = 0;
     queueMockState.commitKnowledgeGraphCalls.length = 0;
     queueMockState.commitSummaryCalls.length = 0;
@@ -405,6 +418,63 @@ describe("cli/queue", () => {
     expect(queueMockState.textWrites.join("")).toContain("Job job-1 queued");
   });
 
+  it("prints a created chapter job as json", async () => {
+    await runQueueCommand({
+      acceptCost: true,
+      action: "add",
+      archivePath: "book.wikg",
+      chapterId: 12,
+      json: true,
+      target: "reading-graph",
+    });
+
+    expect(JSON.parse(queueMockState.textWrites.join(""))).toMatchObject({
+      archivePath: "book.wikg",
+      chapterId: 12,
+      jobId: "job-1",
+      state: "queued",
+      target: "reading-summary",
+    });
+  });
+
+  it("prints archive job add results as json", async () => {
+    queueMockState.chapters = [
+      {
+        chapterId: 11,
+        stage: "planned",
+      },
+      {
+        chapterId: 12,
+        stage: "sourced",
+      },
+    ];
+
+    await runQueueCommand({
+      acceptCost: true,
+      action: "add",
+      archivePath: "book.wikg",
+      json: true,
+      target: "reading-graph",
+    });
+
+    expect(JSON.parse(queueMockState.textWrites.join(""))).toMatchObject({
+      created: [
+        {
+          archivePath: "book.wikg",
+          chapterId: 12,
+          jobId: "job-1",
+          state: "queued",
+        },
+      ],
+      skipped: [
+        {
+          chapterId: 11,
+          reason: "planned",
+        },
+      ],
+    });
+  });
+
   it("rejects job add before enqueueing when llm config is missing", async () => {
     queueMockState.loadRequiredStageConfigError = new Error(
       "Missing LLM configuration.",
@@ -426,6 +496,21 @@ describe("cli/queue", () => {
         llmJSON: '{"model":"inline-model"}',
       },
     ]);
+    expect(queueMockState.addCalls).toStrictEqual([]);
+    expect(queueMockState.textWrites).toStrictEqual([]);
+  });
+
+  it("rejects knowledge graph job add when wikispine is not configured", async () => {
+    await expect(
+      runQueueCommand({
+        acceptCost: true,
+        action: "add",
+        archivePath: "book.wikg",
+        chapterId: 12,
+        target: "knowledge-graph",
+      }),
+    ).rejects.toThrow("Knowledge Graph requires WikiSpine.");
+
     expect(queueMockState.addCalls).toStrictEqual([]);
     expect(queueMockState.textWrites).toStrictEqual([]);
   });
@@ -622,6 +707,12 @@ describe("cli/queue", () => {
   });
 
   it("runs knowledge graph work without reading graph or summary builds", async () => {
+    queueMockState.cliConfig = {
+      wikispine: {
+        endpoint: "https://wikispine.example",
+        provider: "fetch",
+      },
+    };
     queueMockState.job = {
       ...queueMockState.job,
       state: "running",
@@ -660,6 +751,10 @@ describe("cli/queue", () => {
     expect(queueMockState.buildKnowledgeGraphCalls[0]).toMatchObject({
       policyPrompt: "Keep key beats",
       progressTracker: reporter,
+      wikispine: {
+        endpoint: "https://wikispine.example",
+        provider: "fetch",
+      },
       workspacePath: "/tmp/job-workspace",
     });
     expect(queueMockState.commitKnowledgeGraphCalls).toStrictEqual([
@@ -717,6 +812,33 @@ describe("cli/queue", () => {
       '{"at":1,"seq":1,"jobId":"job-1","type":"created","state":"queued"}\n',
       '{"at":2,"seq":2,"jobId":"job-1","type":"succeeded","state":"succeeded"}\n',
     ]);
+  });
+
+  it("rejects knowledge graph work when wikispine is not configured", async () => {
+    queueMockState.job = {
+      ...queueMockState.job,
+      state: "running",
+      target: "knowledge-graph",
+    };
+
+    await runQueueCommand({
+      action: "worker",
+    });
+
+    const reporter = {
+      addOutputCharacters: vi.fn(() => Promise.resolve()),
+      setTotals: vi.fn(() => Promise.resolve()),
+      stepCompleted: vi.fn(() => Promise.resolve()),
+      stepStarted: vi.fn(() => Promise.resolve()),
+      updatePhase: vi.fn(() => Promise.resolve()),
+      updateWords: vi.fn(() => Promise.resolve()),
+    };
+
+    await expect(
+      queueMockState.runWorkerOptions!.executeJob(queueMockState.job, reporter),
+    ).rejects.toThrow("Knowledge Graph requires WikiSpine.");
+    expect(queueMockState.buildKnowledgeGraphCalls).toStrictEqual([]);
+    expect(queueMockState.writeCalls).toStrictEqual([]);
   });
 
   it("resolves short job ids before watching", async () => {

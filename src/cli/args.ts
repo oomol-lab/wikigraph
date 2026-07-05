@@ -8,18 +8,19 @@ import {
   type ChapterStage,
 } from "../facade/index.js";
 import {
+  isUriHelpPredicate,
   parseHelpTopic,
-  parseHelpMatrixPage,
   renderArchiveCommandHelpText,
   renderArchiveMaintenanceCommandHelpText,
   renderGcCommandHelpText,
-  renderHelpMatrixText,
   renderHelpTopicText,
   renderLegacyCommandHelpText,
   renderMainHelpText,
-  renderQueueCommandHelpText,
   renderArchiveMaintenanceChapterActionHelpText,
   renderTransformHelpText,
+  renderUriHelpText,
+  renderUriPredicateHelpText,
+  type UriHelpTargetName,
 } from "./help.js";
 import {
   parseLocalConfigSection,
@@ -681,7 +682,7 @@ export function parseCLIArguments(
   }
 
   if (
-    isArchiveAction(positionals[0]) &&
+    isPublicArchiveCommandHelpAction(positionals[0]) &&
     values.help === true &&
     positionals.length === 1
   ) {
@@ -690,9 +691,6 @@ export function parseCLIArguments(
 
   if (positionals.length === 0) {
     throw new Error(withHelpRoute("Missing command.", CLI_HELP_ROUTES.command));
-  }
-  if (positionals.some((positional) => looksLikeSdpubPath(positional))) {
-    throw new Error(formatLegacySdpubPathMessage());
   }
   throw new Error(formatUnknownCommandMessage(positionals[0]!));
 }
@@ -710,12 +708,41 @@ function parseArchiveUriFirstArguments(
 
   const action =
     explicitAction ?? resolveImplicitArchiveUriAction(uri, values.query);
+  const helpTarget = classifyArchiveUriHelpTarget(uri);
+
+  if (isRemovedImplicitArchiveAction(explicitAction)) {
+    throw new Error(formatRemovedImplicitVerbMessage(explicitAction));
+  }
+
+  if (values.help === true && explicitAction === undefined) {
+    return {
+      help: true,
+      helpText: renderUriHelpText(helpTarget, uri),
+      kind: "help",
+    };
+  }
+
+  if (values.help === true && explicitAction !== undefined) {
+    if (!isUriHelpPredicate(helpTarget, explicitAction)) {
+      throw new Error(
+        withHelpRoute(
+          `The URI target ${uri} does not support \`${explicitAction}\`.`,
+          `wikigraph ${uri} --help`,
+        ),
+      );
+    }
+    return {
+      help: true,
+      helpText: renderUriPredicateHelpText(helpTarget, explicitAction, uri),
+      kind: "help",
+    };
+  }
 
   if (!isArchiveUriAction(action)) {
     throw new Error(
       withHelpRoute(
-        `The URI-first form does not support \`${action}\`. Use \`wikigraph help object\` to inspect valid object/verb pairs.`,
-        "wikigraph help object",
+        `The URI-first form does not support \`${action}\`. Use \`wikigraph ${uri} --help\` to inspect valid predicates.`,
+        `wikigraph ${uri} --help`,
       ),
     );
   }
@@ -749,7 +776,7 @@ function resolveImplicitArchiveUriAction(
     throw new Error(
       withHelpRoute(
         "`--query` requires a scope URI, or an explicit `related` or `evidence` command for supported object URIs.",
-        "wikigraph help uri",
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
@@ -781,6 +808,68 @@ function classifyArchiveUri(objectUri: string | undefined): ArchiveUriKind {
   }
 
   return "object";
+}
+
+function classifyArchiveUriHelpTarget(uri: string): UriHelpTargetName {
+  const parsed = parseLocatedWikiGraphUri(uri);
+  const objectUri = parsed.objectUri;
+
+  if (objectUri === undefined) {
+    return "archive-scope";
+  }
+
+  const path = stripObjectUriPrefix(objectUri);
+
+  if (path === "cover") {
+    return "cover-object";
+  }
+  if (path === "index") {
+    return "index-object";
+  }
+  if (path === "chapter") {
+    return "chapter-collection-scope";
+  }
+  if (/^chapter\/[1-9][0-9]*$/u.test(path)) {
+    return "chapter-scope";
+  }
+  if (path === "chapter/tree") {
+    return "chapter-tree-object";
+  }
+  if (/^chapter\/[1-9][0-9]*\/state(?:\/.+)?$/u.test(path)) {
+    return "chapter-state-object";
+  }
+  if (/^chapter\/[1-9][0-9]*\/source(?:#.*)?$/u.test(path)) {
+    return "chapter-source-object";
+  }
+  if (/^chapter\/[1-9][0-9]*\/summary(?:#.*)?$/u.test(path)) {
+    return "chapter-summary-object";
+  }
+  if (/^chapter\/[1-9][0-9]*\/title$/u.test(path)) {
+    return "chapter-title-object";
+  }
+  if (/^(?:chapter\/[1-9][0-9]*\/)?chunk$/u.test(path)) {
+    return "chunk-scope";
+  }
+  if (/^(?:chapter\/[1-9][0-9]*\/)?chunk\/.+$/u.test(path)) {
+    return "chunk-object";
+  }
+  if (/^(?:chapter\/[1-9][0-9]*\/)?entity$/u.test(path)) {
+    return "entity-scope";
+  }
+  if (/^(?:chapter\/[1-9][0-9]*\/)?entity\/[^/]+\/wikipage$/u.test(path)) {
+    return "entity-wikipage-object";
+  }
+  if (/^(?:chapter\/[1-9][0-9]*\/)?entity\/.+$/u.test(path)) {
+    return "entity-object";
+  }
+  if (isTripleScopePath(path)) {
+    return "triple-scope";
+  }
+  if (/^(?:chapter\/[1-9][0-9]*\/)?triple(?:\/.*)?$/u.test(path)) {
+    return "triple-object";
+  }
+
+  return "archive-scope";
 }
 
 function parseArchiveUriTargetArguments(
@@ -824,8 +913,8 @@ function parseArchiveUriTargetArguments(
   if (containsMetadataKeySuffix(objectUri)) {
     throw new Error(
       withHelpRoute(
-        "Metadata keys are not addressed in the URI. Use `<object>/meta get` and filter the output, or use `<object>/meta put <key> ...`.",
-        "wikigraph help object meta",
+        "Metadata keys are not addressed in the URI. Read `<object>/meta` and filter the output, or use `<object>/meta put <key> ...`.",
+        "wikigraph <object-uri>/meta --help",
       ),
     );
   }
@@ -860,16 +949,16 @@ function parseArchiveUriTargetArguments(
   if (uriKind === "object" && (action === "list" || action === "search")) {
     throw new Error(
       withHelpRoute(
-        `The object URI ${uri} does not support \`${action}\`. Use a scope URI for list or search.`,
-        "wikigraph help uri",
+        `The object URI ${uri} does not support \`${action}\`. Use a scope URI directly, or add --query to a scope URI.`,
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
   if (uriKind === "scope" && action === "get") {
     throw new Error(
       withHelpRoute(
-        `The scope URI ${uri} does not support \`get\`. Use a concrete object URI.`,
-        "wikigraph help uri",
+        `The scope URI ${uri} cannot be read as one object. Use a concrete object URI.`,
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
@@ -877,8 +966,8 @@ function parseArchiveUriTargetArguments(
   if (!isUriFirstArchiveAction(action)) {
     throw new Error(
       withHelpRoute(
-        `The URI target ${uri} does not support \`${action}\`. Use \`wikigraph help object\` to inspect valid object/verb pairs.`,
-        "wikigraph help object",
+        `The URI target ${uri} does not support \`${action}\`. Use \`wikigraph ${uri} --help\` to inspect valid predicates.`,
+        `wikigraph ${uri} --help`,
       ),
     );
   }
@@ -897,7 +986,10 @@ function parseArchiveIndexUriArguments(
   if (values.help === true) {
     return {
       help: true,
-      helpText: renderHelpMatrixText({ kind: "object", object: "index" }),
+      helpText: renderUriHelpText(
+        "index-object",
+        "wikg://<archive.wikg>/index",
+      ),
       kind: "help",
     };
   }
@@ -905,8 +997,8 @@ function parseArchiveIndexUriArguments(
   if (!isArchiveIndexAction(action)) {
     throw new Error(
       withHelpRoute(
-        `The index object does not support \`${action}\`. Expected get, build, embed, external, or clear.`,
-        "wikigraph help object",
+        `The index object does not support \`${action}\`. Read the index object directly, or use build, embed, external, or clear.`,
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
@@ -976,8 +1068,8 @@ function parseMetadataUriArguments(
   if (!isMetadataAction(action)) {
     throw new Error(
       withHelpRoute(
-        `The metadata object does not support \`${action}\`. Expected get, set, put, delete, or clear.`,
-        "wikigraph help object meta",
+        `The metadata object does not support \`${action}\`. Read it directly, or use set, put, delete, or clear.`,
+        "wikigraph <object-uri>/meta --help",
       ),
     );
   }
@@ -1096,8 +1188,8 @@ function parseArchiveUriArchiveArguments(
   if (!isArchiveAction(action)) {
     throw new Error(
       withHelpRoute(
-        `The archive URI form does not support \`${action}\`. Use \`wikigraph help object archive\` to inspect valid verbs.`,
-        "wikigraph help object archive",
+        `The archive URI form does not support \`${action}\`. Use \`wikigraph <archive-uri> --help\` to inspect valid verbs.`,
+        "wikigraph <archive-uri> --help",
       ),
     );
   }
@@ -1115,8 +1207,8 @@ function parseArchiveUriArchiveArguments(
   ) {
     throw new Error(
       withHelpRoute(
-        `The archive URI ${uri} cannot be used with \`${action}\`; use a concrete object URI. Use \`wikigraph help object archive\` to inspect valid archive verbs.`,
-        "wikigraph help object archive",
+        `The archive URI ${uri} cannot be used with \`${action}\`; use a concrete object URI. Use \`wikigraph <archive-uri> --help\` to inspect valid archive verbs.`,
+        "wikigraph <archive-uri> --help",
       ),
     );
   }
@@ -1149,8 +1241,8 @@ function parseArchiveCoverUriArguments(
   if (action !== "get") {
     throw new Error(
       withHelpRoute(
-        `The cover object does not support \`${action}\`. Expected get.`,
-        "wikigraph help object cover",
+        `The cover object does not support \`${action}\`. Read the cover URI directly.`,
+        "wikigraph <cover-uri> --help",
       ),
     );
   }
@@ -1539,8 +1631,8 @@ function parseChapterCollectionUriArguments(
   if (action !== "add") {
     throw new Error(
       withHelpRoute(
-        `The chapter collection does not support \`${action}\`. Expected add, list, or search.`,
-        "wikigraph help object chapter",
+        `The chapter collection does not support \`${action}\`. Read it directly, add --query, or use add.`,
+        "wikigraph <chapter-uri> --help",
       ),
     );
   }
@@ -1565,8 +1657,8 @@ function parseArchiveLensUriArguments(
   if (action !== "list" && action !== "search") {
     throw new Error(
       withHelpRoute(
-        `The ${lens} collection does not support \`${action}\`. Expected list or search.`,
-        `wikigraph help object ${lens}`,
+        `The ${lens} collection does not support \`${action}\`. Read it directly, or add --query.`,
+        `wikigraph <scope-uri> --help`,
       ),
     );
   }
@@ -1587,8 +1679,8 @@ function parseArchiveTriplePatternLensUriArguments(
   if (action !== "list" && action !== "search") {
     throw new Error(
       withHelpRoute(
-        `The triple pattern collection does not support \`${action}\`. Expected list or search.`,
-        "wikigraph help object triple",
+        `The triple pattern collection does not support \`${action}\`. Read it directly, or add --query.`,
+        "wikigraph <triple-uri> --help",
       ),
     );
   }
@@ -1609,8 +1701,8 @@ function parseChapterTreeUriArguments(
   if (action !== "get" && action !== "set") {
     throw new Error(
       withHelpRoute(
-        `The chapter tree does not support \`${action}\`. Expected get or set.`,
-        "wikigraph help object chapter-tree",
+        `The chapter tree does not support \`${action}\`. Read it directly, or use set.`,
+        "wikigraph <archive-uri>/chapter/tree --help",
       ),
     );
   }
@@ -1646,7 +1738,7 @@ function parseSingleChapterUriArguments(
       throw new Error(
         withHelpRoute(
           "`chapter/<id>` is a scope URI. Use `chapter/<id>/title` or `chapter/<id>/state` to read a concrete chapter object.",
-          "wikigraph help uri",
+          CLI_HELP_ROUTES.uri,
         ),
       );
     case "inspect":
@@ -1670,7 +1762,7 @@ function parseSingleChapterUriArguments(
       throw new Error(
         withHelpRoute(
           `The chapter object does not support \`${action}\`.`,
-          "wikigraph help object chapter",
+          "wikigraph <chapter-uri> --help",
         ),
       );
   }
@@ -1688,8 +1780,8 @@ function parseChapterLensUriArguments(
   if (action !== "list" && action !== "search") {
     throw new Error(
       withHelpRoute(
-        `The chapter ${lens} collection does not support \`${action}\`. Expected list or search.`,
-        `wikigraph help object ${lens}`,
+        `The chapter ${lens} collection does not support \`${action}\`. Read it directly, or add --query.`,
+        `wikigraph <scope-uri> --help`,
       ),
     );
   }
@@ -1715,8 +1807,8 @@ function parseChapterTriplePatternLensUriArguments(
   if (action !== "list" && action !== "search") {
     throw new Error(
       withHelpRoute(
-        `The chapter triple pattern collection does not support \`${action}\`. Expected list or search.`,
-        "wikigraph help object triple",
+        `The chapter triple pattern collection does not support \`${action}\`. Read it directly, or add --query.`,
+        "wikigraph <triple-uri> --help",
       ),
     );
   }
@@ -1740,8 +1832,8 @@ function parseChapterStateUriArguments(
   if (action !== "get") {
     throw new Error(
       withHelpRoute(
-        `The chapter state object does not support \`${action}\`. Expected get.`,
-        "wikigraph help object chapter-state",
+        `The chapter state object does not support \`${action}\`. Read the state URI directly.`,
+        "wikigraph <chapter-uri>/state --help",
       ),
     );
   }
@@ -1758,11 +1850,13 @@ function parseChapterResourceUriArguments(
   values: ArchiveArgumentValues,
   helpRoute: string,
 ): ParsedCLIArguments {
+  const resourceHelpRoute = `wikigraph <chapter-uri>/${resource} --help`;
+
   if (action === "list" || action === "search") {
     throw new Error(
       withHelpRoute(
         `The chapter ${resource} resource does not support \`${action}\`.`,
-        `wikigraph help object chapter-${resource}`,
+        resourceHelpRoute,
       ),
     );
   }
@@ -1770,8 +1864,8 @@ function parseChapterResourceUriArguments(
   if (action !== "set" && action !== "get" && action !== "clear") {
     throw new Error(
       withHelpRoute(
-        `The chapter ${resource} resource does not support \`${action}\`. Expected get or set.`,
-        `wikigraph help object chapter-${resource}`,
+        `The chapter ${resource} resource does not support \`${action}\`. Read it directly, or use set.`,
+        resourceHelpRoute,
       ),
     );
   }
@@ -1779,7 +1873,7 @@ function parseChapterResourceUriArguments(
     throw new Error(
       withHelpRoute(
         `The chapter ${resource} resource does not support clear.`,
-        `wikigraph help object chapter-${resource}`,
+        resourceHelpRoute,
       ),
     );
   }
@@ -1787,7 +1881,7 @@ function parseChapterResourceUriArguments(
     throw new Error(
       withHelpRoute(
         `The chapter ${resource} set command does not support --clear. Use \`clear\`.`,
-        `wikigraph help object chapter-${resource}`,
+        resourceHelpRoute,
       ),
     );
   }
@@ -1892,42 +1986,54 @@ function parseJobUriFirstArguments(
 ): ParsedCLIArguments {
   const uri = positionals[0];
   const jobTargetUri = parseWikiGraphJobTargetUri(uri);
-  const action = positionals[1];
+  const explicitAction = positionals[1];
 
   if (uri === undefined) {
     throw new Error("Internal error: missing job URI.");
   }
 
+  if (isRemovedImplicitArchiveAction(explicitAction)) {
+    throw new Error(formatRemovedImplicitVerbMessage(explicitAction));
+  }
+
   if (values.help === true) {
-    if (action === undefined) {
+    if (explicitAction === undefined) {
       return {
         help: true,
-        helpText: renderQueueCommandHelpText(),
+        helpText: renderUriHelpText(
+          jobTargetUri === undefined && parseWikiGraphJobUri(uri) === undefined
+            ? "job-collection-scope"
+            : jobTargetUri === undefined
+              ? "job-object"
+              : "job-target-object",
+          uri,
+        ),
         kind: "help",
       };
     }
-    if (action === "get") {
+    const targetName =
+      jobTargetUri === undefined && parseWikiGraphJobUri(uri) === undefined
+        ? "job-collection-scope"
+        : jobTargetUri === undefined
+          ? "job-object"
+          : "job-target-object";
+    if (isUriHelpPredicate(targetName, explicitAction)) {
       return {
         help: true,
-        helpText: renderQueueCommandHelpText("status"),
-        kind: "help",
-      };
-    }
-    if (action === "set" && jobTargetUri !== undefined) {
-      return {
-        help: true,
-        helpText: renderQueueCommandHelpText("target"),
-        kind: "help",
-      };
-    }
-    if (isQueueActionHelp(action)) {
-      return {
-        help: true,
-        helpText: renderQueueCommandHelpText(action),
+        helpText: renderUriPredicateHelpText(targetName, explicitAction, uri),
         kind: "help",
       };
     }
   }
+
+  const jobId = jobTargetUri ?? parseWikiGraphJobUri(uri);
+  const action =
+    explicitAction ??
+    (jobTargetUri !== undefined
+      ? undefined
+      : jobId === undefined
+        ? "list"
+        : "get");
 
   if (!isJobUriAction(action)) {
     throw new Error(
@@ -1940,8 +2046,11 @@ function parseJobUriFirstArguments(
     );
   }
 
-  const jobId = jobTargetUri ?? parseWikiGraphJobUri(uri);
-  const helpRoute = `wikigraph ${uri} ${action} --help`;
+  const helpRoute =
+    explicitAction === undefined
+      ? `wikigraph ${uri} --help`
+      : `wikigraph ${uri} ${action} --help`;
+  const tail = explicitAction === undefined ? [] : positionals.slice(2);
 
   if (jobTargetUri !== undefined) {
     if (action !== "set") {
@@ -1954,7 +2063,7 @@ function parseJobUriFirstArguments(
     }
     return parseQueueJobTargetUriArguments(
       jobTargetUri,
-      positionals.slice(2),
+      tail,
       values,
       helpRoute,
     );
@@ -1967,7 +2076,7 @@ function parseJobUriFirstArguments(
           withHelpRoute("Job add requires `wikg://local/job`.", helpRoute),
         );
       }
-      return parseQueueAddArguments(positionals.slice(2), values, helpRoute);
+      return parseQueueAddArguments(tail, values, helpRoute);
     case "clean":
       if (jobId !== undefined) {
         throw new Error(
@@ -1976,12 +2085,7 @@ function parseJobUriFirstArguments(
       }
       rejectQueueJSONFlag("clean", values.json, helpRoute);
       rejectQueueJSONLFlag("clean", values.jsonl, helpRoute);
-      rejectQueueExtraPositionals(
-        "clean",
-        ["clean", ...positionals.slice(2)],
-        1,
-        helpRoute,
-      );
+      rejectQueueExtraPositionals("clean", ["clean", ...tail], 1, helpRoute);
       return {
         args: {
           action: "clean",
@@ -1996,12 +2100,7 @@ function parseJobUriFirstArguments(
         );
       }
       rejectQueueJSONLFlag("list", values.jsonl, helpRoute);
-      rejectQueueExtraPositionals(
-        "list",
-        ["list", ...positionals.slice(2)],
-        1,
-        helpRoute,
-      );
+      rejectQueueExtraPositionals("list", ["list", ...tail], 1, helpRoute);
       return {
         args: {
           action: "list",
@@ -2016,25 +2115,13 @@ function parseJobUriFirstArguments(
         kind: "queue",
       };
     case "get":
-      return parseQueueJobArguments(
-        "status",
-        jobId,
-        positionals.slice(2),
-        values,
-        helpRoute,
-      );
+      return parseQueueJobArguments("status", jobId, tail, values, helpRoute);
     case "watch":
     case "pause":
     case "resume":
     case "cancel":
     case "boost":
-      return parseQueueJobArguments(
-        action,
-        jobId,
-        positionals.slice(2),
-        values,
-        helpRoute,
-      );
+      return parseQueueJobArguments(action, jobId, tail, values, helpRoute);
     case "set":
       throw new Error(
         withHelpRoute(
@@ -2058,21 +2145,52 @@ function parseLocalConfigUriFirstArguments(
   }
 
   const section = parseLocalConfigUriSection(uri);
-  const action = positionals[1] ?? "get";
-  const helpRoute = `wikigraph ${uri} ${action} --help`;
+  const explicitAction = positionals[1];
+
+  if (isRemovedImplicitArchiveAction(explicitAction)) {
+    throw new Error(formatRemovedImplicitVerbMessage(explicitAction));
+  }
+
+  const action = explicitAction ?? "get";
+  const helpRoute =
+    explicitAction === undefined
+      ? `wikigraph ${uri} --help`
+      : `wikigraph ${uri} ${action} --help`;
 
   if (section === undefined) {
     throw new Error(
       withHelpRoute(
         "Expected a local config section URI such as wikg://local/config/llm.",
-        "wikigraph help config",
+        CLI_HELP_ROUTES.config,
       ),
     );
+  }
+  if (values.help === true && explicitAction === undefined) {
+    return {
+      help: true,
+      helpText: renderUriHelpText("local-config-section", uri),
+      kind: "help",
+    };
+  }
+  if (values.help === true && explicitAction !== undefined) {
+    if (!isUriHelpPredicate("local-config-section", action)) {
+      throw new Error(
+        withHelpRoute(
+          `The URI target ${uri} does not support \`${action}\`.`,
+          `wikigraph ${uri} --help`,
+        ),
+      );
+    }
+    return {
+      help: true,
+      helpText: renderUriPredicateHelpText("local-config-section", action, uri),
+      kind: "help",
+    };
   }
   if (!isLocalConfigAction(action)) {
     throw new Error(
       withHelpRoute(
-        `The local config URI form does not support \`${action}\`. Expected get, set, put, delete, clear, or test.`,
+        `The local config URI form does not support \`${action}\`. Pass the URI directly to read it, or use set, put, delete, clear, or test.`,
         helpRoute,
       ),
     );
@@ -2081,7 +2199,7 @@ function parseLocalConfigUriFirstArguments(
   return parseLocalConfigArguments(
     section,
     action,
-    positionals[1] === undefined ? [] : positionals.slice(2),
+    explicitAction === undefined ? [] : positionals.slice(2),
     values,
     helpRoute,
   );
@@ -2488,7 +2606,6 @@ function parseQueueAddArguments(
 ): ParsedCLIArguments {
   const action = "add";
 
-  rejectQueueJSONFlag(action, values.json, helpRoute);
   rejectQueueJSONLFlag(action, values.jsonl, helpRoute);
   rejectQueueFlag(action, "--stage", values.stage, helpRoute);
   rejectQueueFlag(action, "--to", values.to, helpRoute);
@@ -2510,6 +2627,7 @@ function parseQueueAddArguments(
       ...(values.boost === undefined ? {} : { boost: values.boost }),
       ...(input.chapterId === undefined ? {} : { chapterId: input.chapterId }),
       inputPath: values.input,
+      ...(values.json === undefined ? {} : { json: values.json }),
       ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
       ...(values.prompt === undefined ? {} : { prompt: values.prompt }),
       target: parseBuildJobTarget(values.task),
@@ -2711,7 +2829,7 @@ function parseArchiveMaintenanceArguments(
       if (!isArchiveChapterAction(action)) {
         throw new Error(
           withHelpRoute(
-            `Invalid chapter action: ${action}. Expected one of list, add, move, remove, reset, or tree. Use concrete chapter resource URIs such as /source, /summary, or /title for set operations.`,
+            `Invalid chapter action: ${action}. Use the chapter collection URI directly, add --query, or use add, move, remove, reset, or tree. Use concrete chapter resource URIs such as /source, /summary, or /title for set operations.`,
             CLI_HELP_ROUTES.command,
           ),
         );
@@ -2930,7 +3048,7 @@ function parseArchiveArguments(
 
       if (query === undefined) {
         throw new Error(
-          withHelpRoute("`wikigraph search` requires --query.", helpRoute),
+          withHelpRoute("Scope keyword retrieval requires --query.", helpRoute),
         );
       }
       rejectArchiveExtraPositionals(action, positionals, 1, helpRoute);
@@ -3108,6 +3226,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      validateEvidenceTargetUri(archivePath, helpRoute);
       return {
         args: {
           action,
@@ -3222,9 +3341,6 @@ function validateArchiveCommandUriInput(
     return;
   }
 
-  if (looksLikeSdpubPath(value)) {
-    throw new Error(formatLegacySdpubPathMessage());
-  }
   if (!looksLikeWikgPath(value)) {
     return;
   }
@@ -3258,10 +3374,7 @@ function validatePackTargetUri(uri: string, helpRoute: string): void {
   }
   if (parsed.objectUri === undefined) {
     throw new Error(
-      withHelpRoute(
-        formatPackObjectMismatchMessage(uri),
-        "wikigraph help object",
-      ),
+      withHelpRoute(formatPackObjectMismatchMessage(uri), CLI_HELP_ROUTES.uri),
     );
   }
   if (!isPackableObjectUri(parsed.objectUri)) {
@@ -3286,7 +3399,7 @@ function validateRelatedTargetUri(
     throw new Error(
       withHelpRoute(
         `Related requires a chunk or entity URI: ${uri}`,
-        "wikigraph help object",
+        CLI_HELP_ROUTES.uri,
       ),
     );
   }
@@ -3302,6 +3415,33 @@ function validateRelatedTargetUri(
   }
 
   return targetType;
+}
+
+function validateEvidenceTargetUri(uri: string, helpRoute: string): void {
+  const parsed = parseLocatedWikiGraphUri(uri);
+
+  if (parsed.archivePath === undefined) {
+    throw new Error(
+      withHelpRoute(formatMissingArchiveLocatorMessage(uri), helpRoute),
+    );
+  }
+  if (
+    parsed.objectUri === undefined ||
+    !isEvidenceObjectUri(parsed.objectUri)
+  ) {
+    throw new Error(
+      withHelpRoute(
+        `Evidence is only available for chunk, entity, and triple objects: ${uri}`,
+        helpRoute,
+      ),
+    );
+  }
+}
+
+function isEvidenceObjectUri(objectUri: string): boolean {
+  return /^(?:chapter\/[1-9][0-9]*\/)?(?:chunk\/.+|entity\/.+|triple\/.+)$/u.test(
+    stripObjectUriPrefix(objectUri),
+  );
 }
 
 function isPackableObjectUri(objectUri: string): boolean {
@@ -3333,31 +3473,11 @@ function getRelatedObjectUriType(
 }
 
 function formatUnknownCommandMessage(command: string): string {
-  if (looksLikeSdpubPath(command)) {
-    return formatLegacySdpubPathMessage();
-  }
   if (looksLikeWikgPath(command)) {
     return formatPathAsUriMessage(command);
   }
 
   return withHelpRoute(`Unknown command: ${command}.`, CLI_HELP_ROUTES.command);
-}
-
-function formatLegacySdpubPathMessage(): string {
-  return withHelpRoute(
-    "Legacy .sdpub archives must be migrated first.",
-    "wikigraph legacy migrate --help",
-  );
-}
-
-function looksLikeSdpubPath(value: string): boolean {
-  const normalized = normalizeWikgPathSeparators(value);
-
-  return (
-    normalized.endsWith(".sdpub") ||
-    normalized.includes(".sdpub/") ||
-    normalized.includes(".sdpub#")
-  );
 }
 
 function looksLikeWikgPath(value: string): boolean {
@@ -3407,7 +3527,7 @@ function formatPackObjectMismatchMessage(uri: string): string {
   return [
     `Pack requires a graph object URI: ${uri}`,
     "Supported pack targets are chunk and entity objects.",
-    "Use `wikigraph help object` to inspect valid object/verb pairs.",
+    "Use `wikigraph <uri> --help` to inspect valid predicates.",
   ].join("\n");
 }
 
@@ -3420,10 +3540,11 @@ function formatMissingArchiveInputMessage(action: CLIArchiveAction): string {
     case "inspect":
       return "Missing archive URI. Use `wikigraph wikg://<archive.wikg> inspect`.";
     case "search":
-      return "Missing Wiki Graph URI with .wikg locator. Use `wikigraph wikg://<archive.wikg> search <query>`.";
+      return "Missing scope URI with .wikg locator. Use `wikigraph wikg://<archive.wikg> --query <query>`.";
     case "list":
-      return "Missing Wiki Graph URI with .wikg locator. Use `wikigraph wikg://<archive.wikg> list`.";
+      return "Missing scope URI with .wikg locator. Use `wikigraph wikg://<archive.wikg>`.";
     case "get":
+      return "Missing object URI with .wikg locator. Use `wikigraph wikg://<archive.wikg>/<object>`.";
     case "related":
     case "evidence":
     case "pack":
@@ -3955,11 +4076,7 @@ function parseHelpArguments(
     );
   }
 
-  if (
-    positionals.length > 1 &&
-    positionals[0] !== "object" &&
-    positionals[0] !== "verb"
-  ) {
+  if (positionals.length > 1) {
     throw new Error(
       withHelpRoute(
         `Unexpected positional arguments: ${positionals.slice(1).join(" ")}.`,
@@ -3976,16 +4093,7 @@ function parseHelpArguments(
     };
   }
 
-  const matrixPage = parseHelpMatrixPage(positionals);
-  if (matrixPage !== undefined) {
-    return {
-      help: true,
-      helpText: renderHelpMatrixText(matrixPage),
-      kind: "help",
-    };
-  }
-
-  if (isArchiveAction(positionals[0])) {
+  if (isPublicArchiveCommandHelpAction(positionals[0])) {
     return {
       help: true,
       helpText: renderArchiveCommandHelpText(positionals[0]),
@@ -4447,6 +4555,27 @@ function isArchiveAction(value: string | undefined): value is CLIArchiveAction {
   );
 }
 
+function isPublicArchiveCommandHelpAction(
+  value: string | undefined,
+): value is "next" {
+  return value === "next";
+}
+
+function isRemovedImplicitArchiveAction(
+  value: string | undefined,
+): value is "get" | "list" | "search" {
+  return value === "get" || value === "list" || value === "search";
+}
+
+function formatRemovedImplicitVerbMessage(
+  _action: "get" | "list" | "search",
+): string {
+  return withHelpRoute(
+    "This command form is not available. Pass the URI directly, or add --query to a scope URI.",
+    CLI_HELP_ROUTES.uri,
+  );
+}
+
 function isArchiveUriAction(
   value: string | undefined,
 ): value is CLIArchiveUriAction {
@@ -4635,21 +4764,6 @@ function isJobUriAction(value: string | undefined): value is CLIJobAction {
     value === "pause" ||
     value === "resume" ||
     value === "set" ||
-    value === "watch"
-  );
-}
-
-function isQueueActionHelp(
-  value: string | undefined,
-): value is Exclude<CLIQueueAction, "status" | "target" | "worker"> {
-  return (
-    value === "add" ||
-    value === "boost" ||
-    value === "cancel" ||
-    value === "clean" ||
-    value === "list" ||
-    value === "pause" ||
-    value === "resume" ||
     value === "watch"
   );
 }
