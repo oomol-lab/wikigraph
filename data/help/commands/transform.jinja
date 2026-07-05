@@ -2,8 +2,8 @@ Help Type: command
 Command: wikigraph transform
 
 Purpose:
-  Run a direct one-shot digest/export without creating a reusable `.wikg` archive.
-  This is not a plain file-format converter; source inputs usually require LLM-backed digest work.
+  Run a direct one-shot digest/export.
+  This is not a plain file-format converter; source inputs usually require LLM-backed digest work, and `--output-format wikg` can create a reusable `.wikg` archive.
 
 Usage:
   wikigraph transform [--input <path>] [--output <path>] [--input-format <format>] [--output-format <format>] [--digest-dir <path>] [--llm <json>] [--prompt <text>] [--stage <planned|source|reading-graph|reading-summary>] [--verbose|-v]

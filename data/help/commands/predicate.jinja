@@ -53,7 +53,7 @@ Usage:
   wikigraph {{ uri }} create [source] [--input-format <format>] [--llm <json>] [--prompt <text>] [--json]
 
 Notes:
-  - `source` may be EPUB, Markdown, txt, or another supported input path.
+  - `source` may be EPUB, Markdown, txt, URL, or another supported input path.
   - Without `source`, an empty `.wikg` archive is created unless stdin is selected with `--input-format`.
   - Stdin is supported when `--input-format markdown` or `--input-format txt` is provided.
   - Input format is inferred from the source extension when possible; use `--input-format` when stdin or the extension is ambiguous.
@@ -75,7 +75,7 @@ Purpose:
   Export a projection from this archive.
 
 Usage:
-  wikigraph {{ uri }} export --output-format markdown|txt|epub [--output <path>]
+  wikigraph {{ uri }} export [--output-format markdown|txt|epub] [--output <path>]
 
 Notes:
   - Default output format is markdown when omitted by the parser, but explicit `--output-format` is recommended.
