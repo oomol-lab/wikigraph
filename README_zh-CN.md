@@ -1,5 +1,5 @@
-<div align=center>
-  <h1>SpineDigest</h1>
+<div align="center">
+  <h1>Wiki Graph</h1>
   <p><a href="./README.md">English</a> | 中文</p>
   <p>
     <a href="https://www.npmjs.com/package/wikigraph"><img alt="npm version" src="https://img.shields.io/npm/v/wikigraph"></a>
@@ -8,199 +8,308 @@
   </p>
 </div>
 
-![SpineDigest Terminal 演示](./docs/images/terminal-cn.png)
+Wiki Graph 是一个面向 [Andrej Karpathy](https://github.com/karpathy) 的 [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) 思路和 Google [OKF](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing) 方向构建的开源长文本知识库管理 CLI。
 
-**SpineDigest 是一个面向 AI Agent 优化的知识库 CLI。** 它把 EPUB、Markdown 和纯文本导入 `.wikg`，并可用 LLM 从中提取知识图谱和摘要，再把这份归档暴露成可搜索、可浏览、可阅读、可追溯证据、可沿图导航、可打包上下文的 [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)。
+它将纯文本写入 `.wikg` 归档，并按需生成可检索、可追溯证据的 Knowledge Graph。Wiki Graph 为 Karpathy 所说的 LLM Wiki 落地为可执行的知识生产流程，提供了一套可运行的 CLI。
 
-它不是一个把书一次性压成摘要的转换器。摘要、EPUB、Markdown 和 JSON 输出只是 `.wikg` 知识库的投影视图。真正的主对象是 `.wikg` 本身：一份可以被持续构建、维护、检索和复用的便携知识归档。
+在 Agent 场景里，PDF、网页、EPUB、字幕、会议录音、视频课程或内部文档都可以先由 Agent 或外部工具转成纯文本，再交给 Wiki Graph。Wiki Graph 负责后半段：把这些长文本落入知识库，抽取 Entity 和 Triple，并保留能追到章节与原句的证据线索；需要压缩阅读时，也可以先生成阅读图谱，再基于它产出摘要。
 
-探索 `.wikg` 有三条主线：
-
-- **搜索模式：** 用 scope URI 加 `--query` 发现可 URI 寻址的 source、summary、chunk、entity 和 triple 对象。
-- **结构模式：** 用 `wikg://.../chapter/tree --json` 查看目录层级，再直接使用 scope URI 或加 `--query` 检查局部对象集合。
-- **阅读模式：** 选定对象后，直接传入 source、chapter、summary、chunk、entity 或 triple URI 读取内容。
-
-通过这三种模式，可以把长文档当作可导航的知识库使用：先看结构，再定位相关内容，最后回到原文和知识点中深入阅读。
-
-![Inkora 打开效果](./docs/images/app-screenshot-cn.png)
-
-<div align=center>
-  <sub><a href="http://inkora.oomol.com/download/wikg">Inkora</a> 打开 .wikg 效果</sub>
-</div>
-
-## 安装
-
-运行前提：
-
-- Node `>=22.12.0`
-- 如果要构建 graph 或 summary：需要一个受支持的 LLM provider 及其凭据
-- 如果只是搜索、阅读、导航或导出 `.wikg`：不需要 LLM 访问权限
-
-无需全局安装，直接试用：
-
-```bash
-npx spinedigest --help
-```
-
-全局安装：
-
-```bash
-npm install -g spinedigest
-```
-
-如果你想先了解这个 CLI 的能力边界，建议先执行：
-
-```bash
-wikigraph --help
-wikigraph help overview
-wikigraph help ai
-```
+Karpathy 的核心想法是：不要让 AI 每次提问都从原始材料重新检索，而是把知识编译成可持续维护的 Wiki。OKF 则把这类 Wiki 实践推向开放、可移植的知识格式。Wiki Graph 负责把这条链路中属于 OKF 的 source layer 做实：把长文本变成 Wiki 和 OKF 可以继续消费的知识原料，包括实体、关系，以及能追回原文的证据。
 
 ## 快速开始
 
-SpineDigest 的主对象是 `.wikg`：一份由 CLI 管理的知识库归档，而不是一次性导出结果。
+运行前提：
 
-用源材料创建知识库：
+- Node.js `>=22.12.0`
+- 一个可用的 LLM provider 和凭据，用于生成 Knowledge Graph、Reading Graph 或 Summary
+- 如果只是读取、检索或导出已有 `.wikg`，通常不需要 LLM 访问
+
+安装：
 
 ```bash
+npm install -g wikigraph
+```
+
+查看内建文档入口：
+
+```bash
+wikigraph --help
+```
+
+从长文本创建一份 `.wikg` 知识库：
+
+```bash
+cat ./chapter.txt | wikigraph wikg://chapter.wikg create --input-format txt
+cat ./transcript.txt | wikigraph wikg://video.wikg create --input-format txt
+```
+
+如果材料已经是 Markdown 或 EPUB，CLI 也可以直接读取：
+
+```bash
+wikigraph wikg://notes.wikg create ./notes.md
 wikigraph wikg://book.wikg create ./book.epub
-cat ./article.md | wikigraph wikg://article.wikg create --input-format markdown
 ```
 
-在启动昂贵构建之前先查看和估算：
+先检查归档状态，再决定下一步。大材料不必一次性全量生成，可以从一章或一段开始：
 
 ```bash
-wikigraph wikg://book.wikg/state
-wikigraph wikg://book.wikg/chapter/tree --json
-wikigraph wikg://book.wikg estimate --stage reading-summary
+wikigraph wikg://chapter.wikg inspect
 ```
 
-明确要花 LLM 成本时，再构建派生知识：
+配置 LLM：
 
 ```bash
-wikigraph wikg://local/job add --input wikg://book.wikg/chapter/12 --task reading-graph --accept-cost
+wikigraph wikg://local/config/llm put provider openai
+wikigraph wikg://local/config/llm put model gpt-4.1
+wikigraph wikg://local/config/llm put apiKey --secret
+wikigraph wikg://local/config/llm test
+```
+
+Knowledge Graph 生成还需要 WikiSpine。多数环境可以先使用内置 HTTP provider：
+
+```bash
+wikigraph wikg://local/config/wikispine put provider fetch
+wikigraph wikg://local/config/wikispine test
+```
+
+如果你需要本地 WikiSpine runtime，见 [WikiSpine Runtime](./docs/wikispine-runtime.md)。
+
+为归档或章节启动 Knowledge Graph 任务：
+
+```bash
+wikigraph wikg://local/job add --input wikg://chapter.wikg --task knowledge-graph --accept-cost
+wikigraph wikg://local/job add --input wikg://book.wikg/chapter/3 --task knowledge-graph --accept-cost
 wikigraph wikg://local/job/<job-id> watch --jsonl
 ```
 
-通过知识库接口搜索、浏览和阅读：
+启用可搜索索引：
 
 ```bash
-wikigraph wikg://book.wikg/chapter/tree --json
-wikigraph wikg://book.wikg/chunk --query "RAG"
-wikigraph wikg://book.wikg/chapter/12/source --query "exact source phrase"
-wikigraph wikg://book.wikg/chapter/12
-wikigraph wikg://book.wikg/chunk/84
-wikigraph wikg://book.wikg/chunk/84 related
-wikigraph wikg://book.wikg/chunk/84 evidence
-wikigraph wikg://book.wikg/chunk/84 pack --budget 5000
+wikigraph wikg://chapter.wikg/index enable
 ```
 
-只有需要便携视图时再输出 projection。比如只需要某一章的 `.md` 文本，可以读取该章；需要完整电子书视图时再导出 EPUB：
+查询实体、关系和证据：
 
 ```bash
-wikigraph wikg://book.wikg/chapter/12/source > ./chapter-12.md
-wikigraph wikg://book.wikg export --output-format epub --output ./digest.epub
+wikigraph wikg://chapter.wikg/entity --query "attention" --evidence 2
+wikigraph wikg://chapter.wikg/triple --query "attention memory" --evidence 2
+wikigraph wikg://chapter.wikg/entity/Q8018 evidence
+wikigraph wikg://chapter.wikg/entity/Q8018 related --query "memory" --evidence 2
+wikigraph wikg://chapter.wikg/entity/Q8018 pack --budget 5000
 ```
 
-成本规则：
+导出可读投影：
+
+```bash
+wikigraph wikg://chapter.wikg export --output-format markdown --output chapter.md
+```
+
+这也是 Wiki Graph 作为 Agent CLI 的推荐用法：让 Agent 负责把任意材料转换成长纯文本，例如网页正文、PDF 章节、YouTube 字幕或音频转录稿；再通过 stdin 或文件路径交给 `wikigraph` 归档。这样，任何能被 Agent 读成文本的材料，都可以进入同一套 `.wikg` 知识库流程。
+
+## 为什么需要 Wiki Graph
+
+TODO：这一节最后写。
+
+可以讨论的问题：
+
+- 为什么长文本不应该只被压缩成摘要？
+- 为什么知识库比一次性问答更适合反复使用？
+- 为什么 Knowledge Graph 要保留 source evidence？
+- 为什么 Reading Graph 和 Summary 是辅助层，而不是最终目标？
+- 为什么 CLI 和 URI 对 AI Agent 特别重要？
+
+## 核心概念
+
+### `.wikg`
+
+`.wikg` 是 Wiki Graph 管理的知识库归档。它可以保存源文本、章节结构、Knowledge Graph、Reading Graph、Summary、索引策略和元数据。
+
+`.wikg` 是托管归档，不是让用户手工解压和编辑的文件格式。日常读取、检索、生成和维护都应通过 `wikigraph` CLI 完成。
+
+### Knowledge Graph
+
+Knowledge Graph 是 Wiki Graph 的主要生成结果。它从源文本中抽取实体、关系和证据，让长文本可以被查询、验证和复用。
+
+典型问题包括：
+
+- 文档里出现了哪些重要实体？
+- 某个实体和哪些对象有关系？
+- 某条关系由哪些原文支持？
+- 哪些章节或段落支撑了同一个知识点？
+
+### Entity、Triple 和 Evidence
+
+Entity 是归一化后的知识对象，例如人物、组织、地点、概念或术语。
+
+Triple 是一条实体级关系，形如：
 
 ```text
-Create 便宜。
-启动 reading-graph、reading-summary 或 knowledge-graph 任务之前先 estimate。
-只有成本和等待时间可接受时，才启动 reading-graph、reading-summary 或 knowledge-graph 任务。
-完成构建后，搜索、读取、导航、证据追踪、打包和导出都便宜。
+subject --predicate--> object
 ```
 
-完整参数说明见 [CLI Reference](./docs/zh-CN/cli.md)。
+Evidence 是支持实体或关系的原文依据。Wiki Graph 的 Knowledge Graph 不是只给出结论，还要能回到 source text。
 
-## 为什么要做这个项目
+### Reading Graph 和 Summary
 
-知识库对长文档很有用，因为它把材料变成可以反复进入的结构：先看目录，再找概念，再回到证据，而不是把所有内容一次性塞进上下文。问题是，知识库通常需要人来整理页面边界、概念关系和引用来源。书是最典型的长文本，如果能把一本书 Wiki 化，EPUB、Markdown 和纯文本也就可以用同一套方式进入知识库。
+Reading Graph 与 Summary 是辅助能力。Reading Graph 用于保存阅读过程中的注意力结构，Summary 用于生成压缩后的可读文本。
 
-这就是 SpineDigest 最初关心“整本书”的原因。大家常说，LLM 不能真正读完整本书，因为上下文窗口不够长。可是，人类的短期记忆只有 7±2 个单位（[Miller 定律](https://zh.wikipedia.org/wiki/%E7%A5%9E%E5%A5%87%E7%9A%84%E6%95%B0%E5%AD%97%EF%BC%9A7%C2%B12)），远比任何 LLM 的上下文窗口短得多。人类仍然可以读完一本书，带着问题来回翻找，在脑中建立结构，再用这些结构回答具体问题。
+它们仍然有价值，但不是 README 的主线。当前产品心智以 Knowledge Graph 和 source-backed retrieval 为中心。
 
-瓶颈不只是窗口大小，而是工作记忆的组织方式。
+### Wiki Graph URI
 
-如果把一本书直接塞进上下文，得到的只是一条很长的文本流。它可以被临时总结，可以被关键词搜索，也可以被截取片段，但很难稳定地回答：哪些概念属于同一组，某个判断来自哪里，两个章节之间有什么关系，哪些原文证据支撑了某个知识点。上下文窗口越长，这些问题越不消失，反而越需要结构。
-
-SpineDigest 的目标，是把长文档变成外部工作记忆。
-
-第一步，LLM 逐段阅读原文，模拟人类阅读时被重点“吸引”的过程，从中识别出若干 [chunk](<https://en.wikipedia.org/wiki/Chunking_(psychology)>)。这里的 chunk 不是最终摘要，而是一个注意力落点：原文中可以被再次引用、追溯和组合的独立知识单元。
-
-接下来，传统算法接手。我以 chunk 为节点构建知识图谱，根据概念相关性建立连接，再通过图遍历与社区发现，把语义上内聚的 chunk 聚合在一起。每一组聚合结果按原文顺序串联成线索，我把它叫做 snake。它像一条穿过原文的知识链，把分散在不同位置、但属于同一主题的知识点连起来。
-
-最后，LLM 再回到这个结构上工作。旧的用法会把这些结构压缩成 summary；现在更重要的用法，是把它们保存进 `.wikg`。之后可以像使用 Wiki 一样打开 chapter 和 chunk 对象、追溯 source evidence、跟随 related object，并在回答问题前打包一个有证据边界的上下文。
-
-**每一位教授手里，都攥着一条 snake。**
-
-想象一场毕业论文答辩。答辩人站在台上，教授们围坐在场。每位教授都攥着自己负责的那条知识链，提醒答辩人：这里有证据，那里有关系，这个概念不能和另一个概念混在一起。过去，这个故事的终点是一份更公平的摘要；现在，它的终点是一间可以反复进入的资料室。使用者不需要一次性记住整本书，而是可以随时叫出相关教授，沿着线索回到证据，再组织自己的回答。
-
-![SpineDigest 架构图](./docs/images/flowchart.svg)
-
-你的意图仍然贯穿整个过程。在构建阶段，prompt 会影响哪些知识单元被关注；在检索阶段，任务会决定先看结构、先找关键词，还是先读原文片段。同一份 `.wikg` 可以服务不同问题：今天用来梳理时间线，明天用来追踪概念关系，后天用来为写作打包上下文。知识库不是一次性答案，而是一个可以反复阅读、定位和复用的操作界面。
-
-## `.wikg` 格式
-
-`.wikg` 是 SpineDigest 的核心知识库归档对象。它保存源材料派生出的章节式页面、graph node、证据指针、summary 和元数据，并通过 CLI 以 LLM Wiki 的形式暴露出来。
-
-有了这份归档，就可以直接搜索和导航知识结构：
+Wiki Graph 用 URI 作为归档和对象的稳定句柄。CLI 命令围绕 URI 工作：
 
 ```bash
-wikigraph wikg://book.wikg/chapter/tree --json
-wikigraph wikg://book.wikg/chapter/12/chunk
-wikigraph wikg://book.wikg/chunk --query "central argument"
-wikigraph wikg://book.wikg/chapter/12
-wikigraph wikg://book.wikg/chapter/12/source
+wikigraph wikg://book.wikg
+wikigraph wikg://book.wikg/chapter
+wikigraph wikg://book.wikg/entity
+wikigraph wikg://book.wikg/entity/Q8018
+wikigraph wikg://book.wikg/triple/Q8018/discusses/Q123
 ```
 
-Markdown、EPUB、txt 和 JSON 风格输出都是归档的 projection。它们适合携带和阅读，但当你需要图链接和证据追溯时，不能替代 `.wikg` 本身。
-
-打开 `.wikg` 文件，可以使用 **[Inkora](http://inkora.oomol.com/download/wikg)**。这是专门为它设计的免费应用，提供章节拓扑图和知识关系图两个视图。
-
-想了解 `.wikg` 的内部结构或自行解析，参见格式规格文档。
-
-## 直接转换
-
-如果你只需要一次性的 digest 或格式转换，也可以使用 `transform`。它不会留下可复用的 `.wikg` 知识库，除非显式选择 `--output-format wikg`。
+Scope URI 默认枚举对象，也可以加 `--query` 检索。Object URI 默认读取一个具体对象。对象支持哪些操作，由对象自己的 help 决定：
 
 ```bash
-cat chapter.txt | wikigraph transform --input-format txt --output-format markdown
-wikigraph transform --input book.epub --output digest.md --output-format markdown
+wikigraph <uri> --help
+wikigraph <uri> <predicate> --help
 ```
 
-这种用法适合纯转换需求；如果材料后续还要被检索、导航、追溯证据或继续构建，优先创建 `.wikg`。
+### Local Index、Local Job 和 Local Config
 
-## 作为库使用
+Wiki Graph 把归档内容和本机运行状态分开：
 
-SpineDigest 也提供程序化 API，适合把底层导入、构建和导出流程嵌入自己的 Node 或 TypeScript 代码。CLI 仍然是当前最完整的知识库操作界面。CLI 之外的集成方式见 [Library Usage](./docs/zh-CN/library.md)。
+- `<archive-uri>/index` 管理 `.wikg` 的搜索索引策略。
+- `wikg://local/job` 管理本机生成任务。
+- `wikg://local/config` 下的 section 管理本机 LLM、并发和 WikiSpine 配置。
 
-## 相关项目
+这些本地状态不等同于归档内容。复制 `.wikg` 文件时，接收方可能需要在自己的机器上重新启用索引或配置 provider。
 
-- [PDF Craft](https://github.com/oomol-lab/pdf-craft)：如果你的源材料是扫描版 PDF，可以先用 PDF Craft 转成 EPUB 或 Markdown，再导入 SpineDigest 知识库。
-- [EPUB Translator](https://github.com/oomol-lab/epub-translator)：如果你的目标是双语阅读而不是构建知识库，EPUB Translator 可以在保留原始排版的前提下，把 EPUB 转成双语版本。
+## 常用工作流
+
+### 创建知识库
+
+```bash
+wikigraph wikg://book.wikg create ./book.epub
+wikigraph wikg://report.wikg create ./report.md
+cat ./notes.txt | wikigraph wikg://notes.wikg create --input-format txt
+```
+
+创建命令只导入 source stage。Knowledge Graph、Reading Graph 和 Summary 需要后续生成任务。
+
+### 检查归档状态
+
+```bash
+wikigraph wikg://book.wikg inspect
+wikigraph wikg://book.wikg inspect --json
+```
+
+`inspect` 会告诉你当前归档有哪些内容，哪些能力还没准备好，以及下一步应该读哪个 help 或执行哪个命令。
+
+### 生成 Knowledge Graph
+
+```bash
+wikigraph wikg://local/job add --input wikg://book.wikg --task knowledge-graph --accept-cost
+wikigraph wikg://local/job add --input wikg://book.wikg/chapter/3 --task knowledge-graph --accept-cost
+wikigraph wikg://local/job/<job-id> watch --jsonl
+```
+
+生成任务可能调用 LLM，耗时和成本取决于材料长度、模型和配置。启动前先读 `inspect` 和 job help。
+
+### 检索实体和关系
+
+```bash
+wikigraph wikg://book.wikg/entity --query "neural network" --evidence 2
+wikigraph wikg://book.wikg/triple --query "attention memory" --evidence 2
+wikigraph wikg://book.wikg/chapter/3/entity --query "attention"
+wikigraph wikg://book.wikg/chapter/3/triple --query "memory"
+```
+
+尽量选择最窄的 URI scope。已知章节时，从章节 scope 查；需要全书视角时，再查 archive scope。
+
+### 追溯原文证据
+
+```bash
+wikigraph wikg://book.wikg/entity/Q8018 evidence
+wikigraph wikg://book.wikg/triple/Q8018/discusses/Q123 evidence
+wikigraph wikg://book.wikg/entity/Q8018 evidence --query "memory"
+```
+
+当你需要确认一个实体、关系或回答是否有原文依据时，优先使用 `evidence`。
+
+### 扩展相关对象
+
+```bash
+wikigraph wikg://book.wikg/entity/Q8018 related --evidence 2
+wikigraph wikg://book.wikg/entity/Q8018 related --query "memory" --evidence 2
+```
+
+`related` 用于从一个已选对象扩展到附近对象。Entity 的 related 结果主要是相关 triples。
+
+### 打包上下文
+
+```bash
+wikigraph wikg://book.wikg/entity/Q8018 pack --budget 5000
+```
+
+`pack` 用于把一个已选 chunk 或 entity 周围的上下文打包给 AI Agent。需要严格核验时，先用 `evidence`。
+
+### 导出投影
+
+```bash
+wikigraph wikg://book.wikg export --output-format markdown --output book.md
+wikigraph wikg://book.wikg export --output-format txt > book.txt
+```
+
+导出结果是 `.wikg` 的可读投影，不替代 `.wikg` 归档本身。
 
 ## 面向 AI Agent
 
-CLI 优先的设计让 SpineDigest 可以把 `.wikg` 作为托管的 LLM Wiki 归档暴露给 Agent。
-
-- **把 `.wikg` 当作主对象。** 先使用归档命令，不要先解压或读取内部文件。
-- **先选择探索模式。** 综合理解和结构理解先用 `wikg://.../chapter/tree --json`；候选定位和精确原文检查用 scope URI 加 `--query`；选定相关 URI 后直接传入它连续阅读。
-- **把 help 当作探索入口。** 把 `wikigraph --help` 当作根入口，再继续读取 `wikigraph help overview`、`wikigraph help ai`、相关专题页或命令级 `--help`，不要先猜行为。
-- **优先使用 `--json`。** 当输出要交给其他工具处理时使用 JSON。
-- **启动任务之前先 estimate。** 不要在没有估算的情况下启动大范围 graph 或 summary 任务。
-- **退出码。** 成功返回 `0`；失败返回非零退出码，并在 `stderr` 输出纯文本错误信息。
-- **不要常规读取 `database.db`。** 使用 URI-first 读取、scope query 和图导航命令。
-
-常用 help 入口：
+Wiki Graph 的 CLI help 是产品契约的一部分。Agent 不应该猜命令形态，而应该从 help 网络继续下钻：
 
 ```bash
-wikigraph help overview
-wikigraph help ai
-wikigraph help task
+wikigraph --help
+wikigraph help recipe
+wikigraph help readiness
+wikigraph help uri
+wikigraph help format
 wikigraph help config
-wikigraph help env
-wikigraph help config-file
-wikigraph help command
+wikigraph help runtime
 ```
 
-完整 agent 操作参考见 [AI Agent Guide](./docs/zh-CN/ai-agents.md)。
+拿到一个陌生归档时，第一步是：
+
+```bash
+wikigraph <archive-uri> inspect
+```
+
+拿到一个 URI 但不知道它能做什么时：
+
+```bash
+wikigraph <uri> --help
+```
+
+拿到一个 URI 和一个 predicate，但不知道参数时：
+
+```bash
+wikigraph <uri> <predicate> --help
+```
+
+Agent 使用原则：
+
+- 不要解压 `.wikg`，不要直接改内部 SQLite 或归档文件。
+- 不要把裸文件路径当作 URI target，先转成 `wikg://...`。
+- 命令返回的短 URI 是 archive-relative handle，复用前要补上 archive locator。
+- 需要稳定字段时优先使用 `--json`。
+- 需要遍历大量对象或读取进度流时使用 `--jsonl`。
+- 需要回答内容问题时，优先从 `inspect`、scope query、object read、`evidence`、`related` 和 `pack` 组合出上下文。
+- 需要生成新数据时，先确认 LLM、WikiSpine、index 和 job readiness。
+
+## 状态
+
+Wiki Graph 仍在快速迭代。当前推荐的稳定入口是 `wikigraph` CLI 和它的内建 help 系统。
+
+程序化 API 和 `.wikg` 内部格式暂时不是 README 的主要文档面。它们可能已经随包暴露，但不建议外部用户在没有明确需求时依赖。
+
+## License
+
+Apache-2.0
