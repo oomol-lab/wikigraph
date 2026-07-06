@@ -746,13 +746,14 @@ function parseArchiveUriFirstArguments(
 
   const action =
     explicitAction ?? resolveImplicitArchiveUriAction(uri, values.query);
-  const helpTarget = classifyArchiveUriHelpTarget(uri);
 
   if (isRemovedImplicitArchiveAction(explicitAction)) {
     throw new Error(formatRemovedImplicitVerbMessage(explicitAction));
   }
 
   if (values.help === true && explicitAction === undefined) {
+    const helpTarget = classifyArchiveUriHelpTarget(uri);
+
     return {
       help: true,
       helpText: renderUriHelpText(helpTarget, uri),
@@ -761,6 +762,8 @@ function parseArchiveUriFirstArguments(
   }
 
   if (values.help === true && explicitAction !== undefined) {
+    const helpTarget = classifyArchiveUriHelpTarget(uri);
+
     if (!isUriHelpPredicate(helpTarget, explicitAction)) {
       throw new Error(
         withHelpRoute(
@@ -909,7 +912,12 @@ function classifyArchiveUriHelpTarget(uri: string): UriHelpTargetName {
     return "triple-object";
   }
 
-  return "archive-scope";
+  throw new Error(
+    withHelpRoute(
+      `Unknown Wiki Graph URI target: ${uri}. Use the archive root help or URI guide to choose a valid target.`,
+      CLI_HELP_ROUTES.uri,
+    ),
+  );
 }
 
 function parseArchiveUriTargetArguments(

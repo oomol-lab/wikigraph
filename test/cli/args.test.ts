@@ -66,6 +66,11 @@ describe("cli/args", () => {
     expect(() => parseCLIArguments(["create", "--help"])).toThrow(
       "Unknown command: create.",
     );
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg/unknown", "--help"]),
+    ).toThrow(
+      "Unknown Wiki Graph URI target: wikg://book.wikg/unknown. Use the archive root help or URI guide to choose a valid target.",
+    );
   });
 
   it("parses legacy migration commands", () => {
