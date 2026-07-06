@@ -1611,6 +1611,7 @@ describe("cli/archive", () => {
       cursor: "raw-next-evidence-cursor",
       format: "json",
       kind: "evidence",
+      order: "doc-asc",
       query: "RAG",
       targetUri: "wikg://entity/Q1",
     });
@@ -1846,6 +1847,63 @@ describe("cli/archive", () => {
     expect(archiveMockState.textWrites[0]).not.toContain("Cost: $");
   });
 
+  it("prints request and job performance hints for multi-chapter generation", async () => {
+    archiveMockState.inspectChapters = [
+      {
+        chapterId: 1,
+        childCount: 0,
+        depth: 0,
+        fragmentCount: 1,
+        stage: "sourced",
+        title: "First chapter",
+        tocPath: ["First chapter"],
+        words: 500,
+      },
+      {
+        chapterId: 2,
+        childCount: 0,
+        depth: 0,
+        fragmentCount: 1,
+        stage: "sourced",
+        title: "Second chapter",
+        tocPath: ["Second chapter"],
+        words: 600,
+      },
+      {
+        chapterId: 3,
+        childCount: 0,
+        depth: 0,
+        fragmentCount: 1,
+        stage: "sourced",
+        title: "Third chapter",
+        tocPath: ["Third chapter"],
+        words: 700,
+      },
+    ];
+    archiveMockState.serials = new Map([
+      [1, { knowledgeGraphReady: false, topologyReady: false }],
+      [2, { knowledgeGraphReady: false, topologyReady: false }],
+      [3, { knowledgeGraphReady: false, topologyReady: false }],
+    ]);
+
+    await runArchiveCommand({
+      action: "inspect",
+      archivePath: "/tmp/book.wikg",
+    });
+
+    const output = archiveMockState.textWrites[0] ?? "";
+    const requestIndex = output.indexOf(
+      "Command: wikigraph wikg://local/config/concurrent put request 6",
+    );
+    const jobIndex = output.indexOf(
+      "Command: wikigraph wikg://local/config/concurrent put job 4",
+    );
+
+    expect(requestIndex).toBeGreaterThanOrEqual(0);
+    expect(jobIndex).toBeGreaterThanOrEqual(0);
+    expect(requestIndex).toBeLessThan(jobIndex);
+  });
+
   it("inspects archive readiness as a json report", async () => {
     interface InspectJSONReport {
       readonly improvements: readonly unknown[];
@@ -1947,7 +2005,7 @@ describe("cli/archive", () => {
         current: 3,
         kind: "request",
         message:
-          "LLM request concurrency is below 4. Use at least 4; 6-8 is usually faster when the provider allows it.",
+          "LLM request concurrency can often be higher. Use at least 4; 6-8 is usually faster when the provider allows it.",
         recommended: 6,
       },
     ]);
@@ -2478,6 +2536,7 @@ describe("cli/archive", () => {
       cursor: "raw-next-evidence-cursor",
       format: "json",
       kind: "evidence",
+      order: "doc-asc",
       query: "paragraph",
       sourceContext: 0,
       targetUri: "wikg://entity/Q1",

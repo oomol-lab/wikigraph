@@ -5,6 +5,9 @@ export interface GenerationConcurrency {
   readonly request: number;
 }
 
+export const DEFAULT_GENERATION_JOB_CONCURRENCY = 3;
+export const DEFAULT_GENERATION_REQUEST_CONCURRENCY = 6;
+
 export interface GenerationPlanningCost {
   readonly model: string;
   readonly timeSeconds: {
@@ -67,14 +70,21 @@ export function createGenerationPerformanceHints(input: {
 
   const hints: GenerationPerformanceHint[] = [];
 
-  if (input.concurrent.request < 4) {
+  const recommendedRequest =
+    input.concurrent.request < 4
+      ? DEFAULT_GENERATION_REQUEST_CONCURRENCY
+      : input.concurrent.request < 8
+        ? 8
+        : undefined;
+
+  if (recommendedRequest !== undefined) {
     hints.push({
-      command: "wikigraph wikg://local/config/concurrent put request 6",
+      command: `wikigraph wikg://local/config/concurrent put request ${recommendedRequest}`,
       current: input.concurrent.request,
       kind: "request",
       message:
-        "LLM request concurrency is below 4. Use at least 4; 6-8 is usually faster when the provider allows it.",
-      recommended: 6,
+        "LLM request concurrency can often be higher. Use at least 4; 6-8 is usually faster when the provider allows it.",
+      recommended: recommendedRequest,
     });
   }
 

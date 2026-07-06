@@ -46,6 +46,8 @@ import type { CLIQueueArguments } from "./args.js";
 import { loadCLIConfig, type CLIConfig } from "./config.js";
 import {
   createGenerationPerformanceHints,
+  DEFAULT_GENERATION_JOB_CONCURRENCY,
+  DEFAULT_GENERATION_REQUEST_CONCURRENCY,
   formatGenerationPlanningDuration,
   formatGenerationPlanningModel,
   planGenerationTask,
@@ -73,8 +75,6 @@ const TERMINAL_STATES = new Set<BuildJobState>([
   "failed",
   "canceled",
 ]);
-const DEFAULT_QUEUE_CONCURRENCY = 3;
-const DEFAULT_REQUEST_CONCURRENCY = 6;
 const PROGRESS_OUTPUT_INTERVAL_MS = 6_000;
 
 interface QueueAddEstimate {
@@ -309,7 +309,7 @@ async function runQueueWorker(): Promise<void> {
   const config = await loadCLIConfig();
 
   await runBuildJobWorker({
-    concurrency: config.concurrent?.job ?? DEFAULT_QUEUE_CONCURRENCY,
+    concurrency: config.concurrent?.job ?? DEFAULT_GENERATION_JOB_CONCURRENCY,
     executeJob: async (job, reporter, context) => {
       await executeBuildJob(job, reporter, context);
     },
@@ -1000,8 +1000,9 @@ function createQueueAddEstimate(input: {
   readonly target: BuildJobTarget;
 }): QueueAddEstimate {
   const concurrent = {
-    job: input.config.concurrent?.job ?? DEFAULT_QUEUE_CONCURRENCY,
-    request: input.config.concurrent?.request ?? DEFAULT_REQUEST_CONCURRENCY,
+    job: input.config.concurrent?.job ?? DEFAULT_GENERATION_JOB_CONCURRENCY,
+    request:
+      input.config.concurrent?.request ?? DEFAULT_GENERATION_REQUEST_CONCURRENCY,
   };
   const words = input.chapters.reduce(
     (total, chapter) => total + chapter.words,

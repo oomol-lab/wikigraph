@@ -45,6 +45,8 @@ import { loadCLIConfig } from "./config.js";
 import { runConvertCommand } from "./convert.js";
 import {
   createGenerationPerformanceHints,
+  DEFAULT_GENERATION_JOB_CONCURRENCY,
+  DEFAULT_GENERATION_REQUEST_CONCURRENCY,
   formatGenerationPlanningDuration,
   formatGenerationPlanningModel,
   planGenerationTask,
@@ -1182,8 +1184,8 @@ async function createArchiveInspectReport(
       loadCLIConfig(),
     ]);
   const concurrent = {
-    job: config.concurrent?.job ?? 3,
-    request: config.concurrent?.request ?? 6,
+    job: config.concurrent?.job ?? DEFAULT_GENERATION_JOB_CONCURRENCY,
+    request: config.concurrent?.request ?? DEFAULT_GENERATION_REQUEST_CONCURRENCY,
   };
   const planningModel = formatGenerationPlanningModel(config.llm);
   const contentChapters = chapters.filter(
