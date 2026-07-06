@@ -1434,7 +1434,7 @@ function createInspectImprovements(input: {
         `${input.archiveUri}/chapter`,
         "add",
         "--stage",
-        "sourced",
+        "source",
       ]),
       recommendation:
         "No source content is available yet; add or import source text before graph or summary generation.",

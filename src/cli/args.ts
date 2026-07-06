@@ -3757,6 +3757,7 @@ function normalizeArchiveChapterArguments(
         path,
         ...(addStage === undefined ? {} : { addStage }),
         ...(values.input === undefined ? {} : { inputPath: values.input }),
+        ...(values.json === undefined ? {} : { json: values.json }),
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
         ...(parentChapterId === undefined ? {} : { parentChapterId }),
         ...(values.title === undefined ? {} : { title: values.title }),
@@ -3836,6 +3837,7 @@ function normalizeArchiveChapterArguments(
         ...(beforeChapterId === undefined ? {} : { beforeChapterId }),
         chapterId,
         ...(values.first === undefined ? {} : { first: values.first }),
+        ...(values.json === undefined ? {} : { json: values.json }),
         ...(values.last === undefined ? {} : { last: values.last }),
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
         ...(values.root === undefined ? {} : { moveToRoot: values.root }),
@@ -3872,6 +3874,7 @@ function normalizeArchiveChapterArguments(
       return {
         action,
         chapterId,
+        ...(values.json === undefined ? {} : { json: values.json }),
         path,
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
         ...(values.recursive === undefined
@@ -3921,6 +3924,7 @@ function normalizeArchiveChapterArguments(
       return {
         action,
         chapterId,
+        ...(values.json === undefined ? {} : { json: values.json }),
         path,
         resetStage,
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
@@ -3961,6 +3965,7 @@ function normalizeArchiveChapterArguments(
         action,
         chapterId,
         ...(inputValue === undefined ? {} : { inputValue }),
+        ...(values.json === undefined ? {} : { json: values.json }),
         path,
         ...(values.input === undefined ? {} : { inputPath: values.input }),
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),

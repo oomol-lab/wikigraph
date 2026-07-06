@@ -331,6 +331,27 @@ describe("cli/archive-chapter", () => {
     expect(chapterMockState.textWrites[0]).toContain("Chapter: 3\n");
   });
 
+  it("adds a chapter and prints JSON when requested", async () => {
+    await runArchiveChapterCommand({
+      action: "add",
+      addStage: "planned",
+      json: true,
+      path: "/tmp/book.wikg",
+      title: "New Chapter",
+    });
+
+    expect(JSON.parse(chapterMockState.textWrites[0] ?? "")).toStrictEqual({
+      chapterId: 3,
+      childCount: 0,
+      graphReady: false,
+      hasSummary: false,
+      sourceUnits: 2,
+      stage: "planned",
+      title: "New Chapter",
+      uri: "wikg://chapter/3",
+    });
+  });
+
   it("adds a sourced chapter from --input", async () => {
     await runArchiveChapterCommand({
       action: "add",
