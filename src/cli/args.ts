@@ -922,7 +922,9 @@ function parseArchiveUriTargetArguments(
   const parsed = parseLocatedWikiGraphUri(uri);
   const archivePath = parsed.archivePath;
   const objectUri = parsed.objectUri;
-  const helpRoute = formatWikiGraphHelpCommand(uri, action);
+  const helpRoute = isImplicitArchiveReadAction(action)
+    ? formatWikiGraphHelpCommand(uri)
+    : formatWikiGraphHelpCommand(uri, action);
 
   if (archivePath === undefined) {
     throw new Error(formatMissingArchiveLocatorMessage(uri));
@@ -4740,6 +4742,12 @@ function isUriFirstArchiveAction(
     value === "related" ||
     value === "search"
   );
+}
+
+function isImplicitArchiveReadAction(
+  value: CLIArchiveUriAction,
+): value is "get" | "list" | "search" {
+  return value === "get" || value === "list" || value === "search";
 }
 
 function isWikiGraphUri(value: string | undefined): boolean {

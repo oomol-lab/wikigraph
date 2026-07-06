@@ -745,6 +745,11 @@ describe("cli/args", () => {
         "--reverse",
       ]),
     ).toThrow("`--reverse` cannot be combined with --query.");
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "--query", "agent", "--reverse"]),
+    ).toThrow(
+      "`--reverse` cannot be combined with --query.\nSee: wikigraph wikg://book.wikg --help",
+    );
 
     expect(
       parseCLIArguments(["wikg://book.wikg/triple/Q1/_/Q2"]),
