@@ -1863,14 +1863,12 @@ async function writeFindHits(
     return;
   }
 
-  const outputObjects = coalesceTextStreamObjects(objects);
-
   await writeTextToStdout(
-    `${outputObjects
+    `${objects
       .map((object) => formatFindObject(object))
       .join(
-        getListObjectSeparator(outputObjects),
-      )}${formatOpenShortUriHint(outputObjects, context)}${formatNextCursor(nextCursor)}${formatFindLensHint(result)}\n`,
+        getListObjectSeparator(objects),
+      )}${formatOpenShortUriHint(objects, context)}${formatNextCursor(nextCursor)}${formatFindLensHint(result)}\n`,
   );
 }
 
@@ -1931,14 +1929,10 @@ async function writeFindHitsWithoutContinuation(
     return;
   }
 
-  const outputObjects = coalesceTextStreamObjects(objects);
-
   await writeTextToStdout(
-    `${outputObjects
+    `${objects
       .map((object) => formatFindObject(object))
-      .join(
-        getListObjectSeparator(outputObjects),
-      )}${formatFindLensHint(result)}\n`,
+      .join(getListObjectSeparator(objects))}${formatFindLensHint(result)}\n`,
   );
 }
 
@@ -1957,98 +1951,6 @@ function mergeFindResultPages(
     limit: pages.reduce((total, page) => total + page.items.length, 0),
     nextCursor: null,
   };
-}
-
-function coalesceTextStreamObjects(
-  objects: readonly ArchiveOutputObject[],
-): readonly ArchiveOutputObject[] {
-  const coalesced: ArchiveOutputObject[] = [];
-
-  for (const object of objects) {
-    if (object.backlinks !== undefined) {
-      coalesced.push(object);
-      continue;
-    }
-
-    const previous = coalesced.at(-1);
-    const previousRange =
-      previous === undefined ? undefined : parseTextStreamObjectRange(previous);
-    const currentRange = parseTextStreamObjectRange(object);
-
-    if (
-      previous !== undefined &&
-      previousRange !== undefined &&
-      currentRange !== undefined &&
-      previousRange.chapterId === currentRange.chapterId &&
-      previousRange.stream === currentRange.stream &&
-      previousRange.end + 1 === currentRange.start
-    ) {
-      coalesced[coalesced.length - 1] = {
-        ...previous,
-        text: [previous.text, object.text].filter(isString).join("\n"),
-        uri: formatTextStreamObjectUri(
-          previousRange.chapterId,
-          previousRange.stream,
-          previousRange.start,
-          currentRange.end,
-        ),
-      };
-      continue;
-    }
-
-    coalesced.push(object);
-  }
-
-  return coalesced;
-}
-
-function parseTextStreamObjectRange(object: ArchiveOutputObject):
-  | {
-      readonly chapterId: number;
-      readonly end: number;
-      readonly start: number;
-      readonly stream: "source" | "summary";
-    }
-  | undefined {
-  const match =
-    /^wikg:\/\/chapter\/([1-9][0-9]*)\/(source|summary)#([0-9]+)(?:\.\.([0-9]+))?$/u.exec(
-      object.uri,
-    );
-
-  if (
-    match?.[1] === undefined ||
-    match[2] === undefined ||
-    match[3] === undefined
-  ) {
-    return undefined;
-  }
-
-  const start = Number(match[3]);
-  const end = match[4] === undefined ? start : Number(match[4]);
-
-  if (!Number.isInteger(start) || !Number.isInteger(end) || end < start) {
-    return undefined;
-  }
-
-  return {
-    chapterId: Number(match[1]),
-    end,
-    start,
-    stream: match[2] as "source" | "summary",
-  };
-}
-
-function formatTextStreamObjectUri(
-  chapterId: number,
-  stream: "source" | "summary",
-  start: number,
-  end: number,
-): string {
-  return `wikg://chapter/${chapterId}/${stream}#${start === end ? String(start) : `${start}..${end}`}`;
-}
-
-function isString(value: string | undefined): value is string {
-  return value !== undefined && value !== "";
 }
 
 async function writeEvidence(

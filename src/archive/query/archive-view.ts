@@ -469,6 +469,14 @@ type SourceEvidenceRange = {
   readonly startSentenceIndex: number;
 };
 
+type TextStreamHitRange = {
+  readonly chapterId: number;
+  readonly endSentenceIndex: number;
+  readonly hit: ArchiveFindHit;
+  readonly startSentenceIndex: number;
+  readonly stream: ArchiveTextStreamKind;
+};
+
 interface ArchiveTextStreamSentence {
   readonly fragmentId: number;
   readonly globalIndex: number;
@@ -2998,7 +3006,7 @@ async function hydrateFindHitEvidence(
 ): Promise<readonly ArchiveFindHit[]> {
   const evidenceContext = createEvidenceReadContext();
 
-  return await Promise.all(
+  const hydrated = await Promise.all(
     hits.map(async (rawHit) => {
       const displayHit = await hydrateEntityDisplayHit(document, rawHit);
       const hit = await hydrateTextStreamHitContext(
@@ -3072,6 +3080,8 @@ async function hydrateFindHitEvidence(
       };
     }),
   );
+
+  return await coalesceTextStreamFindHits(document, hydrated, evidenceContext);
 }
 
 async function hydrateEntityDisplayHit(
@@ -3159,6 +3169,154 @@ function parseTextStreamHitReference(
   } catch {
     return undefined;
   }
+}
+
+async function coalesceTextStreamFindHits(
+  document: ReadonlyDocument,
+  hits: readonly ArchiveFindHit[],
+  context: EvidenceReadContext,
+): Promise<readonly ArchiveFindHit[]> {
+  const entries: Array<
+    | { readonly hit: ArchiveFindHit; readonly type: "hit" }
+    | { range: TextStreamHitRange; readonly type: "range" }
+  > = [];
+
+  for (const hit of hits) {
+    const range = parseSearchTextStreamHitRange(hit);
+
+    if (range === undefined || hit.backlinks !== undefined) {
+      entries.push({ hit, type: "hit" });
+      continue;
+    }
+
+    const overlappingIndexes = entries
+      .map((entry, index) =>
+        entry.type === "range" &&
+        areMergeableTextStreamHitRanges(entry.range, range)
+          ? index
+          : -1,
+      )
+      .filter((index) => index >= 0);
+
+    if (overlappingIndexes.length === 0) {
+      entries.push({ range, type: "range" });
+      continue;
+    }
+
+    const firstIndex = overlappingIndexes[0] ?? 0;
+    const ranges = overlappingIndexes.flatMap((index) => {
+      const entry = entries[index];
+
+      return entry?.type === "range" ? [entry.range] : [];
+    });
+
+    entries[firstIndex] = {
+      range: await mergeTextStreamHitRangeGroup(
+        document,
+        [...ranges, range],
+        context,
+      ),
+      type: "range",
+    };
+
+    for (const index of overlappingIndexes.slice(1).reverse()) {
+      entries.splice(index, 1);
+    }
+  }
+
+  return entries.map((entry) =>
+    entry.type === "range" ? entry.range.hit : entry.hit,
+  );
+}
+
+function parseSearchTextStreamHitRange(
+  hit: ArchiveFindHit,
+): TextStreamHitRange | undefined {
+  if (hit.type !== "source" && hit.type !== "summary") {
+    return undefined;
+  }
+  if (hit.matchCount === undefined && hit.matchedTerms === undefined) {
+    return undefined;
+  }
+
+  const reference = parseTextStreamHitReference(hit.id);
+
+  if (reference === undefined) {
+    return undefined;
+  }
+
+  return {
+    chapterId: reference.chapterId,
+    endSentenceIndex: reference.endSentenceIndex,
+    hit,
+    startSentenceIndex: reference.startSentenceIndex,
+    stream: reference.stream,
+  };
+}
+
+function areMergeableTextStreamHitRanges(
+  left: TextStreamHitRange,
+  right: TextStreamHitRange,
+): boolean {
+  return (
+    left.chapterId === right.chapterId &&
+    left.stream === right.stream &&
+    right.startSentenceIndex <= left.endSentenceIndex + 1 &&
+    left.startSentenceIndex <= right.endSentenceIndex + 1
+  );
+}
+
+async function mergeTextStreamHitRangeGroup(
+  document: ReadonlyDocument,
+  ranges: readonly TextStreamHitRange[],
+  context: EvidenceReadContext,
+): Promise<TextStreamHitRange> {
+  const [representative] = ranges;
+
+  if (representative === undefined) {
+    throw new Error(
+      "Internal error: cannot merge empty text stream hit group.",
+    );
+  }
+
+  const startSentenceIndex = Math.min(
+    ...ranges.map((range) => range.startSentenceIndex),
+  );
+  const endSentenceIndex = Math.max(
+    ...ranges.map((range) => range.endSentenceIndex),
+  );
+  const text = await readTextStreamRange(
+    document,
+    representative.chapterId,
+    representative.stream,
+    startSentenceIndex,
+    endSentenceIndex,
+    context,
+  );
+  const hits = ranges.map((range) => range.hit);
+  const scores = hits
+    .map((hit) => hit.score)
+    .filter((score): score is number => score !== undefined);
+
+  return {
+    chapterId: representative.chapterId,
+    endSentenceIndex,
+    hit: {
+      ...representative.hit,
+      id: text.id,
+      matchCount: Math.max(...hits.map((hit) => hit.matchCount ?? 0)),
+      matchedTerms: mergeStringLists(
+        hits.flatMap((hit) => hit.matchedTerms ?? []),
+      ),
+      missingTerms: mergeStringLists(
+        hits.flatMap((hit) => hit.missingTerms ?? []),
+      ),
+      ...(scores.length === 0 ? {} : { score: Math.max(...scores) }),
+      snippet: text.text,
+    },
+    startSentenceIndex,
+    stream: representative.stream,
+  };
 }
 
 async function hydrateFindResultBacklinks(

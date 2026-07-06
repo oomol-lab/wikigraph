@@ -222,6 +222,58 @@ describe("archive/query/archive-view", () => {
     });
   });
 
+  it("coalesces expanded text search hits within a result page", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          const draft = await openedDocument
+            .getSerialFragments(1)
+            .createDraft();
+
+          draft.addSentence("# Test Note", 3);
+          draft.addSentence("Alice studies graph retrieval.", 4);
+          draft.addSentence("Bob cites Alice in a research note.", 7);
+          await draft.commit();
+          await openedDocument.writeBookMeta({
+            authors: [],
+            description: null,
+            identifier: null,
+            language: "en",
+            publishedAt: null,
+            publisher: null,
+            sourceFormat: "markdown",
+            title: "Archive Fixture",
+            version: 1,
+          });
+          await openedDocument.writeToc({
+            items: [{ children: [], serialId: 1, title: "Chapter 1" }],
+            version: 1,
+          });
+        });
+        await rebuildArchiveSearchIndex(document);
+
+        const result = await findArchiveObjects(document, "Alice");
+
+        expect(result.items).toStrictEqual([
+          expect.objectContaining({
+            field: "source",
+            id: "wikg://chapter/1/source#0..2",
+            snippet:
+              "# Test Note\nAlice studies graph retrieval.\nBob cites Alice in a research note.",
+            type: "source",
+          }),
+        ]);
+        expect(result.limit).toBe(20);
+        expect(result.nextCursor).toBeNull();
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("finds any whitespace-separated keyword by default", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
