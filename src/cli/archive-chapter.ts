@@ -46,7 +46,7 @@ export async function runArchiveChapterCommand(
           ...(args.title === undefined ? {} : { title: args.title }),
         });
 
-        if (args.addStage === "sourced") {
+        if (args.inputPath !== undefined) {
           details = await setChapterSource(
             document,
             details.chapterId,
@@ -218,6 +218,9 @@ function createContentStream(
   if (args.inputValue !== undefined) {
     return Readable.from([args.inputValue]);
   }
+  if (args.inputPath === "-") {
+    return readTextStreamFromStdin();
+  }
   if (args.inputPath !== undefined) {
     return createReadStream(args.inputPath, { encoding: "utf8" });
   }
@@ -238,6 +241,15 @@ async function readContentText(
   }
   if (args.inputValue !== undefined) {
     return args.inputValue;
+  }
+  if (args.inputPath === "-") {
+    let content = "";
+
+    for await (const chunk of readTextStreamFromStdin()) {
+      content += chunk;
+    }
+
+    return content;
   }
   if (args.inputPath !== undefined) {
     return await readFile(args.inputPath, "utf8");

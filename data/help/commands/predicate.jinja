@@ -100,16 +100,16 @@ Notes:
   - Use `--json` for a machine-readable report with the same recommendations.
 {% elif predicate == "add" and target.name == "chapter-collection-scope" %}
 Purpose:
-  Add a planned or source chapter to the archive.
+  Add a chapter to the archive.
 
 Usage:
-  wikigraph {{ uri }} add --stage planned [--parent <chapter-uri>] [--title <title>] [--json]
-  wikigraph {{ uri }} add --stage source [--parent <chapter-uri>] [--title <title>] [--input <path>] [--json]
+  wikigraph {{ uri }} add [--parent <chapter-uri>] [--title <title>] [--input <path|->] [--json]
 
 Notes:
-  - `--stage planned` creates an empty chapter placeholder.
-  - `--stage source` creates a chapter and fills source text from `--input <path>` or stdin.
-  - Source input must not be empty.
+  - Without `--input`, creates an empty planned chapter placeholder.
+  - With `--input <path>`, creates a chapter and fills source text.
+  - Use `--input -` to read source text from stdin.
+  - Source input must not be empty when `--input` is used.
 {% elif predicate == "add" and target.name == "job-collection-scope" %}
 Purpose:
   Add a local generation job.

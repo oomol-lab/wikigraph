@@ -1360,8 +1360,6 @@ describe("cli/args", () => {
       parseCLIArguments([
         "wikg://book.wikg/chapter",
         "add",
-        "--stage",
-        "planned",
         "--title",
         "Chapter 1",
         "--parent",
@@ -1370,7 +1368,6 @@ describe("cli/args", () => {
     ).toStrictEqual({
       args: {
         action: "add",
-        addStage: "planned",
         parentChapterId: 3,
         path: archivePath,
         title: "Chapter 1",
@@ -1378,6 +1375,33 @@ describe("cli/args", () => {
       help: false,
       kind: "chapter",
     });
+    expect(
+      parseCLIArguments([
+        "wikg://book.wikg/chapter",
+        "add",
+        "--title",
+        "Chapter 1",
+        "--input",
+        "chapter.txt",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "add",
+        inputPath: "chapter.txt",
+        path: archivePath,
+        title: "Chapter 1",
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(() =>
+      parseCLIArguments([
+        "wikg://book.wikg/chapter",
+        "add",
+        "--stage",
+        "planned",
+      ]),
+    ).toThrow("The `chapter add` action does not support --stage.");
     expect(
       parseCLIArguments([
         "wikg://book.wikg/chapter/8",

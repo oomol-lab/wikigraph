@@ -316,7 +316,6 @@ describe("cli/archive-chapter", () => {
   it("adds a chapter and prints the new chapter id", async () => {
     await runArchiveChapterCommand({
       action: "add",
-      addStage: "planned",
       parentChapterId: 1,
       path: "/tmp/book.wikg",
       title: "New Chapter",
@@ -334,7 +333,6 @@ describe("cli/archive-chapter", () => {
   it("adds a chapter and prints JSON when requested", async () => {
     await runArchiveChapterCommand({
       action: "add",
-      addStage: "planned",
       json: true,
       path: "/tmp/book.wikg",
       title: "New Chapter",
@@ -355,7 +353,6 @@ describe("cli/archive-chapter", () => {
   it("adds a sourced chapter from --input", async () => {
     await runArchiveChapterCommand({
       action: "add",
-      addStage: "sourced",
       inputPath: "/tmp/chapter.md",
       path: "/tmp/book.wikg",
       title: "New Chapter",
@@ -370,6 +367,23 @@ describe("cli/archive-chapter", () => {
       {
         chapterId: 3,
         streamText: "file content",
+      },
+    ]);
+    expect(chapterMockState.textWrites[0]).toContain("Stage: source\n");
+  });
+
+  it("adds a sourced chapter from stdin when --input is dash", async () => {
+    await runArchiveChapterCommand({
+      action: "add",
+      inputPath: "-",
+      path: "/tmp/book.wikg",
+      title: "New Chapter",
+    });
+
+    expect(chapterMockState.setSourceCalls).toStrictEqual([
+      {
+        chapterId: 3,
+        streamText: "stdin content",
       },
     ]);
     expect(chapterMockState.textWrites[0]).toContain("Stage: source\n");

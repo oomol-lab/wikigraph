@@ -96,7 +96,6 @@ export type CLIArchiveChapterAction =
 
 export interface CLIArchiveChapterArguments {
   readonly action: CLIArchiveChapterAction;
-  readonly addStage?: Extract<ChapterStage, "planned" | "sourced">;
   readonly afterChapterId?: number;
   readonly beforeChapterId?: number;
   readonly chapterId?: number;
@@ -3706,10 +3705,6 @@ function normalizeArchiveChapterArguments(
     values.after === undefined
       ? undefined
       : parseChapterRef(values.after, "--after", path, helpRoute);
-  const addStage =
-    values.stage === undefined
-      ? undefined
-      : parseChapterAddStage(values.stage, helpRoute);
   const resetStage =
     values.to === undefined ? undefined : parseResetStage(values.to, helpRoute);
 
@@ -3725,6 +3720,7 @@ function normalizeArchiveChapterArguments(
       rejectActionFlag(values.chapter, "--chapter", action, helpRoute);
       rejectActionFlag(values.import, "--import", action, helpRoute);
       rejectActionFlag(values.prompt, "--prompt", action, helpRoute);
+      rejectActionFlag(values.stage, "--stage", action, helpRoute);
       rejectActionFlag(values.to, "--to", action, helpRoute);
       rejectActionBooleanFlag(
         values.recursive,
@@ -3732,34 +3728,15 @@ function normalizeArchiveChapterArguments(
         action,
         helpRoute,
       );
-      if (addStage === undefined) {
-        throw new Error(
-          withHelpRoute(
-            "Missing --stage. `chapter add` requires planned or source.",
-            helpRoute,
-          ),
-        );
-      }
-      if (addStage === "planned") {
-        rejectActionFlag(values.input, "--input", action, helpRoute);
-        rejectActionFlag(
-          values["input-format"],
-          "--input-format",
-          action,
-          helpRoute,
-        );
-      } else if (addStage === "sourced") {
-        rejectActionFlag(
-          values["input-format"],
-          "--input-format",
-          action,
-          helpRoute,
-        );
-      }
+      rejectActionFlag(
+        values["input-format"],
+        "--input-format",
+        action,
+        helpRoute,
+      );
       return {
         action,
         path,
-        ...(addStage === undefined ? {} : { addStage }),
         ...(values.input === undefined ? {} : { inputPath: values.input }),
         ...(values.json === undefined ? {} : { json: values.json }),
         ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
@@ -4313,24 +4290,6 @@ function parseChapterStage(
   throw new Error(
     withHelpRoute(
       `Invalid ${flag}: ${value}. Expected planned, source, reading-graph, or reading-summary.`,
-      helpRoute,
-    ),
-  );
-}
-
-function parseChapterAddStage(
-  value: string,
-  helpRoute: string,
-): Extract<ChapterStage, "planned" | "sourced"> {
-  const stage = parseExternalChapterStage(value);
-
-  if (stage === "planned" || stage === "sourced") {
-    return stage;
-  }
-
-  throw new Error(
-    withHelpRoute(
-      `Invalid --stage: ${value}. chapter add accepts planned or source.`,
       helpRoute,
     ),
   );
