@@ -145,20 +145,21 @@ Purpose:
   Replace the chapter tree with a JSON tree document.
 
 Usage:
-  wikigraph {{ uri }} set --input <tree.json>
+  wikigraph {{ uri }} set --input <tree.json|->
 
 Notes:
   - The input is a chapter tree JSON document produced by the chapter tree view.
+  - Use `--input -` to read the tree JSON from stdin.
   - This rewires chapter hierarchy and order; it does not rewrite chapter source text or generated graph content.
 {% elif target.name == "chapter-source-object" %}
 Purpose:
   Replace this chapter source text.
 
 Usage:
-  wikigraph {{ uri }} set [text] [--input <path>]
+  wikigraph {{ uri }} set [text] [--input <path|->]
 
 Notes:
-  - Source text is read from a positional value, `--input <path>`, or stdin.
+  - Source text is read from a positional value, `--input <path>`, or `--input -` for stdin.
   - Source replacement invalidates later generated work for that chapter.
   - Use `wikigraph {{ uri }} --help` to inspect the source object before replacing it.
 {% elif target.name == "chapter-summary-object" %}
@@ -166,10 +167,10 @@ Purpose:
   Replace this chapter summary text.
 
 Usage:
-  wikigraph {{ uri }} set [text] [--input <path>]
+  wikigraph {{ uri }} set [text] [--input <path|->]
 
 Notes:
-  - The input is plain summary text.
+  - The input is plain summary text from a positional value, `--input <path>`, or `--input -` for stdin.
   - This sets the summary resource directly; it does not call an LLM provider.
 {% elif target.name == "chapter-title-object" %}
 Purpose:
@@ -252,10 +253,12 @@ Purpose:
 
 Usage:
   wikigraph {{ uri }} set <json> [--json]
+  wikigraph {{ uri }} set --input <path|-> [--json]
   wikigraph {{ uri }} set --json-input <json> [--json]
 
 Notes:
   - Metadata shape depends on whether this is archive metadata or object metadata.
+  - Use `--input -` when metadata JSON should come from stdin.
   - `put`, `delete`, and `clear` are usually safer for single-key metadata edits.
 {% else %}
 Purpose:

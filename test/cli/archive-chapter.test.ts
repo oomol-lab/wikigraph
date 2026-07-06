@@ -405,6 +405,22 @@ describe("cli/archive-chapter", () => {
     ]);
   });
 
+  it("reads source content from stdin when --input is dash", async () => {
+    await runArchiveChapterCommand({
+      action: "set-source",
+      chapterId: 2,
+      inputPath: "-",
+      path: "/tmp/book.wikg",
+    });
+
+    expect(chapterMockState.setSourceCalls).toStrictEqual([
+      {
+        chapterId: 2,
+        streamText: "stdin content",
+      },
+    ]);
+  });
+
   it("reads source content from a positional value", async () => {
     await runArchiveChapterCommand({
       action: "set-source",
@@ -419,6 +435,20 @@ describe("cli/archive-chapter", () => {
         streamText: "inline source",
       },
     ]);
+  });
+
+  it("rejects missing source input without reading implicit stdin", async () => {
+    await expect(
+      runArchiveChapterCommand({
+        action: "set-source",
+        chapterId: 2,
+        path: "/tmp/book.wikg",
+      }),
+    ).rejects.toThrow(
+      "Missing input. Pass a positional value, use --input <path>, or use --input - for stdin.",
+    );
+
+    expect(chapterMockState.setSourceCalls).toStrictEqual([]);
   });
 
   it("reads summary content from --input", async () => {
@@ -437,6 +467,22 @@ describe("cli/archive-chapter", () => {
     ]);
   });
 
+  it("reads summary content from stdin when --input is dash", async () => {
+    await runArchiveChapterCommand({
+      action: "set-summary",
+      chapterId: 2,
+      inputPath: "-",
+      path: "/tmp/book.wikg",
+    });
+
+    expect(chapterMockState.setSummaryCalls).toStrictEqual([
+      {
+        chapterId: 2,
+        summary: "stdin content",
+      },
+    ]);
+  });
+
   it("reads summary content from a positional value", async () => {
     await runArchiveChapterCommand({
       action: "set-summary",
@@ -451,6 +497,41 @@ describe("cli/archive-chapter", () => {
         summary: "inline summary",
       },
     ]);
+  });
+
+  it("rejects missing summary input without reading implicit stdin", async () => {
+    await expect(
+      runArchiveChapterCommand({
+        action: "set-summary",
+        chapterId: 2,
+        path: "/tmp/book.wikg",
+      }),
+    ).rejects.toThrow(
+      "Missing input. Pass a positional value, use --input <path>, or use --input - for stdin.",
+    );
+
+    expect(chapterMockState.setSummaryCalls).toStrictEqual([]);
+  });
+
+  it("prints summary set result as JSON when requested", async () => {
+    await runArchiveChapterCommand({
+      action: "set-summary",
+      chapterId: 2,
+      inputValue: "inline summary",
+      json: true,
+      path: "/tmp/book.wikg",
+    });
+
+    expect(JSON.parse(chapterMockState.textWrites[0] ?? "")).toStrictEqual({
+      chapterId: 2,
+      childCount: 0,
+      graphReady: false,
+      hasSummary: true,
+      sourceUnits: 2,
+      stage: "reading-summary",
+      title: "Chapter 1",
+      uri: "wikg://chapter/2",
+    });
   });
 
   it("sets a chapter title", async () => {
@@ -590,6 +671,58 @@ describe("cli/archive-chapter", () => {
       "Dry run: chapter tree not changed.",
     );
     expect(chapterMockState.activeConflictChecks).toStrictEqual([]);
+  });
+
+  it("applies chapter tree from stdin when --input is dash", async () => {
+    chapterMockState.stdinStream = [
+      JSON.stringify({
+        chapters: [
+          {
+            children: [],
+            id: 2,
+            title: "Chapter 1",
+          },
+        ],
+      }),
+    ];
+
+    await runArchiveChapterCommand({
+      action: "tree",
+      inputPath: "-",
+      path: "/tmp/book.wikg",
+      treeAction: "apply",
+    });
+
+    expect(chapterMockState.treeApplyCalls).toStrictEqual([
+      {
+        options: {
+          dryRun: false,
+        },
+        tree: {
+          chapters: [
+            {
+              children: [],
+              id: 2,
+              title: "Chapter 1",
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("rejects missing chapter tree input without reading implicit stdin", async () => {
+    await expect(
+      runArchiveChapterCommand({
+        action: "tree",
+        path: "/tmp/book.wikg",
+        treeAction: "apply",
+      }),
+    ).rejects.toThrow(
+      "Missing input. Pass a positional value, use --input <path>, or use --input - for stdin.",
+    );
+
+    expect(chapterMockState.treeApplyCalls).toStrictEqual([]);
   });
 
   it("removes chapters recursively when requested", async () => {
