@@ -1,6 +1,11 @@
+import { stat } from "fs/promises";
+
 import { resolveWikiGraphCacheDatabasePath } from "../common/wiki-graph-dir.js";
+import { getNumber } from "../document/database.js";
 import { openSharedStateDatabase } from "../document/index.js";
 import type { Database } from "../document/index.js";
+import type { GcContext, GcJobResult } from "../gc/index.js";
+import { isNodeError } from "../utils/node-error.js";
 
 import type {
   CachedDisambiguationRecord,
@@ -41,8 +46,15 @@ CREATE TABLE IF NOT EXISTS disambiguation_cache (
 const WIKIPAGE_CACHE_SCHEMA_SQL = `
 ${CREATE_QID_CACHE_SQL}
 
+CREATE INDEX IF NOT EXISTS idx_qid_cache_checked_at
+ON qid_cache(checked_at);
+
 ${CREATE_DISAMBIGUATION_CACHE_SQL}
+
+CREATE INDEX IF NOT EXISTS idx_disambiguation_cache_checked_at
+ON disambiguation_cache(checked_at);
 `;
+const WIKIPAGE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export class WikipageCache {
   readonly #database: Database;
@@ -201,6 +213,57 @@ ON CONFLICT(qid, wiki) DO UPDATE SET
   }
 }
 
+export async function runWikipageCacheGc(
+  context: GcContext,
+): Promise<GcJobResult> {
+  const databasePath = resolveWikiGraphCacheDatabasePath();
+  const beforeBytes = await readFileSize(databasePath);
+
+  if (beforeBytes === undefined) {
+    return {
+      freedBytes: 0,
+      removed: 0,
+      scanned: 0,
+    };
+  }
+
+  const database = await openSharedStateDatabase(
+    databasePath,
+    WIKIPAGE_CACHE_SCHEMA_SQL,
+  );
+
+  try {
+    await migrateWikipageCacheSchema(database);
+
+    const scanned = await countWikipageCacheRows(database);
+    const cutoff = new Date(context.now - WIKIPAGE_CACHE_TTL_MS).toISOString();
+    const expired = await countExpiredWikipageCacheRows(database, cutoff);
+
+    if (!context.dryRun && expired > 0) {
+      await database.transaction(async () => {
+        await database.run("DELETE FROM qid_cache WHERE checked_at < ?", [
+          cutoff,
+        ]);
+        await database.run(
+          "DELETE FROM disambiguation_cache WHERE checked_at < ?",
+          [cutoff],
+        );
+      });
+      await database.run("VACUUM");
+    }
+
+    const afterBytes = await readFileSize(databasePath);
+
+    return {
+      freedBytes: Math.max(0, beforeBytes - (afterBytes ?? 0)),
+      removed: expired,
+      scanned,
+    };
+  } finally {
+    await database.close();
+  }
+}
+
 async function migrateWikipageCacheSchema(database: Database): Promise<void> {
   await migrateQidCacheSchema(database);
   await migrateDisambiguationCacheSchema(database);
@@ -278,6 +341,57 @@ async function listTableColumns(
   );
 
   return new Set(columns);
+}
+
+async function countWikipageCacheRows(database: Database): Promise<number> {
+  const qids = await countRows(database, "qid_cache");
+  const disambiguations = await countRows(database, "disambiguation_cache");
+
+  return qids + disambiguations;
+}
+
+async function countExpiredWikipageCacheRows(
+  database: Database,
+  cutoff: string,
+): Promise<number> {
+  const qids = await countRows(database, "qid_cache", cutoff);
+  const disambiguations = await countRows(
+    database,
+    "disambiguation_cache",
+    cutoff,
+  );
+
+  return qids + disambiguations;
+}
+
+async function countRows(
+  database: Database,
+  table: "disambiguation_cache" | "qid_cache",
+  checkedBefore?: string,
+): Promise<number> {
+  return (
+    (await database.queryOne(
+      `
+SELECT COUNT(*) AS count
+FROM ${table}
+${checkedBefore === undefined ? "" : "WHERE checked_at < ?"}
+`,
+      checkedBefore === undefined ? undefined : [checkedBefore],
+      (row) => getNumber(row, "count"),
+    )) ?? 0
+  );
+}
+
+async function readFileSize(path: string): Promise<number | undefined> {
+  try {
+    return (await stat(path)).size;
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return undefined;
+    }
+
+    throw error;
+  }
 }
 
 function mapQidRecord(row: SqlRow): CachedQidRecord {

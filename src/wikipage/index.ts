@@ -1,4 +1,4 @@
-export { WikipageCache } from "./cache.js";
+export { runWikipageCacheGc, WikipageCache } from "./cache.js";
 export {
   createDisambiguationProfileNormalizer,
   type CreateDisambiguationProfileNormalizerOptions,

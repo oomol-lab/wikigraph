@@ -5,6 +5,7 @@ import { resolveWikiGraphStateRootPath } from "../common/wiki-graph-temp.js";
 import { runSearchCacheGc } from "../archive/query/index.js";
 import { runBuildQueueGc } from "../facade/index.js";
 import { runWikgCoordinatorGc } from "../wikg/index.js";
+import { runWikipageCacheGc } from "../wikipage/index.js";
 import { formatError } from "../utils/node-error.js";
 
 import { tryAcquireGcLock } from "./lock.js";
@@ -24,6 +25,10 @@ const GC_JOBS: readonly NamedGcJob[] = [
   {
     name: "search-cache",
     run: runSearchCacheGc,
+  },
+  {
+    name: "wikipage-cache",
+    run: runWikipageCacheGc,
   },
   {
     name: "build-queue",
