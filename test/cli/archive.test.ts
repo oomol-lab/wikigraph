@@ -1975,7 +1975,7 @@ describe("cli/archive", () => {
         expect.objectContaining({
           command: "wikigraph wikg:///tmp/book.wikg/index enable",
           recommendation:
-            "Enable the searchable FTS index so --query, related, and evidence commands are available.",
+            "Enable the searchable FTS index so --query filtering is available for scopes, related results, and evidence.",
           title: "Enable searchable index",
         }),
         expect.objectContaining({

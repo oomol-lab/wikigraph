@@ -32,6 +32,7 @@ describe("document/stores", () => {
 
         expect(serialId).toBe(1);
         expect(await openedDocument.serials.getById(1)).toStrictEqual({
+          documentOrder: 0,
           id: 1,
           knowledgeGraphReady: false,
           revision: 0,
@@ -50,12 +51,14 @@ describe("document/stores", () => {
         );
 
         expect(await openedDocument.serials.getById(3)).toStrictEqual({
+          documentOrder: 0,
           id: 3,
           knowledgeGraphReady: true,
           revision: 0,
           topologyReady: true,
         });
         expect(await openedDocument.serials.getById(5)).toStrictEqual({
+          documentOrder: 0,
           id: 5,
           knowledgeGraphReady: false,
           revision: 0,

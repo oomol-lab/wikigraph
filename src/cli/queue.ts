@@ -1002,7 +1002,8 @@ function createQueueAddEstimate(input: {
   const concurrent = {
     job: input.config.concurrent?.job ?? DEFAULT_GENERATION_JOB_CONCURRENCY,
     request:
-      input.config.concurrent?.request ?? DEFAULT_GENERATION_REQUEST_CONCURRENCY,
+      input.config.concurrent?.request ??
+      DEFAULT_GENERATION_REQUEST_CONCURRENCY,
   };
   const words = input.chapters.reduce(
     (total, chapter) => total + chapter.words,

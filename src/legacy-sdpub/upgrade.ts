@@ -44,7 +44,7 @@ export async function migrateLegacySdpubToWikg(
 
   try {
     await extractLegacySdpubArchive(inputPath, workspacePath);
-    await migrateKnowledgeEdgesInDatabase(join(workspacePath, "database.db"));
+    await migrateLegacyDatabase(join(workspacePath, "database.db"));
     await migrateLegacyTextStorage(workspacePath);
     await writeWikgArchive(workspacePath, outputPath);
 
@@ -131,13 +131,12 @@ function assertSupportedManifest(content: string): void {
   throw new Error("Unsupported legacy sdpub archive.");
 }
 
-async function migrateKnowledgeEdgesInDatabase(
-  databasePath: string,
-): Promise<void> {
+async function migrateLegacyDatabase(databasePath: string): Promise<void> {
   const database = await Database.open(databasePath);
 
   try {
     await migrateKnowledgeEdges(database);
+    await migrateSerialDocumentOrder(database);
   } finally {
     await database.close();
   }
@@ -156,6 +155,22 @@ async function migrateKnowledgeEdges(database: Database): Promise<void> {
   await database.run(`
     ALTER TABLE knowledge_edges
     RENAME TO reading_edges
+  `);
+}
+
+async function migrateSerialDocumentOrder(database: Database): Promise<void> {
+  const columns = await listTableColumns(database, "serials");
+
+  if (!columns.has("document_order")) {
+    await database.run(`
+      ALTER TABLE serials
+      ADD COLUMN document_order INTEGER NOT NULL DEFAULT 0
+    `);
+  }
+
+  await database.run(`
+    CREATE INDEX IF NOT EXISTS idx_serials_document_order
+    ON serials(document_order, id)
   `);
 }
 
@@ -927,6 +942,19 @@ async function listTableNames(
   );
 
   return new Set(names);
+}
+
+async function listTableColumns(
+  database: Database,
+  tableName: string,
+): Promise<ReadonlySet<string>> {
+  const columns = await database.queryAll(
+    `PRAGMA table_info(${JSON.stringify(tableName)})`,
+    undefined,
+    (row) => String(row.name),
+  );
+
+  return new Set(columns);
 }
 
 async function indexArchiveEntries(

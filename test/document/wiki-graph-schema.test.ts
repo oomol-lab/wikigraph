@@ -40,6 +40,7 @@ describe("document/wiki-graph-schema", () => {
           await expect(
             openedDocument.serials.getById(1),
           ).resolves.toStrictEqual({
+            documentOrder: 0,
             id: 1,
             knowledgeGraphReady: false,
             revision: 0,
@@ -59,6 +60,7 @@ describe("document/wiki-graph-schema", () => {
           await expect(
             openedDocument.serials.getById(1),
           ).resolves.toStrictEqual({
+            documentOrder: 0,
             id: 1,
             knowledgeGraphParameterHash: parameter.hash,
             knowledgeGraphReady: true,

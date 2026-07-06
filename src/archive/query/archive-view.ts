@@ -2324,12 +2324,13 @@ function sortGraphNeighborsByListMode(
 ): readonly GraphNeighbor[] {
   const direction = order === "doc-asc" ? 1 : -1;
 
-  return [...neighbors].sort((left, right) =>
-    compareSentenceIds(
-      getFirstGraphNodeSentenceId(left.node),
-      getFirstGraphNodeSentenceId(right.node),
-      documentOrders,
-    ) * direction,
+  return [...neighbors].sort(
+    (left, right) =>
+      compareSentenceIds(
+        getFirstGraphNodeSentenceId(left.node),
+        getFirstGraphNodeSentenceId(right.node),
+        documentOrders,
+      ) * direction,
   );
 }
 
@@ -4700,8 +4701,7 @@ function compareSourceEvidenceRanges(
     ) ||
       compareNumbers(left.chapterId, right.chapterId) ||
       compareNumbers(left.startSentenceIndex, right.startSentenceIndex) ||
-      compareNumbers(left.endSentenceIndex, right.endSentenceIndex)) *
-    direction
+      compareNumbers(left.endSentenceIndex, right.endSentenceIndex)) * direction
   );
 }
 

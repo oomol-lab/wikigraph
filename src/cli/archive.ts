@@ -1185,7 +1185,8 @@ async function createArchiveInspectReport(
     ]);
   const concurrent = {
     job: config.concurrent?.job ?? DEFAULT_GENERATION_JOB_CONCURRENCY,
-    request: config.concurrent?.request ?? DEFAULT_GENERATION_REQUEST_CONCURRENCY,
+    request:
+      config.concurrent?.request ?? DEFAULT_GENERATION_REQUEST_CONCURRENCY,
   };
   const planningModel = formatGenerationPlanningModel(config.llm);
   const contentChapters = chapters.filter(
@@ -1468,7 +1469,7 @@ function createInspectImprovements(input: {
     improvements.push({
       command: `wikigraph ${input.archiveUri}/index enable`,
       recommendation:
-        "Enable the searchable FTS index so --query, related, and evidence commands are available.",
+        "Enable the searchable FTS index so --query filtering is available for scopes, related results, and evidence.",
       title: "Enable searchable index",
     });
   }

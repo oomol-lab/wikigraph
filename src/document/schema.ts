@@ -6,9 +6,6 @@ export const SCHEMA_SQL = `
     document_order INTEGER NOT NULL DEFAULT 0
   );
 
-  CREATE INDEX IF NOT EXISTS idx_serials_document_order
-  ON serials(document_order, id);
-
   CREATE TABLE IF NOT EXISTS serial_states (
     serial_id INTEGER PRIMARY KEY,
     revision INTEGER NOT NULL DEFAULT 0,
