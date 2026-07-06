@@ -10,19 +10,17 @@
 
 Wiki Graph 是一个面向 [Andrej Karpathy](https://github.com/karpathy) 的 [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) 思路和 Google [OKF](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing) 方向构建的开源长文本知识库管理 CLI。
 
-它将纯文本写入 `.wikg` 归档，并按需生成可检索、可追溯证据的 Knowledge Graph。Wiki Graph 为 Karpathy 所说的 LLM Wiki 落地为可执行的知识生产流程，提供了一套可运行的 CLI。
+它将纯文本写入 `.wikg` 归档，并按需生成可检索、可追溯证据的 Knowledge Graph。这为 Karpathy 所说的 LLM Wiki 落地为可执行的知识生产流程，提供了一套可运行的 CLI。
 
-在 Agent 场景里，PDF、网页、EPUB、字幕、会议录音、视频课程或内部文档都可以先由 Agent 或外部工具转成纯文本，再交给 Wiki Graph。Wiki Graph 负责后半段：把这些长文本落入知识库，抽取 Entity 和 Triple，并保留能追到章节与原句的证据线索；需要压缩阅读时，也可以先生成阅读图谱，再基于它产出摘要。
+在 Agent 场景中，PDF、网页、EPUB、字幕、会议录音、视频课程或内部文档都可以先由外部工具转成纯文本，再交给 Wiki Graph。Wiki Graph 负责的是后半段：把这些长文本落入知识库，抽取 Entity 和 Triple，并保留能追到章节与原句的证据线索；需要压缩阅读时，也可以先生成阅读图谱，再基于它产出摘要。
 
-Karpathy 的核心想法是：不要让 AI 每次提问都从原始材料重新检索，而是把知识编译成可持续维护的 Wiki。OKF 则把这类 Wiki 实践推向开放、可移植的知识格式。Wiki Graph 负责把这条链路中属于 OKF 的 source layer 做实：把长文本变成 Wiki 和 OKF 可以继续消费的知识原料，包括实体、关系，以及能追回原文的证据。
+Karpathy 的核心想法是：不要让 AI 每次提问都从原始材料重新检索，而是把知识编译成可持续维护的 Wiki。OKF 则把这类 Wiki 实践推向开放、可移植的知识格式。Wiki Graph 负责把这条链路中属于 OKF 的 source layer 这部分做实：把长文本变成 Wiki 和 OKF 可以继续消费的知识原料，包括实体、关系，以及能追回原文的证据。
 
 ## 快速开始
 
 运行前提：
 
 - Node.js `>=22.12.0`
-- 一个可用的 LLM provider 和凭据，用于生成 Knowledge Graph、Reading Graph 或 Summary
-- 如果只是读取、检索或导出已有 `.wikg`，通常不需要 LLM 访问
 
 安装：
 
@@ -36,75 +34,51 @@ npm install -g wikigraph
 wikigraph --help
 ```
 
-从长文本创建一份 `.wikg` 知识库：
+准备一段纯文本，并创建一份 `.wikg` 知识库：
 
 ```bash
-cat ./chapter.txt | wikigraph wikg://chapter.wikg create --input-format txt
-cat ./transcript.txt | wikigraph wikg://video.wikg create --input-format txt
+printf "Alpha is connected to beta.\nThis note is only plain text.\n" > chapter.txt
+cat ./chapter.txt | wikigraph wikg://quickstart.wikg create --input-format txt
 ```
 
-如果材料已经是 Markdown 或 EPUB，CLI 也可以直接读取：
+Markdown 也可以通过同样的管道进入知识库：
 
 ```bash
-wikigraph wikg://notes.wikg create ./notes.md
+cat ./notes.md | wikigraph wikg://notes.wikg create --input-format markdown
+```
+
+如果你已经有 EPUB 或 Markdown 文件，CLI 也可以直接读取：
+
+```bash
 wikigraph wikg://book.wikg create ./book.epub
+wikigraph wikg://notes.wikg create ./notes.md
 ```
 
-先检查归档状态，再决定下一步。大材料不必一次性全量生成，可以从一章或一段开始：
+检查刚创建的归档：
 
 ```bash
-wikigraph wikg://chapter.wikg inspect
+wikigraph wikg://quickstart.wikg inspect
 ```
 
-配置 LLM：
+启用可搜索索引。这个步骤只使用本机 CPU 和磁盘，不需要 LLM 或 WikiSpine：
 
 ```bash
-wikigraph wikg://local/config/llm put provider openai
-wikigraph wikg://local/config/llm put model gpt-4.1
-wikigraph wikg://local/config/llm put apiKey --secret
-wikigraph wikg://local/config/llm test
+wikigraph wikg://quickstart.wikg/index enable
 ```
 
-Knowledge Graph 生成还需要 WikiSpine。多数环境可以先使用内置 HTTP provider：
+把内容搜出来：
 
 ```bash
-wikigraph wikg://local/config/wikispine put provider fetch
-wikigraph wikg://local/config/wikispine test
+wikigraph wikg://quickstart.wikg --query alpha
 ```
 
-如果你需要本地 WikiSpine runtime，见 [WikiSpine Runtime](./docs/wikispine-runtime.md)。
-
-为归档或章节启动 Knowledge Graph 任务：
+读取搜索结果里的 source range：
 
 ```bash
-wikigraph wikg://local/job add --input wikg://chapter.wikg --task knowledge-graph --accept-cost
-wikigraph wikg://local/job add --input wikg://book.wikg/chapter/3 --task knowledge-graph --accept-cost
-wikigraph wikg://local/job/<job-id> watch --jsonl
+wikigraph wikg://quickstart.wikg/chapter/1/source#0..1
 ```
 
-启用可搜索索引：
-
-```bash
-wikigraph wikg://chapter.wikg/index enable
-```
-
-查询实体、关系和证据：
-
-```bash
-wikigraph wikg://chapter.wikg/entity --query "attention" --evidence 2
-wikigraph wikg://chapter.wikg/triple --query "attention memory" --evidence 2
-wikigraph wikg://chapter.wikg/entity/Q8018 evidence
-wikigraph wikg://chapter.wikg/entity/Q8018 related --query "memory" --evidence 2
-wikigraph wikg://chapter.wikg/entity/Q8018 pack --budget 5000
-```
-
-导出可读投影：
-
-```bash
-wikigraph wikg://chapter.wikg export --output-format markdown --output chapter.md
-```
-
-这也是 Wiki Graph 作为 Agent CLI 的推荐用法：让 Agent 负责把任意材料转换成长纯文本，例如网页正文、PDF 章节、YouTube 字幕或音频转录稿；再通过 stdin 或文件路径交给 `wikigraph` 归档。这样，任何能被 Agent 读成文本的材料，都可以进入同一套 `.wikg` 知识库流程。
+这就是 Wiki Graph 作为 Agent CLI 的基础用法：让 Agent 负责把任意材料转换成长纯文本，例如网页正文、PDF 章节、YouTube 字幕或音频转录稿；再通过 stdin 或文件路径交给 `wikigraph` 归档。任何能被 Agent 读成文本的材料，都可以进入同一套 `.wikg` 知识库流程。
 
 ## 为什么需要 Wiki Graph
 
