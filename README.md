@@ -64,7 +64,7 @@ $ wikigraph wikg://quickstart.wikg --query alpha
 Alpha is connected to beta.
 ```
 
-## Why Build Wiki Graph
+## Why We Built This
 
 This project started as SpineDigest, with a focus on compressing long text into shorter summaries that were easier to read and carry. That version was built around a reading problem: how can an LLM read a whole book more like a person, keep useful threads in limited working memory, and still return to the source when needed? It used the ideas behind [Miller's Law](https://en.wikipedia.org/wiki/The_Magical_Number_Seven,_Plus_or_Minus_Two) and cognitive [chunking](<https://en.wikipedia.org/wiki/Chunking_(psychology)>) to organize long text into a Reading Graph, then generated summaries from that structure.
 
