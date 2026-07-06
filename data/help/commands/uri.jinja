@@ -73,6 +73,7 @@ URI type:
 Default behavior:
   - `wikigraph {{ uri }}` reads source text.
   - Source range fragments such as `#4..8` read an exact range.
+  - Whole source reads are plain text streams and do not support `--json`; source range fragments are structured range objects and support `--json`.
 
 Use when:
   - You need continuous original wording from a selected chapter.
@@ -83,6 +84,7 @@ URI type:
 Default behavior:
   - `wikigraph {{ uri }}` reads summary text.
   - Summary range fragments such as `#4..8` read an exact range.
+  - Whole summary reads are plain text streams and do not support `--json`; summary range fragments are structured range objects and support `--json`.
 
 Use when:
   - You need compact readable prose before tracing source evidence.

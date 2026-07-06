@@ -10,7 +10,7 @@ Purpose:
 Operating rules:
   - Never unzip a `.wikg` archive, rewrite internal files, or bypass this CLI. Use CLI commands for archive edits.
   - Use Wiki Graph URIs as stable object handles.
-  - Use `--json` when you want stable Agent-readable fields instead of human text. URI commands support it except readable `source` and `summary` text objects.
+  - Use `--json` when you want stable Agent-readable fields instead of human text. Whole `source` and `summary` objects are text streams, while ranged fragments such as `/source#20..30` support `--json`.
   - If you have a URI and need valid operations, run `wikigraph <uri> --help`.
   - If you need concrete predicate usage for that URI type, run `wikigraph <uri> <predicate> --help`.
   - Never pass a bare filesystem path to URI-targeted commands.

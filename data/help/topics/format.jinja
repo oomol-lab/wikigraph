@@ -29,7 +29,8 @@ Command output shapes:
   - Default text output is for direct human reading and quick inspection.
   - Use `--json` when an Agent or script needs one stable machine-readable response.
   - Use `--jsonl` when a command returns many records, streams progress, or feeds a Unix pipeline.
-  - URI commands support `--json` except readable `source` and `summary` text objects, which are plain text streams by design.
+  - Whole `source` and `summary` text objects are plain text streams and do not support `--json`.
+  - Ranged fragments such as `/source#20..30` and `/summary#20..30` are structured range objects and support `--json`.
   - Commands that do not support `--json` or `--jsonl` say so in their command help or error message.
 
 JSON:

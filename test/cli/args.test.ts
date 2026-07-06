@@ -1987,6 +1987,12 @@ describe("cli/args", () => {
       "Use `--json` when an Agent or script needs one stable machine-readable response.",
     );
     expect(renderHelpTopicText("format")).toContain(
+      "Whole `source` and `summary` text objects are plain text streams and do not support `--json`.",
+    );
+    expect(renderHelpTopicText("format")).toContain(
+      "Ranged fragments such as `/source#20..30` and `/summary#20..30` are structured range objects and support `--json`.",
+    );
+    expect(renderHelpTopicText("format")).toContain(
       "JSONL may contain both object records and control records.",
     );
     expect(renderHelpTopicText("format")).toContain("--all --jsonl");
@@ -2094,6 +2100,20 @@ describe("cli/args", () => {
     );
     expect(renderHelpTopicText("recipe")).toContain(
       "Use `--json` when you want stable Agent-readable fields",
+    );
+    expect(renderHelpTopicText("recipe")).toContain(
+      "ranged fragments such as `/source#20..30` support `--json`",
+    );
+    expect(uriHelpText).toContain(
+      "Ranged fragments such as `/source#4..8` and `/summary#4..8` are structured range objects.",
+    );
+    expect(
+      renderUriHelpText(
+        "chapter-source-object",
+        "wikg://book.wikg/chapter/3/source",
+      ),
+    ).toContain(
+      "Whole source reads are plain text streams and do not support `--json`; source range fragments are structured range objects and support `--json`.",
     );
     expect(renderHelpTopicText("recipe")).toContain(
       "wikigraph wikg://book.wikg/chapter/3/entity --all --jsonl",

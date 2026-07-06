@@ -101,7 +101,8 @@ Triple pattern scopes:
 Object boundaries:
   - `chapter/<id>` is a scope, not an object.
   - `chapter/<id>/title` is the queryable chapter title object.
-  - `source` and `summary` are readable text objects, not collection scopes.
+  - Whole `source` and `summary` objects are readable text streams, not collection scopes.
+  - Ranged fragments such as `/source#4..8` and `/summary#4..8` are structured range objects.
   - Source text is the grounding material. `evidence` is not available for source, summary, or chapter scope URIs.
   - `chunk`, `entity`, and `triple` can return source-backed evidence.
 
