@@ -1801,6 +1801,100 @@ describe("archive/query/archive-view", () => {
     });
   });
 
+  it("orders no-query source and evidence results by document flow", async () => {
+    await withTempDir("spinedigest-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.createSerial();
+          await openedDocument.createSerial();
+
+          for (const serialId of [1, 2]) {
+            const draft = await openedDocument
+              .getSerialFragments(serialId)
+              .createDraft();
+
+            draft.addSentence(`Chapter ${serialId} source sentence.`, 4);
+            await draft.commit();
+          }
+
+          await openedDocument.mentions.saveMany([
+            {
+              chapterId: 1,
+              id: "flow-mention-one",
+              qid: "Q1",
+              rangeEnd: 9,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Chapter 1",
+            },
+            {
+              chapterId: 2,
+              id: "flow-mention-two",
+              qid: "Q1",
+              rangeEnd: 9,
+              rangeStart: 0,
+              sentenceIndex: 0,
+              surface: "Chapter 2",
+            },
+          ]);
+          await openedDocument.writeToc({
+            items: [
+              {
+                children: [],
+                serialId: 2,
+                title: "Second in id, first in document",
+              },
+              {
+                children: [],
+                serialId: 1,
+                title: "First in id, second in document",
+              },
+            ],
+            version: 1,
+          });
+        });
+
+        const chapters = await listArchiveCollection(document, {
+          types: ["chapter-title"],
+        });
+        const chaptersReverse = await listArchiveCollection(document, {
+          order: "doc-desc",
+          types: ["chapter-title"],
+        });
+        const evidence = await listArchiveEvidence(
+          document,
+          "wikg://entity/Q1",
+        );
+        const evidenceReverse = await listArchiveEvidence(
+          document,
+          "wikg://entity/Q1",
+          { order: "doc-desc" },
+        );
+
+        expect(chapters.items.map((item) => item.id)).toStrictEqual([
+          "chapter-title:2",
+          "chapter-title:1",
+        ]);
+        expect(chaptersReverse.items.map((item) => item.id)).toStrictEqual([
+          "chapter-title:1",
+          "chapter-title:2",
+        ]);
+        expect(evidence.items.map((item) => item.id)).toStrictEqual([
+          "wikg://chapter/2/source#0",
+          "wikg://chapter/1/source#0",
+        ]);
+        expect(evidenceReverse.items.map((item) => item.id)).toStrictEqual([
+          "wikg://chapter/1/source#0",
+          "wikg://chapter/2/source#0",
+        ]);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("lists objects as a pageable collection", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);

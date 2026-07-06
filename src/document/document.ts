@@ -4,7 +4,7 @@ import { join, resolve } from "path";
 import { z } from "zod";
 
 import { bookMetaSchema, type BookMeta } from "../source/meta.js";
-import { tocFileSchema, type TocFile } from "../source/toc.js";
+import { tocFileSchema, type TocFile, type TocItem } from "../source/toc.js";
 import type { SourceAsset } from "../source/types.js";
 import { isNodeError } from "../utils/node-error.js";
 import { Database } from "./database.js";
@@ -477,11 +477,13 @@ export class DirectoryDocument implements Document {
 
   public async writeToc(toc: TocFile): Promise<void> {
     await this.#writeJsonFile(this.#getTocPath(), toc);
+    await this.#replaceDocumentOrder(toc);
     await this.serials.bumpChaptersRevision();
   }
 
   public async replaceToc(toc: TocFile): Promise<void> {
     await this.#writeJsonFile(this.#getTocPath(), toc, { overwrite: true });
+    await this.#replaceDocumentOrder(toc);
     await this.serials.bumpChaptersRevision();
   }
 
@@ -712,6 +714,15 @@ export class DirectoryDocument implements Document {
     return await this.#fileStore.readFile(path);
   }
 
+  async #replaceDocumentOrder(toc: TocFile): Promise<void> {
+    await this.serials.setDocumentOrders(
+      listTocSerialIds(toc.items).map((serialId, index) => ({
+        documentOrder: index,
+        serialId,
+      })),
+    );
+  }
+
   async #readOptionalTextFile(path: string): Promise<string | undefined> {
     const content = await this.#fileStore.readFile(path);
 
@@ -783,6 +794,20 @@ export class DirectoryDocument implements Document {
   ): Promise<void> {
     await this.#rollbackContext(context);
   }
+}
+
+function listTocSerialIds(items: readonly TocItem[]): number[] {
+  const serialIds: number[] = [];
+
+  for (const item of items) {
+    if (item.serialId !== undefined) {
+      serialIds.push(item.serialId);
+    }
+
+    serialIds.push(...listTocSerialIds(item.children));
+  }
+
+  return serialIds;
 }
 
 class DirectoryDocumentContext implements DocumentContext {

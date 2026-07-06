@@ -90,6 +90,7 @@ const fragmentRecordSchema = z.object({
 }) satisfies z.ZodType<FragmentRecord>;
 const serialRecordSchema = z
   .object({
+    documentOrder: z.number().optional(),
     id: z.number(),
     knowledgeGraphReady: z.boolean(),
     knowledgeGraphParameterHash: z.string().optional(),
@@ -98,6 +99,7 @@ const serialRecordSchema = z
     topologyReady: z.boolean(),
   })
   .transform((record) => ({
+    documentOrder: record.documentOrder ?? record.id,
     id: record.id,
     knowledgeGraphReady: record.knowledgeGraphReady,
     ...(record.knowledgeGraphParameterHash === undefined
@@ -421,6 +423,7 @@ export async function snapshotChapterSummaryInput(
     fragments,
     readingEdges: await document.readingEdges.listBySerial(chapterId),
     serial: {
+      documentOrder: chapterId,
       id: chapterId,
       knowledgeGraphReady: false,
       revision: 0,
@@ -902,6 +905,12 @@ class SnapshotSerialStore implements ReadonlySerialStore {
 
   public listIds(): Promise<number[]> {
     return Promise.resolve([this.#serial.id]);
+  }
+
+  public listDocumentOrders(): Promise<ReadonlyMap<number, number>> {
+    return Promise.resolve(
+      new Map([[this.#serial.id, this.#serial.documentOrder]]),
+    );
   }
 }
 

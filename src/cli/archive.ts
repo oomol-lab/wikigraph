@@ -324,6 +324,7 @@ export async function runArchiveCommand(
                 ? {}
                 : { backlinks: args.backlinks }),
               ...(evidenceLimit === undefined ? {} : { evidenceLimit }),
+              ...(args.reverse === true ? { order: "doc-desc" } : {}),
               ...createOptionalSourceContext(args),
             }),
             outputContext,
@@ -350,6 +351,7 @@ export async function runArchiveCommand(
                 ...(cursor === undefined ? {} : { cursor }),
                 ...createOptionalEvidenceLimit(args),
                 ...(args.limit === undefined ? {} : { limit: args.limit }),
+                ...(args.reverse === true ? { order: "doc-desc" } : {}),
                 ...(args.query === undefined ? {} : { query: args.query }),
                 ...(args.role === undefined ? {} : { role: args.role }),
                 ...createOptionalSourceContext(args),
@@ -392,6 +394,7 @@ export async function runArchiveCommand(
                   {
                     ...(cursor === undefined ? {} : { cursor }),
                     ...(args.limit === undefined ? {} : { limit: args.limit }),
+                    ...(args.reverse === true ? { order: "doc-desc" } : {}),
                     ...(args.query === undefined ? {} : { query: args.query }),
                     ...createOptionalSourceContext(args),
                   },
@@ -406,6 +409,7 @@ export async function runArchiveCommand(
             await listArchiveEvidence(document, getObjectUri(args.objectId!), {
               ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
               ...(args.limit === undefined ? {} : { limit: args.limit }),
+              ...(args.reverse === true ? { order: "doc-desc" } : {}),
               ...(args.query === undefined ? {} : { query: args.query }),
               ...createOptionalSourceContext(args),
             }),
@@ -717,6 +721,7 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
           await listArchiveEvidence(document, cursor.targetUri, {
             cursor: cursor.cursor,
             limit,
+            order: cursor.order,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
             ...(cursor.sourceContext === undefined
               ? {}
@@ -728,6 +733,7 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
             continuationKind: "evidence",
             format,
             limit,
+            order: cursor.order,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
             ...(cursor.sourceContext === undefined
               ? {}
@@ -746,6 +752,7 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
               ? {}
               : { evidenceLimit: cursor.evidenceLimit }),
             limit,
+            order: cursor.order,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
             ...(cursor.role === undefined ? {} : { role: cursor.role }),
             ...(cursor.sourceContext === undefined
@@ -761,6 +768,7 @@ async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
               : { evidenceLimit: cursor.evidenceLimit }),
             format,
             limit,
+            order: cursor.order,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
             ...(cursor.role === undefined ? {} : { role: cursor.role }),
             ...(cursor.sourceContext === undefined
@@ -830,6 +838,7 @@ function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
     ...createOptionalEvidenceLimit(args),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
+    ...(args.reverse === true ? { order: "doc-desc" } : {}),
     ...createOptionalSourceContext(args),
     ...(args.triplePattern === undefined
       ? {}
@@ -863,6 +872,7 @@ function createArchiveOutputContext(
     ...createOptionalSourceContext(args),
     format: args.format ?? "text",
     limit: args.limit ?? DEFAULT_OUTPUT_LIMIT,
+    ...(args.reverse === true ? { order: "doc-desc" } : {}),
     ...(args.action !== "evidence" &&
     args.action !== "related" &&
     args.action !== "search"
@@ -958,6 +968,7 @@ async function createOutputContinuationCursor(
       cursor,
       format: context.format,
       kind: "evidence",
+      order: context.order ?? "doc-asc",
       ...(context.query === undefined ? {} : { query: context.query }),
       ...(context.sourceContext === undefined
         ? {}
@@ -978,6 +989,7 @@ async function createOutputContinuationCursor(
         : { evidenceLimit: context.evidenceLimit }),
       format: context.format,
       kind: "related",
+      order: context.order ?? "doc-asc",
       ...(context.query === undefined ? {} : { query: context.query }),
       ...(context.role === undefined ? {} : { role: context.role }),
       ...(context.sourceContext === undefined

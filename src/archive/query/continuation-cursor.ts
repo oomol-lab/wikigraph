@@ -49,6 +49,7 @@ export type ContinuationCursor =
       readonly cursor: string;
       readonly format: "json" | "jsonl" | "text";
       readonly kind: "evidence";
+      readonly order: "doc-asc" | "doc-desc";
       readonly query?: string;
       readonly sourceContext?: number;
       readonly targetUri: string;
@@ -60,6 +61,7 @@ export type ContinuationCursor =
       readonly evidenceLimit?: number;
       readonly format: "json" | "jsonl" | "text";
       readonly kind: "related";
+      readonly order: "doc-asc" | "doc-desc";
       readonly query?: string;
       readonly role?: "any" | "object" | "self" | "subject";
       readonly sourceContext?: number;
@@ -209,6 +211,7 @@ function createCursorPayload(input: ContinuationCursor): object {
     case "evidence":
       return {
         cursor: input.cursor,
+        order: input.order,
         ...(input.query === undefined ? {} : { query: input.query }),
         ...(input.sourceContext === undefined
           ? {}
@@ -221,6 +224,7 @@ function createCursorPayload(input: ContinuationCursor): object {
         ...(input.evidenceLimit === undefined
           ? {}
           : { evidenceLimit: input.evidenceLimit }),
+        order: input.order,
         ...(input.query === undefined ? {} : { query: input.query }),
         ...(input.role === undefined ? {} : { role: input.role }),
         ...(input.sourceContext === undefined
@@ -281,6 +285,7 @@ function parseContinuationCursorRecord(record: {
       cursor: getPayloadString(payload, "cursor"),
       format: record.format,
       kind: "evidence",
+      order: getPayloadOrder(payload),
       ...getPayloadOptionalString(payload, "query"),
       ...getPayloadOptionalInteger(payload, "sourceContext", "sourceContext"),
       targetUri: getPayloadString(payload, "targetUri"),
@@ -295,6 +300,7 @@ function parseContinuationCursorRecord(record: {
       ...getPayloadOptionalPositiveInteger(payload, "evidenceLimit"),
       format: record.format,
       kind: "related",
+      order: getPayloadOrder(payload),
       ...getPayloadOptionalString(payload, "query"),
       ...getPayloadOptionalRelatedRole(payload),
       ...getPayloadOptionalInteger(payload, "sourceContext", "sourceContext"),

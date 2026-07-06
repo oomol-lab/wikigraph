@@ -199,6 +199,7 @@ export type ArchiveFindMatch = "all" | "any";
 
 export interface ArchiveFindPosition {
   readonly chapter: number;
+  readonly documentOrder?: number;
   readonly fragment?: number;
   readonly sentence?: number;
 }
@@ -411,6 +412,7 @@ export interface ArchiveRelatedOptions {
   readonly cursor?: string;
   readonly evidenceLimit?: number;
   readonly limit?: number;
+  readonly order?: ArchiveFindOrder;
   readonly query?: string;
   readonly role?: ArchiveRelatedRole;
   readonly sourceContext?: number;
@@ -488,6 +490,7 @@ export interface ArchiveNodeSourceFragment {
 export interface ArchiveEvidenceOptions {
   readonly cursor?: string;
   readonly limit?: number;
+  readonly order?: ArchiveFindOrder;
   readonly query?: string;
   readonly sourceContext?: number;
 }
@@ -497,6 +500,7 @@ const DEFAULT_SOURCE_CONTEXT = 2;
 export interface ArchivePageOptions {
   readonly backlinks?: boolean;
   readonly evidenceLimit?: number;
+  readonly order?: ArchiveFindOrder;
   readonly sourceContext?: number;
   readonly wikipageResolverOptions?: WikipageResolverOptions;
 }
@@ -600,6 +604,7 @@ export async function listArchiveObjects(
               chapter.chapterId,
               "source",
               title,
+              chapter.documentOrder,
             ).map((hit) => ({
               id: hit.id,
               label: title,
@@ -617,6 +622,7 @@ export async function listArchiveCollection(
   options: ArchiveCollectionOptions = {},
 ): Promise<ArchiveCollectionResult> {
   const items: ArchiveFindHit[] = [];
+  const documentOrders = await document.serials.listDocumentOrders();
   const chapterFilter =
     options.chapters === undefined ? undefined : new Set(options.chapters);
   const types = options.types ?? [
@@ -653,7 +659,10 @@ export async function listArchiveCollection(
           chapter: chapter.chapterId,
           field: "title",
           id: formatChapterTitleId(chapter.chapterId),
-          position: { chapter: chapter.chapterId },
+          position: {
+            chapter: chapter.chapterId,
+            documentOrder: chapter.documentOrder,
+          },
           snippet: title,
           title,
           type: "chapter-title",
@@ -668,7 +677,7 @@ export async function listArchiveCollection(
         continue;
       }
 
-      const position = createNodePosition(node.sentenceIds);
+      const position = createNodePosition(node.sentenceIds, documentOrders);
 
       items.push({
         chapter: node.sentenceId[0],
@@ -689,12 +698,15 @@ export async function listArchiveCollection(
           await listAllMentions(document),
           chapterFilter,
         ),
+        documentOrders,
       ),
     );
   }
 
   if (types.includes("triple")) {
-    items.push(...(await listTripleCollection(document, chapterFilter)));
+    items.push(
+      ...(await listTripleCollection(document, chapterFilter, documentOrders)),
+    );
   }
 
   const result = createCollectionResult(items, options);
@@ -702,6 +714,7 @@ export async function listArchiveCollection(
     ...(options.evidenceLimit === undefined
       ? {}
       : { evidenceLimit: options.evidenceLimit }),
+    order: options.order ?? "doc-asc",
     ...(options.sourceContext === undefined
       ? {}
       : { sourceContext: options.sourceContext }),
@@ -1670,6 +1683,7 @@ async function readWikiGraphPage(
           options.evidenceLimit,
           createEvidenceReadContext(),
           options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
+          options.order ?? "doc-asc",
         ),
         id: uri,
         label: selectEntityLabel(mentions),
@@ -1707,6 +1721,7 @@ async function readWikiGraphPage(
           options.evidenceLimit,
           createEvidenceReadContext(),
           options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
+          options.order ?? "doc-asc",
         ),
         id: uri,
         label: await createTriplePageLabel(document, reference),
@@ -1812,9 +1827,12 @@ export async function listRelatedArchiveObjects(
   }
   rejectRelatedRole(options.role, id);
 
+  const documentOrders = await document.serials.listDocumentOrders();
   const { chapterId } = await requireNode(document, reference.id);
   const items = sortGraphNeighborsByListMode(
     await listGraphNeighbors(document, chapterId, reference.id),
+    documentOrders,
+    options.order ?? "doc-asc",
   ).map((neighbor) => ({
     id: formatNodeId(neighbor.node.id),
     label: neighbor.node.label,
@@ -1856,6 +1874,8 @@ async function listRelatedWikiGraphObjects(
 
       const items = sortGraphNeighborsByListMode(
         await listGraphNeighbors(document, chapterId, reference.id),
+        await document.serials.listDocumentOrders(),
+        options.order ?? "doc-asc",
       ).map((neighbor) => ({
         id: formatNodeId(neighbor.node.id),
         label: neighbor.node.label,
@@ -2048,7 +2068,11 @@ async function listRelatedEntityObjects(
     document,
     await filterAndSortEntityRelatedTriplesByQuery(
       document,
-      sortRelatedItemsByListMode([...triplesById.values()]),
+      sortRelatedItemsByListMode(
+        [...triplesById.values()],
+        options.order ?? "doc-asc",
+        await document.serials.listDocumentOrders(),
+      ),
       reference.qid,
       options.query,
     ),
@@ -2281,29 +2305,39 @@ function compareRelatedQueryItems(
 
 function sortRelatedItemsByListMode(
   items: readonly ArchiveListItem[],
+  order: ArchiveFindOrder = "doc-asc",
+  documentOrders?: ReadonlyMap<number, number>,
 ): readonly ArchiveListItem[] {
   return [...items].sort((left, right) =>
     compareListHits(
-      createFindHitFromListItem(left),
-      createFindHitFromListItem(right),
-      "doc-asc",
+      createFindHitFromListItem(left, documentOrders),
+      createFindHitFromListItem(right, documentOrders),
+      order,
     ),
   );
 }
 
 function sortGraphNeighborsByListMode(
   neighbors: readonly GraphNeighbor[],
+  documentOrders: ReadonlyMap<number, number>,
+  order: ArchiveFindOrder,
 ): readonly GraphNeighbor[] {
+  const direction = order === "doc-asc" ? 1 : -1;
+
   return [...neighbors].sort((left, right) =>
     compareSentenceIds(
       getFirstGraphNodeSentenceId(left.node),
       getFirstGraphNodeSentenceId(right.node),
-    ),
+      documentOrders,
+    ) * direction,
   );
 }
 
-function createFindHitFromListItem(item: ArchiveListItem): ArchiveFindHit {
-  const position = createListItemPosition(item);
+function createFindHitFromListItem(
+  item: ArchiveListItem,
+  documentOrders?: ReadonlyMap<number, number>,
+): ArchiveFindHit {
+  const position = createListItemPosition(item, documentOrders);
   const score =
     item.type === "triple" ? (item.evidenceLinks?.length ?? 0) : undefined;
 
@@ -2332,9 +2366,13 @@ function toFindObjectType(
 
 function createListItemPosition(
   item: ArchiveListItem,
+  documentOrders?: ReadonlyMap<number, number>,
 ): ArchiveFindPosition | undefined {
   if (item.type === "triple") {
-    return createFirstMentionLinkPosition(item.evidenceLinks ?? []);
+    return createFirstMentionLinkPosition(
+      item.evidenceLinks ?? [],
+      documentOrders,
+    );
   }
 
   return undefined;
@@ -2342,11 +2380,16 @@ function createListItemPosition(
 
 function createFirstMentionLinkPosition(
   links: readonly MentionLinkRecord[],
+  documentOrders?: ReadonlyMap<number, number>,
 ): ArchiveFindPosition | undefined {
   const sentenceIds = links.flatMap((link) => link.evidenceSentenceIds);
-  const [first] = sentenceIds.sort(compareSentenceIds);
+  const [first] = sentenceIds.sort((left, right) =>
+    compareSentenceIds(left, right, documentOrders),
+  );
 
-  return first === undefined ? undefined : createSentencePosition(first);
+  return first === undefined
+    ? undefined
+    : createSentencePosition(first, documentOrders);
 }
 
 function getFirstGraphNodeSentenceId(node: GraphNode): SentenceId {
@@ -2434,6 +2477,7 @@ async function hydrateRelatedItemsEvidence(
             evidenceLimit,
             context,
             options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
+            options.order ?? "doc-asc",
           );
           const { evidenceLinks: _evidenceLinks, ...publicItem } = item;
 
@@ -2455,6 +2499,7 @@ async function hydrateRelatedItemsEvidence(
               evidenceLimit,
               context,
               options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
+              options.order ?? "doc-asc",
             ),
           };
         }
@@ -2784,6 +2829,7 @@ function groupTripleEvidenceHits(
 
 function listEntityCollection(
   mentions: readonly MentionRecord[],
+  documentOrders?: ReadonlyMap<number, number>,
 ): readonly ArchiveFindHit[] {
   const mentionsByQid = new Map<string, MentionRecord[]>();
 
@@ -2810,6 +2856,7 @@ function listEntityCollection(
       id: `wikg://entity/${qid}`,
       position: {
         chapter: first.chapterId,
+        documentOrder: documentOrders?.get(first.chapterId) ?? first.chapterId,
         sentence: first.sentenceIndex ?? 0,
       },
       score: qidMentions.length,
@@ -2825,6 +2872,7 @@ function listTextStreamSentenceCollection(
   chapterId: number,
   stream: ArchiveTextStreamKind,
   title: string,
+  documentOrder?: number,
 ): readonly ArchiveFindHit[] {
   return index.sentences.map((sentence) => ({
     chapter: chapterId,
@@ -2837,6 +2885,7 @@ function listTextStreamSentenceCollection(
     ),
     position: {
       chapter: chapterId,
+      documentOrder: documentOrder ?? chapterId,
       fragment: sentence.fragmentId,
       sentence: sentence.localIndex,
     },
@@ -2849,6 +2898,7 @@ function listTextStreamSentenceCollection(
 async function listTripleCollection(
   document: ReadonlyDocument,
   chapterFilter?: ReadonlySet<number>,
+  documentOrders?: ReadonlyMap<number, number>,
 ): Promise<readonly ArchiveFindHit[]> {
   const hitsById = new Map<string, ArchiveFindHit>();
 
@@ -2887,6 +2937,8 @@ async function listTripleCollection(
         id,
         position: {
           chapter: source.chapterId,
+          documentOrder:
+            documentOrders?.get(source.chapterId) ?? source.chapterId,
           sentence: source.sentenceIndex ?? 0,
         },
         score: 1,
@@ -2938,6 +2990,7 @@ async function hydrateFindHitEvidence(
   hits: readonly ArchiveFindHit[],
   options: {
     readonly evidenceLimit?: number;
+    readonly order?: ArchiveFindOrder;
     readonly sessionId?: string;
     readonly sourceContext?: number;
   } = {},
@@ -2984,6 +3037,7 @@ async function hydrateFindHitEvidence(
           options.evidenceLimit,
           evidenceContext,
           options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
+          options.order ?? "doc-asc",
         );
         const { evidenceLinks: _evidenceLinks, ...publicHit } = hit;
 
@@ -3007,6 +3061,7 @@ async function hydrateFindHitEvidence(
         options.evidenceLimit,
         evidenceContext,
         options.sourceContext ?? DEFAULT_SOURCE_CONTEXT,
+        options.order ?? "doc-asc",
       );
       const { evidenceMentions: _evidenceMentions, ...publicHit } = hit;
 
@@ -3166,6 +3221,7 @@ function createFindEvidenceHydrationOptions(
   sessionId?: string,
 ): {
   readonly evidenceLimit?: number;
+  readonly order?: ArchiveFindOrder;
   readonly sessionId?: string;
   readonly sourceContext?: number;
 } {
@@ -3173,6 +3229,7 @@ function createFindEvidenceHydrationOptions(
     ...(options.evidenceLimit === undefined
       ? {}
       : { evidenceLimit: options.evidenceLimit }),
+    order: options.order ?? "doc-asc",
     ...(sessionId === undefined ? {} : { sessionId }),
     ...(options.sourceContext === undefined
       ? {}
@@ -4390,6 +4447,7 @@ async function createMentionEvidencePreview(
   limit = 3,
   context: EvidenceReadContext = createEvidenceReadContext(),
   sourceContext = DEFAULT_SOURCE_CONTEXT,
+  order: ArchiveFindOrder = "doc-asc",
 ): Promise<ArchiveFindEvidencePreview> {
   return await createSourceEvidencePreview(
     document,
@@ -4397,6 +4455,7 @@ async function createMentionEvidencePreview(
     limit,
     context,
     sourceContext,
+    order,
   );
 }
 
@@ -4442,6 +4501,7 @@ async function createMentionLinkEvidencePreview(
   limit = 3,
   context: EvidenceReadContext = createEvidenceReadContext(),
   sourceContext = DEFAULT_SOURCE_CONTEXT,
+  order: ArchiveFindOrder = "doc-asc",
 ): Promise<ArchiveFindEvidencePreview> {
   return await createSourceEvidencePreview(
     document,
@@ -4449,6 +4509,7 @@ async function createMentionLinkEvidencePreview(
     limit,
     context,
     sourceContext,
+    order,
   );
 }
 
@@ -4521,6 +4582,7 @@ async function createSourceEvidencePage(
     document,
     ranges,
     options.query,
+    options.order ?? "doc-asc",
   );
   const displayRanges = await createExpandedSourceEvidenceRanges(
     document,
@@ -4556,9 +4618,14 @@ async function filterAndSortSourceEvidenceRangesByFtsQuery(
   document: ReadonlyDocument,
   ranges: readonly SourceEvidenceRange[],
   queryText: string | undefined,
+  order: ArchiveFindOrder,
 ): Promise<readonly SourceEvidenceRange[]> {
+  const documentOrders = await document.serials.listDocumentOrders();
+
   if (queryText === undefined) {
-    return mergeSourceEvidenceRanges(ranges);
+    return mergeSourceEvidenceRanges(ranges).sort((left, right) =>
+      compareSourceEvidenceRanges(left, right, documentOrders, order),
+    );
   }
 
   const indexResult = await queryRequiredSearchIndex(document, queryText, {
@@ -4610,7 +4677,7 @@ async function filterAndSortSourceEvidenceRangesByFtsQuery(
       return scoreComparison;
     }
 
-    return compareSourceEvidenceRanges(left, right);
+    return compareSourceEvidenceRanges(left, right, documentOrders, "doc-asc");
   });
 }
 
@@ -4621,11 +4688,20 @@ function formatSourceEvidenceRangeKey(range: SourceEvidenceRange): string {
 function compareSourceEvidenceRanges(
   left: SourceEvidenceRange,
   right: SourceEvidenceRange,
+  documentOrders: ReadonlyMap<number, number>,
+  order: ArchiveFindOrder,
 ): number {
+  const direction = order === "doc-asc" ? 1 : -1;
+
   return (
-    compareNumbers(left.chapterId, right.chapterId) ||
-    compareNumbers(left.startSentenceIndex, right.startSentenceIndex) ||
-    compareNumbers(left.endSentenceIndex, right.endSentenceIndex)
+    (compareNumbers(
+      documentOrders.get(left.chapterId) ?? left.chapterId,
+      documentOrders.get(right.chapterId) ?? right.chapterId,
+    ) ||
+      compareNumbers(left.chapterId, right.chapterId) ||
+      compareNumbers(left.startSentenceIndex, right.startSentenceIndex) ||
+      compareNumbers(left.endSentenceIndex, right.endSentenceIndex)) *
+    direction
   );
 }
 
@@ -4635,8 +4711,12 @@ async function createSourceEvidencePreview(
   limit: number,
   context: EvidenceReadContext = createEvidenceReadContext(),
   sourceContext = DEFAULT_SOURCE_CONTEXT,
+  order: ArchiveFindOrder = "doc-asc",
 ): Promise<ArchiveFindEvidencePreview> {
-  const mergedRanges = mergeSourceEvidenceRanges(ranges);
+  const documentOrders = await document.serials.listDocumentOrders();
+  const mergedRanges = mergeSourceEvidenceRanges(ranges).sort((left, right) =>
+    compareSourceEvidenceRanges(left, right, documentOrders, order),
+  );
   const displayRanges = await createExpandedSourceEvidenceRanges(
     document,
     mergedRanges.slice(0, limit),
@@ -5704,6 +5784,10 @@ function compareSearchHits(
     compareNumbers(right.score ?? 0, left.score ?? 0) ||
     compareNumbers(right.matchCount ?? 0, left.matchCount ?? 0);
   const position =
+    compareNumbers(
+      getPositionDocumentOrder(left),
+      getPositionDocumentOrder(right),
+    ) ||
     compareNumbers(getPositionChapter(left), getPositionChapter(right)) ||
     compareNumbers(getPositionFragment(left), getPositionFragment(right)) ||
     compareNumbers(getPositionSentence(left), getPositionSentence(right)) ||
@@ -5751,6 +5835,10 @@ function compareListPosition(
   right: ArchiveFindHit,
 ): number {
   return (
+    compareNumbers(
+      getPositionDocumentOrder(left),
+      getPositionDocumentOrder(right),
+    ) ||
     compareNumbers(getPositionChapter(left), getPositionChapter(right)) ||
     compareNumbers(getPositionFragment(left), getPositionFragment(right)) ||
     compareNumbers(getPositionSentence(left), getPositionSentence(right)) ||
@@ -5810,6 +5898,14 @@ function getPositionChapter(hit: ArchiveFindHit): number {
   return hit.position?.chapter ?? Number.MAX_SAFE_INTEGER;
 }
 
+function getPositionDocumentOrder(hit: ArchiveFindHit): number {
+  return (
+    hit.position?.documentOrder ??
+    hit.position?.chapter ??
+    Number.MAX_SAFE_INTEGER
+  );
+}
+
 function getPositionFragment(hit: ArchiveFindHit): number {
   return hit.position?.fragment ?? 0;
 }
@@ -5844,22 +5940,40 @@ function getTypeOrder(type: ArchiveFindObjectType): number {
 
 function createNodePosition(
   sentenceIds: readonly SentenceId[],
+  documentOrders?: ReadonlyMap<number, number>,
 ): ArchiveFindPosition | undefined {
   const [first] = [...sentenceIds].sort(compareSentenceIds);
 
-  return first === undefined ? undefined : createSentencePosition(first);
+  return first === undefined
+    ? undefined
+    : createSentencePosition(first, documentOrders);
 }
 
-function createSentencePosition(sentenceId: SentenceId): ArchiveFindPosition {
+function createSentencePosition(
+  sentenceId: SentenceId,
+  documentOrders?: ReadonlyMap<number, number>,
+): ArchiveFindPosition {
   return {
     chapter: sentenceId[0],
+    documentOrder: documentOrders?.get(sentenceId[0]) ?? sentenceId[0],
     fragment: sentenceId[1],
     sentence: sentenceId[1],
   };
 }
 
-function compareSentenceIds(left: SentenceId, right: SentenceId): number {
-  return compareNumbers(left[0], right[0]) || compareNumbers(left[1], right[1]);
+function compareSentenceIds(
+  left: SentenceId,
+  right: SentenceId,
+  documentOrders?: ReadonlyMap<number, number>,
+): number {
+  return (
+    compareNumbers(
+      documentOrders?.get(left[0]) ?? left[0],
+      documentOrders?.get(right[0]) ?? right[0],
+    ) ||
+    compareNumbers(left[0], right[0]) ||
+    compareNumbers(left[1], right[1])
+  );
 }
 
 function compareArchivePositions(
@@ -5867,6 +5981,10 @@ function compareArchivePositions(
   right: ArchiveFindPosition,
 ): number {
   return (
+    compareNumbers(
+      left.documentOrder ?? left.chapter,
+      right.documentOrder ?? right.chapter,
+    ) ||
     compareNumbers(left.chapter, right.chapter) ||
     compareNumbers(left.fragment ?? 0, right.fragment ?? 0) ||
     compareNumbers(left.sentence ?? 0, right.sentence ?? 0)

@@ -33,6 +33,7 @@ export interface ReadonlySerialStore {
   getMaxId(): Promise<number>;
   getChaptersRevision(): Promise<number>;
   listIds(): Promise<number[]>;
+  listDocumentOrders(): Promise<ReadonlyMap<number, number>>;
 }
 
 export interface ReadonlyGraphBuildParameterStore {
@@ -363,6 +364,7 @@ export class SerialStore implements ReadonlySerialStore {
       `
         SELECT
           serials.id AS id,
+          serials.document_order AS document_order,
           COALESCE(serial_states.revision, 0) AS revision,
           COALESCE(serial_states.topology_ready, 0) AS topology_ready,
           serial_states.topology_parameter_hash AS topology_parameter_hash,
@@ -545,6 +547,57 @@ export class SerialStore implements ReadonlySerialStore {
       (row) => getNumber(row, "id"),
     );
   }
+
+  public async listDocumentOrders(): Promise<ReadonlyMap<number, number>> {
+    const rows = await this.#database.queryAll(
+      `
+        SELECT id, document_order
+        FROM serials
+        ORDER BY id
+      `,
+      undefined,
+      (row) =>
+        [getNumber(row, "id"), getNumber(row, "document_order")] as const,
+    );
+
+    return new Map(rows);
+  }
+
+  public async setDocumentOrders(
+    entries: readonly {
+      readonly documentOrder: number;
+      readonly serialId: number;
+    }[],
+  ): Promise<void> {
+    await this.#database.transaction(async () => {
+      for (const entry of entries) {
+        await this.#database.run(
+          `
+            INSERT OR IGNORE INTO serials (id)
+            VALUES (?)
+          `,
+          [entry.serialId],
+        );
+        await this.#database.run(
+          `
+            INSERT OR IGNORE INTO serial_states (
+              serial_id, revision, topology_ready, knowledge_graph_ready
+            )
+            VALUES (?, ?, ?, ?)
+          `,
+          [entry.serialId, 0, 0, 0],
+        );
+        await this.#database.run(
+          `
+            UPDATE serials
+            SET document_order = ?
+            WHERE id = ?
+          `,
+          [entry.documentOrder, entry.serialId],
+        );
+      }
+    });
+  }
 }
 
 function mapSerialRow(row: SqlRow): SerialRecord {
@@ -558,6 +611,7 @@ function mapSerialRow(row: SqlRow): SerialRecord {
   );
 
   return {
+    documentOrder: getNumber(row, "document_order"),
     id: getNumber(row, "id"),
     knowledgeGraphReady: getNumber(row, "knowledge_graph_ready") !== 0,
     ...(knowledgeGraphParameterHash === undefined

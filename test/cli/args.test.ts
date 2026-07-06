@@ -692,6 +692,7 @@ describe("cli/args", () => {
       parseCLIArguments([
         "wikg://book.wikg/entity/Q1",
         "evidence",
+        "--reverse",
         "--all",
         "--limit",
         "2",
@@ -708,6 +709,7 @@ describe("cli/args", () => {
         format: "jsonl",
         limit: 2,
         objectId: "wikg://book.wikg/entity/Q1",
+        reverse: true,
       },
       help: false,
       kind: "archive",
@@ -717,6 +719,7 @@ describe("cli/args", () => {
       parseCLIArguments([
         "wikg://book.wikg/entity/Q1",
         "related",
+        "--reverse",
         "--all",
         "--limit",
         "2",
@@ -736,10 +739,20 @@ describe("cli/args", () => {
         format: "jsonl",
         limit: 2,
         objectId: "wikg://book.wikg/entity/Q1",
+        reverse: true,
       },
       help: false,
       kind: "archive",
     });
+    expect(() =>
+      parseCLIArguments([
+        "wikg://book.wikg/entity/Q1",
+        "related",
+        "--query",
+        "agent",
+        "--reverse",
+      ]),
+    ).toThrow("`--reverse` cannot be combined with --query.");
 
     expect(
       parseCLIArguments(["wikg://book.wikg/triple/Q1/_/Q2"]),

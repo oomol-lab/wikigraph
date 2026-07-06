@@ -43,6 +43,7 @@ export interface FragmentRecord {
 }
 
 export interface SerialRecord {
+  readonly documentOrder: number;
   readonly knowledgeGraphReady: boolean;
   readonly knowledgeGraphParameterHash?: string;
   readonly id: number;

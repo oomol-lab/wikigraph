@@ -267,6 +267,7 @@ export interface CLIArchiveArguments {
   readonly prompt?: string;
   readonly query?: string;
   readonly replace?: boolean;
+  readonly reverse?: boolean;
   readonly role?: "any" | "object" | "self" | "subject";
   readonly sourcePath?: string;
   readonly triplePattern?: ArchiveTriplePattern;
@@ -331,6 +332,7 @@ interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly prompt?: string;
   readonly query?: string;
   readonly replace?: boolean;
+  readonly reverse?: boolean;
   readonly role?: string;
   readonly root?: boolean;
   readonly secret?: boolean;
@@ -547,6 +549,9 @@ export function parseCLIArguments(
       replace: {
         type: "boolean",
       },
+      reverse: {
+        type: "boolean",
+      },
       stage: {
         type: "string",
       },
@@ -639,6 +644,14 @@ export function parseCLIArguments(
     );
   }
 
+  if (
+    values.reverse === true &&
+    (positionals[0] === undefined ||
+      (!isWikiGraphUri(positionals[0]) && positionals[0] !== "next"))
+  ) {
+    throw new Error("The current command does not support --reverse.");
+  }
+
   if (positionals[0] === "help") {
     return parseHelpArguments(positionals.slice(1), values);
   }
@@ -676,10 +689,22 @@ export function parseCLIArguments(
   }
 
   if (isWikiGraphJobUri(positionals[0])) {
+    rejectArchiveBooleanFlag(
+      positionals[1] ?? "job",
+      "--reverse",
+      values.reverse,
+      "wikigraph wikg://local/job --help",
+    );
     return parseJobUriFirstArguments(positionals, values);
   }
 
   if (isWikiGraphLocalConfigUri(positionals[0])) {
+    rejectArchiveBooleanFlag(
+      positionals[1] ?? "config",
+      "--reverse",
+      values.reverse,
+      "wikigraph wikg://local/config --help",
+    );
     return parseLocalConfigUriFirstArguments(positionals, values);
   }
 
@@ -892,6 +917,7 @@ function parseArchiveUriTargetArguments(
   if (archivePath === undefined) {
     throw new Error(formatMissingArchiveLocatorMessage(uri));
   }
+  rejectUnsupportedArchiveReverse(action, values.reverse, helpRoute);
 
   if (objectUri === undefined) {
     return parseArchiveUriArchiveArguments(
@@ -979,6 +1005,31 @@ function parseArchiveUriTargetArguments(
   }
 
   return parseArchiveArguments(action, [uri, ...tail], values, helpRoute);
+}
+
+function rejectUnsupportedArchiveReverse(
+  action: CLIArchiveUriAction,
+  reverse: boolean | undefined,
+  helpRoute: string,
+): void {
+  if (reverse !== true) {
+    return;
+  }
+  if (action === "search") {
+    throw new Error(
+      withHelpRoute("`--reverse` cannot be combined with --query.", helpRoute),
+    );
+  }
+  if (
+    action === "evidence" ||
+    action === "get" ||
+    action === "list" ||
+    action === "related"
+  ) {
+    return;
+  }
+
+  rejectArchiveBooleanFlag(action, "--reverse", reverse, helpRoute);
 }
 
 function parseArchiveIndexUriArguments(
@@ -3065,6 +3116,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
+      rejectArchiveBooleanFlag(action, "--reverse", values.reverse, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
 
@@ -3109,6 +3161,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--query", values.query, helpRoute);
+      rejectArchiveReverseQuery(values, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
@@ -3132,6 +3185,7 @@ function parseArchiveArguments(
                   helpRoute,
                 ),
               }),
+          ...(values.reverse === true ? { reverse: true } : {}),
           ...(options.defaultKinds === undefined
             ? {}
             : { kinds: options.defaultKinds }),
@@ -3152,6 +3206,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--query", values.query, helpRoute);
+      rejectArchiveReverseQuery(values, helpRoute);
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
@@ -3167,6 +3222,7 @@ function parseArchiveArguments(
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
           objectId: archivePath,
+          ...(values.reverse === true ? { reverse: true } : {}),
         },
         help: false,
         kind: "archive",
@@ -3188,6 +3244,7 @@ function parseArchiveArguments(
       if (relatedTarget === "chunk") {
         rejectArchiveFlag(action, "--role", values.role, helpRoute);
       }
+      rejectArchiveReverseQuery(values, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       return {
@@ -3210,6 +3267,7 @@ function parseArchiveArguments(
               }),
           objectId: archivePath,
           ...(values.query === undefined ? {} : { query: values.query }),
+          ...(values.reverse === true ? { reverse: true } : {}),
           ...(relatedTarget === "entity"
             ? parseRelatedRoleFlag(values.role, helpRoute)
             : {}),
@@ -3233,6 +3291,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+      rejectArchiveReverseQuery(values, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
       validateEvidenceTargetUri(archivePath, helpRoute);
       return {
@@ -3254,6 +3313,7 @@ function parseArchiveArguments(
               }),
           objectId: archivePath,
           ...(values.query === undefined ? {} : { query: values.query }),
+          ...(values.reverse === true ? { reverse: true } : {}),
         },
         help: false,
         kind: "archive",
@@ -3274,6 +3334,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+      rejectArchiveBooleanFlag(action, "--reverse", values.reverse, helpRoute);
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
@@ -3302,6 +3363,7 @@ function parseArchiveArguments(
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
+      rejectArchiveBooleanFlag(action, "--reverse", values.reverse, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
@@ -4887,6 +4949,17 @@ function parseSourceContextFlag(
   };
 }
 
+function rejectArchiveReverseQuery(
+  values: Pick<ArchiveArgumentValues, "query" | "reverse">,
+  helpRoute: string,
+): void {
+  if (values.query !== undefined && values.reverse === true) {
+    throw new Error(
+      withHelpRoute("`--reverse` cannot be combined with --query.", helpRoute),
+    );
+  }
+}
+
 function parseRelatedRoleFlag(
   value: string | undefined,
   helpRoute: string,
@@ -4968,6 +5041,7 @@ function normalizeArchiveInlineOptions(
     switch (item) {
       case "--json":
       case "--confirm":
+      case "--reverse":
         normalizedValues[item.slice(2)] = true;
         continue;
       case "--budget":

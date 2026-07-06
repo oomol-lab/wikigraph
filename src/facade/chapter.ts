@@ -25,6 +25,7 @@ export interface ChapterEntry {
   readonly chapterId: number;
   readonly childCount: number;
   readonly depth: number;
+  readonly documentOrder: number;
   readonly fragmentCount: number;
   readonly stage: ChapterStage;
   readonly title: string | null;
@@ -689,12 +690,16 @@ async function createChapterEntry(
     readonly tocPath: readonly string[];
   },
 ): Promise<ChapterEntry> {
-  const sourceSummary = await summarizeSerialSource(document, serialId);
+  const [serial, sourceSummary] = await Promise.all([
+    document.serials.getById(serialId),
+    summarizeSerialSource(document, serialId),
+  ]);
 
   return {
     chapterId: serialId,
     childCount: item.children.length,
     depth: input.depth,
+    documentOrder: serial?.documentOrder ?? serialId,
     fragmentCount: sourceSummary.fragmentCount,
     stage: await resolveChapterStage(
       document,
