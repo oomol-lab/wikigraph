@@ -114,7 +114,7 @@ describe("cli/args", () => {
     );
   });
 
-  it("renders archive-first stdin create recipes", () => {
+  it("renders archive-first create recipes", () => {
     const recipeHelp = parseCLIArguments(["help", "recipe"]);
 
     expect(recipeHelp.help).toBe(true);
@@ -123,7 +123,7 @@ describe("cli/args", () => {
       throw new Error("Expected recipe help");
     }
     expect(recipeHelp.helpText).toContain(
-      "cat article.md | wikigraph wikg://article.wikg create --input-format markdown",
+      "wikigraph wikg://book.wikg create --import ./book.epub",
     );
     expect(recipeHelp.helpText).toContain(
       "cat chapter.txt | wikigraph transform --input-format txt --output-format markdown",
@@ -589,39 +589,21 @@ describe("cli/args", () => {
       parseCLIArguments([
         "wikg://book.wikg",
         "create",
-        "book.md",
-        "--input-format",
-        "markdown",
+        "--import",
+        "book.epub",
         "--replace",
       ]),
     ).toStrictEqual({
       args: {
         action: "create",
         archivePath: archivePath,
-        inputFormat: "markdown",
+        importPath: "book.epub",
         replace: true,
-        sourcePath: "book.md",
       },
       help: false,
       kind: "archive",
     });
 
-    expect(
-      parseCLIArguments([
-        "wikg://book.wikg",
-        "create",
-        "--input-format",
-        "markdown",
-      ]),
-    ).toStrictEqual({
-      args: {
-        action: "create",
-        archivePath: archivePath,
-        inputFormat: "markdown",
-      },
-      help: false,
-      kind: "archive",
-    });
     expect(parseCLIArguments(["wikg://book.wikg", "create"])).toStrictEqual({
       args: {
         action: "create",
@@ -630,6 +612,9 @@ describe("cli/args", () => {
       help: false,
       kind: "archive",
     });
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "create", "book.epub"]),
+    ).toThrow("Unexpected positional arguments for `create`: book.epub.");
     expect(
       parseCLIArguments(["wikg://book.wikg", "create", "--json"]),
     ).toStrictEqual({
@@ -990,12 +975,7 @@ describe("cli/args", () => {
       ]),
     ).toThrow("Unknown option '--order'.");
     expect(() =>
-      parseCLIArguments([
-        "wikg://book.wikg",
-        "create",
-        "source.md",
-        "--evidence",
-      ]),
+      parseCLIArguments(["wikg://book.wikg", "create", "--evidence"]),
     ).toThrow("The `create` command does not support --evidence.");
     expect(() =>
       parseCLIArguments(["wikg://book.wikg", "export", "--evidence"]),
@@ -1342,20 +1322,29 @@ describe("cli/args", () => {
         "set",
         "--input",
         "chapter.md",
-        "--input-format",
-        "markdown",
       ]),
     ).toStrictEqual({
       args: {
         action: "set-source",
         chapterId: 12,
-        inputFormat: "markdown",
         inputPath: "chapter.md",
         path: archivePath,
       },
       help: false,
       kind: "chapter",
     });
+    expect(() =>
+      parseCLIArguments([
+        "wikg://book.wikg/chapter/12/source",
+        "set",
+        "--input",
+        "chapter.txt",
+        "--input-format",
+        "txt",
+      ]),
+    ).toThrow(
+      "The `chapter set-source` action does not support --input-format.",
+    );
     expect(
       parseCLIArguments([
         "wikg://book.wikg/chapter",
@@ -1636,6 +1625,31 @@ describe("cli/args", () => {
         "--clear",
       ]),
     ).toThrow("does not support --clear. Use `clear`.");
+    expect(() =>
+      parseCLIArguments([
+        "wikg://book.wikg/chapter/12/summary",
+        "set",
+        "--import",
+        "book.epub",
+      ]),
+    ).toThrow("The `chapter set-summary` action does not support --import.");
+    expect(() =>
+      parseCLIArguments([
+        "wikg://book.wikg/chapter/12/title",
+        "set",
+        "Title",
+        "--import",
+        "book.epub",
+      ]),
+    ).toThrow("The `chapter set-title` action does not support --import.");
+    expect(() =>
+      parseCLIArguments([
+        "wikg://book.wikg/chapter/tree",
+        "set",
+        "--import",
+        "book.epub",
+      ]),
+    ).toThrow("The `chapter tree` action does not support --import.");
   });
 
   it("prints archive maintenance help pages", () => {
@@ -1771,15 +1785,9 @@ describe("cli/args", () => {
 
   it("rejects invalid format flags", () => {
     expect(() =>
-      parseCLIArguments([
-        "wikg://book.wikg",
-        "create",
-        "book.md",
-        "--input-format",
-        "pdf",
-      ]),
+      parseCLIArguments(["wikg://book.wikg", "create", "--import", "pdf"]),
     ).toThrow(
-      "Invalid --input-format: pdf. Expected one of wikg, epub, txt, markdown.\nSee: wikigraph help format",
+      "`create --import` only supports EPUB input.\nSee: wikigraph wikg://book.wikg create --help",
     );
     expect(() =>
       parseCLIArguments([
@@ -1833,9 +1841,7 @@ describe("cli/args", () => {
     );
     expect(() =>
       parseCLIArguments(["wikg://book.wikg/chapter/1/source", "set"]),
-    ).toThrow(
-      "Missing --input-format. `chapter set-source` requires txt or markdown.\nSee: wikigraph wikg://book.wikg/chapter/1/source set --help",
-    );
+    ).not.toThrow();
     expect(() =>
       parseCLIArguments([
         "wikg://book.wikg/chapter/1/source",
@@ -2165,14 +2171,8 @@ describe("cli/args", () => {
     expect(rootHelpText).not.toContain("wikigraph help overview");
     expect(rootHelpText).not.toContain("wikigraph help command");
     expect(() =>
-      parseCLIArguments([
-        "wikg://book.wikg",
-        "create",
-        "book.md",
-        "--input-format",
-        "pdf",
-      ]),
-    ).toThrow("See: wikigraph help format");
+      parseCLIArguments(["wikg://book.wikg", "create", "--import", "book.pdf"]),
+    ).toThrow("See: wikigraph wikg://book.wikg create --help");
     expect(() => parseCLIArguments(["wikg", "inspect"])).toThrow(
       "See: wikigraph --help",
     );

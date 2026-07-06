@@ -335,7 +335,6 @@ describe("cli/archive-chapter", () => {
     await runArchiveChapterCommand({
       action: "add",
       addStage: "sourced",
-      inputFormat: "markdown",
       inputPath: "/tmp/chapter.md",
       path: "/tmp/book.wikg",
       title: "New Chapter",
@@ -359,7 +358,6 @@ describe("cli/archive-chapter", () => {
     await runArchiveChapterCommand({
       action: "set-source",
       chapterId: 2,
-      inputFormat: "markdown",
       inputPath: "/tmp/chapter.md",
       path: "/tmp/book.wikg",
     });
@@ -376,7 +374,6 @@ describe("cli/archive-chapter", () => {
     await runArchiveChapterCommand({
       action: "set-source",
       chapterId: 2,
-      inputFormat: "txt",
       inputValue: "inline source",
       path: "/tmp/book.wikg",
     });
