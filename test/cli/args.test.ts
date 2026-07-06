@@ -260,7 +260,9 @@ describe("cli/args", () => {
   it("parses archive index object commands", () => {
     expect(() =>
       parseCLIArguments(["wikg:///tmp/book.wikg/index", "enable", "--json"]),
-    ).toThrow("The `enable` command does not support --json.");
+    ).toThrow(
+      "The `enable` command does not support --json because it streams progress events. Use --jsonl for line-delimited progress output.",
+    );
     expect(() =>
       parseCLIArguments(["wikg:///tmp/book.wikg/index", "--reverse"]),
     ).toThrow("The `get` command does not support --reverse.");
@@ -517,7 +519,9 @@ describe("cli/args", () => {
 
     expect(() =>
       parseCLIArguments(["wikg://local/job/job-1", "watch", "--json"]),
-    ).toThrow("does not support --json");
+    ).toThrow(
+      "The `watch` command does not support --json because it streams progress events. Use --jsonl for line-delimited progress output.",
+    );
     expect(() => parseCLIArguments(["wikg://local/job", "--jsonl"])).toThrow(
       "does not support --jsonl",
     );

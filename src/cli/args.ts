@@ -1098,7 +1098,7 @@ function parseArchiveIndexUriArguments(
   rejectArchiveBooleanFlag(action, "--dry-run", values["dry-run"], helpRoute);
   rejectArchiveBooleanFlag(action, "--first", values.first, helpRoute);
   if (action === "enable") {
-    rejectArchiveBooleanFlag(action, "--json", values.json, helpRoute);
+    rejectStreamingJSONFlag(action, values.json, helpRoute);
   } else {
     rejectArchiveBooleanFlag(action, "--jsonl", values.jsonl, helpRoute);
   }
@@ -2627,7 +2627,7 @@ function parseQueueWorkerArguments(
 ): ParsedCLIArguments {
   const helpRoute = "wikigraph help";
 
-  rejectQueueJSONFlag("worker", values.json, helpRoute);
+  rejectStreamingJSONFlag("worker", values.json, helpRoute);
   rejectQueueJSONLFlag("worker", values.jsonl, helpRoute);
   rejectQueueExtraPositionals(
     "worker",
@@ -2657,6 +2657,23 @@ function rejectQueueJSONFlag(
   throw new Error(
     withHelpRoute(
       `\`wikigraph wikg://local/job ${action}\` does not support --json.`,
+      helpRoute,
+    ),
+  );
+}
+
+function rejectStreamingJSONFlag(
+  action: string,
+  value: boolean | undefined,
+  helpRoute: string,
+): void {
+  if (value !== true) {
+    return;
+  }
+
+  throw new Error(
+    withHelpRoute(
+      `The \`${action}\` command does not support --json because it streams progress events. Use --jsonl for line-delimited progress output.`,
       helpRoute,
     ),
   );
@@ -2744,7 +2761,7 @@ function parseQueueJobArguments(
   if (action === "status") {
     rejectQueueJSONLFlag(action, values.jsonl, helpRoute);
   } else if (action === "watch") {
-    rejectQueueJSONFlag(action, values.json, helpRoute);
+    rejectStreamingJSONFlag(action, values.json, helpRoute);
   } else {
     rejectQueueJSONFlag(action, values.json, helpRoute);
     rejectQueueJSONLFlag(action, values.jsonl, helpRoute);
