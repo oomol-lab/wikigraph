@@ -212,13 +212,6 @@ export async function generateChapterKnowledgeGraphArtifact(
     text,
   });
   await options.progressTracker?.throwIfStopped();
-  await options.progressTracker?.updatePhase({
-    done: 0,
-    phase: "relation-discovery",
-    total: mentions.length,
-    unit: "record",
-  });
-
   const mentionLinks = await discoverMentionLinks({
     fragments,
     mentions,
@@ -233,12 +226,6 @@ export async function generateChapterKnowledgeGraphArtifact(
     mentions,
     parameter: createKnowledgeGraphParameterInput(options),
     workspacePath: options.workspacePath,
-  });
-  await options.progressTracker?.updatePhase({
-    done: mentions.length,
-    phase: "relation-discovery",
-    total: mentions.length,
-    unit: "record",
   });
 
   return artifact;
