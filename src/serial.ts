@@ -122,7 +122,9 @@ export async function writeSerialSource(
   const serialFragments = document.getSerialFragments(serialId);
 
   await serialFragments.writeTextStream(await collectTextStream(stream), {
-    ...(options.segmenter === undefined ? {} : { segmenter: options.segmenter }),
+    ...(options.segmenter === undefined
+      ? {}
+      : { segmenter: options.segmenter }),
   });
   await document.serials.bumpRevision(serialId);
 }

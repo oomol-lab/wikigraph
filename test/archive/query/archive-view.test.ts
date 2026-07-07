@@ -230,7 +230,9 @@ describe("archive/query/archive-view", () => {
       try {
         await document.openSession(async (openedDocument) => {
           await openedDocument.createSerial();
-          await openedDocument.getSerialFragments(1).writeTextStream(sourceText);
+          await openedDocument
+            .getSerialFragments(1)
+            .writeTextStream(sourceText);
           await openedDocument.writeToc({
             items: [{ children: [], serialId: 1, title: "Chapter 1" }],
             version: 1,

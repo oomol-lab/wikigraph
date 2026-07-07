@@ -4167,8 +4167,7 @@ async function readTextStreamRange(
   const text =
     normalizeRenderedTextStreamRange(
       await readTextStreamRawRange(document, chapterId, stream, start, end),
-    ) ??
-    joinTextStreamSentences(sentences);
+    ) ?? joinTextStreamSentences(sentences);
 
   return {
     endSentenceIndex: end,

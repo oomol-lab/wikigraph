@@ -43,9 +43,7 @@ interface TextStreamFileAccess {
 }
 
 interface TextStreamSentenceSegmenter {
-  pipe(
-    stream: Iterable<string>,
-  ): AsyncIterable<{
+  pipe(stream: Iterable<string>): AsyncIterable<{
     readonly offset: number;
     readonly text: string;
     readonly wordsCount: number;
@@ -356,10 +354,7 @@ export class SerialTextStream implements ReadonlySerialTextStream {
     options: WriteTextStreamOptions = {},
   ): Promise<void> {
     await this.delete();
-    const sentences = await splitTextIntoSentenceSpans(
-      text,
-      options.segmenter,
-    );
+    const sentences = await splitTextIntoSentenceSpans(text, options.segmenter);
     const draft = await this.createDraft();
 
     for (const sentence of sentences) {
@@ -676,12 +671,14 @@ export class TextStreamDraft {
 async function splitTextIntoSentenceSpans(
   text: string,
   segmenter: TextStreamSentenceSegmenter | undefined,
-): Promise<ReadonlyArray<
-  SentenceRecord & {
-    readonly byteOffset: number;
-    readonly byteLength: number;
-  }
->> {
+): Promise<
+  ReadonlyArray<
+    SentenceRecord & {
+      readonly byteOffset: number;
+      readonly byteLength: number;
+    }
+  >
+> {
   if (segmenter !== undefined) {
     return await splitTextIntoCustomSentenceSpans(text, segmenter);
   }
@@ -735,7 +732,10 @@ async function splitTextIntoCustomSentenceSpans(
   > = [];
 
   for await (const segment of segmenter.pipe([text])) {
-    const rawText = text.slice(segment.offset, segment.offset + segment.text.length);
+    const rawText = text.slice(
+      segment.offset,
+      segment.offset + segment.text.length,
+    );
 
     if (rawText.trim() === "") {
       continue;

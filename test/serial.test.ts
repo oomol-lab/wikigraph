@@ -273,7 +273,8 @@ describe("serial", () => {
   it("preserves imported source text while exposing normalized sentences", async () => {
     await withTempDir("spinedigest-serial-", async (path) => {
       const document = await DirectoryDocument.open(path);
-      const sourceText = "\n\n  Alpha wraps\ninside one sentence. Beta follows.\n\n";
+      const sourceText =
+        "\n\n  Alpha wraps\ninside one sentence. Beta follows.\n\n";
 
       try {
         await document.serials.createWithId(1);
