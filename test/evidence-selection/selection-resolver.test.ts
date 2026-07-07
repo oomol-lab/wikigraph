@@ -145,6 +145,23 @@ describe("evidence-selection/selection-resolver", () => {
     });
   });
 
+  it("adds a sentence-boundary hint when a failed quote appears to span sentences", () => {
+    const [resolution, failure] = resolveEvidenceSelection({
+      evidence: {
+        quote: "unrelated public university. Another unmatched sentence.",
+      },
+      sentences: SENTENCES,
+    });
+
+    expect(resolution).toBeUndefined();
+    expect(failure).toMatchObject({
+      code: "low_confidence",
+    });
+    expect(failure?.message).toContain(
+      "Evidence quote appears to contain more than one sentence.",
+    );
+  });
+
   it("ranks quote candidates independently from business objects", () => {
     const ranked = rankEvidenceQuote("Beta in Vienna", SENTENCES);
 

@@ -5,6 +5,7 @@ import {
   type PreparedEvidenceQuote,
   type EvidenceQuoteScore,
 } from "./quote-score.js";
+import { splitTextIntoSentences } from "./text.js";
 import type {
   EvidenceSelection,
   EvidenceSelectionCandidate,
@@ -122,6 +123,7 @@ export function resolveEvidenceSelection(input: {
 
   const secondScore = candidates[1]?.score ?? 0;
   const gap = topCandidate.score - secondScore;
+  const boundaryHint = formatSentenceBoundaryHint(quote);
 
   if (topCandidate.score < LOW_CONFIDENCE_MAX_SCORE) {
     return [
@@ -131,7 +133,8 @@ export function resolveEvidenceSelection(input: {
         code: "low_confidence",
         message:
           "Evidence quote could not be matched confidently. " +
-          `Best candidate score=${topCandidate.score.toFixed(3)}.`,
+          `Best candidate score=${topCandidate.score.toFixed(3)}.` +
+          boundaryHint,
       },
     ];
   }
@@ -154,9 +157,22 @@ export function resolveEvidenceSelection(input: {
       candidates: candidates.slice(0, MAX_CANDIDATES),
       code: "ambiguous",
       message:
-        "Evidence quote is ambiguous. Choose one candidate occurrence ID.",
+        "Evidence quote is ambiguous. Choose one candidate occurrence ID." +
+        boundaryHint,
     },
   ];
+}
+
+function formatSentenceBoundaryHint(quote: string): string {
+  if (splitTextIntoSentences(quote).length <= 1) {
+    return "";
+  }
+
+  return (
+    " Evidence quote appears to contain more than one sentence. " +
+    "Each evidence item must stay within one source sentence. " +
+    "Recheck whether this evidence should be shortened, split into multiple evidence items, or removed."
+  );
 }
 
 export function resolveEvidenceSelectionList(input: {

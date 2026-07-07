@@ -1,12 +1,16 @@
 export const EVIDENCE_SELECTION_PROMPT_FRAGMENT = [
   "Evidence selection:",
   '- Return evidence as [{"sentence_id":"S1","quote":"exact short source quote"}].',
+  "- evidence.quote is a locator for the source sentence, not a proof excerpt.",
+  "- Choose the shortest exact quote that still uniquely identifies the intended sentence.",
+  "- If the quote is too short, it may match multiple sentences; if it is too long, it may include unnecessary text or cross sentence boundaries.",
+  "- Do not use a whole sentence by default.",
   "- evidence is an array. Use multiple items when the claim needs multiple source sentences.",
   "- Each evidence item must point to exactly one source sentence.",
+  "- Each evidence item must quote one continuous span from exactly one source sentence.",
   "- sentence_id must be one of the sentence IDs shown in the source context.",
   "- quote must be copied from the untagged original source sentence.",
   "- If the source context contains XML-like tags, do not copy the tags into quote; copy only the visible text.",
-  "- Use the shortest exact quote that identifies the evidence inside the selected sentence.",
 ].join("\n");
 
 export const EVIDENCE_SELECTION_JSON_SHAPE = [
