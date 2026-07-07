@@ -4165,7 +4165,9 @@ async function readTextStreamRange(
   const end = clampInteger(endSentenceIndex, start, lastSentenceIndex);
   const sentences = index.sentences.slice(start, end + 1);
   const text =
-    (await readTextStreamRawRange(document, chapterId, stream, start, end)) ??
+    normalizeRenderedTextStreamRange(
+      await readTextStreamRawRange(document, chapterId, stream, start, end),
+    ) ??
     joinTextStreamSentences(sentences);
 
   return {
@@ -4219,6 +4221,14 @@ function joinTextStreamSentences(
   sentences: readonly Pick<ArchiveTextStreamSentence, "text">[],
 ): string {
   return sentences.map((sentence) => sentence.text).join("");
+}
+
+function normalizeRenderedTextStreamRange(
+  text: string | undefined,
+): string | undefined {
+  return text
+    ?.replace(/^(?:[^\S\r\n]*(?:\r\n|\n|\r))+/u, "")
+    .replace(/(?:(?:\r\n|\n|\r)[^\S\r\n]*)+$/u, "");
 }
 
 async function getTextStreamIndex(

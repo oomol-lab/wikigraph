@@ -225,7 +225,7 @@ describe("archive/query/archive-view", () => {
   it("renders source text from the stored text stream without sentence newlines", async () => {
     await withTempDir("spinedigest-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);
-      const sourceText = "Alpha one.\n\nBeta two.";
+      const sourceText = "\n\n  Alpha one.\n\nBeta two.\n\n";
 
       try {
         await document.openSession(async (openedDocument) => {
@@ -251,8 +251,8 @@ describe("archive/query/archive-view", () => {
         if (fullPage.type !== "fragment" || rangePage.type !== "fragment") {
           throw new Error("Expected source fragment pages");
         }
-        expect(fullPage.fragment.text).toBe(sourceText);
-        expect(rangePage.fragment.text).toBe(sourceText);
+        expect(fullPage.fragment.text).toBe("  Alpha one.\n\nBeta two.");
+        expect(rangePage.fragment.text).toBe("  Alpha one.\n\nBeta two.");
       } finally {
         await document.release();
       }

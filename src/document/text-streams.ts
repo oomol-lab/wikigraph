@@ -3,7 +3,12 @@ import { join, resolve } from "path";
 
 import { isNodeError } from "../utils/node-error.js";
 import type { Database } from "./database.js";
-import type { FragmentRecord, SentenceId, SentenceRecord } from "./types.js";
+import {
+  Sentence,
+  type FragmentRecord,
+  type SentenceId,
+  type SentenceRecord,
+} from "./types.js";
 
 const DEFAULT_FRAGMENT_WORDS_COUNT = 600;
 const TEXT_STREAM_KIND = {
@@ -35,6 +40,20 @@ interface TextStreamFileAccess {
     content: string | Uint8Array,
     options: { readonly overwrite?: boolean },
   ): Promise<void>;
+}
+
+interface TextStreamSentenceSegmenter {
+  pipe(
+    stream: Iterable<string>,
+  ): AsyncIterable<{
+    readonly offset: number;
+    readonly text: string;
+    readonly wordsCount: number;
+  }>;
+}
+
+interface WriteTextStreamOptions {
+  readonly segmenter?: TextStreamSentenceSegmenter;
 }
 
 const DEFAULT_FILE_ACCESS: TextStreamFileAccess = {
@@ -313,15 +332,15 @@ export class SerialTextStream implements ReadonlySerialTextStream {
     location: TextSentenceLocation,
     content: Buffer,
   ): SentenceRecord {
-    return {
-      text: content
+    return new Sentence(
+      content
         .subarray(
           location.byteOffset,
           location.byteOffset + location.byteLength,
         )
         .toString("utf8"),
-      wordsCount: location.wordsCount,
-    };
+      location.wordsCount,
+    );
   }
 
   public async readText(): Promise<string | undefined> {
@@ -332,9 +351,15 @@ export class SerialTextStream implements ReadonlySerialTextStream {
       : Buffer.from(content).toString("utf8");
   }
 
-  public async writeTextStream(text: string): Promise<void> {
+  public async writeTextStream(
+    text: string,
+    options: WriteTextStreamOptions = {},
+  ): Promise<void> {
     await this.delete();
-    const sentences = splitTextIntoSentenceSpans(text);
+    const sentences = await splitTextIntoSentenceSpans(
+      text,
+      options.segmenter,
+    );
     const draft = await this.createDraft();
 
     for (const sentence of sentences) {
@@ -381,7 +406,7 @@ export class SerialTextStream implements ReadonlySerialTextStream {
       existing === undefined ? Buffer.alloc(0) : Buffer.from(existing);
     const text =
       textOverride === ""
-        ? sentences.map((sentence) => sentence.text).join("")
+        ? sentences.map(getSentenceRawText).join("")
         : textOverride;
     const appendBuffer = Buffer.from(text, "utf8");
     let offset = existingBuffer.length;
@@ -588,17 +613,16 @@ export class TextStreamDraft {
   ): SentenceId {
     this.#assertActive();
     const sentenceIndex = this.#startSentenceIndex + this.#sentences.length;
+    const sentence = new Sentence(text, wordsCount);
 
-    this.#sentences.push({
-      text,
-      wordsCount,
-      ...(location === undefined
-        ? {}
-        : {
-            byteLength: location.byteLength,
-            byteOffset: location.byteOffset,
-          }),
-    });
+    if (location !== undefined) {
+      Object.assign(sentence, {
+        byteLength: location.byteLength,
+        byteOffset: location.byteOffset,
+      });
+    }
+
+    this.#sentences.push(sentence);
 
     return [this.#serialId, sentenceIndex];
   }
@@ -649,11 +673,59 @@ export class TextStreamDraft {
   }
 }
 
-function splitTextIntoSentenceSpans(text: string): ReadonlyArray<
+async function splitTextIntoSentenceSpans(
+  text: string,
+  segmenter: TextStreamSentenceSegmenter | undefined,
+): Promise<ReadonlyArray<
   SentenceRecord & {
     readonly byteOffset: number;
     readonly byteLength: number;
   }
+>> {
+  if (segmenter !== undefined) {
+    return await splitTextIntoCustomSentenceSpans(text, segmenter);
+  }
+
+  const spans: Array<
+    SentenceRecord & {
+      readonly byteOffset: number;
+      readonly byteLength: number;
+    }
+  > = [];
+
+  for (const segment of createSentenceSegmenter().segment(text)) {
+    const rawText = segment.segment;
+
+    if (rawText.trim() === "") {
+      continue;
+    }
+    const sentence = new Sentence(rawText, countWords(rawText));
+
+    Object.assign(sentence, {
+      byteLength: Buffer.byteLength(rawText, "utf8"),
+      byteOffset: Buffer.byteLength(text.slice(0, segment.index), "utf8"),
+    });
+    spans.push(
+      sentence as unknown as SentenceRecord & {
+        readonly byteOffset: number;
+        readonly byteLength: number;
+      },
+    );
+  }
+
+  return spans;
+}
+
+async function splitTextIntoCustomSentenceSpans(
+  text: string,
+  segmenter: TextStreamSentenceSegmenter,
+): Promise<
+  ReadonlyArray<
+    SentenceRecord & {
+      readonly byteOffset: number;
+      readonly byteLength: number;
+    }
+  >
 > {
   const spans: Array<
     SentenceRecord & {
@@ -661,35 +733,38 @@ function splitTextIntoSentenceSpans(text: string): ReadonlyArray<
       readonly byteLength: number;
     }
   > = [];
-  const pattern = /\S[^\n]*(?:\n(?!\n)\s*[^\n]+)*/gu;
 
-  for (const match of text.matchAll(pattern)) {
-    const raw = match[0];
-    const start = match.index;
+  for await (const segment of segmenter.pipe([text])) {
+    const rawText = text.slice(segment.offset, segment.offset + segment.text.length);
 
-    if (start === undefined) {
+    if (rawText.trim() === "") {
       continue;
     }
+    const sentence = new Sentence(rawText, segment.wordsCount);
 
-    const leadingWhitespaceLength = raw.length - raw.trimStart().length;
-    const trailingWhitespaceLength = raw.length - raw.trimEnd().length;
-    const sentenceStart = start + leadingWhitespaceLength;
-    const sentenceEnd = start + raw.length - trailingWhitespaceLength;
-    const sentence = text.slice(sentenceStart, sentenceEnd);
-
-    if (sentence === "") {
-      continue;
-    }
-
-    spans.push({
-      byteLength: Buffer.byteLength(sentence, "utf8"),
-      byteOffset: Buffer.byteLength(text.slice(0, sentenceStart), "utf8"),
-      text: sentence,
-      wordsCount: countWords(sentence),
+    Object.assign(sentence, {
+      byteLength: Buffer.byteLength(rawText, "utf8"),
+      byteOffset: Buffer.byteLength(text.slice(0, segment.offset), "utf8"),
     });
+    spans.push(
+      sentence as unknown as SentenceRecord & {
+        readonly byteOffset: number;
+        readonly byteLength: number;
+      },
+    );
   }
 
   return spans;
+}
+
+let SENTENCE_SEGMENTER: Intl.Segmenter | undefined;
+
+function createSentenceSegmenter(): Intl.Segmenter {
+  SENTENCE_SEGMENTER ??= new Intl.Segmenter(undefined, {
+    granularity: "sentence",
+  });
+
+  return SENTENCE_SEGMENTER;
 }
 
 function countWords(text: string): number {
@@ -716,5 +791,11 @@ function getSentenceByteLength(sentence: SentenceRecord): number {
 
   return typeof value === "number"
     ? value
-    : Buffer.byteLength(sentence.text, "utf8");
+    : Buffer.byteLength(getSentenceRawText(sentence), "utf8");
+}
+
+function getSentenceRawText(sentence: SentenceRecord): string {
+  const value = (sentence as { readonly rawText?: unknown }).rawText;
+
+  return typeof value === "string" ? value : sentence.text;
 }
