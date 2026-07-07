@@ -253,7 +253,10 @@ function parseRelationResponse(
       continue;
     }
     if (source.id === target.id) {
-      issues.push(`${prefix} links a mention to itself.`);
+      issues.push(
+        `${prefix} links a mention to itself. ` +
+          "Use two different tagged mention IDs, or remove the relation if the other endpoint is not tagged.",
+      );
       continue;
     }
 
@@ -388,6 +391,9 @@ function formatRelationSystemPrompt(): string {
     "- Return JSON only.",
     "- Return only relations that are directly supported by the source text.",
     '- Every relation must connect two mention IDs from the <mention id="..." qid="..."> tags.',
+    "- A relation is valid only when both endpoints are explicitly tagged mentions in the source context.",
+    "- If a supported relation would require a subject or object that is not tagged with a mention ID, skip that relation.",
+    "- Do not invent mention IDs, and do not reuse another mention as a placeholder for an untagged endpoint.",
     "- sourceMentionId and targetMentionId must be different mention IDs; never link a mention to itself.",
     "- Do not create a relation just because two mentions are nearby.",
     "- If the text explicitly states both a positive relation and a negated/distinction relation between mentions, return both relations when both are directly supported.",
