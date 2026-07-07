@@ -4,7 +4,7 @@ import { tmpdir } from "os";
 import { join, resolve } from "path";
 
 const packageRoot = resolve(import.meta.dirname, "..");
-const tempRoot = mkdtempSync(join(tmpdir(), "wikigraph-pack-"));
+const tempRoot = mkdtempSync(join(tmpdir(), "wiki-graph-pack-"));
 let tarballName;
 
 try {
@@ -16,7 +16,7 @@ try {
 
   writeFileSync(
     join(tempRoot, "package.json"),
-    JSON.stringify({ name: "wikigraph-pack-smoke", private: true }),
+    JSON.stringify({ name: "wiki-graph-pack-smoke", private: true }),
   );
 
   const tarballPath = join(packageRoot, tarballName);
@@ -31,7 +31,7 @@ try {
     [
       "-e",
       [
-        'const mod = require("spinedigest");',
+        'const mod = require("wiki-graph");',
         'if (typeof mod.SpineDigestApp !== "function") {',
         '  throw new Error("CommonJS export SpineDigestApp is not available");',
         "}",
@@ -49,7 +49,7 @@ try {
       "--input-type=module",
       "-e",
       [
-        'const mod = await import("spinedigest");',
+        'const mod = await import("wiki-graph");',
         'if (typeof mod.SpineDigestApp !== "function") {',
         '  throw new Error("ESM export SpineDigestApp is not available");',
         "}",
@@ -65,7 +65,7 @@ try {
   const installedCliPath = join(
     tempRoot,
     "node_modules",
-    "spinedigest",
+    "wiki-graph",
     "dist",
     "cli.js",
   );
