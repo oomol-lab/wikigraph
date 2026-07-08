@@ -1,4 +1,4 @@
-import { readdir, readFile } from "fs/promises";
+import { mkdir, readdir, readFile } from "fs/promises";
 
 import { describe, expect, it } from "vitest";
 
@@ -233,6 +233,50 @@ describe("wikipage/resolver", () => {
         responseText: "service unavailable",
         status: 503,
       });
+    });
+  });
+
+  it("does not fail requests when fetch logging fails", async () => {
+    await withTempDir("spinedigest-wikipage-", async (path) => {
+      const calls: string[] = [];
+
+      await expect(
+        withLoggingContext(
+          {
+            logDirPath: path,
+            operation: "wikipage-test",
+          },
+          async () => {
+            const resolver = await WikipageResolver.open({
+              cacheDatabasePath: `${path}/cache.sqlite`,
+              fetch: createMockFetch(calls),
+              language: "en",
+              logDirPath: path,
+              minRequestIntervalMs: 0,
+              retryBaseDelayMs: 0,
+            });
+
+            try {
+              const runDirName = await readOnlyRunDirName(path);
+              await mkdir(
+                `${path}/${runDirName}/artifacts/wikipage/wikipage-fetch.jsonl`,
+              );
+
+              return await resolver.resolveQids(["Q1"]);
+            } finally {
+              await resolver.close();
+            }
+          },
+        ),
+      ).resolves.toMatchObject([
+        {
+          description: "totality of space and time",
+          label: "Universe",
+          qid: "Q1",
+        },
+      ]);
+
+      expect(calls.length).toBeGreaterThan(0);
     });
   });
 
@@ -507,15 +551,21 @@ function createMockFetch(calls: string[]): typeof fetch {
 }
 
 async function readWikipageFetchLog(logDirPath: string): Promise<string> {
-  const entries = await readdir(logDirPath, { withFileTypes: true });
-  const runEntry = entries.find((entry) => entry.isDirectory());
-
-  expect(runEntry).toBeDefined();
+  const runDirName = await readOnlyRunDirName(logDirPath);
 
   return await readFile(
-    `${logDirPath}/${runEntry!.name}/artifacts/wikipage/wikipage-fetch.jsonl`,
+    `${logDirPath}/${runDirName}/artifacts/wikipage/wikipage-fetch.jsonl`,
     "utf8",
   );
+}
+
+async function readOnlyRunDirName(logDirPath: string): Promise<string> {
+  const entries = await readdir(logDirPath, { withFileTypes: true });
+  const runEntries = entries.filter((entry) => entry.isDirectory());
+
+  expect(runEntries).toHaveLength(1);
+
+  return runEntries[0]!.name;
 }
 
 function readBatchSample(entry: Record<string, unknown>): readonly unknown[] {

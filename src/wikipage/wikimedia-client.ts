@@ -1,5 +1,7 @@
 import { DomUtils, parseDocument } from "htmlparser2";
 
+import { getLogger } from "../common/logging.js";
+import { formatError } from "../utils/node-error.js";
 import type { WikipageFetchLog } from "./fetch-log.js";
 import { RateLimiter, parseRetryAfterMs } from "./rate-limiter.js";
 
@@ -246,7 +248,7 @@ export class WikimediaClient {
             },
       );
     } catch (error) {
-      await this.#requestLog.append({
+      await this.#appendFetchLog({
         attempt,
         durationMs: Date.now() - startedAt,
         error,
@@ -266,7 +268,7 @@ export class WikimediaClient {
         ? await response.text()
         : undefined;
 
-      await this.#requestLog.append({
+      await this.#appendFetchLog({
         attempt,
         durationMs: Date.now() - startedAt,
         response,
@@ -277,7 +279,7 @@ export class WikimediaClient {
       throw new WikimediaRequestError(url, response.status, retryAfterMs);
     }
 
-    await this.#requestLog.append({
+    await this.#appendFetchLog({
       attempt,
       durationMs: Date.now() - startedAt,
       response,
@@ -286,6 +288,18 @@ export class WikimediaClient {
     });
 
     return asRecord(await response.json());
+  }
+
+  async #appendFetchLog(
+    entry: Parameters<WikipageFetchLog["append"]>[0],
+  ): Promise<void> {
+    try {
+      await this.#requestLog.append(entry);
+    } catch (error) {
+      getLogger({ component: "wikipage" }).warn(
+        `Failed to write wikipage fetch log entry: ${formatError(error)}`,
+      );
+    }
   }
 }
 
