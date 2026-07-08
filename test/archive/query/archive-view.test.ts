@@ -1473,6 +1473,10 @@ describe("archive/query/archive-view", () => {
         const firstPage = await findArchiveObjects(document, "Source", {
           limit: 1,
         });
+
+        expect(firstPage.items).toHaveLength(1);
+        expect(firstPage.nextCursor).not.toBeNull();
+
         const secondPage = await findArchiveObjects(document, "Source", {
           ...(firstPage.nextCursor === null
             ? {}
@@ -1480,8 +1484,6 @@ describe("archive/query/archive-view", () => {
           limit: 1,
         });
 
-        expect(firstPage.items).toHaveLength(1);
-        expect(firstPage.nextCursor).not.toBeNull();
         expect(secondPage.items).toHaveLength(1);
         expect(secondPage.nextCursor).not.toBe(firstPage.nextCursor);
       } finally {

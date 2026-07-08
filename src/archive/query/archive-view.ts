@@ -1277,7 +1277,9 @@ async function readObjectBucketPage(
   readonly items: readonly ArchiveFindHit[];
   readonly nextCursor: BucketSearchCursor | undefined;
 }> {
-  await populateObjectBucketCaches(document, session);
+  if (!session.objectCachesPopulated) {
+    await populateObjectBucketCaches(document, session);
+  }
   const page = await readSearchSessionObjectBucketPage(
     session.sessionId,
     1,
@@ -1296,7 +1298,11 @@ async function readObjectBucketPage(
       page.length > limit && last !== undefined
         ? {
             bucket: 1,
-            key: { id: getObjectBucketCursorId(last), score: last.score ?? 0 },
+            key: {
+              id: getObjectBucketCursorId(last),
+              kind: last.type === "triple" ? "triple" : "entity",
+              score: last.score ?? 0,
+            },
           }
         : { bucket: 2 },
   };

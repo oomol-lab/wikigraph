@@ -341,10 +341,18 @@ export async function querySearchIndex(
       ]);
 
       for (const hit of objectRows) {
-        objectHitsByKey.set(createObjectHitKey(hit), hit);
+        const key = createObjectHitKey(hit);
+
+        if (!objectHitsByKey.has(key)) {
+          objectHitsByKey.set(key, hit);
+        }
       }
       for (const hit of textRows) {
-        textHitsByKey.set(createTextHitKey(hit), hit);
+        const key = createTextHitKey(hit);
+
+        if (!textHitsByKey.has(key)) {
+          textHitsByKey.set(key, hit);
+        }
       }
       if (
         (!queriesObjects || objectHitsByKey.size >= objectHitLimit) &&

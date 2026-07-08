@@ -110,6 +110,7 @@ export interface SearchSessionDescriptor {
   readonly createdAt: number;
   readonly lens: string;
   readonly match: string;
+  readonly objectCachesPopulated: boolean;
   readonly query: string;
   readonly sessionId: string;
   readonly terms: readonly string[];
@@ -141,6 +142,7 @@ export interface SearchChapterTitleCursorKey {
 
 export interface SearchObjectCursorKey {
   readonly id: string;
+  readonly kind: "entity" | "triple";
   readonly score: number;
 }
 
@@ -165,6 +167,7 @@ CREATE TABLE IF NOT EXISTS search_sessions (
   terms_json TEXT NOT NULL,
   lens TEXT NOT NULL,
   match TEXT NOT NULL,
+  object_caches_populated INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL,
   accessed_at INTEGER NOT NULL
@@ -382,17 +385,14 @@ export async function readSearchSessionObjectBucketPage(
       database,
       sessionId,
       after,
-      limit,
+      limit + 1,
     );
-    const tripleRows =
-      entityRows.length > limit
-        ? []
-        : await readSearchSessionTripleBucketRows(
-            database,
-            sessionId,
-            after,
-            limit,
-          );
+    const tripleRows = await readSearchSessionTripleBucketRows(
+      database,
+      sessionId,
+      after,
+      limit + 1,
+    );
 
     return [...entityRows, ...tripleRows]
       .sort(compareObjectBucketHits)
@@ -536,6 +536,14 @@ export async function populateSearchSessionObjectCaches(input: {
       for (const hit of input.chunkHits ?? []) {
         await upsertSearchChunkHit(database, input.sessionId, hit);
       }
+      await database.run(
+        `
+          UPDATE search_sessions
+          SET object_caches_populated = 1
+          WHERE session_id = ?
+        `,
+        [input.sessionId],
+      );
     });
   } finally {
     await database.close();
@@ -747,6 +755,7 @@ export async function readSearchSessionDescriptor(
       createdAt: session.createdAt,
       lens: session.lens,
       match: session.match,
+      objectCachesPopulated: session.objectCachesPopulated,
       query: session.query,
       sessionId,
       terms: session.terms,
@@ -779,6 +788,7 @@ export async function readSearchSessionMetadataForCursor(
       createdAt: session.createdAt,
       lens: session.lens,
       match: session.match,
+      objectCachesPopulated: session.objectCachesPopulated,
       query: session.query,
       sessionId,
       terms: session.terms,
@@ -1321,6 +1331,7 @@ async function readSearchSessionMetadata(
   readonly sessionId: string;
   readonly terms: readonly string[];
   readonly expiresAt: number;
+  readonly objectCachesPopulated: boolean;
 }> {
   const session = await database.queryOne(
     `
@@ -1331,6 +1342,7 @@ async function readSearchSessionMetadata(
         terms_json,
         lens,
         match,
+        object_caches_populated,
         created_at,
         expires_at
       FROM search_sessions
@@ -1348,6 +1360,7 @@ async function readSearchSessionMetadata(
       expiresAt: getNumber(row, "expires_at"),
       lens: getString(row, "lens"),
       match: getString(row, "match"),
+      objectCachesPopulated: getNumber(row, "object_caches_populated") !== 0,
       options: parseSessionOptions(getString(row, "options_json")),
       query: getString(row, "query"),
       sessionId: getString(row, "session_id"),
@@ -1437,7 +1450,13 @@ async function readSearchSessionEntityBucketRows(
             : `
               AND (
                 result_score < ?
-                OR (result_score = ? AND qid > ?)
+                OR (
+                  result_score = ?
+                  AND (
+                    ? < ?
+                    OR (? = ? AND qid > ?)
+                  )
+                )
               )
             `
         }
@@ -1446,8 +1465,18 @@ async function readSearchSessionEntityBucketRows(
     `,
     [
       sessionId,
-      ...(after === undefined ? [] : [after.score, after.score, after.id]),
-      limit + 1,
+      ...(after === undefined
+        ? []
+        : [
+            after.score,
+            after.score,
+            getObjectBucketKindOrder(after.kind),
+            SEARCH_OBJECT_BUCKET_KIND.entity,
+            getObjectBucketKindOrder(after.kind),
+            SEARCH_OBJECT_BUCKET_KIND.entity,
+            after.id,
+          ]),
+      limit,
     ],
     mapEntitySearchObjectRow,
   );
@@ -1479,10 +1508,16 @@ async function readSearchSessionTripleBucketRows(
                 OR (
                   search_triple_hits.result_score = ?
                   AND (
-                    search_triple_hits.subject_qid || char(31) ||
-                    predicate_dictionary.value || char(31) ||
-                    search_triple_hits.object_qid
-                  ) > ?
+                    ? < ?
+                    OR (
+                      ? = ?
+                      AND (
+                        search_triple_hits.subject_qid || char(31) ||
+                        predicate_dictionary.value || char(31) ||
+                        search_triple_hits.object_qid
+                      ) > ?
+                    )
+                  )
                 )
               )
             `
@@ -1495,8 +1530,18 @@ async function readSearchSessionTripleBucketRows(
     `,
     [
       sessionId,
-      ...(after === undefined ? [] : [after.score, after.score, after.id]),
-      limit + 1,
+      ...(after === undefined
+        ? []
+        : [
+            after.score,
+            after.score,
+            getObjectBucketKindOrder(after.kind),
+            SEARCH_OBJECT_BUCKET_KIND.triple,
+            getObjectBucketKindOrder(after.kind),
+            SEARCH_OBJECT_BUCKET_KIND.triple,
+            after.id,
+          ]),
+      limit,
     ],
     (row) => {
       const subjectQid = getString(row, "subject_qid");
@@ -1526,8 +1571,38 @@ function compareObjectBucketHits(
   right: ArchiveFindHit,
 ): number {
   return (
-    (right.score ?? 0) - (left.score ?? 0) || left.id.localeCompare(right.id)
+    (right.score ?? 0) - (left.score ?? 0) ||
+    getObjectBucketKindOrder(getObjectBucketHitKind(left)) -
+      getObjectBucketKindOrder(getObjectBucketHitKind(right)) ||
+    getObjectBucketHitKey(left).localeCompare(getObjectBucketHitKey(right))
   );
+}
+
+const SEARCH_OBJECT_BUCKET_KIND = {
+  entity: 1,
+  triple: 2,
+} as const;
+
+function getObjectBucketHitKind(
+  hit: ArchiveFindHit,
+): SearchObjectCursorKey["kind"] {
+  return hit.type === "triple" ? "triple" : "entity";
+}
+
+function getObjectBucketHitKey(hit: ArchiveFindHit): string {
+  if (hit.type !== "triple") {
+    return hit.id.slice("wikg://entity/".length);
+  }
+
+  return [
+    hit.triple?.subjectLabel ?? "",
+    hit.triple?.predicate ?? "",
+    hit.triple?.objectLabel ?? "",
+  ].join("\u001f");
+}
+
+function getObjectBucketKindOrder(kind: SearchObjectCursorKey["kind"]): number {
+  return SEARCH_OBJECT_BUCKET_KIND[kind];
 }
 
 function isBucketSearchCursor(value: unknown): value is BucketSearchCursor {
@@ -1566,6 +1641,8 @@ function isObjectCursorKey(value: unknown): value is SearchObjectCursorKey {
     typeof value === "object" &&
     value !== null &&
     typeof (value as SearchObjectCursorKey).id === "string" &&
+    ((value as SearchObjectCursorKey).kind === "entity" ||
+      (value as SearchObjectCursorKey).kind === "triple") &&
     typeof (value as SearchObjectCursorKey).score === "number"
   );
 }
