@@ -18,7 +18,7 @@ export interface SearchSessionInput {
   readonly chunkHits?: readonly SearchChunkHitInput[];
   readonly entityHits?: readonly SearchEntityHitInput[];
   readonly evidenceEvents?: readonly SearchEvidenceHitEventInput[];
-  readonly items: readonly ArchiveFindHit[];
+  readonly items?: readonly ArchiveFindHit[];
   readonly lens: string;
   readonly match: string;
   readonly order: string;
@@ -114,6 +114,46 @@ export interface SearchSessionDescriptor {
   readonly sessionId: string;
   readonly terms: readonly string[];
   readonly types: readonly string[] | null;
+}
+
+export type BucketSearchCursor =
+  | {
+      readonly bucket: 0;
+      readonly key?: SearchChapterTitleCursorKey;
+    }
+  | {
+      readonly bucket: 1;
+      readonly key?: SearchObjectCursorKey;
+    }
+  | {
+      readonly bucket: 2;
+      readonly key?: SearchChunkCursorKey;
+    }
+  | {
+      readonly bucket: 3;
+      readonly key?: SearchTextCursorKey;
+    };
+
+export interface SearchChapterTitleCursorKey {
+  readonly chapterId: number;
+  readonly score: number;
+}
+
+export interface SearchObjectCursorKey {
+  readonly id: string;
+  readonly score: number;
+}
+
+export interface SearchChunkCursorKey {
+  readonly chunkId: number;
+  readonly score: number;
+}
+
+export interface SearchTextCursorKey {
+  readonly chapterId: number;
+  readonly kind: number;
+  readonly rank: number;
+  readonly sentenceIndex: number;
 }
 
 const SEARCH_SESSION_SCHEMA_SQL = `
@@ -300,7 +340,7 @@ export async function createSearchSession(
         ],
       );
 
-      for (const [index, item] of input.items.entries()) {
+      for (const [index, item] of (input.items ?? []).entries()) {
         await database.run(
           `
             INSERT INTO search_results (session_id, rank, item_json)
@@ -324,6 +364,92 @@ export async function createSearchSession(
     });
 
     return sessionId;
+  } finally {
+    await database.close();
+  }
+}
+
+export async function readSearchSessionObjectBucketPage(
+  sessionId: string,
+  bucket: 1,
+  after: SearchObjectCursorKey | undefined,
+  limit: number,
+): Promise<readonly ArchiveFindHit[]> {
+  const database = await openSearchSessionDatabase();
+
+  try {
+    const entityRows = await readSearchSessionEntityBucketRows(
+      database,
+      sessionId,
+      after,
+      limit,
+    );
+    const tripleRows =
+      entityRows.length > limit
+        ? []
+        : await readSearchSessionTripleBucketRows(
+            database,
+            sessionId,
+            after,
+            limit,
+          );
+
+    return [...entityRows, ...tripleRows]
+      .sort(compareObjectBucketHits)
+      .slice(0, limit + 1);
+  } finally {
+    await database.close();
+  }
+}
+
+export async function readSearchSessionChunkBucketPage(
+  sessionId: string,
+  after: SearchChunkCursorKey | undefined,
+  limit: number,
+): Promise<readonly ArchiveFindHit[]> {
+  const database = await openSearchSessionDatabase();
+
+  try {
+    return await database.queryAll(
+      `
+        SELECT
+          chunk_id,
+          result_score
+        FROM search_chunk_hits
+        WHERE session_id = ?
+          ${
+            after === undefined
+              ? ""
+              : `
+                AND (
+                  result_score < ?
+                  OR (result_score = ? AND chunk_id > ?)
+                )
+              `
+          }
+        ORDER BY result_score DESC, chunk_id
+        LIMIT ?
+      `,
+      [
+        sessionId,
+        ...(after === undefined
+          ? []
+          : [after.score, after.score, after.chunkId]),
+        limit + 1,
+      ],
+      (row) => {
+        const chunkId = getNumber(row, "chunk_id");
+
+        return {
+          field: "title",
+          id: `wikg://chunk/${chunkId}`,
+          score: getNumber(row, "result_score"),
+          snippet: `chunk ${chunkId}`,
+          title: `chunk ${chunkId}`,
+          type: "node",
+        };
+      },
+    );
   } finally {
     await database.close();
   }
@@ -382,6 +508,35 @@ export async function createEntitySearchSession(
     });
 
     return sessionId;
+  } finally {
+    await database.close();
+  }
+}
+
+export async function populateSearchSessionObjectCaches(input: {
+  readonly chunkHits?: readonly SearchChunkHitInput[];
+  readonly entityHits?: readonly SearchEntityHitInput[];
+  readonly evidenceEvents?: readonly SearchEvidenceHitEventInput[];
+  readonly sessionId: string;
+  readonly tripleHits?: readonly SearchTripleHitInput[];
+}): Promise<void> {
+  const database = await openSearchSessionDatabase();
+
+  try {
+    await database.transaction(async () => {
+      for (const event of input.evidenceEvents ?? []) {
+        await insertSearchEvidenceHitEvent(database, input.sessionId, event);
+      }
+      for (const hit of input.entityHits ?? []) {
+        await upsertSearchEntityHit(database, input.sessionId, hit);
+      }
+      for (const hit of input.tripleHits ?? []) {
+        await upsertSearchTripleHit(database, input.sessionId, hit);
+      }
+      for (const hit of input.chunkHits ?? []) {
+        await upsertSearchChunkHit(database, input.sessionId, hit);
+      }
+    });
   } finally {
     await database.close();
   }
@@ -602,6 +757,38 @@ export async function readSearchSessionDescriptor(
   }
 }
 
+export async function readSearchSessionMetadataForCursor(
+  sessionId: string,
+  expectedArchiveKey?: string,
+  expectedCreatedAt?: number,
+): Promise<SearchSessionDescriptor> {
+  const database = await openSearchSessionDatabase();
+
+  try {
+    const session = await readSearchSessionMetadata(
+      database,
+      sessionId,
+      expectedArchiveKey,
+      expectedCreatedAt,
+    );
+
+    await touchSearchSession(database, sessionId);
+
+    return {
+      chapters: session.options.chapters,
+      createdAt: session.createdAt,
+      lens: session.lens,
+      match: session.match,
+      query: session.query,
+      sessionId,
+      terms: session.terms,
+      types: session.options.types,
+    };
+  } finally {
+    await database.close();
+  }
+}
+
 export async function readEntitySearchEvidenceMentions(
   sessionId: string,
   mentionIds: readonly string[],
@@ -648,6 +835,54 @@ export function encodeSearchSessionCursor(
   return Buffer.from(
     JSON.stringify({ createdAt, offset, sessionId, v: 3 }),
   ).toString("base64url");
+}
+
+export function encodeBucketSearchSessionCursor(
+  sessionId: string,
+  cursor: BucketSearchCursor,
+  createdAt: number,
+): string {
+  return Buffer.from(
+    JSON.stringify({ createdAt, cursor, sessionId, v: 4 }),
+  ).toString("base64url");
+}
+
+export function decodeBucketSearchSessionCursor(cursor: string): {
+  readonly createdAt: number;
+  readonly cursor: BucketSearchCursor;
+  readonly sessionId: string;
+} {
+  try {
+    const parsed: unknown = JSON.parse(
+      Buffer.from(cursor, "base64url").toString("utf8"),
+    );
+
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "createdAt" in parsed &&
+      "cursor" in parsed &&
+      "sessionId" in parsed &&
+      "v" in parsed &&
+      parsed.v === 4 &&
+      typeof parsed.createdAt === "number" &&
+      Number.isInteger(parsed.createdAt) &&
+      parsed.createdAt >= 0 &&
+      typeof parsed.sessionId === "string" &&
+      parsed.sessionId !== "" &&
+      isBucketSearchCursor(parsed.cursor)
+    ) {
+      return {
+        createdAt: parsed.createdAt,
+        cursor: parsed.cursor,
+        sessionId: parsed.sessionId,
+      };
+    }
+  } catch {
+    throw new Error("Invalid search cursor.");
+  }
+
+  throw new Error("Invalid search cursor.");
 }
 
 export function decodeSearchSessionCursor(cursor: string): {
@@ -1181,6 +1416,178 @@ function mapEntitySearchObjectRow(
     title: qid,
     type: "entity",
   };
+}
+
+async function readSearchSessionEntityBucketRows(
+  database: Database,
+  sessionId: string,
+  after: SearchObjectCursorKey | undefined,
+  limit: number,
+): Promise<readonly ArchiveFindHit[]> {
+  return await database.queryAll(
+    `
+      SELECT
+        qid,
+        result_score
+      FROM search_entity_hits
+      WHERE session_id = ?
+        ${
+          after === undefined
+            ? ""
+            : `
+              AND (
+                result_score < ?
+                OR (result_score = ? AND qid > ?)
+              )
+            `
+        }
+      ORDER BY result_score DESC, qid
+      LIMIT ?
+    `,
+    [
+      sessionId,
+      ...(after === undefined ? [] : [after.score, after.score, after.id]),
+      limit + 1,
+    ],
+    mapEntitySearchObjectRow,
+  );
+}
+
+async function readSearchSessionTripleBucketRows(
+  database: Database,
+  sessionId: string,
+  after: SearchObjectCursorKey | undefined,
+  limit: number,
+): Promise<readonly ArchiveFindHit[]> {
+  return await database.queryAll(
+    `
+      SELECT
+        search_triple_hits.subject_qid AS subject_qid,
+        predicate_dictionary.value AS predicate,
+        search_triple_hits.object_qid AS object_qid,
+        search_triple_hits.result_score AS result_score
+      FROM search_triple_hits
+      JOIN predicate_dictionary
+        ON predicate_dictionary.id = search_triple_hits.predicate_id
+      WHERE search_triple_hits.session_id = ?
+        ${
+          after === undefined
+            ? ""
+            : `
+              AND (
+                search_triple_hits.result_score < ?
+                OR (
+                  search_triple_hits.result_score = ?
+                  AND (
+                    search_triple_hits.subject_qid || char(31) ||
+                    predicate_dictionary.value || char(31) ||
+                    search_triple_hits.object_qid
+                  ) > ?
+                )
+              )
+            `
+        }
+      ORDER BY search_triple_hits.result_score DESC,
+        search_triple_hits.subject_qid,
+        predicate_dictionary.value,
+        search_triple_hits.object_qid
+      LIMIT ?
+    `,
+    [
+      sessionId,
+      ...(after === undefined ? [] : [after.score, after.score, after.id]),
+      limit + 1,
+    ],
+    (row) => {
+      const subjectQid = getString(row, "subject_qid");
+      const predicate = getString(row, "predicate");
+      const objectQid = getString(row, "object_qid");
+      const title = `${subjectQid} ${predicate} ${objectQid}`;
+
+      return {
+        field: "content",
+        id: `wikg://triple/${subjectQid}/${encodeURIComponent(predicate)}/${objectQid}`,
+        score: getNumber(row, "result_score"),
+        snippet: title,
+        title,
+        triple: {
+          objectLabel: objectQid,
+          predicate,
+          subjectLabel: subjectQid,
+        },
+        type: "triple",
+      };
+    },
+  );
+}
+
+function compareObjectBucketHits(
+  left: ArchiveFindHit,
+  right: ArchiveFindHit,
+): number {
+  return (
+    (right.score ?? 0) - (left.score ?? 0) || left.id.localeCompare(right.id)
+  );
+}
+
+function isBucketSearchCursor(value: unknown): value is BucketSearchCursor {
+  if (typeof value !== "object" || value === null || !("bucket" in value)) {
+    return false;
+  }
+  const cursor = value as { readonly bucket: unknown; readonly key?: unknown };
+
+  switch (cursor.bucket) {
+    case 0:
+      return cursor.key === undefined || isChapterTitleCursorKey(cursor.key);
+    case 1:
+      return cursor.key === undefined || isObjectCursorKey(cursor.key);
+    case 2:
+      return cursor.key === undefined || isChunkCursorKey(cursor.key);
+    case 3:
+      return cursor.key === undefined || isTextCursorKey(cursor.key);
+    default:
+      return false;
+  }
+}
+
+function isChapterTitleCursorKey(
+  value: unknown,
+): value is SearchChapterTitleCursorKey {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as SearchChapterTitleCursorKey).chapterId === "number" &&
+    typeof (value as SearchChapterTitleCursorKey).score === "number"
+  );
+}
+
+function isObjectCursorKey(value: unknown): value is SearchObjectCursorKey {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as SearchObjectCursorKey).id === "string" &&
+    typeof (value as SearchObjectCursorKey).score === "number"
+  );
+}
+
+function isChunkCursorKey(value: unknown): value is SearchChunkCursorKey {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as SearchChunkCursorKey).chunkId === "number" &&
+    typeof (value as SearchChunkCursorKey).score === "number"
+  );
+}
+
+function isTextCursorKey(value: unknown): value is SearchTextCursorKey {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as SearchTextCursorKey).chapterId === "number" &&
+    typeof (value as SearchTextCursorKey).kind === "number" &&
+    typeof (value as SearchTextCursorKey).rank === "number" &&
+    typeof (value as SearchTextCursorKey).sentenceIndex === "number"
+  );
 }
 
 function createSearchSessionId(input: SearchSessionCacheInput): string {
