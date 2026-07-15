@@ -293,7 +293,10 @@ vi.mock("../../packages/cli/src/cli/stage-runtime.js", () => ({
   ),
 }));
 
-import { runQueueCommand } from "../../packages/cli/src/cli/queue.js";
+import {
+  runQueueCommand,
+  runQueueWorker,
+} from "../../packages/cli/src/cli/queue.js";
 
 describe("cli/queue", () => {
   const originalDisableAutostart =
@@ -773,9 +776,7 @@ describe("cli/queue", () => {
       state: "running",
     };
 
-    await runQueueCommand({
-      action: "worker",
-    });
+    await runQueueWorker();
 
     const reporter = {
       addOutputCharacters: vi.fn(() => Promise.resolve()),
@@ -854,9 +855,7 @@ describe("cli/queue", () => {
   });
 
   it("uses default queue concurrency for worker slots", async () => {
-    await runQueueCommand({
-      action: "worker",
-    });
+    await runQueueWorker();
 
     expect(queueMockState.runWorkerOptions?.concurrency).toBe(3);
   });
@@ -868,9 +867,7 @@ describe("cli/queue", () => {
       },
     };
 
-    await runQueueCommand({
-      action: "worker",
-    });
+    await runQueueWorker();
 
     expect(queueMockState.runWorkerOptions?.concurrency).toBe(5);
   });
@@ -887,9 +884,7 @@ describe("cli/queue", () => {
       target: "knowledge-graph",
     };
 
-    await runQueueCommand({
-      action: "worker",
-    });
+    await runQueueWorker();
 
     const reporter = {
       addOutputCharacters: vi.fn(() => Promise.resolve()),
@@ -994,9 +989,7 @@ describe("cli/queue", () => {
       target: "knowledge-graph",
     };
 
-    await runQueueCommand({
-      action: "worker",
-    });
+    await runQueueWorker();
 
     const reporter = {
       addOutputCharacters: vi.fn(() => Promise.resolve()),

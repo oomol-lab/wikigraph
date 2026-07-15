@@ -6,7 +6,10 @@ import {
 } from "../../packages/core/src/common/llm-scope.js";
 import { Language } from "../../packages/core/src/common/language.js";
 import type { ReadonlySerialFragments } from "../../packages/core/src/document/index.js";
-import type { ChunkRecord, FragmentRecord } from "../../packages/core/src/document/types.js";
+import type {
+  ChunkRecord,
+  FragmentRecord,
+} from "../../packages/core/src/document/types.js";
 import {
   CLUE_REVIEWER_GENERATOR_PROMPT_TEMPLATE,
   CLUE_REVIEWER_PROMPT_TEMPLATE,
@@ -44,9 +47,7 @@ describe("editor/review", () => {
     expect(llm.prompts[0]?.templateName).toBe(
       CLUE_REVIEWER_GENERATOR_PROMPT_TEMPLATE,
     );
-    expect(llm.calls[0]?.options.scope).toBe(
-      WikiGraphScope.EditorReviewGuide,
-    );
+    expect(llm.calls[0]?.options.scope).toBe(WikiGraphScope.EditorReviewGuide);
   });
 
   it("reviews compression through guaranteed-json requests with history", async () => {

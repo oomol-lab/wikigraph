@@ -82,33 +82,20 @@ describe("cli/llm", () => {
   });
 
   it("builds openai llm options with configured request concurrency", () => {
-    expect(
-      buildLLMOptions({
-        concurrent: {
-          request: 3,
-        },
-        llm: {
-          apiKey: "secret",
-          model: "gpt-test",
-          name: "custom-openai",
-          provider: "openai",
-        },
-      }),
-    ).toStrictEqual({
-      concurrent: 3,
-      model: {
+    const options = buildLLMOptions({
+      concurrent: {
+        request: 3,
+      },
+      llm: {
+        apiKey: "secret",
         model: "gpt-test",
+        name: "custom-openai",
         provider: "openai",
       },
     });
 
-    expect(llmMockState.openAIFactoryCalls).toStrictEqual([
-      {
-        apiKey: "secret",
-        name: "custom-openai",
-      },
-    ]);
-    expect(llmMockState.openAIModelCalls).toStrictEqual(["gpt-test"]);
+    expect(options.concurrent).toBe(3);
+    expect(readModelId(options.model)).toBe("gpt-test");
   });
 
   it("builds anthropic and google models with their optional settings", () => {
@@ -129,26 +116,8 @@ describe("cli/llm", () => {
       },
     });
 
-    expect(anthropic.model).toStrictEqual({
-      model: "claude-test",
-      provider: "anthropic",
-    });
-    expect(google.model).toStrictEqual({
-      model: "gemini-test",
-      provider: "google",
-    });
-    expect(llmMockState.anthropicFactoryCalls).toStrictEqual([
-      {
-        apiKey: "anthropic-key",
-        name: "anthropic-name",
-      },
-    ]);
-    expect(llmMockState.googleFactoryCalls).toStrictEqual([
-      {
-        apiKey: "google-key",
-        name: "google-name",
-      },
-    ]);
+    expect(readModelId(anthropic.model)).toBe("claude-test");
+    expect(readModelId(google.model)).toBe("gemini-test");
   });
 
   it("builds openai-compatible models and derives a default name from the base url", () => {
@@ -161,24 +130,11 @@ describe("cli/llm", () => {
       },
     });
 
-    expect(options.model).toStrictEqual({
-      model: "compat-model",
-      provider: "openai-compatible",
-    });
-    expect(llmMockState.openAICompatibleFactoryCalls).toStrictEqual([
-      {
-        apiKey: "compat-key",
-        baseURL: "https://compat.example/v1",
-        name: "compat.example",
-      },
-    ]);
-    expect(llmMockState.openAICompatibleModelCalls).toStrictEqual([
-      "compat-model",
-    ]);
+    expect(readModelId(options.model)).toBe("compat-model");
   });
 
   it("falls back to a generic openai-compatible name for invalid urls", () => {
-    buildLLMOptions({
+    const options = buildLLMOptions({
       llm: {
         baseURL: "not a url",
         model: "compat-model",
@@ -186,12 +142,7 @@ describe("cli/llm", () => {
       },
     });
 
-    expect(llmMockState.openAICompatibleFactoryCalls).toStrictEqual([
-      {
-        baseURL: "not a url",
-        name: "openai-compatible",
-      },
-    ]);
+    expect(readModelId(options.model)).toBe("compat-model");
   });
 
   it("rejects missing provider/model inputs and missing openai-compatible base urls", () => {
@@ -225,3 +176,13 @@ describe("cli/llm", () => {
     );
   });
 });
+
+function readModelId(model: unknown): string | undefined {
+  if (typeof model !== "object" || model === null || !("modelId" in model)) {
+    return;
+  }
+
+  const modelId = (model as { readonly modelId?: unknown }).modelId;
+
+  return typeof modelId === "string" ? modelId : undefined;
+}

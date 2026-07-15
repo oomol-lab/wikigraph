@@ -151,9 +151,7 @@ export class WikiGraphTask {
   }
 }
 
-export function createWikiGraphTaskId(
-  identity: WikiGraphTaskIdentity,
-): string {
+export function createWikiGraphTaskId(identity: WikiGraphTaskIdentity): string {
   return createHash({
     normalizedSource: identity.normalizedSource,
     parameters: identity.parameters,

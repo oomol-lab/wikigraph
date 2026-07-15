@@ -57,12 +57,14 @@ export async function runArchiveChapterCommand(
       });
       return;
     case "list":
-      await new WikiGraphArchiveFile(args.path).readDocument(async (document) => {
-        await writeChapterList(
-          await listChapters(document),
-          args.json ?? false,
-        );
-      });
+      await new WikiGraphArchiveFile(args.path).readDocument(
+        async (document) => {
+          await writeChapterList(
+            await listChapters(document),
+            args.json ?? false,
+          );
+        },
+      );
       return;
     case "move":
       await runEditableCommand(args.path, async (document) => {
@@ -191,12 +193,14 @@ export async function runArchiveChapterCommand(
         return;
       }
 
-      await new WikiGraphArchiveFile(args.path).readDocument(async (document) => {
-        await writeChapterTree(
-          await getChapterTree(document),
-          args.json ?? false,
-        );
-      });
+      await new WikiGraphArchiveFile(args.path).readDocument(
+        async (document) => {
+          await writeChapterTree(
+            await getChapterTree(document),
+            args.json ?? false,
+          );
+        },
+      );
       return;
   }
 }

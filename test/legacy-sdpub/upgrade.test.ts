@@ -6,7 +6,10 @@ import { finished } from "stream/promises";
 import { ZipFile } from "yazl";
 import { describe, expect, it } from "vitest";
 
-import { Database, DirectoryDocument } from "../../packages/core/src/document/index.js";
+import {
+  Database,
+  DirectoryDocument,
+} from "../../packages/core/src/document/index.js";
 import { rebuildArchiveSearchIndex } from "../../packages/core/src/archive/query/index.js";
 import { extractWikgArchive } from "../../packages/core/src/wikg/archive.js";
 import { migrateLegacySdpubToWikg } from "../../packages/core/src/legacy-sdpub/upgrade.js";

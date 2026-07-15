@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { ReadonlyDocument } from "../../packages/core/src/document/index.js";
-import type { ChunkRecord, SnakeRecord } from "../../packages/core/src/document/types.js";
+import type {
+  ChunkRecord,
+  SnakeRecord,
+} from "../../packages/core/src/document/types.js";
 import { extractCluesFromDocument } from "../../packages/core/src/editor/clue.js";
 
 describe("editor/clue", () => {

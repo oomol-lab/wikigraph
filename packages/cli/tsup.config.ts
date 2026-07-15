@@ -17,7 +17,6 @@ export default defineConfig([
     clean: true,
     dts: true,
     entry: {
-      cli: "src/cli.ts",
       index: "src/index.ts",
     },
     format: ["cjs"],
@@ -33,6 +32,7 @@ export default defineConfig([
     entry: {
       cli: "src/cli.ts",
       index: "src/index.ts",
+      "queue-worker": "src/queue-worker.ts",
     },
     format: ["esm"],
   },

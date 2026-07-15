@@ -9,7 +9,10 @@ import type {
   SourceAsset,
   SourceSection,
 } from "../../packages/core/src/source/index.js";
-import { importSource, importSourceDocument } from "../../packages/core/src/facade/import.js";
+import {
+  importSource,
+  importSourceDocument,
+} from "../../packages/core/src/facade/import.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const serialMockState = vi.hoisted(() => ({

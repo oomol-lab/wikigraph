@@ -25,7 +25,10 @@ import {
   WIKI_GRAPH_READER_SCOPES,
   WikiGraphScope,
 } from "../../packages/core/src/common/llm-scope.js";
-import { ChunkImportance, ChunkRetention } from "../../packages/core/src/document/index.js";
+import {
+  ChunkImportance,
+  ChunkRetention,
+} from "../../packages/core/src/document/index.js";
 import type {
   SentenceStreamAdapter,
   SentenceStreamItem,

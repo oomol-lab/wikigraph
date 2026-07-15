@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { fileURLToPath } from "url";
 
 import { WikiGraphScope } from "wiki-graph-core";
 import { withLoggingContext } from "wiki-graph-core";
@@ -187,9 +188,6 @@ export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
     case "clean":
       await writeTextToStdout(`Cleaned ${await cleanBuildJobs()} jobs.\n`);
       return;
-    case "worker":
-      await runQueueWorker();
-      return;
   }
 }
 
@@ -307,7 +305,7 @@ function assertBuildCostAccepted(args: CLIQueueArguments): void {
   );
 }
 
-async function runQueueWorker(): Promise<void> {
+export async function runQueueWorker(): Promise<void> {
   const config = await loadCLIConfig();
 
   await runBuildJobWorker({
@@ -381,7 +379,9 @@ async function executeBuildJobWithLogging(
     operation: (request: GuaranteedRequest) => Promise<T>,
   ): Promise<T> => await llm.request(async () => await operation(request));
 
-  const buildInput = await new WikiGraphArchiveFile(job.archivePath).readDocument(
+  const buildInput = await new WikiGraphArchiveFile(
+    job.archivePath,
+  ).readDocument(
     async (document) => await readChapterBuildInput(document, job.chapterId),
   );
   let { details } = buildInput;
@@ -524,16 +524,16 @@ async function executeBuildJobWithLogging(
   }
 
   await reporter.stepStarted("reading-summary");
-  const summaryInput = await new WikiGraphArchiveFile(job.archivePath).readDocument(
-    async (document) => {
-      await assertCurrentBuildInputRevision(job, document);
-      return await snapshotChapterSummaryInput(
-        document,
-        job.chapterId,
-        job.workspacePath,
-      );
-    },
-  );
+  const summaryInput = await new WikiGraphArchiveFile(
+    job.archivePath,
+  ).readDocument(async (document) => {
+    await assertCurrentBuildInputRevision(job, document);
+    return await snapshotChapterSummaryInput(
+      document,
+      job.chapterId,
+      job.workspacePath,
+    );
+  });
   const summary = await buildChapterSummaryArtifactFromSnapshot(job.chapterId, {
     llm,
     snapshotPath: summaryInput.filePath,
@@ -1235,15 +1235,16 @@ function tryStartQueueWorker(): void {
     return;
   }
 
-  const entryPath = process.argv[1];
+  const entryPath = fileURLToPath(
+    new URL("../queue-worker.js", import.meta.url),
+  );
 
-  if (entryPath === undefined) {
-    return;
-  }
-
-  const child = spawn(process.execPath, [entryPath, "__queue-worker"], {
+  const child = spawn(process.execPath, [entryPath], {
     detached: true,
-    env: process.env,
+    env: {
+      ...process.env,
+      WIKIGRAPH_INTERNAL_WORKER: "queue-v1",
+    },
     stdio: "ignore",
   });
 

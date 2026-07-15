@@ -171,8 +171,7 @@ export type CLIQueueAction =
   | "resume"
   | "status"
   | "target"
-  | "watch"
-  | "worker";
+  | "watch";
 
 export type CLIObjectKind =
   | "chunk"
@@ -665,10 +664,6 @@ export function parseCLIArguments(
 
   if (positionals[0] === "gc") {
     return parseGcArguments(positionals.slice(1), values);
-  }
-
-  if (positionals[0] === "__queue-worker") {
-    return parseQueueWorkerArguments(positionals.slice(1), values);
   }
 
   if (positionals[0] === "legacy") {
@@ -2639,30 +2634,6 @@ function rejectLegacyBooleanFlag(
   }
 }
 
-function parseQueueWorkerArguments(
-  positionals: readonly string[],
-  values: ArchiveArgumentValues,
-): ParsedCLIArguments {
-  const helpRoute = "wg help";
-
-  rejectStreamingJSONFlag("worker", values.json, helpRoute);
-  rejectQueueJSONLFlag("worker", values.jsonl, helpRoute);
-  rejectQueueExtraPositionals(
-    "worker",
-    ["worker", ...positionals],
-    1,
-    helpRoute,
-  );
-  return {
-    args: {
-      action: "worker",
-      ...(values.llm === undefined ? {} : { llmJSON: values.llm }),
-    },
-    help: false,
-    kind: "queue",
-  };
-}
-
 function rejectQueueJSONFlag(
   action: CLIQueueAction,
   value: boolean | undefined,
@@ -2770,7 +2741,7 @@ function parseQueueAddInput(
 }
 
 function parseQueueJobArguments(
-  action: Exclude<CLIQueueAction, "add" | "clean" | "list" | "worker">,
+  action: Exclude<CLIQueueAction, "add" | "clean" | "list">,
   jobId: string | undefined,
   tail: readonly string[],
   values: ArchiveArgumentValues,

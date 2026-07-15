@@ -31,7 +31,9 @@ describe("wikg/wiki-graph-archive-file", () => {
           await seedDocument(document);
 
           const archivePath = `${path}/fixture/book.wikg`;
-          await new WikiGraphArchive(document, document.path).saveAs(archivePath);
+          await new WikiGraphArchive(document, document.path).saveAs(
+            archivePath,
+          );
 
           const digestFile = new WikiGraphArchiveFile(archivePath);
           const exportedText = await digestFile.read(async (digest) => {
@@ -129,11 +131,13 @@ describe("wikg/wiki-graph-archive-file", () => {
           Array.from(
             { length: 6 },
             async () =>
-              await new WikiGraphArchiveFile(archivePath).read(async (digest) => {
-                expect(await digest.readMeta()).toMatchObject({
-                  title: "Session Fixture",
-                });
-              }),
+              await new WikiGraphArchiveFile(archivePath).read(
+                async (digest) => {
+                  expect(await digest.readMeta()).toMatchObject({
+                    title: "Session Fixture",
+                  });
+                },
+              ),
           ),
         );
       } finally {
@@ -594,7 +598,8 @@ async function readCoordinatorOverlays(path: string): Promise<
     return [];
   }
 
-  const { Database } = await import("../../packages/core/src/document/index.js");
+  const { Database } =
+    await import("../../packages/core/src/document/index.js");
   const database = await Database.open(
     `${path}/state/staging/staging.sqlite`,
     "",
@@ -622,7 +627,8 @@ ORDER BY archive_path, entry_path
 }
 
 async function createStaleOverlay(path: string): Promise<void> {
-  const { Database } = await import("../../packages/core/src/document/index.js");
+  const { Database } =
+    await import("../../packages/core/src/document/index.js");
 
   await mkdir(`${path}/state/staging`, { recursive: true });
   const database = await Database.open(

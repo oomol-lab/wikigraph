@@ -8,7 +8,10 @@ vi.mock("../../packages/core/src/topology/grouping.js", () => ({
   groupSegments: groupSegmentsMock,
 }));
 
-import { ChunkImportance, ChunkRetention } from "../../packages/core/src/document/index.js";
+import {
+  ChunkImportance,
+  ChunkRetention,
+} from "../../packages/core/src/document/index.js";
 import type {
   ChunkRecord,
   Document,

@@ -1,4 +1,4 @@
-import { tryRunWikiGraphGc } from "wiki-graph-core";
+import { tryRunWikiGraphGc } from "wiki-graph-core/gc";
 
 import type { CLIGcArguments } from "./args.js";
 import { writeTextToStdout } from "./io.js";

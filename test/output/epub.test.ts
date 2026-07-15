@@ -10,7 +10,10 @@ import {
   createNavDocument,
 } from "../../packages/core/src/output/epub/navigation.js";
 import { createPackageOpf } from "../../packages/core/src/output/epub/package.js";
-import { escapeXml, normalizeLanguage } from "../../packages/core/src/output/epub/shared.js";
+import {
+  escapeXml,
+  normalizeLanguage,
+} from "../../packages/core/src/output/epub/shared.js";
 
 describe("output/epub", () => {
   it("escapes xml and normalizes language values", () => {

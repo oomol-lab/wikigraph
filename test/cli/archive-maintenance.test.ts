@@ -42,9 +42,6 @@ vi.mock("../../packages/core/src/index.js", () => ({
       return await operation(createMockDigest());
     }
   },
-}));
-
-vi.mock("../../packages/core/src/wikg/wiki-graph-archive-file.js", () => ({
   WikiGraphArchiveFile: class {
     readonly #path: string;
 

@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { access } from "fs/promises";
 
-import { DirectoryDocument, ChunkRetention } from "../../packages/core/src/document/index.js";
+import {
+  DirectoryDocument,
+  ChunkRetention,
+} from "../../packages/core/src/document/index.js";
 
 vi.mock("../../packages/core/src/editor/index.js", () => ({
   compressText: vi.fn((options: { readonly groupId: number }) =>

@@ -17,10 +17,13 @@ function resolveDataDirPathFromWorkingDirectory(): string {
   const rootDirectoryPath = parse(currentDirectoryPath).root;
 
   while (true) {
-    const candidatePath = join(currentDirectoryPath, "data");
-
-    if (existsSync(candidatePath) && statSync(candidatePath).isDirectory()) {
-      return candidatePath;
+    for (const candidatePath of [
+      join(currentDirectoryPath, "data"),
+      join(currentDirectoryPath, "packages", "core", "data"),
+    ]) {
+      if (existsSync(candidatePath) && statSync(candidatePath).isDirectory()) {
+        return candidatePath;
+      }
     }
 
     if (currentDirectoryPath === rootDirectoryPath) {

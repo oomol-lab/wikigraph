@@ -4,7 +4,10 @@ import { join } from "path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Database, DirectoryDocument } from "../../../packages/core/src/document/index.js";
+import {
+  Database,
+  DirectoryDocument,
+} from "../../../packages/core/src/document/index.js";
 import {
   findArchiveObjects,
   grepArchiveObjects,

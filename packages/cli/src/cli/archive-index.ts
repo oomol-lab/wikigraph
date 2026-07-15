@@ -3,10 +3,7 @@ import {
   isArchiveSearchIndexCurrent,
   rebuildArchiveSearchIndex,
 } from "wiki-graph-core";
-import {
-  readArchiveIndexSettings,
-  setFtsIndexEmbedded,
-} from "wiki-graph-core";
+import { readArchiveIndexSettings, setFtsIndexEmbedded } from "wiki-graph-core";
 import { WikiGraphArchiveFile } from "wiki-graph-core";
 
 import type { CLIArchiveIndexArguments } from "./args.js";
@@ -44,14 +41,16 @@ export async function runArchiveIndexCommand(
 async function readIndexSettings(
   args: CLIArchiveIndexArguments,
 ): Promise<void> {
-  await new WikiGraphArchiveFile(args.archivePath).readDocument(async (document) => {
-    const settings = await readArchiveIndexSettings(document);
+  await new WikiGraphArchiveFile(args.archivePath).readDocument(
+    async (document) => {
+      const settings = await readArchiveIndexSettings(document);
 
-    await writeIndexOutput(args, {
-      ftsEmbedded: settings.ftsEmbedded,
-      ftsCurrent: await isArchiveSearchIndexCurrent(document),
-    });
-  });
+      await writeIndexOutput(args, {
+        ftsEmbedded: settings.ftsEmbedded,
+        ftsCurrent: await isArchiveSearchIndexCurrent(document),
+      });
+    },
+  );
 }
 
 async function enableIndex(args: CLIArchiveIndexArguments): Promise<void> {

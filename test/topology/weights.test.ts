@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { ChunkImportance, ChunkRetention } from "../../packages/core/src/document/index.js";
+import {
+  ChunkImportance,
+  ChunkRetention,
+} from "../../packages/core/src/document/index.js";
 import {
   computeChunkWeights,
   computeReadingEdgeWeights,

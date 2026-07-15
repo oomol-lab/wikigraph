@@ -207,9 +207,7 @@ describe("editor/editor", () => {
       RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
     ]);
     expect(llm.calls).toHaveLength(5);
-    expect(llm.calls[0]?.options.scope).toBe(
-      WikiGraphScope.EditorReviewGuide,
-    );
+    expect(llm.calls[0]?.options.scope).toBe(WikiGraphScope.EditorReviewGuide);
     expect(llm.calls[1]?.options.scope).toBe(WikiGraphScope.EditorCompress);
     expect(llm.calls[2]?.options.scope).toBe(WikiGraphScope.EditorReview);
     expect(llm.calls[3]?.options.scope).toBe(WikiGraphScope.EditorCompress);

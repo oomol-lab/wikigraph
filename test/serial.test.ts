@@ -71,7 +71,10 @@ vi.mock("../packages/core/src/topology/index.js", () => ({
 }));
 
 import { DirectoryDocument } from "../packages/core/src/document/index.js";
-import { SerialGeneration, writeSerialSource } from "../packages/core/src/serial.js";
+import {
+  SerialGeneration,
+  writeSerialSource,
+} from "../packages/core/src/serial.js";
 import { withTempDir } from "./helpers/temp.js";
 
 describe("serial", () => {

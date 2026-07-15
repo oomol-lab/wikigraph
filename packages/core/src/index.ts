@@ -147,34 +147,16 @@ export {
   DirectoryDocument,
   openSharedStateDatabase,
 } from "./document/index.js";
-export type {
-  Database,
-  Document,
-  ReadonlyDocument,
-} from "./document/index.js";
+export type { Database, Document, ReadonlyDocument } from "./document/index.js";
 export { TOC_FILE_VERSION } from "./source/index.js";
 export type { BookMeta } from "./source/index.js";
-export {
-  isArchiveSearchIndexCurrent,
-} from "./archive/query/index.js";
-export {
-  readArchiveIndexSettings,
-} from "./archive/search-index/index.js";
-export {
-  migrateLegacySdpubToWikg,
-} from "./legacy-sdpub/upgrade.js";
+export { isArchiveSearchIndexCurrent } from "./archive/query/index.js";
+export { readArchiveIndexSettings } from "./archive/search-index/index.js";
+export { migrateLegacySdpubToWikg } from "./legacy-sdpub/upgrade.js";
 export type {
   GuaranteedRequest,
   GuaranteedRequestController,
 } from "./guaranteed/index.js";
-export { tryRunWikiGraphGc } from "./gc/index.js";
-export type {
-  GcContext,
-  GcJob,
-  GcJobReport,
-  GcJobResult,
-  GcRunReport,
-} from "./gc/index.js";
 export { formatError } from "./utils/node-error.js";
 export * from "./archive/query/index.js";
 export * from "./archive/search-index/index.js";

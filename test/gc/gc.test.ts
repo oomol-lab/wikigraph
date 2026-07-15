@@ -4,7 +4,10 @@ import { dirname, join } from "path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createWikiGraphTempDirectory } from "../../packages/core/src/common/wiki-graph-temp.js";
-import { Database, DirectoryDocument } from "../../packages/core/src/document/index.js";
+import {
+  Database,
+  DirectoryDocument,
+} from "../../packages/core/src/document/index.js";
 import { addBuildJob } from "../../packages/core/src/facade/index.js";
 import { tryRunWikiGraphGc } from "../../packages/core/src/gc/index.js";
 import {

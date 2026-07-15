@@ -193,12 +193,12 @@ describe("facade/app", () => {
       temperature: 0.3,
       topP: 0.9,
     });
-    expect(
-      llmOptions.sampling[WikiGraphScope.EditorReviewGuide],
-    ).toStrictEqual({
-      temperature: 0.3,
-      topP: 0.6,
-    });
+    expect(llmOptions.sampling[WikiGraphScope.EditorReviewGuide]).toStrictEqual(
+      {
+        temperature: 0.3,
+        topP: 0.6,
+      },
+    );
     expect(appMockState.digestCalls.textStream).toHaveLength(1);
     const digestCall = appMockState.digestCalls.textStream[0] as {
       readonly bookLanguage: string;

@@ -1,10 +1,7 @@
 import { resolveDataDirPath } from "wiki-graph-core";
 import { createEnv } from "wiki-graph-core";
 
-import {
-  CLI_FULL_COMMAND,
-  CLI_PRIMARY_COMMAND,
-} from "wiki-graph-core";
+import { CLI_FULL_COMMAND, CLI_PRIMARY_COMMAND } from "wiki-graph-core";
 import { CLI_FORMATS } from "./formats.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "./errors.js";
 import { formatCliCommand } from "./shell.js";

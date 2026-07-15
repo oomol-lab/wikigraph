@@ -32,10 +32,5 @@
     "packages/*/tsup.config.ts",
     "vitest.config.ts"
   ],
-  "exclude": [
-    "packages/*/dist",
-    "dist",
-    "coverage",
-    "node_modules"
-  ]
+  "exclude": ["packages/*/dist", "dist", "coverage", "node_modules"]
 }
