@@ -8,7 +8,7 @@ import {
   extractJsonText,
   listSchemaIssues,
   repairJsonText,
-} from "../../src/guaranteed/response.js";
+} from "../../packages/core/src/guaranteed/response.js";
 
 describe("guaranteed/response", () => {
   it("extracts JSON from fenced responses", () => {

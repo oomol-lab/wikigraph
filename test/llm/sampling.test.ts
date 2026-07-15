@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { SpineDigestScope } from "../../src/common/llm-scope.js";
+import { SpineDigestScope } from "../../packages/core/src/common/llm-scope.js";
 import {
   getScopeDefaults,
   resolveSamplingSetting,
   resolveTemperatureSetting,
-} from "../../src/llm/sampling.js";
+} from "../../packages/core/src/llm/sampling.js";
 
 describe("llm/sampling", () => {
   it("resolves static and ranged sampling values", () => {

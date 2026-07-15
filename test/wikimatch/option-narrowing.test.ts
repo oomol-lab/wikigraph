@@ -4,11 +4,11 @@ import {
   narrowWikimatchCandidateOptions,
   parseNarrowingResponse,
   type WikimatchCandidate,
-} from "../../src/wikimatch/index.js";
+} from "../../packages/core/src/wikimatch/index.js";
 import {
   ParsedJsonError,
   type GuaranteedRequest,
-} from "../../src/guaranteed/index.js";
+} from "../../packages/core/src/guaranteed/index.js";
 
 describe("wikimatch/option-narrowing", () => {
   it("splits oversized options into bounded narrowing requests", async () => {

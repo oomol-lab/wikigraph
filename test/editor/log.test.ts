@@ -2,10 +2,10 @@ import { readdir, readFile } from "fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { Language } from "../../src/common/language.js";
-import { ChunkRetention, type ChunkRecord } from "../../src/document/index.js";
-import { CompressionLog } from "../../src/editor/log.js";
-import { ReviewSeverity } from "../../src/editor/types.js";
+import { Language } from "../../packages/core/src/common/language.js";
+import { ChunkRetention, type ChunkRecord } from "../../packages/core/src/document/index.js";
+import { CompressionLog } from "../../packages/core/src/editor/log.js";
+import { ReviewSeverity } from "../../packages/core/src/editor/types.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("editor/log", () => {

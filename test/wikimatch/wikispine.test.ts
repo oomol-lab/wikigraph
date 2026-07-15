@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_WIKISPINE_FETCH_ENDPOINT,
   matchWikispineSentenceCandidates,
-} from "../../src/wikimatch/index.js";
+} from "../../packages/core/src/wikimatch/index.js";
 
 describe("wikimatch/wikispine", () => {
   it("matches each sentence separately and converts sentence offsets to document ranges", async () => {

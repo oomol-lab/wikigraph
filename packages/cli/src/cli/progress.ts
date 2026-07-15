@@ -3,7 +3,7 @@ import { clearLine, cursorTo, moveCursor } from "readline";
 import type {
   SpineDigestProgressCallback,
   SpineDigestProgressEvent,
-} from "../index.js";
+} from "wiki-graph-core";
 
 interface SerialState {
   completedFragments: number;

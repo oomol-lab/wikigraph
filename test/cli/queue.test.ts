@@ -68,7 +68,7 @@ const queueMockState = vi.hoisted(() => ({
   writeCalls: [] as string[],
 }));
 
-vi.mock("../../src/wikg/spine-digest-file.js", () => ({
+vi.mock("../../packages/core/src/wikg/spine-digest-file.js", () => ({
   SpineDigestFile: class {
     readonly #path: string;
 
@@ -125,7 +125,7 @@ vi.mock("../../src/wikg/spine-digest-file.js", () => ({
   },
 }));
 
-vi.mock("../../src/facade/index.js", () => ({
+vi.mock("../../packages/core/src/facade/index.js", () => ({
   addBuildJob: vi.fn((options: unknown) => {
     queueMockState.addCalls.push(options);
     return Promise.resolve({
@@ -260,18 +260,18 @@ vi.mock("../../src/facade/index.js", () => ({
   updateBuildJobTarget: vi.fn(),
 }));
 
-vi.mock("../../src/cli/io.js", () => ({
+vi.mock("../../packages/cli/src/cli/io.js", () => ({
   writeTextToStdout: vi.fn((text: string) => {
     queueMockState.textWrites.push(text);
     return Promise.resolve();
   }),
 }));
 
-vi.mock("../../src/cli/config.js", () => ({
+vi.mock("../../packages/cli/src/cli/config.js", () => ({
   loadCLIConfig: vi.fn(() => Promise.resolve(queueMockState.cliConfig)),
 }));
 
-vi.mock("../../src/cli/stage-runtime.js", () => ({
+vi.mock("../../packages/cli/src/cli/stage-runtime.js", () => ({
   createStageLLM: vi.fn((_config: unknown, options: unknown) => {
     queueMockState.createStageLLMCalls.push(options);
     return {};
@@ -293,7 +293,7 @@ vi.mock("../../src/cli/stage-runtime.js", () => ({
   ),
 }));
 
-import { runQueueCommand } from "../../src/cli/queue.js";
+import { runQueueCommand } from "../../packages/cli/src/cli/queue.js";
 
 describe("cli/queue", () => {
   const originalDisableAutostart =

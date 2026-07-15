@@ -4,7 +4,7 @@ import { dirname, join } from "path";
 import type {
   SourceSection,
   SourceTextStream,
-} from "../../src/source/index.js";
+} from "../../packages/core/src/source/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 

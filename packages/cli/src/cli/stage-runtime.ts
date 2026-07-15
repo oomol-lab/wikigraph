@@ -1,11 +1,11 @@
-import { resolveDataDirPath } from "../common/data-dir.js";
-import type { SpineDigestScope } from "../common/llm-scope.js";
-import { createDefaultSpineDigestSampling } from "../facade/llm-sampling.js";
-import { LLM } from "../llm/index.js";
+import { resolveDataDirPath } from "wiki-graph-core";
+import type { SpineDigestScope } from "wiki-graph-core";
+import { createDefaultSpineDigestSampling } from "wiki-graph-core";
+import { LLM } from "wiki-graph-core";
 import type {
   LLMStreamProgressCallback,
   LLMTokenUsageCallback,
-} from "../llm/index.js";
+} from "wiki-graph-core";
 
 import { loadCLIConfig, type CLIConfig } from "./config.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "./errors.js";

@@ -13,8 +13,8 @@ import { runLocalConfigCommand } from "./local-config.js";
 import { renderMainHelpText } from "./help.js";
 import { runObjectMetadataCommand } from "./object-metadata.js";
 import { runQueueCommand } from "./queue.js";
-import { LLMPaymentRequiredError } from "../llm/index.js";
-import { formatError } from "../utils/node-error.js";
+import { LLMPaymentRequiredError } from "wiki-graph-core";
+import { formatError } from "wiki-graph-core";
 import { formatCLIJSON, formatCLIJSONLine } from "./json.js";
 import { readCLIVersion } from "./version.js";
 

@@ -1,8 +1,8 @@
 import { rm } from "fs/promises";
 import { resolve } from "path";
 
-import { SpineDigestApp, type SpineDigestAppOptions } from "../index.js";
-import type { SpineDigest } from "../facade/index.js";
+import { SpineDigestApp, type SpineDigestAppOptions } from "wiki-graph-core";
+import type { SpineDigest } from "wiki-graph-core";
 
 import type { CLIArguments } from "./args.js";
 import { loadCLIConfig, type CLIConfig } from "./config.js";

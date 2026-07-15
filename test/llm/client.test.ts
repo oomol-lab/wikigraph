@@ -98,9 +98,9 @@ vi.mock("ai", () => ({
   }),
 }));
 
-import { SpineDigestScope } from "../../src/common/llm-scope.js";
-import { LLM } from "../../src/llm/client.js";
-import { LLMPaymentRequiredError } from "../../src/llm/errors.js";
+import { SpineDigestScope } from "../../packages/core/src/common/llm-scope.js";
+import { LLM } from "../../packages/core/src/llm/client.js";
+import { LLMPaymentRequiredError } from "../../packages/core/src/llm/errors.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const RETRYABLE_TRANSPORT_CODES = [

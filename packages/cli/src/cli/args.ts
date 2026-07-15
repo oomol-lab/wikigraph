@@ -10,7 +10,7 @@ import {
   type ArchiveTriplePattern,
   type BuildJobTarget,
   type ChapterStage,
-} from "../facade/index.js";
+} from "wiki-graph-core";
 import {
   isUriHelpPredicate,
   parseHelpTopic,
@@ -38,7 +38,7 @@ import {
   parseLocatedWikiGraphUri,
   WIKI_GRAPH_JOB_URI_PREFIX,
   WIKI_GRAPH_URI_PREFIX,
-} from "../wikg/index.js";
+} from "wiki-graph-core";
 
 export interface CLIArguments {
   readonly digestDirPath?: string;

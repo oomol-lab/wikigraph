@@ -4,7 +4,7 @@ import { join } from "path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Database, DirectoryDocument } from "../../../src/document/index.js";
+import { Database, DirectoryDocument } from "../../../packages/core/src/document/index.js";
 import {
   findArchiveObjects,
   grepArchiveObjects,
@@ -17,14 +17,14 @@ import {
   readArchiveText,
   readArchivePage,
   rebuildArchiveSearchIndex,
-} from "../../../src/archive/query/archive-view.js";
+} from "../../../packages/core/src/archive/query/archive-view.js";
 import {
   isSearchIndexCurrent,
   querySearchIndex,
   readArchiveIndexSettings,
   SEARCH_INDEX_FTS_HIT_LIMIT,
-} from "../../../src/archive/search-index/index.js";
-import { deleteArchiveSearchSessions } from "../../../src/archive/query/search-cache.js";
+} from "../../../packages/core/src/archive/search-index/index.js";
+import { deleteArchiveSearchSessions } from "../../../packages/core/src/archive/query/search-cache.js";
 import { withTempDir } from "../../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;

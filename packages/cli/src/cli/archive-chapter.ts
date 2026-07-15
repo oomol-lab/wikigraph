@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 import { Readable } from "stream";
 
-import type { DirectoryDocument } from "../document/index.js";
+import type { DirectoryDocument } from "wiki-graph-core";
 import {
   addChapter,
   applyChapterTree,
@@ -20,8 +20,8 @@ import {
   type ChapterTreeApplyResult,
   type ChapterDetails,
   type ChapterEntry,
-} from "../facade/index.js";
-import { SpineDigestFile } from "../wikg/index.js";
+} from "wiki-graph-core";
+import { SpineDigestFile } from "wiki-graph-core";
 
 import type { CLIArchiveChapterArguments } from "./args.js";
 import { readTextStreamFromStdin, writeTextToStdout } from "./io.js";

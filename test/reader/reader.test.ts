@@ -10,27 +10,27 @@ const {
   segmentTextStreamMock: vi.fn(),
 }));
 
-vi.mock("../../src/reader/chunk-batch/extract.js", () => ({
+vi.mock("../../packages/core/src/reader/chunk-batch/extract.js", () => ({
   extractBookCoherenceChunkBatch: extractBookCoherenceChunkBatchMock,
   extractUserFocusedChunkBatch: extractUserFocusedChunkBatchMock,
 }));
 
-vi.mock("../../src/reader/segment/segment.js", () => ({
+vi.mock("../../packages/core/src/reader/segment/segment.js", () => ({
   segmentTextStream: segmentTextStreamMock,
 }));
 
-import { Reader } from "../../src/reader/reader.js";
-import { Language } from "../../src/common/language.js";
+import { Reader } from "../../packages/core/src/reader/reader.js";
+import { Language } from "../../packages/core/src/common/language.js";
 import {
   SPINE_DIGEST_READER_SCOPES,
   SpineDigestScope,
-} from "../../src/common/llm-scope.js";
-import { ChunkImportance, ChunkRetention } from "../../src/document/index.js";
+} from "../../packages/core/src/common/llm-scope.js";
+import { ChunkImportance, ChunkRetention } from "../../packages/core/src/document/index.js";
 import type {
   SentenceStreamAdapter,
   SentenceStreamItem,
   TextStream,
-} from "../../src/reader/segment/types.js";
+} from "../../packages/core/src/reader/segment/types.js";
 
 describe("reader/reader", () => {
   beforeEach(() => {

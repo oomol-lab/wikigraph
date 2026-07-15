@@ -10,7 +10,7 @@ import type {
   ArchiveFindHit,
   ArchiveListItem,
   ArchivePage,
-} from "../../src/archive/query/archive-view.js";
+} from "../../packages/core/src/archive/query/archive-view.js";
 
 const archiveMockState = vi.hoisted(() => ({
   backlinks: {
@@ -461,7 +461,7 @@ function parseJSONLLastLine(text: string | undefined): unknown {
   return JSON.parse(line) as unknown;
 }
 
-vi.mock("../../src/wikg/spine-digest-file.js", () => ({
+vi.mock("../../packages/core/src/wikg/spine-digest-file.js", () => ({
   SpineDigestFile: class {
     readonly #path: string;
 
@@ -483,7 +483,7 @@ vi.mock("../../src/wikg/spine-digest-file.js", () => ({
   },
 }));
 
-vi.mock("../../src/facade/index.js", () => ({
+vi.mock("../../packages/core/src/facade/index.js", () => ({
   createContinuationCursor: vi.fn(() => Promise.resolve("c_next")),
   findArchiveObjects: vi.fn(
     (
@@ -561,19 +561,19 @@ vi.mock("../../src/facade/index.js", () => ({
   ),
 }));
 
-vi.mock("../../src/archive/search-index/index.js", () => ({
+vi.mock("../../packages/core/src/archive/search-index/index.js", () => ({
   readArchiveIndexSettings: vi.fn(() =>
     Promise.resolve({ ftsEmbedded: archiveMockState.ftsEmbedded }),
   ),
 }));
 
-vi.mock("../../src/archive/query/index.js", () => ({
+vi.mock("../../packages/core/src/archive/query/index.js", () => ({
   isArchiveSearchIndexCurrent: vi.fn(() =>
     Promise.resolve(archiveMockState.ftsCurrent),
   ),
 }));
 
-vi.mock("../../src/cli/config.js", () => ({
+vi.mock("../../packages/cli/src/cli/config.js", () => ({
   loadCLIConfig: vi.fn(() =>
     Promise.resolve({
       concurrent: {
@@ -588,14 +588,14 @@ vi.mock("../../src/cli/config.js", () => ({
   ),
 }));
 
-vi.mock("../../src/cli/io.js", () => ({
+vi.mock("../../packages/cli/src/cli/io.js", () => ({
   writeTextToStdout: vi.fn((text: string) => {
     archiveMockState.textWrites.push(text);
     return Promise.resolve();
   }),
 }));
 
-vi.mock("../../src/cli/convert.js", () => ({
+vi.mock("../../packages/cli/src/cli/convert.js", () => ({
   runConvertCommand: vi.fn(async (args: { readonly outputPath?: string }) => {
     archiveMockState.convertCalls.push(args);
     if (args.outputPath !== undefined) {
@@ -606,7 +606,7 @@ vi.mock("../../src/cli/convert.js", () => ({
   }),
 }));
 
-import { runArchiveCommand } from "../../src/cli/archive.js";
+import { runArchiveCommand } from "../../packages/cli/src/cli/archive.js";
 import {
   createContinuationCursor,
   findArchiveObjects,
@@ -615,7 +615,7 @@ import {
   listRelatedArchiveObjects,
   readContinuationCursor,
   readArchivePage,
-} from "../../src/facade/index.js";
+} from "../../packages/core/src/facade/index.js";
 
 function createArchiveMockDocument(): unknown {
   const document = {};

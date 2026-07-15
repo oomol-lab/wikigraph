@@ -4,7 +4,7 @@ import {
   ChunkImportance,
   ChunkRetention,
   DirectoryDocument,
-} from "../../src/document/index.js";
+} from "../../packages/core/src/document/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 async function withDocument(

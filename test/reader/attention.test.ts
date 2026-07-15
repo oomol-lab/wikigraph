@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { Attention } from "../../src/reader/attention/attention.js";
-import { ChunkImportance } from "../../src/document/index.js";
+import { Attention } from "../../packages/core/src/reader/attention/attention.js";
+import { ChunkImportance } from "../../packages/core/src/document/index.js";
 
 describe("reader/attention", () => {
   it("accepts chunk batches, assigns ids, and exposes visible context", async () => {

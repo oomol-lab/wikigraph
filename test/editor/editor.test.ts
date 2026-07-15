@@ -13,26 +13,26 @@ vi.mock("tinyld", () => ({
 import type {
   ReadonlyDocument,
   ReadonlySerialFragments,
-} from "../../src/document/index.js";
+} from "../../packages/core/src/document/index.js";
 import {
   SPINE_DIGEST_EDITOR_SCOPES,
   SpineDigestScope,
-} from "../../src/common/llm-scope.js";
-import { Language } from "../../src/common/language.js";
+} from "../../packages/core/src/common/llm-scope.js";
+import { Language } from "../../packages/core/src/common/language.js";
 import type {
   ChunkRecord,
   FragmentGroupRecord,
   FragmentRecord,
   SnakeRecord,
-} from "../../src/document/types.js";
-import { compressText } from "../../src/editor/editor.js";
+} from "../../packages/core/src/document/types.js";
+import { compressText } from "../../packages/core/src/editor/editor.js";
 import {
   CLUE_REVIEWER_GENERATOR_PROMPT_TEMPLATE,
   CLUE_REVIEWER_PROMPT_TEMPLATE,
   REVISION_FEEDBACK_PROMPT_TEMPLATE,
   TEXT_COMPRESSOR_PROMPT_TEMPLATE,
-} from "../../src/editor/prompt-templates.js";
-import { RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE } from "../../src/guaranteed/index.js";
+} from "../../packages/core/src/editor/prompt-templates.js";
+import { RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE } from "../../packages/core/src/guaranteed/index.js";
 import { ScriptedLLM } from "../helpers/scripted-llm.js";
 
 describe("editor/editor", () => {

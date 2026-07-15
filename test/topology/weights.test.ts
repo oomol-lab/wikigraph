@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { ChunkImportance, ChunkRetention } from "../../src/document/index.js";
+import { ChunkImportance, ChunkRetention } from "../../packages/core/src/document/index.js";
 import {
   computeChunkWeights,
   computeReadingEdgeWeights,
   getReadingEdgeKey,
-} from "../../src/topology/weights.js";
+} from "../../packages/core/src/topology/weights.js";
 
 describe("topology/weights", () => {
   it("computes chunk weights from retention and importance", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { DirectoryDocument } from "../../src/document/index.js";
+import { DirectoryDocument } from "../../packages/core/src/document/index.js";
 import {
   buildChapterKnowledgeGraphArtifact,
   clearChapterKnowledgeGraph,
@@ -8,8 +8,8 @@ import {
   createEnrichmentProgressReporter,
   generateChapterKnowledgeGraphArtifactFromSnapshot,
   groundWikimatchCandidates,
-} from "../../src/facade/index.js";
-import type { GuaranteedRequest } from "../../src/guaranteed/index.js";
+} from "../../packages/core/src/facade/index.js";
+import type { GuaranteedRequest } from "../../packages/core/src/guaranteed/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("facade/knowledge-graph-build", () => {

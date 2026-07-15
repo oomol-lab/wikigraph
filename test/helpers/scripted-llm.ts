@@ -3,7 +3,7 @@ import type {
   LLMLazyRequestOperation,
   LLMRequestFunction,
   LLMRequestOptions,
-} from "../../src/llm/index.js";
+} from "../../packages/core/src/llm/index.js";
 
 export interface ScriptedLLMCall<S extends string> {
   readonly messages: readonly LLMessage[];

@@ -1,4 +1,4 @@
-import type { SpineDigestLLMOptions } from "../facade/index.js";
+import type { SpineDigestLLMOptions } from "wiki-graph-core";
 
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

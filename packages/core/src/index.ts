@@ -15,7 +15,33 @@ export {
   type SpineDigestTaskIdentity,
   type SpineDigestTaskType,
 } from "./context/index.js";
-export { LLMPaymentRequiredError } from "./llm/index.js";
+export { LLM, LLMPaymentRequiredError } from "./llm/index.js";
+export type {
+  LLMessage,
+  LLMOptions,
+  LLMRequestOptions,
+  LLMStreamProgressCallback,
+  LLMTokenUsage,
+  LLMTokenUsageCallback,
+} from "./llm/index.js";
+export {
+  SpineDigestScope,
+  SPINE_DIGEST_EDITOR_SCOPES,
+  SPINE_DIGEST_READER_SCOPES,
+  SPINE_DIGEST_SCOPES,
+} from "./common/llm-scope.js";
+export { withLoggingContext } from "./common/logging.js";
+export { CLI_FULL_COMMAND, CLI_PRIMARY_COMMAND } from "./common/cli-command.js";
+export { resolveDataDirPath } from "./common/data-dir.js";
+export { createEnv } from "./common/template.js";
+export {
+  resolveWikiGraphCoreDatabasePath,
+  resolveWikiGraphHomeDirectoryPath,
+} from "./common/wiki-graph-dir.js";
+export {
+  createWikiGraphTempDirectory,
+  resolveWikiGraphStateRootPath,
+} from "./common/wiki-graph-temp.js";
 export {
   EVIDENCE_SELECTION_JSON_SHAPE,
   EVIDENCE_SELECTION_PROMPT_FRAGMENT,
@@ -79,6 +105,7 @@ export {
   type WikimatchTextRange,
   type WikimatchWindow,
 } from "./wikimatch/index.js";
+export { createDefaultSpineDigestSampling } from "./facade/llm-sampling.js";
 export {
   type DigestProgressEvent,
   type SerialDiscoveryItem,
@@ -97,3 +124,60 @@ export {
   type SpineDigestTextStreamSessionOptions,
 } from "./facade/index.js";
 export type { SpineDigestSerialEntry } from "./facade/index.js";
+export {
+  formatLocatedChapterResourceUri,
+  formatLocatedChapterSourceCollectionUri,
+  formatLocatedChapterUri,
+  isWikiGraphJobUri,
+  isWikiGraphUri,
+  readWikgArchiveFormatVersion,
+  formatWikiGraphCommandUri,
+  formatLocatedWikiGraphUri,
+  parseLocatedWikiGraphUri,
+  requireArchiveUri,
+  requireLocatedObjectOrArchiveUri,
+  requireLocatedObjectUri,
+  SpineDigestFile,
+  WIKI_GRAPH_JOB_URI_PREFIX,
+  WIKI_GRAPH_URI_PREFIX,
+  writeWikgArchive,
+} from "./wikg/index.js";
+export type { LocatedWikiGraphUri } from "./wikg/index.js";
+export {
+  DirectoryDocument,
+  openSharedStateDatabase,
+} from "./document/index.js";
+export type {
+  Database,
+  Document,
+  ReadonlyDocument,
+} from "./document/index.js";
+export { TOC_FILE_VERSION } from "./source/index.js";
+export type { BookMeta } from "./source/index.js";
+export {
+  isArchiveSearchIndexCurrent,
+} from "./archive/query/index.js";
+export {
+  readArchiveIndexSettings,
+} from "./archive/search-index/index.js";
+export {
+  migrateLegacySdpubToWikg,
+} from "./legacy-sdpub/upgrade.js";
+export type {
+  GuaranteedRequest,
+  GuaranteedRequestController,
+} from "./guaranteed/index.js";
+export { tryRunWikiGraphGc } from "./gc/index.js";
+export type {
+  GcContext,
+  GcJob,
+  GcJobReport,
+  GcJobResult,
+  GcRunReport,
+} from "./gc/index.js";
+export { formatError } from "./utils/node-error.js";
+export * from "./archive/query/index.js";
+export * from "./archive/search-index/index.js";
+export * from "./document/index.js";
+export * from "./facade/index.js";
+export * from "./wikimatch/index.js";

@@ -3,15 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ChunkImportance,
   ChunkRetention,
-} from "../../../src/document/index.js";
-import { ParsedJsonError } from "../../../src/guaranteed/index.js";
+} from "../../../packages/core/src/document/index.js";
+import { ParsedJsonError } from "../../../packages/core/src/guaranteed/index.js";
 import {
   ChunkBatchParser,
   ChunkMetadataField,
-} from "../../../src/reader/chunk-batch/parser.js";
-import { FragmentProjection } from "../../../src/reader/chunk-batch/fragment-projection.js";
-import type { ChunkExtractionSentence } from "../../../src/reader/chunk-batch/types.js";
-import type { LLMessage } from "../../../src/llm/index.js";
+} from "../../../packages/core/src/reader/chunk-batch/parser.js";
+import { FragmentProjection } from "../../../packages/core/src/reader/chunk-batch/fragment-projection.js";
+import type { ChunkExtractionSentence } from "../../../packages/core/src/reader/chunk-batch/types.js";
+import type { LLMessage } from "../../../packages/core/src/llm/index.js";
 
 describe("reader/chunk-batch/parser", () => {
   it("parses valid chunks from contiguous source sentences", async () => {

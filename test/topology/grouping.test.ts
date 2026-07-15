@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type {
   ChunkRecord,
   ReadonlySerialFragments,
-} from "../../src/document/index.js";
-import { groupSegments } from "../../src/topology/grouping.js";
+} from "../../packages/core/src/document/index.js";
+import { groupSegments } from "../../packages/core/src/topology/grouping.js";
 
 describe("topology/grouping", () => {
   it("converts normalized segment incisions into persisted sentence groups", async () => {

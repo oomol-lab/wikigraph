@@ -47,7 +47,7 @@ const mockTemporaryOutput = {
 
 const mockStdinStream = ["from stdin"];
 
-vi.mock("../../src/index.js", () => ({
+vi.mock("../../packages/core/src/index.js", () => ({
   SpineDigestApp: class {
     public constructor(options: unknown) {
       cliMockState.appConstructorOptions.push(options);
@@ -99,21 +99,21 @@ vi.mock("../../src/index.js", () => ({
   },
 }));
 
-vi.mock("../../src/cli/config.js", () => ({
+vi.mock("../../packages/cli/src/cli/config.js", () => ({
   loadCLIConfig: vi.fn((options?: unknown) => {
     cliMockState.loadCLIConfigOptions.push(options);
     return Promise.resolve(cliMockState.config);
   }),
 }));
 
-vi.mock("../../src/cli/llm.js", () => ({
+vi.mock("../../packages/cli/src/cli/llm.js", () => ({
   buildLLMOptions: vi.fn((config: unknown) => {
     cliMockState.buildLLMOptionsConfig.push(config);
     return mockLLMOptions;
   }),
 }));
 
-vi.mock("../../src/cli/io.js", () => ({
+vi.mock("../../packages/cli/src/cli/io.js", () => ({
   createTemporaryOutputPath: vi.fn((prefix: string, extension: string) => {
     cliMockState.createTemporaryOutputPathCalls.push({
       extension,
@@ -139,7 +139,7 @@ vi.mock("fs/promises", () => ({
   }),
 }));
 
-import { runConvertCommand } from "../../src/cli/convert.js";
+import { runConvertCommand } from "../../packages/cli/src/cli/convert.js";
 
 describe("cli/convert", () => {
   const originalStdinIsTTY = process.stdin.isTTY;

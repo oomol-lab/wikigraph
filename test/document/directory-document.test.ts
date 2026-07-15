@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   DirectoryDocument,
   ObjectMetadataKind,
-} from "../../src/document/index.js";
+} from "../../packages/core/src/document/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("document/directory-document", () => {

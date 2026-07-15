@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 
-import { SpineDigestScope } from "../common/llm-scope.js";
-import { withLoggingContext } from "../common/logging.js";
+import { SpineDigestScope } from "wiki-graph-core";
+import { withLoggingContext } from "wiki-graph-core";
 import {
   addBuildJob,
   assertBuildJobInputRevision,
@@ -35,13 +35,13 @@ import {
   type BuildJobState,
   type BuildJobTarget,
   type ChapterEntry,
-} from "../facade/index.js";
-import { SpineDigestFile } from "../wikg/index.js";
+} from "wiki-graph-core";
+import { SpineDigestFile } from "wiki-graph-core";
 import type {
   GuaranteedRequest,
   GuaranteedRequestController,
-} from "../guaranteed/index.js";
-import type { LLMessage } from "../llm/index.js";
+} from "wiki-graph-core";
+import type { LLMessage } from "wiki-graph-core";
 
 import type { CLIQueueArguments } from "./args.js";
 import { loadCLIConfig, type CLIConfig } from "./config.js";

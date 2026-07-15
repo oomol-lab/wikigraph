@@ -2,8 +2,8 @@ import { readFile } from "fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { DirectoryDocument } from "../../src/document/index.js";
-import { writePlainText } from "../../src/output/plain-text.js";
+import { DirectoryDocument } from "../../packages/core/src/document/index.js";
+import { writePlainText } from "../../packages/core/src/output/plain-text.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("output/plain-text", () => {

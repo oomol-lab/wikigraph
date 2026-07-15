@@ -4,8 +4,8 @@ import type {
   ChunkRecord,
   FragmentRecord,
   ReadonlySerialFragments,
-} from "../../src/document/index.js";
-import { formatClueAsBook } from "../../src/editor/markup.js";
+} from "../../packages/core/src/document/index.js";
+import { formatClueAsBook } from "../../packages/core/src/editor/markup.js";
 
 describe("editor/markup", () => {
   it("loads the fragment containing a chunk sentence", async () => {

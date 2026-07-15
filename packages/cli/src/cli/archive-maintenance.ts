@@ -1,6 +1,6 @@
-import { SpineDigestApp } from "../index.js";
-import { SpineDigestFile } from "../wikg/index.js";
-import type { BookMeta } from "../source/index.js";
+import { SpineDigestApp } from "wiki-graph-core";
+import { SpineDigestFile } from "wiki-graph-core";
+import type { BookMeta } from "wiki-graph-core";
 
 import type {
   ArchiveMetaPatch,

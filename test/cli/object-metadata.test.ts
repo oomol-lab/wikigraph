@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type * as WikiGraphIndex from "../../src/wikg/index.js";
+import type * as WikiGraphIndex from "../../packages/core/src/wikg/index.js";
 
 const objectMetadataMockState = vi.hoisted(() => ({
   inputFileContent: '{"file":true}',
@@ -12,7 +12,7 @@ const objectMetadataMockState = vi.hoisted(() => ({
   writeCalls: [] as string[],
 }));
 
-vi.mock("../../src/wikg/index.js", async (importOriginal) => {
+vi.mock("../../packages/core/src/wikg/index.js", async (importOriginal) => {
   const actual = await importOriginal<typeof WikiGraphIndex>();
 
   return {
@@ -41,7 +41,7 @@ vi.mock("../../src/wikg/index.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../src/cli/io.js", () => ({
+vi.mock("../../packages/cli/src/cli/io.js", () => ({
   readTextStreamFromStdin: vi.fn(() => objectMetadataMockState.stdinStream),
   writeTextToStdout: vi.fn((text: string) => {
     objectMetadataMockState.textWrites.push(text);
@@ -55,8 +55,8 @@ vi.mock("fs/promises", () => ({
   ),
 }));
 
-import { parseCLIArguments } from "../../src/cli/args.js";
-import { runObjectMetadataCommand } from "../../src/cli/object-metadata.js";
+import { parseCLIArguments } from "../../packages/cli/src/cli/args.js";
+import { runObjectMetadataCommand } from "../../packages/cli/src/cli/object-metadata.js";
 
 interface MockDocument {
   readonly metadata: {

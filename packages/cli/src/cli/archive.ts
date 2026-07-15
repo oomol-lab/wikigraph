@@ -1,7 +1,7 @@
 import { rename, rm, stat } from "fs/promises";
 import { basename, dirname, join } from "path";
 
-import { createWikiGraphTempDirectory } from "../common/wiki-graph-temp.js";
+import { createWikiGraphTempDirectory } from "wiki-graph-core";
 import {
   listArchiveCollection,
   listArchiveEvidence,
@@ -28,9 +28,9 @@ import {
   type ArchiveRelatedResult,
   type ChapterEntry,
   type ContinuationCursor,
-} from "../facade/index.js";
-import { readArchiveIndexSettings } from "../archive/search-index/index.js";
-import { isArchiveSearchIndexCurrent } from "../archive/query/index.js";
+} from "wiki-graph-core";
+import { readArchiveIndexSettings } from "wiki-graph-core";
+import { isArchiveSearchIndexCurrent } from "wiki-graph-core";
 import {
   formatLocatedWikiGraphUri,
   formatWikiGraphCommandUri,
@@ -38,10 +38,10 @@ import {
   requireLocatedObjectOrArchiveUri,
   SpineDigestFile,
   writeWikgArchive,
-} from "../wikg/index.js";
-import { DirectoryDocument, type ReadonlyDocument } from "../document/index.js";
-import { TOC_FILE_VERSION } from "../source/index.js";
-import { CLI_PRIMARY_COMMAND } from "../common/cli-command.js";
+} from "wiki-graph-core";
+import { DirectoryDocument, type ReadonlyDocument } from "wiki-graph-core";
+import { TOC_FILE_VERSION } from "wiki-graph-core";
+import { CLI_PRIMARY_COMMAND } from "wiki-graph-core";
 
 import type { CLIArchiveArguments } from "./args.js";
 import { loadCLIConfig } from "./config.js";

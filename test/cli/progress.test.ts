@@ -12,7 +12,7 @@ vi.mock("readline", () => ({
   },
 }));
 
-import { createCLIProgressRenderer } from "../../src/cli/progress.js";
+import { createCLIProgressRenderer } from "../../packages/cli/src/cli/progress.js";
 
 describe("cli/progress", () => {
   it("renders stage totals and only keeps active serials visible", async () => {

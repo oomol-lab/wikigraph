@@ -12,7 +12,7 @@ const appMockState = vi.hoisted(() => ({
   llmOptions: [] as unknown[],
 }));
 
-vi.mock("../../src/llm/index.js", () => ({
+vi.mock("../../packages/core/src/llm/index.js", () => ({
   LLM: class {
     public constructor(options: unknown) {
       appMockState.llmOptions.push(options);
@@ -20,7 +20,7 @@ vi.mock("../../src/llm/index.js", () => ({
   },
 }));
 
-vi.mock("../../src/facade/digest.js", () => ({
+vi.mock("../../packages/core/src/facade/digest.js", () => ({
   digestEpubSession: vi.fn(
     async (options: unknown, operation: () => unknown) => {
       appMockState.digestCalls.epub.push(options);
@@ -47,10 +47,10 @@ vi.mock("../../src/facade/digest.js", () => ({
   ),
 }));
 
-import { SpineDigestScope } from "../../src/common/llm-scope.js";
-import { DirectoryDocument } from "../../src/document/index.js";
-import { SpineDigest } from "../../src/facade/spine-digest.js";
-import { Language, SpineDigestApp } from "../../src/index.js";
+import { SpineDigestScope } from "../../packages/core/src/common/llm-scope.js";
+import { DirectoryDocument } from "../../packages/core/src/document/index.js";
+import { SpineDigest } from "../../packages/core/src/facade/spine-digest.js";
+import { Language, SpineDigestApp } from "../../packages/core/src/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("facade/app", () => {

@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import type { SpineDigestScope } from "../../src/common/llm-scope.js";
+import type { SpineDigestScope } from "../../packages/core/src/common/llm-scope.js";
 import {
   calculateScore,
   createRevisionFeedback,
   formatIssuesForLog,
   pickBestVersion,
-} from "../../src/editor/feedback.js";
-import { REVISION_FEEDBACK_PROMPT_TEMPLATE } from "../../src/editor/prompt-templates.js";
+} from "../../packages/core/src/editor/feedback.js";
+import { REVISION_FEEDBACK_PROMPT_TEMPLATE } from "../../packages/core/src/editor/prompt-templates.js";
 import {
   ReviewSeverity,
   type CompressionVersion,
   type ReviewResult,
-} from "../../src/editor/types.js";
+} from "../../packages/core/src/editor/types.js";
 import { ScriptedLLM } from "../helpers/scripted-llm.js";
 
 describe("editor/feedback", () => {

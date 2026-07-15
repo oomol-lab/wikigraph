@@ -6,14 +6,14 @@ import { ZipFile } from "yazl";
 
 import { describe, expect, it } from "vitest";
 
-import { DirectoryDocument } from "../../src/document/index.js";
+import { DirectoryDocument } from "../../packages/core/src/document/index.js";
 import {
   extractWikgArchive,
   readWikgArchiveMutationToken,
   readWikgArchiveEntry,
   writeWikgArchive,
   writeWikgArchiveWithOverlays,
-} from "../../src/wikg/archive.js";
+} from "../../packages/core/src/wikg/archive.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const VALID_MUTATION_TOKEN_CONTENT = `wikg-mutation-token:v1\n${"a".repeat(43)}\n`;

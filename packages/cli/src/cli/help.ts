@@ -1,10 +1,10 @@
-import { resolveDataDirPath } from "../common/data-dir.js";
-import { createEnv } from "../common/template.js";
+import { resolveDataDirPath } from "wiki-graph-core";
+import { createEnv } from "wiki-graph-core";
 
 import {
   CLI_FULL_COMMAND,
   CLI_PRIMARY_COMMAND,
-} from "../common/cli-command.js";
+} from "wiki-graph-core";
 import { CLI_FORMATS } from "./formats.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "./errors.js";
 import { formatCliCommand } from "./shell.js";

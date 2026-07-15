@@ -5,10 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   DirectoryDocument,
   type ReadonlyDocument,
-} from "../../src/document/index.js";
-import { extractWikgArchive } from "../../src/wikg/archive.js";
-import { SpineDigest } from "../../src/facade/spine-digest.js";
-import { EPUB_SOURCE_ADAPTER } from "../../src/source/index.js";
+} from "../../packages/core/src/document/index.js";
+import { extractWikgArchive } from "../../packages/core/src/wikg/archive.js";
+import { SpineDigest } from "../../packages/core/src/facade/spine-digest.js";
+import { EPUB_SOURCE_ADAPTER } from "../../packages/core/src/source/index.js";
 import { collectSectionTitles, readStreamText } from "../helpers/fixtures.js";
 import { withTempDir } from "../helpers/temp.js";
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildWikimatchSurfaceProtectionInput,
   type WikimatchCandidate,
-} from "../../src/wikimatch/index.js";
+} from "../../packages/core/src/wikimatch/index.js";
 
 describe("wikimatch/surface-window", () => {
   it("suppresses contained ranges before ranking high-frequency surfaces", () => {

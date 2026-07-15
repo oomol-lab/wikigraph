@@ -31,7 +31,7 @@ const mainMockState = vi.hoisted(() => ({
   legacyRunError: undefined as Error | undefined,
 }));
 
-vi.mock("../../src/cli/args.js", () => ({
+vi.mock("../../packages/cli/src/cli/args.js", () => ({
   parseCLIArguments: vi.fn(() => {
     if (mainMockState.parseError !== undefined) {
       throw mainMockState.parseError;
@@ -41,7 +41,7 @@ vi.mock("../../src/cli/args.js", () => ({
   }),
 }));
 
-vi.mock("../../src/cli/archive.js", () => ({
+vi.mock("../../packages/cli/src/cli/archive.js", () => ({
   runArchiveCommand: vi.fn((args: unknown) => {
     mainMockState.archiveRunCalls.push(args);
 
@@ -53,7 +53,7 @@ vi.mock("../../src/cli/archive.js", () => ({
   }),
 }));
 
-vi.mock("../../src/cli/archive-index.js", () => ({
+vi.mock("../../packages/cli/src/cli/archive-index.js", () => ({
   runArchiveIndexCommand: vi.fn((args: unknown) => {
     mainMockState.archiveIndexRunCalls.push(args);
 
@@ -65,7 +65,7 @@ vi.mock("../../src/cli/archive-index.js", () => ({
   }),
 }));
 
-vi.mock("../../src/cli/convert.js", () => ({
+vi.mock("../../packages/cli/src/cli/convert.js", () => ({
   runConvertCommand: vi.fn((args: unknown) => {
     mainMockState.convertRunCalls.push(args);
 
@@ -77,7 +77,7 @@ vi.mock("../../src/cli/convert.js", () => ({
   }),
 }));
 
-vi.mock("../../src/cli/local-config.js", () => ({
+vi.mock("../../packages/cli/src/cli/local-config.js", () => ({
   runLocalConfigCommand: vi.fn((args: unknown) => {
     mainMockState.localConfigRunCalls.push(args);
 
@@ -89,7 +89,7 @@ vi.mock("../../src/cli/local-config.js", () => ({
   }),
 }));
 
-vi.mock("../../src/cli/gc.js", () => ({
+vi.mock("../../packages/cli/src/cli/gc.js", () => ({
   runGcCommand: vi.fn((args: unknown) => {
     mainMockState.gcRunCalls.push(args);
 
@@ -101,7 +101,7 @@ vi.mock("../../src/cli/gc.js", () => ({
   }),
 }));
 
-vi.mock("../../src/cli/archive-maintenance.js", () => ({
+vi.mock("../../packages/cli/src/cli/archive-maintenance.js", () => ({
   runArchiveCoverCommand: vi.fn((args: unknown) => {
     mainMockState.archiveCoverRunCalls.push(args);
 
@@ -122,7 +122,7 @@ vi.mock("../../src/cli/archive-maintenance.js", () => ({
   }),
 }));
 
-vi.mock("../../src/cli/archive-chapter.js", () => ({
+vi.mock("../../packages/cli/src/cli/archive-chapter.js", () => ({
   runArchiveChapterCommand: vi.fn((args: unknown) => {
     mainMockState.archiveChapterRunCalls.push(args);
 
@@ -134,7 +134,7 @@ vi.mock("../../src/cli/archive-chapter.js", () => ({
   }),
 }));
 
-vi.mock("../../src/cli/legacy.js", () => ({
+vi.mock("../../packages/cli/src/cli/legacy.js", () => ({
   runLegacyCommand: vi.fn((args: unknown) => {
     mainMockState.legacyRunCalls.push(args);
 
@@ -146,9 +146,9 @@ vi.mock("../../src/cli/legacy.js", () => ({
   }),
 }));
 
-import { main } from "../../src/cli/main.js";
-import { renderMainHelpText } from "../../src/cli/help.js";
-import { LLMPaymentRequiredError } from "../../src/llm/index.js";
+import { main } from "../../packages/cli/src/cli/main.js";
+import { renderMainHelpText } from "../../packages/cli/src/cli/help.js";
+import { LLMPaymentRequiredError } from "../../packages/core/src/llm/index.js";
 
 describe("cli/main", () => {
   const originalExitCode = process.exitCode;

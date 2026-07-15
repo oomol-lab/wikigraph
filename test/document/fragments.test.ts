@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Fragments } from "../../src/document/index.js";
+import { Fragments } from "../../packages/core/src/document/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("document/fragments", () => {

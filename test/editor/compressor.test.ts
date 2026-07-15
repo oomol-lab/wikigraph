@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { SpineDigestScope } from "../../src/common/llm-scope.js";
-import { CompressionRequester } from "../../src/editor/compressor.js";
-import { TEXT_COMPRESSOR_PROMPT_TEMPLATE } from "../../src/editor/prompt-templates.js";
+import { SpineDigestScope } from "../../packages/core/src/common/llm-scope.js";
+import { CompressionRequester } from "../../packages/core/src/editor/compressor.js";
+import { TEXT_COMPRESSOR_PROMPT_TEMPLATE } from "../../packages/core/src/editor/prompt-templates.js";
 import { ScriptedLLM } from "../helpers/scripted-llm.js";
 
 describe("editor/compressor", () => {

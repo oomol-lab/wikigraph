@@ -2,9 +2,9 @@ import { mkdir, readdir, readFile } from "fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-import { withLoggingContext } from "../../src/common/logging.js";
-import { Database } from "../../src/document/index.js";
-import { WikipageResolver } from "../../src/wikipage/index.js";
+import { withLoggingContext } from "../../packages/core/src/common/logging.js";
+import { Database } from "../../packages/core/src/document/index.js";
+import { WikipageResolver } from "../../packages/core/src/wikipage/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("wikipage/resolver", () => {

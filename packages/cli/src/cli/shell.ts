@@ -1,4 +1,4 @@
-import { CLI_PRIMARY_COMMAND } from "../common/cli-command.js";
+import { CLI_PRIMARY_COMMAND } from "wiki-graph-core";
 
 const SAFE_SHELL_ARGUMENT_PATTERN = /^[A-Za-z0-9_@%+=:,./-]+$/u;
 

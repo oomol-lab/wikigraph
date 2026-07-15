@@ -1,6 +1,6 @@
-import { resolveWikiGraphCoreDatabasePath } from "../common/wiki-graph-dir.js";
-import { openSharedStateDatabase } from "../document/index.js";
-import type { Database } from "../document/index.js";
+import { resolveWikiGraphCoreDatabasePath } from "wiki-graph-core";
+import { openSharedStateDatabase } from "wiki-graph-core";
+import type { Database } from "wiki-graph-core";
 
 export const LOCAL_CONFIG_SECTIONS = [
   "concurrent",

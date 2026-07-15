@@ -1,5 +1,5 @@
 import type { CLILegacyArguments } from "./args.js";
-import { migrateLegacySdpubToWikg } from "../legacy-sdpub/upgrade.js";
+import { migrateLegacySdpubToWikg } from "wiki-graph-core";
 
 export async function runLegacyCommand(
   args: CLILegacyArguments,

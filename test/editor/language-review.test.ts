@@ -10,9 +10,9 @@ vi.mock("tinyld", () => ({
   validateISO2: validateISO2Mock,
 }));
 
-import { checkOutputLanguage } from "../../src/editor/language-review.js";
-import { ReviewSeverity } from "../../src/editor/types.js";
-import { Language } from "../../src/common/language.js";
+import { checkOutputLanguage } from "../../packages/core/src/editor/language-review.js";
+import { ReviewSeverity } from "../../packages/core/src/editor/types.js";
+import { Language } from "../../packages/core/src/common/language.js";
 
 describe("editor/language-review", () => {
   beforeEach(() => {

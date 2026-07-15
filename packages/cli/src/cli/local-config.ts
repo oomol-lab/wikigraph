@@ -9,7 +9,7 @@ import {
   DEFAULT_WIKISPINE_FETCH_ENDPOINT,
   testWikispineRuntime,
   type WikispineProvider,
-} from "../wikimatch/index.js";
+} from "wiki-graph-core";
 import { buildLLMOptions } from "./llm.js";
 import { writeTextToStderr, writeTextToStdout } from "./io.js";
 import { formatCLIJSON } from "./json.js";

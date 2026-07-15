@@ -3,17 +3,17 @@ import { describe, expect, it } from "vitest";
 import {
   SPINE_DIGEST_EDITOR_SCOPES,
   SpineDigestScope,
-} from "../../src/common/llm-scope.js";
-import { Language } from "../../src/common/language.js";
-import type { ReadonlySerialFragments } from "../../src/document/index.js";
-import type { ChunkRecord, FragmentRecord } from "../../src/document/types.js";
+} from "../../packages/core/src/common/llm-scope.js";
+import { Language } from "../../packages/core/src/common/language.js";
+import type { ReadonlySerialFragments } from "../../packages/core/src/document/index.js";
+import type { ChunkRecord, FragmentRecord } from "../../packages/core/src/document/types.js";
 import {
   CLUE_REVIEWER_GENERATOR_PROMPT_TEMPLATE,
   CLUE_REVIEWER_PROMPT_TEMPLATE,
-} from "../../src/editor/prompt-templates.js";
-import { CompressionReviewer } from "../../src/editor/review.js";
-import type { Clue } from "../../src/editor/clue.js";
-import { ReviewSeverity } from "../../src/editor/types.js";
+} from "../../packages/core/src/editor/prompt-templates.js";
+import { CompressionReviewer } from "../../packages/core/src/editor/review.js";
+import type { Clue } from "../../packages/core/src/editor/clue.js";
+import { ReviewSeverity } from "../../packages/core/src/editor/types.js";
 import { ScriptedLLM } from "../helpers/scripted-llm.js";
 
 describe("editor/review", () => {

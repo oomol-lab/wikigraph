@@ -5,7 +5,7 @@ import type {
   ReaderSegment,
   ReaderSentence,
   ReaderTextStream,
-} from "../src/reader/index.js";
+} from "../packages/core/src/reader/index.js";
 
 const EMPTY_DELTA: ReaderGraphDelta = {
   chunks: [],
@@ -20,11 +20,11 @@ const { compressTextMock, readerFragmentSummaryMock, readerSegmentMock } =
       vi.fn<(stream: ReaderTextStream) => AsyncIterable<ReaderSegment>>(),
   }));
 
-vi.mock("../src/editor/index.js", () => ({
+vi.mock("../packages/core/src/editor/index.js", () => ({
   compressText: compressTextMock,
 }));
 
-vi.mock("../src/reader/index.js", () => ({
+vi.mock("../packages/core/src/reader/index.js", () => ({
   Reader: class {
     public segment(stream: ReaderTextStream): AsyncIterable<ReaderSegment> {
       return readerSegmentMock(stream);
@@ -60,7 +60,7 @@ vi.mock("../src/reader/index.js", () => ({
     readerSegmentMock(stream),
 }));
 
-vi.mock("../src/topology/index.js", () => ({
+vi.mock("../packages/core/src/topology/index.js", () => ({
   Topology: class {
     public accept(): void {}
 
@@ -70,8 +70,8 @@ vi.mock("../src/topology/index.js", () => ({
   },
 }));
 
-import { DirectoryDocument } from "../src/document/index.js";
-import { SerialGeneration, writeSerialSource } from "../src/serial.js";
+import { DirectoryDocument } from "../packages/core/src/document/index.js";
+import { SerialGeneration, writeSerialSource } from "../packages/core/src/serial.js";
 import { withTempDir } from "./helpers/temp.js";
 
 describe("serial", () => {

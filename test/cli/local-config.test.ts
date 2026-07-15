@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { mergeMaskedSecretsForSet } from "../../src/cli/local-config.js";
+import { mergeMaskedSecretsForSet } from "../../packages/cli/src/cli/local-config.js";
 import {
   maskLocalConfigSection,
   normalizeLocalConfigKey,
   validateLocalConfigSection,
-} from "../../src/cli/local-config-store.js";
+} from "../../packages/cli/src/cli/local-config-store.js";
 
 describe("cli/local-config", () => {
   it("normalizes llm kebab-case keys", () => {

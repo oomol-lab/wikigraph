@@ -4,7 +4,7 @@ import {
   Database,
   DirectoryDocument,
   SCHEMA_SQL,
-} from "../../src/document/index.js";
+} from "../../packages/core/src/document/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("document/wiki-graph-schema", () => {

@@ -1,0 +1,61 @@
+{
+  "name": "wiki-graph",
+  "version": "0.3.1",
+  "description": "CLI for building and querying .wikg knowledge-base archives from long-form text and ebooks.",
+  "keywords": [
+    "wiki-graph",
+    "knowledge-graph",
+    "llm",
+    "cli",
+    "wikg"
+  ],
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oomol-lab/wiki-graph.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oomol-lab/wiki-graph/issues"
+  },
+  "homepage": "https://github.com/oomol-lab/wiki-graph",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "bin": {
+    "wg": "dist/cli.js",
+    "wikigraph": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "rimraf dist && tsup --config tsup.config.ts",
+    "dev": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.68",
+    "@ai-sdk/google": "^3.0.61",
+    "@ai-sdk/openai": "^3.0.52",
+    "@ai-sdk/openai-compatible": "^2.0.41",
+    "ai": "^6.0.154",
+    "zod": "^4.3.6",
+    "wiki-graph-core": "workspace:*"
+  }
+}

@@ -3,8 +3,8 @@ import { readFile } from "fs/promises";
 import {
   ObjectMetadataKind,
   type ObjectMetadataTarget,
-} from "../document/index.js";
-import { SpineDigestFile } from "../wikg/index.js";
+} from "wiki-graph-core";
+import { SpineDigestFile } from "wiki-graph-core";
 
 import type { CLIObjectMetadataArguments } from "./args.js";
 import { readTextStreamFromStdin, writeTextToStdout } from "./io.js";

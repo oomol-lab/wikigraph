@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { createCoverImageHref } from "../../src/output/epub/archive.js";
+import { createCoverImageHref } from "../../packages/core/src/output/epub/archive.js";
 import {
   createFallbackSection,
   createSectionDocument,
-} from "../../src/output/epub/content.js";
+} from "../../packages/core/src/output/epub/content.js";
 import {
   buildNavItems,
   createNavDocument,
-} from "../../src/output/epub/navigation.js";
-import { createPackageOpf } from "../../src/output/epub/package.js";
-import { escapeXml, normalizeLanguage } from "../../src/output/epub/shared.js";
+} from "../../packages/core/src/output/epub/navigation.js";
+import { createPackageOpf } from "../../packages/core/src/output/epub/package.js";
+import { escapeXml, normalizeLanguage } from "../../packages/core/src/output/epub/shared.js";
 
 describe("output/epub", () => {
   it("escapes xml and normalizes language values", () => {

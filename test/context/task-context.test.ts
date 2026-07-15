@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   createSpineDigestTaskId,
   SpineDigestTaskContext,
-} from "../../src/context/index.js";
+} from "../../packages/core/src/context/index.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("context/task-context", () => {

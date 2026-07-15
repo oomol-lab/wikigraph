@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatError, isNodeError } from "../../src/utils/node-error.js";
+import { formatError, isNodeError } from "../../packages/core/src/utils/node-error.js";
 
 describe("utils/node-error", () => {
   it("detects Error instances only", () => {

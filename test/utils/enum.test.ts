@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createEnumValueAsserter,
   createEnumValueGuard,
-} from "../../src/utils/enum.js";
+} from "../../packages/core/src/utils/enum.js";
 
 enum DemoEnum {
   Alpha = "alpha",

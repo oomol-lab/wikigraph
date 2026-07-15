@@ -4,7 +4,7 @@ import {
   inferCLIFormatFromPath,
   isTextCLIFormat,
   parseCLIFormat,
-} from "../../src/cli/formats.js";
+} from "../../packages/cli/src/cli/formats.js";
 
 describe("cli/formats", () => {
   it("infers formats from file extensions", () => {

@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { dirname, join } from "path";
 
-import { resolveDataDirPath } from "../common/data-dir.js";
+import { resolveDataDirPath } from "wiki-graph-core";
 
 export function readCLIVersion(): string {
   const packageJSONPath = join(dirname(resolveDataDirPath()), "package.json");

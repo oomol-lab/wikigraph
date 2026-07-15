@@ -7,8 +7,8 @@ import {
   ParsedJsonError,
   SuspectedModelRefusalError,
   requestGuaranteedJson,
-} from "../../src/guaranteed/index.js";
-import type { LLMessage } from "../../src/llm/index.js";
+} from "../../packages/core/src/guaranteed/index.js";
+import type { LLMessage } from "../../packages/core/src/llm/index.js";
 
 const schema = z.object({
   value: z.number(),

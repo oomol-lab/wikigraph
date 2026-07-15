@@ -1,4 +1,4 @@
-import type { BuildJobTarget } from "../facade/index.js";
+import type { BuildJobTarget } from "wiki-graph-core";
 
 export interface GenerationConcurrency {
   readonly job: number;

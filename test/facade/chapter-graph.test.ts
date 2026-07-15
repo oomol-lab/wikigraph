@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { access } from "fs/promises";
 
-import { DirectoryDocument, ChunkRetention } from "../../src/document/index.js";
+import { DirectoryDocument, ChunkRetention } from "../../packages/core/src/document/index.js";
 
-vi.mock("../../src/editor/index.js", () => ({
+vi.mock("../../packages/core/src/editor/index.js", () => ({
   compressText: vi.fn((options: { readonly groupId: number }) =>
     Promise.resolve(`summary group ${options.groupId}`),
   ),
 }));
 
-vi.mock("../../src/serial.js", () => ({
+vi.mock("../../packages/core/src/serial.js", () => ({
   SerialGeneration: class {
     readonly #document: DirectoryDocument;
 
@@ -60,14 +60,14 @@ import {
   generateChapterGraph,
   getChapterDetails,
   setChapterSource,
-} from "../../src/facade/chapter.js";
+} from "../../packages/core/src/facade/chapter.js";
 import {
   buildChapterGraphArtifact,
   buildChapterSummaryArtifactFromSnapshot,
   commitChapterGraphArtifact,
   readChapterBuildInput,
   snapshotChapterSummaryInput,
-} from "../../src/facade/chapter-build.js";
+} from "../../packages/core/src/facade/chapter-build.js";
 import { withTempDir } from "../helpers/temp.js";
 
 describe("facade/chapter graph", () => {

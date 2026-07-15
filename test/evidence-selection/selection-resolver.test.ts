@@ -5,7 +5,7 @@ import {
   resolveEvidenceSelection,
   resolveEvidenceSelectionList,
   type EvidenceSelectionSentence,
-} from "../../src/evidence-selection/index.js";
+} from "../../packages/core/src/evidence-selection/index.js";
 
 const SENTENCES = [
   {

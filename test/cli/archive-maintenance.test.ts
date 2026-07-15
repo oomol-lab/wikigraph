@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { BookMeta } from "../../src/source/index.js";
+import type { BookMeta } from "../../packages/core/src/source/index.js";
 
 const archiveMaintenanceMockState = vi.hoisted(() => ({
   binaryWrites: [] as Uint8Array[],
@@ -32,7 +32,7 @@ const archiveMaintenanceMockState = vi.hoisted(() => ({
   textWrites: [] as string[],
 }));
 
-vi.mock("../../src/index.js", () => ({
+vi.mock("../../packages/core/src/index.js", () => ({
   SpineDigestApp: class {
     public async openSession(
       path: string,
@@ -44,7 +44,7 @@ vi.mock("../../src/index.js", () => ({
   },
 }));
 
-vi.mock("../../src/wikg/spine-digest-file.js", () => ({
+vi.mock("../../packages/core/src/wikg/spine-digest-file.js", () => ({
   SpineDigestFile: class {
     readonly #path: string;
 
@@ -69,7 +69,7 @@ vi.mock("../../src/wikg/spine-digest-file.js", () => ({
   },
 }));
 
-vi.mock("../../src/cli/io.js", () => ({
+vi.mock("../../packages/cli/src/cli/io.js", () => ({
   writeBinaryToStdout: vi.fn((data: Uint8Array) => {
     archiveMaintenanceMockState.binaryWrites.push(data);
     return Promise.resolve();
@@ -83,7 +83,7 @@ vi.mock("../../src/cli/io.js", () => ({
 import {
   runArchiveCoverCommand,
   runArchiveMetaCommand,
-} from "../../src/cli/archive-maintenance.js";
+} from "../../packages/cli/src/cli/archive-maintenance.js";
 
 describe("cli/archive maintenance", () => {
   const originalStdoutIsTTY = process.stdout.isTTY;

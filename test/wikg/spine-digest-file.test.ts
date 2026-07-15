@@ -4,14 +4,14 @@ import { resolve } from "path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { DirectoryDocument } from "../../src/document/index.js";
+import { DirectoryDocument } from "../../packages/core/src/document/index.js";
 import {
   findArchiveObjects,
   rebuildArchiveSearchIndex,
-} from "../../src/archive/query/archive-view.js";
-import { isSearchIndexCurrent } from "../../src/archive/search-index/index.js";
-import { SpineDigest } from "../../src/facade/spine-digest.js";
-import { SpineDigestFile } from "../../src/wikg/spine-digest-file.js";
+} from "../../packages/core/src/archive/query/archive-view.js";
+import { isSearchIndexCurrent } from "../../packages/core/src/archive/search-index/index.js";
+import { SpineDigest } from "../../packages/core/src/facade/spine-digest.js";
+import { SpineDigestFile } from "../../packages/core/src/wikg/spine-digest-file.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
@@ -594,7 +594,7 @@ async function readCoordinatorOverlays(path: string): Promise<
     return [];
   }
 
-  const { Database } = await import("../../src/document/index.js");
+  const { Database } = await import("../../packages/core/src/document/index.js");
   const database = await Database.open(
     `${path}/state/staging/staging.sqlite`,
     "",
@@ -622,7 +622,7 @@ ORDER BY archive_path, entry_path
 }
 
 async function createStaleOverlay(path: string): Promise<void> {
-  const { Database } = await import("../../src/document/index.js");
+  const { Database } = await import("../../packages/core/src/document/index.js");
 
   await mkdir(`${path}/state/staging`, { recursive: true });
   const database = await Database.open(

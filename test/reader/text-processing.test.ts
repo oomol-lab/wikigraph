@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { WaveReflection } from "../../src/reader/attention/wave-reflection.js";
-import { segmentTextStream } from "../../src/reader/segment/segment.js";
+import { WaveReflection } from "../../packages/core/src/reader/attention/wave-reflection.js";
+import { segmentTextStream } from "../../packages/core/src/reader/segment/segment.js";
 import {
   normalizeText,
   splitTextIntoSentences,
-} from "../../src/evidence-selection/index.js";
+} from "../../packages/core/src/evidence-selection/index.js";
 
 describe("reader/text-processing", () => {
   it("splits text into sentences and normalizes comparison text", () => {

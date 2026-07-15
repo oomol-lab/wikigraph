@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Language } from "../../src/common/language.js";
-import { DirectoryDocument } from "../../src/document/index.js";
-import type { SourceDocument } from "../../src/source/adapter.js";
-import { createDigestProgressTracker } from "../../src/progress/index.js";
+import { Language } from "../../packages/core/src/common/language.js";
+import { DirectoryDocument } from "../../packages/core/src/document/index.js";
+import type { SourceDocument } from "../../packages/core/src/source/adapter.js";
+import { createDigestProgressTracker } from "../../packages/core/src/progress/index.js";
 import type {
   BookMeta,
   SourceAsset,
   SourceSection,
-} from "../../src/source/index.js";
-import { importSource, importSourceDocument } from "../../src/facade/import.js";
+} from "../../packages/core/src/source/index.js";
+import { importSource, importSourceDocument } from "../../packages/core/src/facade/import.js";
 import { withTempDir } from "../helpers/temp.js";
 
 const serialMockState = vi.hoisted(() => ({
@@ -30,7 +30,7 @@ const serialMockState = vi.hoisted(() => ({
   startedSerialIds: [] as number[],
 }));
 
-vi.mock("../../src/serial.js", () => ({
+vi.mock("../../packages/core/src/serial.js", () => ({
   discoverSerial: async (input: {
     readonly stream: AsyncIterable<string> | Iterable<string>;
   }) => {

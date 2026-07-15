@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { ReadonlyDocument } from "../../src/document/index.js";
-import type { ChunkRecord, SnakeRecord } from "../../src/document/types.js";
-import { extractCluesFromDocument } from "../../src/editor/clue.js";
+import type { ReadonlyDocument } from "../../packages/core/src/document/index.js";
+import type { ChunkRecord, SnakeRecord } from "../../packages/core/src/document/types.js";
+import { extractCluesFromDocument } from "../../packages/core/src/editor/clue.js";
 
 describe("editor/clue", () => {
   it("extracts and normalizes clues without merging when below the limit", async () => {

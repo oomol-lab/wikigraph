@@ -2,12 +2,12 @@ import {
   deleteArchiveSearchSessions,
   isArchiveSearchIndexCurrent,
   rebuildArchiveSearchIndex,
-} from "../archive/query/index.js";
+} from "wiki-graph-core";
 import {
   readArchiveIndexSettings,
   setFtsIndexEmbedded,
-} from "../archive/search-index/index.js";
-import { SpineDigestFile } from "../wikg/index.js";
+} from "wiki-graph-core";
+import { SpineDigestFile } from "wiki-graph-core";
 
 import type { CLIArchiveIndexArguments } from "./args.js";
 import { writeTextToStdout } from "./io.js";

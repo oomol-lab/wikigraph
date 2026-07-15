@@ -2,11 +2,11 @@ import { join } from "path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Database } from "../../../src/document/index.js";
+import { Database } from "../../../packages/core/src/document/index.js";
 import {
   createSearchSession,
   deleteArchiveSearchSessions,
-} from "../../../src/archive/query/search-cache.js";
+} from "../../../packages/core/src/archive/query/search-cache.js";
 import { withTempDir } from "../../helpers/temp.js";
 
 const originalStateDir = process.env.WIKIGRAPH_STATE_DIR;
