@@ -1,14 +1,20 @@
 import { defineConfig } from "tsup";
 
+const CORE_EXTERNALS: (string | RegExp)[] = [
+  "wiki-graph-core",
+  "wiki-graph-core/*",
+];
 const SHARED_OPTIONS = {
   bundle: true,
   clean: false,
+  external: CORE_EXTERNALS,
   outDir: "dist",
   platform: "node",
   skipNodeModulesBundle: true,
   sourcemap: true,
   splitting: false,
   target: "node22",
+  tsconfig: "tsconfig.build.json",
 } as const;
 
 export default defineConfig([

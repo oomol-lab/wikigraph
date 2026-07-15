@@ -7,9 +7,9 @@ const CJS_DATA_DIR_BANNER = [
   ");",
 ].join("\n");
 const ESM_DATA_DIR_BANNER = [
-  'import { fileURLToPath } from "url";',
-  'import { resolve } from "path";',
-  'globalThis.__WIKIGRAPH_DATA_DIR__ ??= resolve(fileURLToPath(new URL("../data", import.meta.url)));',
+  'import { fileURLToPath as __WIKIGRAPH_FILE_URL_TO_PATH__ } from "url";',
+  'import { resolve as __WIKIGRAPH_RESOLVE__ } from "path";',
+  'globalThis.__WIKIGRAPH_DATA_DIR__ ??= __WIKIGRAPH_RESOLVE__(__WIKIGRAPH_FILE_URL_TO_PATH__(new URL("../data", import.meta.url)));',
 ].join("\n");
 const SHARED_OPTIONS = {
   bundle: true,

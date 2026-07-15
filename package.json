@@ -19,7 +19,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix && prettier . --write",
     "prepack": "pnpm build",
-    "publish:dry-run": "pnpm -r --filter './packages/*' publish --dry-run --access public",
+    "publish:dry-run": "pnpm -r --filter './packages/*' publish --dry-run --access public --no-git-checks",
     "release:check": "pnpm verify && pnpm test:run && pnpm build && pnpm smoke:pack-install && pnpm publish:dry-run",
     "smoke:pack-install": "node ./scripts/smoke-pack-install.mjs",
     "test": "vitest --passWithNoTests",

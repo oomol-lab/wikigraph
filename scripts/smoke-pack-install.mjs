@@ -1,15 +1,19 @@
 import { execFileSync } from "child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
-import { join, resolve } from "path";
+import { isAbsolute, join, resolve } from "path";
 
 const packageRoot = resolve(import.meta.dirname, "..");
+const coreRoot = join(packageRoot, "packages", "core");
+const cliRoot = join(packageRoot, "packages", "cli");
 const tempRoot = mkdtempSync(join(tmpdir(), "wiki-graph-pack-"));
-let tarballName;
+const packedTarballs = [];
 
 function readTarballName(packOutput) {
   const packResult = JSON.parse(packOutput);
-  const filename = packResult[0]?.filename;
+  const filename = Array.isArray(packResult)
+    ? packResult[0]?.filename
+    : packResult.filename;
 
   if (typeof filename !== "string" || filename.length === 0) {
     throw new Error("Failed to resolve tarball filename from npm pack output.");
@@ -18,43 +22,34 @@ function readTarballName(packOutput) {
   return filename;
 }
 
-try {
+function packPackage(packageDirectory) {
   const packOutput = execFileSync(
-    "npm",
-    ["pack", "--ignore-scripts", "--json"],
+    "pnpm",
+    ["pack", "--json", "--pack-destination", tempRoot],
     {
-      cwd: packageRoot,
+      cwd: packageDirectory,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "inherit"],
     },
   );
 
-  tarballName = readTarballName(packOutput);
+  const tarballName = readTarballName(packOutput);
+  const tarballPath = isAbsolute(tarballName)
+    ? tarballName
+    : join(packageDirectory, tarballName);
+  packedTarballs.push(tarballPath);
+  return tarballPath;
+}
 
-  writeFileSync(
-    join(tempRoot, "package.json"),
-    JSON.stringify({ name: "wiki-graph-pack-smoke", private: true }),
-  );
-
-  const tarballPath = join(packageRoot, tarballName);
-
-  execFileSync(
-    "npm",
-    ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarballPath],
-    {
-      cwd: tempRoot,
-      stdio: "inherit",
-    },
-  );
-
+function assertCommonJsExport(specifier, exportName) {
   execFileSync(
     process.execPath,
     [
       "-e",
       [
-        'const mod = require("wiki-graph");',
-        "if (mod.Language === undefined || mod.Language === null) {",
-        '  throw new Error("CommonJS export Language is not available");',
+        `const mod = require(${JSON.stringify(specifier)});`,
+        `if (mod[${JSON.stringify(exportName)}] === undefined || mod[${JSON.stringify(exportName)}] === null) {`,
+        `  throw new Error(${JSON.stringify(`CommonJS export ${exportName} is not available from ${specifier}`)});`,
         "}",
       ].join(" "),
     ],
@@ -63,18 +58,19 @@ try {
       stdio: "inherit",
     },
   );
+}
 
+function assertEsmExport(specifier, exportName) {
   execFileSync(
     process.execPath,
     [
       "--input-type=module",
       "-e",
       [
-        'const mod = await import("wiki-graph");',
-        "if (mod.Language === undefined || mod.Language === null) {",
-        '  throw new Error("ESM export Language is not available");',
+        `const mod = await import(${JSON.stringify(specifier)});`,
+        `if (mod[${JSON.stringify(exportName)}] === undefined || mod[${JSON.stringify(exportName)}] === null) {`,
+        `  throw new Error(${JSON.stringify(`ESM export ${exportName} is not available from ${specifier}`)});`,
         "}",
-        "process.exit(0);",
       ].join(" "),
     ],
     {
@@ -82,6 +78,41 @@ try {
       stdio: "inherit",
     },
   );
+}
+
+try {
+  const coreTarballPath = packPackage(coreRoot);
+  const cliTarballPath = packPackage(cliRoot);
+
+  writeFileSync(
+    join(tempRoot, "package.json"),
+    JSON.stringify({ name: "wiki-graph-pack-smoke", private: true }),
+  );
+
+  execFileSync(
+    "npm",
+    [
+      "install",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      coreTarballPath,
+      cliTarballPath,
+    ],
+    {
+      cwd: tempRoot,
+      stdio: "inherit",
+    },
+  );
+
+  assertCommonJsExport("wiki-graph", "Language");
+  assertEsmExport("wiki-graph", "Language");
+  assertCommonJsExport("wiki-graph-core", "WikiGraph");
+  assertEsmExport("wiki-graph-core", "WikiGraph");
+  assertCommonJsExport("wiki-graph-core/gc", "tryRunWikiGraphGc");
+  assertEsmExport("wiki-graph-core/gc", "tryRunWikiGraphGc");
+  assertCommonJsExport("wiki-graph-core/worker", "runBuildJobWorker");
+  assertEsmExport("wiki-graph-core/worker", "runBuildJobWorker");
 
   for (const command of ["wg", "wikigraph"]) {
     execFileSync(join(tempRoot, "node_modules", ".bin", command), ["--help"], {
@@ -90,8 +121,8 @@ try {
     });
   }
 } finally {
-  if (tarballName !== undefined) {
-    rmSync(join(packageRoot, tarballName), { force: true });
+  for (const tarballPath of packedTarballs) {
+    rmSync(tarballPath, { force: true });
   }
 
   rmSync(tempRoot, { force: true, recursive: true });
