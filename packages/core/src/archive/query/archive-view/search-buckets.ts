@@ -35,16 +35,24 @@ import {
 } from "./helpers.js";
 import {
   assertSearchCursorTypesMatch,
-  compareMentions,
   createEntitySearchCacheInput,
-  createFindEvidenceHydrationOptions,
+} from "./search-cache-input.js";
+import {
   findEntities,
   findTriples,
+} from "./find.js";
+import {
+  createFindEvidenceHydrationOptions,
   hydrateFindHitEvidence,
+} from "./evidence.js";
+import {
   hydrateFindResultBacklinks,
+} from "./backlinks.js";
+import {
+  compareMentions,
   parseEntityQid,
   selectEntityLabel,
-} from "./index.js";
+} from "./knowledge.js";
 import {
   hydrateSearchObjectHit,
   hydrateSearchTextHit,
@@ -553,4 +561,3 @@ export function tryDecodeBucketSearchSessionCursor(cursor: string):
     return undefined;
   }
 }
-

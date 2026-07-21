@@ -7,21 +7,25 @@ import { ARCHIVE_ROOT_ID, createMetaPage, formatMetaText, isWikiGraphObjectUri, 
 import {
   DEFAULT_SOURCE_CONTEXT,
   createChapterState,
-  createEvidenceReadContext,
-  createMentionEvidencePreview,
-  createMentionLinkEvidencePreview,
-  createTextStreamBacklinks,
-  createTriplePageLabel,
-  filterMentionLinksByChapter,
-  filterMentionsByChapter,
   listFragmentNodes,
   readNodeSourceFragments,
   requireChapter,
   requireNode,
-  resolveEntityWikipage,
+} from "./core.js";
+import {
+  createEvidenceReadContext,
+  createMentionEvidencePreview,
+  createMentionLinkEvidencePreview,
+} from "./source-evidence.js";
+import { createTextStreamBacklinks } from "./backlinks.js";
+import {
+  createTriplePageLabel,
+  filterMentionLinksByChapter,
+  filterMentionsByChapter,
   selectEntityLabel,
   selectEntityLabels,
-} from "./index.js";
+} from "./knowledge.js";
+import { resolveEntityWikipage } from "./related.js";
 import {
   formatChapterId,
   formatChapterTitleId,

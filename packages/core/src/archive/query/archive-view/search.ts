@@ -27,19 +27,25 @@ import { isArchiveSearchIndexCurrent } from "./index-state.js";
 import {
   assertSearchCursorTypesMatch,
   createEntitySearchCacheInput,
-  createFindEvidenceHydrationOptions,
   createSentenceEvidenceSearchCacheInput,
+  isEntityOnlySearch,
+  isEntitySearchTypes,
+} from "./search-cache-input.js";
+import {
   filterLexicalHitsByMatch,
   findChapters,
   findEntities,
   findMeta,
   findNodes,
   findTriples,
+} from "./find.js";
+import {
+  createFindEvidenceHydrationOptions,
   hydrateFindHitEvidence,
+} from "./evidence.js";
+import {
   hydrateFindResultBacklinks,
-  isEntityOnlySearch,
-  isEntitySearchTypes,
-} from "./index.js";
+} from "./backlinks.js";
 import {
   readBucketedSearchResultPage,
   tryDecodeBucketSearchSessionCursor,
@@ -436,4 +442,3 @@ export async function grepArchiveObjects(
     "exact",
   );
 }
-
