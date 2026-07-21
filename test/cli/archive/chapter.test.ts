@@ -239,18 +239,21 @@ vi.mock("../../../packages/core/src/external/llm/index.js", () => ({
   },
 }));
 
-vi.mock("../../../packages/cli/src/support/index.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof CLISupport>();
+vi.mock(
+  "../../../packages/cli/src/support/index.js",
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof CLISupport>();
 
-  return {
-    ...actual,
-    readTextStreamFromStdin: vi.fn(() => chapterMockState.stdinStream),
-    writeTextToStdout: vi.fn((text: string) => {
-      chapterMockState.textWrites.push(text);
-      return Promise.resolve();
-    }),
-  };
-});
+    return {
+      ...actual,
+      readTextStreamFromStdin: vi.fn(() => chapterMockState.stdinStream),
+      writeTextToStdout: vi.fn((text: string) => {
+        chapterMockState.textWrites.push(text);
+        return Promise.resolve();
+      }),
+    };
+  },
+);
 
 vi.mock("fs/promises", () => ({
   readFile: vi.fn(() => Promise.resolve(chapterMockState.inputFileContent)),

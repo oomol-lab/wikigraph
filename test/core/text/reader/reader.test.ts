@@ -10,10 +10,13 @@ const {
   segmentTextStreamMock: vi.fn(),
 }));
 
-vi.mock("../../../../packages/core/src/text/reader/chunk-batch/extract.js", () => ({
-  extractBookCoherenceChunkBatch: extractBookCoherenceChunkBatchMock,
-  extractUserFocusedChunkBatch: extractUserFocusedChunkBatchMock,
-}));
+vi.mock(
+  "../../../../packages/core/src/text/reader/chunk-batch/extract.js",
+  () => ({
+    extractBookCoherenceChunkBatch: extractBookCoherenceChunkBatchMock,
+    extractUserFocusedChunkBatch: extractUserFocusedChunkBatchMock,
+  }),
+);
 
 vi.mock("../../../../packages/core/src/text/reader/segment/core.js", () => ({
   segmentTextStream: segmentTextStreamMock,
