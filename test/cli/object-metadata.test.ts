@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type * as CLISupport from "../../packages/cli/src/cli/support/index.js";
+import type * as CLISupport from "../../packages/cli/src/support/index.js";
 import type * as WikiGraphIndex from "../../packages/core/src/wikg/index.js";
 
 const objectMetadataMockState = vi.hoisted(() => ({
@@ -43,7 +43,7 @@ vi.mock("../../packages/core/src/wikg/index.js", async (importOriginal) => {
 });
 
 vi.mock(
-  "../../packages/cli/src/cli/support/index.js",
+  "../../packages/cli/src/support/index.js",
   async (importOriginal) => {
     const actual = await importOriginal<typeof CLISupport>();
 
@@ -64,8 +64,8 @@ vi.mock("fs/promises", () => ({
   ),
 }));
 
-import { parseCLIArguments } from "../../packages/cli/src/cli/args.js";
-import { runObjectMetadataCommand } from "../../packages/cli/src/cli/commands/index.js";
+import { parseCLIArguments } from "../../packages/cli/src/args/index.js";
+import { runObjectMetadataCommand } from "../../packages/cli/src/commands/index.js";
 
 interface MockDocument {
   readonly metadata: {

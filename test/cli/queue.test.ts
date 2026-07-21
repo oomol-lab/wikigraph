@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type * as CLIRuntime from "../../packages/cli/src/cli/runtime/index.js";
-import type * as CLISupport from "../../packages/cli/src/cli/support/index.js";
+import type * as CLIRuntime from "../../packages/cli/src/runtime/index.js";
+import type * as CLISupport from "../../packages/cli/src/support/index.js";
 
 const queueMockState = vi.hoisted(() => ({
   activeError: undefined as Error | undefined,
@@ -263,7 +263,7 @@ vi.mock("../../packages/core/src/facade/index.js", () => ({
 }));
 
 vi.mock(
-  "../../packages/cli/src/cli/support/index.js",
+  "../../packages/cli/src/support/index.js",
   async (importOriginal) => {
     const actual = await importOriginal<typeof CLISupport>();
 
@@ -277,12 +277,12 @@ vi.mock(
   },
 );
 
-vi.mock("../../packages/cli/src/cli/config.js", () => ({
+vi.mock("../../packages/cli/src/app/config.js", () => ({
   loadCLIConfig: vi.fn(() => Promise.resolve(queueMockState.cliConfig)),
 }));
 
 vi.mock(
-  "../../packages/cli/src/cli/runtime/index.js",
+  "../../packages/cli/src/runtime/index.js",
   async (importOriginal) => {
     const actual = await importOriginal<typeof CLIRuntime>();
 
@@ -316,7 +316,7 @@ vi.mock(
 import {
   runQueueCommand,
   runQueueWorker,
-} from "../../packages/cli/src/cli/commands/index.js";
+} from "../../packages/cli/src/commands/index.js";
 
 describe("cli/queue", () => {
   const originalDisableAutostart =

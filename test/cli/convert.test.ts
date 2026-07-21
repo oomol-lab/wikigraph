@@ -7,7 +7,7 @@ import {
   it,
   vi,
 } from "vitest";
-import type * as CLISupport from "../../packages/cli/src/cli/support/index.js";
+import type * as CLISupport from "../../packages/cli/src/support/index.js";
 
 const cliMockState = vi.hoisted(() => ({
   appConstructorOptions: [] as unknown[],
@@ -101,14 +101,14 @@ vi.mock("../../packages/core/src/index.js", () => ({
   },
 }));
 
-vi.mock("../../packages/cli/src/cli/config.js", () => ({
+vi.mock("../../packages/cli/src/app/config.js", () => ({
   loadCLIConfig: vi.fn((options?: unknown) => {
     cliMockState.loadCLIConfigOptions.push(options);
     return Promise.resolve(cliMockState.config);
   }),
 }));
 
-vi.mock("../../packages/cli/src/cli/llm.js", () => ({
+vi.mock("../../packages/cli/src/app/llm.js", () => ({
   buildLLMOptions: vi.fn((config: unknown) => {
     cliMockState.buildLLMOptionsConfig.push(config);
     return mockLLMOptions;
@@ -116,7 +116,7 @@ vi.mock("../../packages/cli/src/cli/llm.js", () => ({
 }));
 
 vi.mock(
-  "../../packages/cli/src/cli/support/index.js",
+  "../../packages/cli/src/support/index.js",
   async (importOriginal) => {
     const actual = await importOriginal<typeof CLISupport>();
 
@@ -149,7 +149,7 @@ vi.mock("fs/promises", () => ({
   }),
 }));
 
-import { runConvertCommand } from "../../packages/cli/src/cli/commands/index.js";
+import { runConvertCommand } from "../../packages/cli/src/commands/index.js";
 
 describe("cli/convert", () => {
   const originalStdinIsTTY = process.stdin.isTTY;

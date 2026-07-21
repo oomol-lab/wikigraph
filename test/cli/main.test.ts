@@ -31,7 +31,7 @@ const mainMockState = vi.hoisted(() => ({
   legacyRunError: undefined as Error | undefined,
 }));
 
-vi.mock("../../packages/cli/src/cli/args.js", () => ({
+vi.mock("../../packages/cli/src/args/index.js", () => ({
   parseCLIArguments: vi.fn(() => {
     if (mainMockState.parseError !== undefined) {
       throw mainMockState.parseError;
@@ -41,7 +41,7 @@ vi.mock("../../packages/cli/src/cli/args.js", () => ({
   }),
 }));
 
-vi.mock("../../packages/cli/src/cli/commands/index.js", () => ({
+vi.mock("../../packages/cli/src/commands/index.js", () => ({
   runArchiveCommand: vi.fn((args: unknown) => {
     mainMockState.archiveRunCalls.push(args);
 
@@ -125,8 +125,8 @@ vi.mock("../../packages/cli/src/cli/commands/index.js", () => ({
   }),
 }));
 
-import { main } from "../../packages/cli/src/cli/main.js";
-import { renderMainHelpText } from "../../packages/cli/src/cli/help.js";
+import { main } from "../../packages/cli/src/app/main.js";
+import { renderMainHelpText } from "../../packages/cli/src/app/help.js";
 import { LLMPaymentRequiredError } from "../../packages/core/src/llm/index.js";
 
 describe("cli/main", () => {

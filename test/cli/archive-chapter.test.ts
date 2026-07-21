@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type * as CLISupport from "../../packages/cli/src/cli/support/index.js";
+import type * as CLISupport from "../../packages/cli/src/support/index.js";
 
 const chapterMockState = vi.hoisted(() => ({
   activeConflictChecks: [] as unknown[],
@@ -237,7 +237,7 @@ vi.mock("../../packages/core/src/llm/index.js", () => ({
 }));
 
 vi.mock(
-  "../../packages/cli/src/cli/support/index.js",
+  "../../packages/cli/src/support/index.js",
   async (importOriginal) => {
     const actual = await importOriginal<typeof CLISupport>();
 
@@ -260,7 +260,7 @@ vi.mock("fs", () => ({
   createReadStream: vi.fn(() => chapterMockState.sourceFileStream),
 }));
 
-import { runArchiveChapterCommand } from "../../packages/cli/src/cli/commands/index.js";
+import { runArchiveChapterCommand } from "../../packages/cli/src/commands/index.js";
 
 describe("cli/archive-chapter", () => {
   const originalStdinIsTTY = process.stdin.isTTY;

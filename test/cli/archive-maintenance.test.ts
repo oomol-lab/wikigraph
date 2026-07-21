@@ -66,7 +66,7 @@ vi.mock("../../packages/core/src/index.js", () => ({
   },
 }));
 
-vi.mock("../../packages/cli/src/cli/support/index.js", () => ({
+vi.mock("../../packages/cli/src/support/index.js", () => ({
   formatCLIJSON: vi.fn((value: unknown) => JSON.stringify(value)),
   writeBinaryToStdout: vi.fn((data: Uint8Array) => {
     archiveMaintenanceMockState.binaryWrites.push(data);
@@ -81,7 +81,7 @@ vi.mock("../../packages/cli/src/cli/support/index.js", () => ({
 import {
   runArchiveCoverCommand,
   runArchiveMetaCommand,
-} from "../../packages/cli/src/cli/commands/index.js";
+} from "../../packages/cli/src/commands/index.js";
 
 describe("cli/archive maintenance", () => {
   const originalStdoutIsTTY = process.stdout.isTTY;

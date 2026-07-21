@@ -3,7 +3,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type * as CLISupport from "../../packages/cli/src/cli/support/index.js";
+import type * as CLISupport from "../../packages/cli/src/support/index.js";
 import type {
   ArchiveBacklinks,
   ArchiveCollectionResult,
@@ -574,7 +574,7 @@ vi.mock("../../packages/core/src/archive/query/index.js", () => ({
   ),
 }));
 
-vi.mock("../../packages/cli/src/cli/config.js", () => ({
+vi.mock("../../packages/cli/src/app/config.js", () => ({
   loadCLIConfig: vi.fn(() =>
     Promise.resolve({
       concurrent: {
@@ -590,7 +590,7 @@ vi.mock("../../packages/cli/src/cli/config.js", () => ({
 }));
 
 vi.mock(
-  "../../packages/cli/src/cli/support/index.js",
+  "../../packages/cli/src/support/index.js",
   async (importOriginal) => {
     const actual = await importOriginal<typeof CLISupport>();
 
@@ -604,7 +604,7 @@ vi.mock(
   },
 );
 
-vi.mock("../../packages/cli/src/cli/commands/convert.js", () => ({
+vi.mock("../../packages/cli/src/commands/convert.js", () => ({
   runConvertCommand: vi.fn(async (args: { readonly outputPath?: string }) => {
     archiveMockState.convertCalls.push(args);
     if (args.outputPath !== undefined) {
@@ -615,7 +615,7 @@ vi.mock("../../packages/cli/src/cli/commands/convert.js", () => ({
   }),
 }));
 
-import { runArchiveCommand } from "../../packages/cli/src/cli/commands/index.js";
+import { runArchiveCommand } from "../../packages/cli/src/commands/index.js";
 import {
   createContinuationCursor,
   findArchiveObjects,
