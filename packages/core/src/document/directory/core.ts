@@ -5,7 +5,6 @@ import { z } from "zod";
 import { bookMetaSchema, type BookMeta } from "../../source/meta.js";
 import { tocFileSchema, type TocFile } from "../../source/toc.js";
 import type { SourceAsset } from "../../source/types.js";
-import { isNodeError } from "../../utils/node-error.js";
 import { Database } from "../database.js";
 import {
   TextStreams,
@@ -14,7 +13,6 @@ import {
 import {
   initializeDocumentSchema,
   SCHEMA_SQL,
-  SEARCH_INDEX_SCHEMA_SQL,
 } from "../schema.js";
 import {
   ChunkStore,
@@ -30,11 +28,24 @@ import {
   SnakeStore,
 } from "../stores/index.js";
 import { ObjectMetadataKind, type SentenceId } from "../types.js";
-import {
-  compareNumberDescending,
-  DirectoryDocumentContext,
-} from "./context.js";
+import { DirectoryDocumentContext } from "./context.js";
 import { LOCAL_DOCUMENT_FILE_STORE } from "./file-store.js";
+import {
+  getCoverDataPath,
+  getCoverDirectoryPath,
+  getCoverInfoPath,
+  getTocPath,
+  readJsonFile,
+  readOptionalFile,
+  writeJsonFile,
+  writeNewFile,
+} from "./files.js";
+import { openSearchIndexDatabase } from "./search-index.js";
+import {
+  deleteSerialGraphRecords,
+  deleteSerialResources,
+  rollbackDocumentContext,
+} from "./serial-cleanup.js";
 import { listTocSerialIds } from "./toc.js";
 import type {
   Document,
@@ -178,7 +189,11 @@ export class DirectoryDocument implements Document {
 
   public async clearSerialGraph(serialId: number): Promise<void> {
     await this.deleteSummary(serialId);
-    await this.#deleteSerialGraphRecords(serialId);
+    await deleteSerialGraphRecords({
+      database: this.#database,
+      metadata: this.metadata,
+      serialId,
+    });
     await this.serials.setTopologyReady(serialId, false);
     await this.serials.setKnowledgeGraphReady(serialId, false);
     await this.serials.bumpRevision(serialId);
@@ -235,13 +250,23 @@ export class DirectoryDocument implements Document {
   public async readSearchIndexDatabase<T>(
     operation: (database: Database) => Promise<T> | T,
   ): Promise<T> {
-    return await this.#openSearchIndexDatabase(true, operation);
+    return await openSearchIndexDatabase({
+      documentPath: this.path,
+      fileStore: this.#fileStore,
+      operation,
+      readonly: true,
+    });
   }
 
   public async writeSearchIndexDatabase<T>(
     operation: (database: Database) => Promise<T> | T,
   ): Promise<T> {
-    return await this.#openSearchIndexDatabase(false, operation);
+    return await openSearchIndexDatabase({
+      documentPath: this.path,
+      fileStore: this.#fileStore,
+      operation,
+      readonly: false,
+    });
   }
 
   public async deleteSearchIndexDatabase(): Promise<void> {
@@ -261,16 +286,20 @@ export class DirectoryDocument implements Document {
   }
 
   public async readCover(): Promise<SourceAsset | undefined> {
-    const coverFile = await this.#readJsonFile(
-      this.#getCoverInfoPath(),
-      (value) => coverFileSchema.parse(value),
-    );
+    const coverFile = await readJsonFile({
+      fileStore: this.#fileStore,
+      parse: (value) => coverFileSchema.parse(value),
+      path: getCoverInfoPath(this.path),
+    });
 
     if (coverFile === undefined) {
       return undefined;
     }
 
-    const data = await this.#readOptionalFile(this.#getCoverDataPath());
+    const data = await readOptionalFile(
+      this.#fileStore,
+      getCoverDataPath(this.path),
+    );
 
     if (data === undefined) {
       throw new Error("Cover data is missing");
@@ -288,9 +317,11 @@ export class DirectoryDocument implements Document {
   }
 
   public async readToc(): Promise<TocFile | undefined> {
-    return await this.#readJsonFile(this.#getTocPath(), (value) =>
-      tocFileSchema.parse(value),
-    );
+    return await readJsonFile({
+      fileStore: this.#fileStore,
+      parse: (value) => tocFileSchema.parse(value),
+      path: getTocPath(this.path),
+    });
   }
 
   public async writeBookMeta(meta: BookMeta): Promise<void> {
@@ -314,12 +345,22 @@ export class DirectoryDocument implements Document {
   }
 
   public async writeCover(cover: SourceAsset): Promise<void> {
-    await this.#fileStore.ensureDirectory(this.#getCoverDirectoryPath());
-    await this.#writeJsonFile(this.#getCoverInfoPath(), {
-      mediaType: cover.mediaType,
-      path: cover.path,
+    await this.#fileStore.ensureDirectory(getCoverDirectoryPath(this.path));
+    await writeJsonFile({
+      context: this.#contextScope.getStore(),
+      fileStore: this.#fileStore,
+      path: getCoverInfoPath(this.path),
+      value: {
+        mediaType: cover.mediaType,
+        path: cover.path,
+      },
     });
-    await this.#writeNewFile(this.#getCoverDataPath(), cover.data);
+    await writeNewFile({
+      content: cover.data,
+      context: this.#contextScope.getStore(),
+      fileStore: this.#fileStore,
+      path: getCoverDataPath(this.path),
+    });
   }
 
   public async writeSummary(serialId: number, summary: string): Promise<void> {
@@ -329,13 +370,24 @@ export class DirectoryDocument implements Document {
   }
 
   public async writeToc(toc: TocFile): Promise<void> {
-    await this.#writeJsonFile(this.#getTocPath(), toc);
+    await writeJsonFile({
+      context: this.#contextScope.getStore(),
+      fileStore: this.#fileStore,
+      path: getTocPath(this.path),
+      value: toc,
+    });
     await this.#replaceDocumentOrder(toc);
     await this.serials.bumpChaptersRevision();
   }
 
   public async replaceToc(toc: TocFile): Promise<void> {
-    await this.#writeJsonFile(this.#getTocPath(), toc, { overwrite: true });
+    await writeJsonFile({
+      context: this.#contextScope.getStore(),
+      fileStore: this.#fileStore,
+      options: { overwrite: true },
+      path: getTocPath(this.path),
+      value: toc,
+    });
     await this.#replaceDocumentOrder(toc);
     await this.serials.bumpChaptersRevision();
   }
@@ -357,214 +409,23 @@ export class DirectoryDocument implements Document {
     await this.release();
   }
 
-  async #openSearchIndexDatabase<T>(
-    readonly: boolean,
-    operation: (database: Database) => Promise<T> | T,
+  public async runWithContext<T>(
+    context: DirectoryDocumentContext,
+    operation: () => Promise<T> | T,
   ): Promise<T> {
-    const databasePath =
-      this.#fileStore.resolveSearchIndexDatabasePath === undefined
-        ? join(this.path, "fts.db")
-        : await this.#fileStore.resolveSearchIndexDatabasePath(this.path);
-    const database = await Database.open(
-      databasePath,
-      readonly ? "" : SEARCH_INDEX_SCHEMA_SQL,
-      {
-        onWrite: () => {
-          this.#fileStore.markSearchIndexDatabaseDirty?.();
-        },
-        readonly,
-      },
-    );
-
-    try {
-      return await operation(database);
-    } finally {
-      await database.close();
-    }
+    return await this.#contextScope.run(context, operation);
   }
 
-  async #rollbackContext(context: DirectoryDocumentContext): Promise<void> {
-    await this.#rollbackOwnedSerials(context.listOwnedSerialIds());
-    await this.#rollbackCreatedFiles(context.listCreatedFilePaths());
-  }
-
-  async #rollbackCreatedFiles(
-    createdFilePaths: readonly string[],
+  public async rollbackContext(
+    context: DirectoryDocumentContext,
   ): Promise<void> {
-    for (const path of [...createdFilePaths].reverse()) {
-      try {
-        await this.#fileStore.deleteFile(path);
-      } catch (error) {
-        if (isNodeError(error) && error.code === "ENOENT") {
-          continue;
-        }
-
-        throw error;
-      }
-    }
-  }
-
-  async #rollbackOwnedSerials(serialIds: readonly number[]): Promise<void> {
-    for (const serialId of [...serialIds].sort(compareNumberDescending)) {
-      await this.#deleteSerialResources(serialId);
-    }
-  }
-
-  async #deleteSerialResources(serialId: number): Promise<void> {
-    await this.metadata.deleteChapterSubtree(serialId);
-    await this.#deleteSerialGraphRecords(serialId);
-    await this.#database.transaction(async () => {
-      await this.#database.run(
-        `
-          DELETE FROM serial_states
-          WHERE serial_id = ?
-        `,
-        [serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM serials
-          WHERE id = ?
-        `,
-        [serialId],
-      );
+    await rollbackDocumentContext({
+      context,
+      deleteSerialResources: async (serialId) => {
+        await this.#deleteSerialResources(serialId);
+      },
+      fileStore: this.#fileStore,
     });
-
-    await this.#textStreams.getSerial(serialId).delete();
-    await this.deleteSummary(serialId);
-    await this.serials.bumpChaptersRevision();
-    await this.graphBuildParameters.deleteUnreferenced();
-  }
-
-  async #deleteSerialGraphRecords(serialId: number): Promise<void> {
-    await this.#database.transaction(async () => {
-      await this.#database.run(
-        `
-          DELETE FROM mention_link_evidence_sentences
-          WHERE link_id IN (
-            SELECT mention_links.id
-            FROM mention_links
-            INNER JOIN mentions AS source_mentions
-              ON source_mentions.id = mention_links.source_mention_id
-            INNER JOIN mentions AS target_mentions
-              ON target_mentions.id = mention_links.target_mention_id
-            WHERE source_mentions.chapter_id = ?
-              OR target_mentions.chapter_id = ?
-          )
-        `,
-        [serialId, serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM mention_links
-          WHERE source_mention_id IN (
-            SELECT id
-            FROM mentions
-            WHERE chapter_id = ?
-          ) OR target_mention_id IN (
-            SELECT id
-            FROM mentions
-            WHERE chapter_id = ?
-          )
-        `,
-        [serialId, serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM mentions
-          WHERE chapter_id = ?
-        `,
-        [serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM snake_edges
-          WHERE from_snake_id IN (
-            SELECT id
-            FROM snakes
-            WHERE serial_id = ?
-          ) OR to_snake_id IN (
-            SELECT id
-            FROM snakes
-            WHERE serial_id = ?
-          )
-        `,
-        [serialId, serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM snake_chunks
-          WHERE snake_id IN (
-            SELECT id
-            FROM snakes
-            WHERE serial_id = ?
-          )
-        `,
-        [serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM snakes
-          WHERE serial_id = ?
-        `,
-        [serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM sentence_groups
-          WHERE serial_id = ?
-        `,
-        [serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM reading_edges
-          WHERE from_id IN (
-            SELECT id
-            FROM chunks
-            WHERE serial_id = ?
-          ) OR to_id IN (
-            SELECT id
-            FROM chunks
-            WHERE serial_id = ?
-          )
-        `,
-        [serialId, serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM chunk_sentences
-          WHERE serial_id = ?
-        `,
-        [serialId],
-      );
-      await this.#database.run(
-        `
-          DELETE FROM chunks
-          WHERE serial_id = ?
-        `,
-        [serialId],
-      );
-      await this.metadata.deleteDeletedChunks();
-      await this.metadata.deleteDeletedEntitiesAndTriples();
-    });
-  }
-
-  async #readJsonFile<T>(
-    path: string,
-    parse: (value: unknown) => T,
-  ): Promise<T | undefined> {
-    const content = await this.#readOptionalTextFile(path);
-
-    if (content === undefined) {
-      return undefined;
-    }
-
-    return parse(JSON.parse(content));
-  }
-
-  async #readOptionalFile(path: string): Promise<Uint8Array | undefined> {
-    return await this.#fileStore.readFile(path);
   }
 
   async #replaceDocumentOrder(toc: TocFile): Promise<void> {
@@ -576,75 +437,17 @@ export class DirectoryDocument implements Document {
     );
   }
 
-  async #readOptionalTextFile(path: string): Promise<string | undefined> {
-    const content = await this.#fileStore.readFile(path);
-
-    return content === undefined
-      ? undefined
-      : Buffer.from(content).toString("utf8");
-  }
-
-  async #writeJsonFile(
-    path: string,
-    value: unknown,
-    options: { readonly overwrite?: boolean } = {},
-  ): Promise<void> {
-    await this.#writeFile(path, `${JSON.stringify(value, null, 2)}\n`, options);
-  }
-
-  async #writeNewFile(
-    path: string,
-    content: string | Uint8Array,
-  ): Promise<void> {
-    await this.#writeFile(path, content, { overwrite: false });
-  }
-
-  async #writeFile(
-    path: string,
-    content: string | Uint8Array,
-    options: { readonly overwrite?: boolean },
-  ): Promise<void> {
-    try {
-      await this.#fileStore.writeFile(path, content, options);
-    } catch (error) {
-      if (isNodeError(error) && error.code === "EEXIST") {
-        throw new Error(`File already exists: ${path}`);
-      }
-
-      throw error;
-    }
-
-    if (options.overwrite !== true) {
-      this.#contextScope.getStore()?.registerCreatedFile(path);
-    }
-  }
-
-  #getCoverDataPath(): string {
-    return join(this.#getCoverDirectoryPath(), "data.bin");
-  }
-
-  #getCoverDirectoryPath(): string {
-    return join(this.path, "cover");
-  }
-
-  #getCoverInfoPath(): string {
-    return join(this.#getCoverDirectoryPath(), "info.json");
-  }
-
-  #getTocPath(): string {
-    return join(this.path, "toc.json");
-  }
-
-  public async runWithContext<T>(
-    context: DirectoryDocumentContext,
-    operation: () => Promise<T> | T,
-  ): Promise<T> {
-    return await this.#contextScope.run(context, operation);
-  }
-
-  public async rollbackContext(
-    context: DirectoryDocumentContext,
-  ): Promise<void> {
-    await this.#rollbackContext(context);
+  async #deleteSerialResources(serialId: number): Promise<void> {
+    await deleteSerialResources({
+      database: this.#database,
+      deleteSummary: async (targetSerialId) => {
+        await this.deleteSummary(targetSerialId);
+      },
+      graphBuildParameters: this.graphBuildParameters,
+      metadata: this.metadata,
+      serialId,
+      serials: this.serials,
+      textStreams: this.#textStreams,
+    });
   }
 }
