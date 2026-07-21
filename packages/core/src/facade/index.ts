@@ -51,7 +51,7 @@ export {
   runBuildQueueGc,
   runBuildJobWorker,
   updateBuildJobTarget,
-} from "./build-queue.js";
+} from "./build-queue/index.js";
 export type {
   AddBuildJobOptions,
   BuildJobConflictScope,
@@ -64,7 +64,7 @@ export type {
   BuildJobState,
   BuildJobTarget,
   BuildJobWorkerOptions,
-} from "./build-queue.js";
+} from "./build-queue/index.js";
 export {
   buildChapterGraphArtifact,
   buildChapterSummaryArtifact,

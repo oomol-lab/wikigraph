@@ -1,28 +1,26 @@
 import { createWriteStream } from "fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "fs/promises";
-import { dirname, join, posix, resolve, sep } from "path";
+import { dirname, join, resolve } from "path";
 import { pipeline } from "stream/promises";
 
 import { createWikiGraphTempDirectory } from "../common/wiki-graph-temp.js";
-import {
-  open as openZip,
-  type Entry,
-  type ZipFile as YauzlZipFile,
-} from "yauzl";
+import type { Entry, ZipFile as YauzlZipFile } from "yauzl";
 
 import { Database, type SqlBindValue } from "../document/database.js";
 import { DirectoryDocument } from "../document/document.js";
 import { writeWikgArchive } from "../wikg/index.js";
 import { isNodeError } from "../utils/node-error.js";
+import { listTableColumns, listTableNames } from "./upgrade/database.js";
+import {
+  assertWithinDirectory,
+  indexArchiveEntries,
+  isLegacySdpubPath,
+  normalizeArchivePath,
+  openArchive,
+  openArchiveEntryStream,
+  readArchiveEntryText,
+} from "./upgrade/archive.js";
 
-const LEGACY_SDPUB_PATTERNS = [
-  /^manifest\.json$/u,
-  /^database\.db$/u,
-  /^toc\.json$/u,
-  /^cover\/(?:data\.bin|info\.json)$/u,
-  /^summaries\/serial-\d+\.txt$/u,
-  /^fragments\/serial-\d+\/fragment_\d+\.json$/u,
-] as const;
 const LEGACY_FORMAT_VERSION = 1;
 
 export interface LegacySdpubMigrationResult {
@@ -926,148 +924,4 @@ async function listLegacySummaries(
 
     throw error;
   }
-}
-
-async function listTableNames(
-  database: Database,
-): Promise<ReadonlySet<string>> {
-  const names = await database.queryAll(
-    `
-      SELECT name
-      FROM sqlite_master
-      WHERE type = 'table'
-    `,
-    undefined,
-    (row) => String(row.name),
-  );
-
-  return new Set(names);
-}
-
-async function listTableColumns(
-  database: Database,
-  tableName: string,
-): Promise<ReadonlySet<string>> {
-  const columns = await database.queryAll(
-    `PRAGMA table_info(${quoteSqlIdentifier(tableName)})`,
-    undefined,
-    (row) => String(row.name),
-  );
-
-  return new Set(columns);
-}
-
-function quoteSqlIdentifier(identifier: string): string {
-  return `"${identifier.replaceAll('"', '""')}"`;
-}
-
-async function indexArchiveEntries(
-  zipFile: YauzlZipFile,
-): Promise<readonly Entry[]> {
-  return await new Promise((resolve, reject) => {
-    const entries: Entry[] = [];
-
-    zipFile.on("entry", (entry: Entry) => {
-      if (entry.fileName.endsWith("/")) {
-        zipFile.readEntry();
-        return;
-      }
-
-      entries.push(entry);
-      zipFile.readEntry();
-    });
-    zipFile.once("end", () => {
-      resolve(entries);
-    });
-    zipFile.once("error", (error: Error) => {
-      reject(error);
-    });
-
-    zipFile.readEntry();
-  });
-}
-
-function isLegacySdpubPath(archivePath: string): boolean {
-  return LEGACY_SDPUB_PATTERNS.some((pattern) => pattern.test(archivePath));
-}
-
-function assertWithinDirectory(
-  rootDirectoryPath: string,
-  targetPath: string,
-  archivePath: string,
-): void {
-  const resolvedRootDirectoryPath = resolve(rootDirectoryPath);
-  const rootPrefix = resolvedRootDirectoryPath.endsWith(sep)
-    ? resolvedRootDirectoryPath
-    : `${resolvedRootDirectoryPath}${sep}`;
-
-  if (
-    targetPath === resolvedRootDirectoryPath ||
-    targetPath.startsWith(rootPrefix)
-  ) {
-    return;
-  }
-
-  throw new Error(`Invalid archive entry path: ${archivePath}`);
-}
-
-function normalizeArchivePath(path: string): string {
-  const normalized = path.replaceAll("\\", "/").trim();
-  const withoutLeadingSlash = normalized.startsWith("/")
-    ? normalized.slice(1)
-    : normalized;
-
-  return posix
-    .normalize(withoutLeadingSlash)
-    .replace(/^(\.\/)+/u, "")
-    .replace(/^\/+/u, "");
-}
-
-async function openArchive(path: string): Promise<YauzlZipFile> {
-  return await new Promise((resolveOpen, rejectOpen) => {
-    openZip(path, { autoClose: false, lazyEntries: true }, (error, zipFile) => {
-      if (error !== null || zipFile === undefined) {
-        rejectOpen(error ?? new Error(`Cannot open archive: ${path}`));
-        return;
-      }
-
-      resolveOpen(zipFile);
-    });
-  });
-}
-
-async function openArchiveEntryStream(
-  zipFile: YauzlZipFile,
-  entry: Entry,
-): Promise<NodeJS.ReadableStream> {
-  return await new Promise((resolveStream, rejectStream) => {
-    zipFile.openReadStream(entry, (error, stream) => {
-      if (error !== null || stream === undefined) {
-        rejectStream(
-          error ?? new Error(`Cannot open archive entry: ${entry.fileName}`),
-        );
-        return;
-      }
-
-      resolveStream(stream);
-    });
-  });
-}
-
-async function readArchiveEntryText(
-  zipFile: YauzlZipFile,
-  entry: Entry,
-): Promise<string> {
-  const chunks: Buffer[] = [];
-  const stream = await openArchiveEntryStream(zipFile, entry);
-
-  await new Promise<void>((resolveRead, rejectRead) => {
-    stream.on("data", (chunk: Buffer) => {
-      chunks.push(chunk);
-    });
-    stream.once("end", resolveRead);
-    stream.once("error", rejectRead);
-  });
-
-  return Buffer.concat(chunks).toString("utf8");
 }
