@@ -9,7 +9,7 @@ import {
 } from "wiki-graph-core";
 
 import type { CLIArchiveArguments } from "../../../args/index.js";
-import { writeEvidence, writeFindHits, writeList } from "../output.js";
+import { writeEvidence, writeFindHits, writeList } from "../../archive-output/index.js";
 import { readArchiveDocument } from "./archive-file.js";
 import { createCollectionFindResult } from "./options.js";
 import { DEFAULT_OUTPUT_LIMIT } from "./types.js";

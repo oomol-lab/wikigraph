@@ -13,9 +13,9 @@ import type {
   LLMTokenUsageCallback,
 } from "wiki-graph-core";
 
-import { loadCLIConfig, type CLIConfig } from "../app/config.js";
+import { loadCLIConfig, type CLIConfig } from "./config.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "../support/index.js";
-import { buildLLMOptions } from "../app/llm.js";
+import { buildLLMOptions } from "./llm.js";
 
 export function createStageLLM(
   config: CLIConfig,

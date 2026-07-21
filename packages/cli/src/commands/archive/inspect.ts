@@ -8,7 +8,7 @@ import {
 } from "wiki-graph-core";
 
 import type { CLIArchiveArguments } from "../../args/index.js";
-import { loadCLIConfig } from "../../app/config.js";
+import { loadCLIConfig } from "../../runtime/config.js";
 import {
   createGenerationPerformanceHints,
   DEFAULT_GENERATION_JOB_CONCURRENCY,

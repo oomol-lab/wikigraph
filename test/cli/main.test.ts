@@ -126,7 +126,7 @@ vi.mock("../../packages/cli/src/commands/index.js", () => ({
 }));
 
 import { main } from "../../packages/cli/src/app/main.js";
-import { renderMainHelpText } from "../../packages/cli/src/app/help.js";
+import { renderMainHelpText } from "../../packages/cli/src/args/help.js";
 import { LLMPaymentRequiredError } from "../../packages/core/src/llm/index.js";
 
 describe("cli/main", () => {

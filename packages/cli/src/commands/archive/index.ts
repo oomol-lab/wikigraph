@@ -22,7 +22,7 @@ import {
   writeList,
   writePack,
   writePage,
-} from "./output.js";
+} from "../archive-output/index.js";
 import {
   ALL_COLLECTION_OUTPUT_LIMIT,
   createArchiveOutputContext,

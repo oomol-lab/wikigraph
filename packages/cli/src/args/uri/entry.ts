@@ -1,6 +1,6 @@
 import { parseLocatedWikiGraphUri } from "wiki-graph-core";
 
-import { isUriHelpPredicate, renderUriHelpText, renderUriPredicateHelpText, type UriHelpTargetName } from "../../app/help.js";
+import { isUriHelpPredicate, renderUriHelpText, renderUriPredicateHelpText, type UriHelpTargetName } from "../help.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "../../support/index.js";
 import { parseArchiveArguments } from "../archive.js";
 import type { ArchiveArgumentValues, CLIArchiveUriAction, ParsedCLIArguments } from "../types.js";

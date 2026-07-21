@@ -1,4 +1,4 @@
-import { parseHelpTopic, renderArchiveCommandHelpText, renderHelpTopicText, renderMainHelpText } from "../../app/help.js";
+import { parseHelpTopic, renderArchiveCommandHelpText, renderHelpTopicText, renderMainHelpText } from "../help.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "../../support/index.js";
 import type { ParsedCLIArguments } from "../types.js";
 import { isPublicArchiveCommandHelpAction, rejectHelpFlag, rejectHelpMetaFlags } from "../helpers.js";

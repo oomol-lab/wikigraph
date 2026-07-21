@@ -1,3 +1,4 @@
+import { renderMainHelpText } from "../args/help.js";
 import { parseCLIArguments } from "../args/index.js";
 import {
   runArchiveChapterCommand,
@@ -12,7 +13,6 @@ import {
   runObjectMetadataCommand,
   runQueueCommand,
 } from "../commands/index.js";
-import { renderMainHelpText } from "./help.js";
 import { LLMPaymentRequiredError } from "wiki-graph-core";
 import { formatError } from "wiki-graph-core";
 import { formatCLIJSON, formatCLIJSONLine } from "../support/index.js";

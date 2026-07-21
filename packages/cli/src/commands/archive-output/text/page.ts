@@ -1,9 +1,9 @@
 import { formatWikiGraphCommandUri, type ArchiveFindEvidencePreview, type ArchivePage } from "wiki-graph-core";
 
-import { formatCLIJSON, formatCliCommand } from "../../../../support/index.js";
-import { createEvidencePreviewObject, createPageObject } from "../objects.js";
-import type { ArchiveOutputContext } from "../types.js";
-import { toWikiGraphUri } from "../uri.js";
+import { formatCLIJSON, formatCliCommand } from "../../../support/index.js";
+import { createEvidencePreviewObject, createPageObject } from "../object/objects.js";
+import type { ArchiveOutputContext } from "../object/types.js";
+import { toWikiGraphUri } from "../object/uri.js";
 import { formatEvidencePreviewBlocks } from "./evidence.js";
 import { formatPlainObject } from "./plain.js";
 

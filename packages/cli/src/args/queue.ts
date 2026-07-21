@@ -4,7 +4,7 @@ import {
   isUriHelpPredicate,
   renderUriHelpText,
   renderUriPredicateHelpText,
-} from "../app/help.js";
+} from "./help.js";
 import type {
   ArchiveArgumentValues,
   CLIQueueAction,

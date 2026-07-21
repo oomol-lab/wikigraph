@@ -25,7 +25,7 @@ import type {
 } from "wiki-graph-core";
 import type { LLMessage } from "wiki-graph-core";
 
-import { loadCLIConfig, type CLIConfig } from "../../app/config.js";
+import { loadCLIConfig, type CLIConfig } from "../../runtime/config.js";
 import {
   createStageLLM,
   DEFAULT_GENERATION_JOB_CONCURRENCY,

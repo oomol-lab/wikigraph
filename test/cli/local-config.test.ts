@@ -5,7 +5,7 @@ import {
   maskLocalConfigSection,
   normalizeLocalConfigKey,
   validateLocalConfigSection,
-} from "../../packages/cli/src/app/local-config.js";
+} from "../../packages/cli/src/runtime/local-config.js";
 
 describe("cli/local-config", () => {
   it("normalizes llm kebab-case keys", () => {

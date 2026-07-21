@@ -2,7 +2,7 @@ import { CLI_HELP_ROUTES, withHelpRoute } from "../../support/index.js";
 import {
   parseLocalConfigSection,
   type LocalConfigSection,
-} from "../../app/local-config.js";
+} from "../../runtime/local-config.js";
 import {
   parseLocatedWikiGraphUri,
   WIKI_GRAPH_JOB_URI_PREFIX,

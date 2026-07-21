@@ -1,4 +1,4 @@
-import type { ArchiveOutputSource } from "../types.js";
+import type { ArchiveOutputSource } from "../object/types.js";
 
 export function formatSourceObject(source: ArchiveOutputSource): string {
   return formatSourceCitationBlock(source.uri, source.text);

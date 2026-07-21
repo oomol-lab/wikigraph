@@ -574,7 +574,7 @@ vi.mock("../../packages/core/src/archive/query/index.js", () => ({
   ),
 }));
 
-vi.mock("../../packages/cli/src/app/config.js", () => ({
+vi.mock("../../packages/cli/src/runtime/config.js", () => ({
   loadCLIConfig: vi.fn(() =>
     Promise.resolve({
       concurrent: {

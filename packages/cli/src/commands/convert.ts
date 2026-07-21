@@ -5,14 +5,14 @@ import { WikiGraph, type WikiGraphOptions } from "wiki-graph-core";
 import type { WikiGraphArchive } from "wiki-graph-core";
 
 import type { CLIArguments } from "../args/index.js";
-import { loadCLIConfig, type CLIConfig } from "../app/config.js";
+import { loadCLIConfig, type CLIConfig } from "../runtime/config.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "../support/index.js";
 import {
   type CLIFormat,
   inferCLIFormatFromPath,
   isTextCLIFormat,
 } from "../support/index.js";
-import { buildLLMOptions } from "../app/llm.js";
+import { buildLLMOptions } from "../runtime/llm.js";
 import {
   createTemporaryOutputPath,
   readTextStreamFromStdin,

@@ -1,5 +1,5 @@
 import { CLI_HELP_ROUTES, withHelpRoute } from "../../support/index.js";
-import { renderArchiveMaintenanceCommandHelpText, renderUriHelpText } from "../../app/help.js";
+import { renderArchiveMaintenanceCommandHelpText, renderUriHelpText } from "../help.js";
 import { parseArchiveArguments } from "../archive.js";
 import type { ArchiveArgumentValues, CLIArchiveUriAction, ParsedCLIArguments } from "../types.js";
 import {

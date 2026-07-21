@@ -1,7 +1,7 @@
 import { type ArchiveEvidenceItem } from "wiki-graph-core";
 import { CLI_PRIMARY_COMMAND } from "wiki-graph-core";
 
-import type { ArchiveOutputEvidencePreview } from "../types.js";
+import type { ArchiveOutputEvidencePreview } from "../object/types.js";
 import { formatScoredLines } from "./lines.js";
 import { formatSourceCitationBlock, formatSourceObject } from "./source.js";
 

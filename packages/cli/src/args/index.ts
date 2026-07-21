@@ -1,4 +1,5 @@
 export { parseArchiveArguments } from "./archive.js";
+export * from "./help.js";
 export { parseCLIArguments } from "./parse.js";
 export {
   formatRemovedImplicitVerbMessage,

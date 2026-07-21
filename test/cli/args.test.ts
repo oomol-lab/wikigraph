@@ -13,7 +13,7 @@ import {
   renderUriHelpText,
   renderUriPredicateHelpText,
   renderTransformHelpText,
-} from "../../packages/cli/src/app/help.js";
+} from "../../packages/cli/src/args/help.js";
 
 describe("cli/args", () => {
   const archivePath = resolve("book.wikg");

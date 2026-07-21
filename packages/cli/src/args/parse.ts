@@ -1,6 +1,6 @@
 import { parseArgs } from "util";
 
-import { renderMainHelpText } from "../app/help.js";
+import { renderMainHelpText } from "./help.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "../support/index.js";
 
 import type { ParsedCLIArguments } from "./types.js";

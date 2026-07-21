@@ -1,6 +1,6 @@
 import type { BuildJobTarget, ChapterEntry } from "wiki-graph-core";
 
-import type { CLIConfig } from "../../app/config.js";
+import type { CLIConfig } from "../../runtime/config.js";
 import {
   createGenerationPerformanceHints,
   DEFAULT_GENERATION_JOB_CONCURRENCY,

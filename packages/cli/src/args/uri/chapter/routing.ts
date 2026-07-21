@@ -5,7 +5,7 @@ import {
   type ArchiveTriplePattern,
 } from "wiki-graph-core";
 
-import { renderArchiveMaintenanceChapterActionHelpText } from "../../../app/help.js";
+import { renderArchiveMaintenanceChapterActionHelpText } from "../../help.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "../../../support/index.js";
 import { parseArchiveArguments } from "../../archive.js";
 import type {

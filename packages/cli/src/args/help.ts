@@ -9,7 +9,7 @@ import type {
   CLIArchiveAction,
   CLIArchiveChapterAction,
   CLIArchiveMaintenanceCommand,
-} from "../args/index.js";
+} from "./types.js";
 
 export const HELP_TOPICS = [
   "format",

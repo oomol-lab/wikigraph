@@ -101,14 +101,14 @@ vi.mock("../../packages/core/src/index.js", () => ({
   },
 }));
 
-vi.mock("../../packages/cli/src/app/config.js", () => ({
+vi.mock("../../packages/cli/src/runtime/config.js", () => ({
   loadCLIConfig: vi.fn((options?: unknown) => {
     cliMockState.loadCLIConfigOptions.push(options);
     return Promise.resolve(cliMockState.config);
   }),
 }));
 
-vi.mock("../../packages/cli/src/app/llm.js", () => ({
+vi.mock("../../packages/cli/src/runtime/llm.js", () => ({
   buildLLMOptions: vi.fn((config: unknown) => {
     cliMockState.buildLLMOptionsConfig.push(config);
     return mockLLMOptions;

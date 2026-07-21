@@ -1,6 +1,6 @@
 import { inferCLIFormatFromPath, parseCLIFormat } from "../support/index.js";
 import { withHelpRoute } from "../support/index.js";
-import { renderArchiveCommandHelpText } from "../app/help.js";
+import { renderArchiveCommandHelpText } from "./help.js";
 import {
   parseLocatedWikiGraphUri,
   type ArchiveTriplePattern,

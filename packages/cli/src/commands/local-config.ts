@@ -4,13 +4,13 @@ import { createInterface } from "readline/promises";
 import { generateText } from "ai";
 
 import type { CLILocalConfigArguments } from "../args/index.js";
-import type { CLIProvider } from "../app/config.js";
+import type { CLIProvider } from "../runtime/config.js";
 import {
   DEFAULT_WIKISPINE_FETCH_ENDPOINT,
   testWikispineRuntime,
   type WikispineProvider,
 } from "wiki-graph-core";
-import { buildLLMOptions } from "../app/llm.js";
+import { buildLLMOptions } from "../runtime/llm.js";
 import { writeTextToStderr, writeTextToStdout } from "../support/index.js";
 import { formatCLIJSON } from "../support/index.js";
 import {
@@ -21,7 +21,7 @@ import {
   readLocalConfigSection,
   replaceLocalConfigSection,
   type LocalConfigObject,
-} from "../app/local-config.js";
+} from "../runtime/local-config.js";
 
 export async function runLocalConfigCommand(
   args: CLILocalConfigArguments,

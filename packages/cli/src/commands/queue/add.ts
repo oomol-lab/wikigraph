@@ -10,7 +10,7 @@ import {
 import { WikiGraphArchiveFile } from "wiki-graph-core";
 
 import type { CLIQueueArguments } from "../../args/index.js";
-import type { CLIConfig } from "../../app/config.js";
+import type { CLIConfig } from "../../runtime/config.js";
 import { createQueueAddEstimate } from "./estimate.js";
 import { writeArchiveAddSummary } from "./output.js";
 

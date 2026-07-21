@@ -1,4 +1,4 @@
-import { renderLegacyCommandHelpText } from "../../app/help.js";
+import { renderLegacyCommandHelpText } from "../help.js";
 import { withHelpRoute } from "../../support/index.js";
 import type { ArchiveArgumentValues, ParsedCLIArguments } from "../types.js";
 

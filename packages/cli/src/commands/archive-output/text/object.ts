@@ -1,8 +1,8 @@
 import { formatWikiGraphCommandUri, parseLocatedWikiGraphUri } from "wiki-graph-core";
 
-import { formatCliCommand } from "../../../../support/index.js";
-import type { ArchiveOutputBacklinks, ArchiveOutputContext, ArchiveOutputObject } from "../types.js";
-import { getTextStreamOutputType } from "../uri.js";
+import { formatCliCommand } from "../../../support/index.js";
+import type { ArchiveOutputBacklinks, ArchiveOutputContext, ArchiveOutputObject } from "../object/types.js";
+import { getTextStreamOutputType } from "../object/uri.js";
 import { formatEvidencePreviewContinuation } from "./evidence.js";
 import { formatScoredLines } from "./lines.js";
 import { formatPlainObject, formatStateInline } from "./plain.js";

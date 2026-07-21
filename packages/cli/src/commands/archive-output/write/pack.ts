@@ -1,11 +1,11 @@
 import type { ArchivePack } from "wiki-graph-core";
 
 import { formatCLIJSON, writeTextToStdout } from "../../../support/index.js";
-import { formatFindObject, formatPackAnchor, truncateToBudget } from "./format.js";
+import { formatFindObject, formatPackAnchor, truncateToBudget } from "../text/index.js";
 import { writeJSONL } from "./jsonl.js";
-import { createListObject, createPackObject } from "./objects.js";
-import { DEFAULT_GET_EVIDENCE_LIMIT } from "./types.js";
-import type { ArchiveOutputContext, ResultFormat } from "./types.js";
+import { createListObject, createPackObject } from "../object/objects.js";
+import { DEFAULT_GET_EVIDENCE_LIMIT } from "../object/types.js";
+import type { ArchiveOutputContext, ResultFormat } from "../object/types.js";
 
 export async function writePack(
   pack: ArchivePack,

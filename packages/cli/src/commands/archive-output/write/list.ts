@@ -1,12 +1,12 @@
 import type { ArchiveRelatedResult } from "wiki-graph-core";
 
 import { formatCLIJSON, writeTextToStdout } from "../../../support/index.js";
-import { createOutputContinuationCursor } from "./cursor.js";
-import { formatFindObject, formatNextCursor, formatOpenShortUriHint, getListObjectSeparator } from "./format.js";
+import { createOutputContinuationCursor } from "../object/cursor.js";
+import { formatFindObject, formatNextCursor, formatOpenShortUriHint, getListObjectSeparator } from "../text/index.js";
 import { writeJSONL } from "./jsonl.js";
-import { createListObject, createObjectResultPage } from "./objects.js";
-import { createPageCursorObject } from "./page-cursor.js";
-import type { ArchiveOutputContext, ResultFormat } from "./types.js";
+import { createListObject, createObjectResultPage } from "../object/objects.js";
+import { createPageCursorObject } from "../object/page-cursor.js";
+import type { ArchiveOutputContext, ResultFormat } from "../object/types.js";
 
 export async function writeList(
   result: ArchiveRelatedResult,

@@ -1,4 +1,4 @@
-import { renderGcCommandHelpText } from "../../app/help.js";
+import { renderGcCommandHelpText } from "../help.js";
 import { withHelpRoute } from "../../support/index.js";
 import type { ArchiveArgumentValues, ArchiveMetaFlagValues, ParsedCLIArguments } from "../types.js";
 import { rejectGcFlag, rejectGcMetaFlags } from "../helpers.js";

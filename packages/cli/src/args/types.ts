@@ -1,5 +1,5 @@
 import type { CLIFormat } from "../support/index.js";
-import type { LocalConfigSection } from "../app/local-config.js";
+import type { LocalConfigSection } from "../runtime/local-config.js";
 import type {
   ArchiveTriplePattern,
   BuildJobTarget,

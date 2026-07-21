@@ -1,5 +1,5 @@
-import { formatCLIJSON } from "../../../../support/index.js";
-import { PLAIN_OBJECT_KEY_PRIORITY } from "../types.js";
+import { formatCLIJSON } from "../../../support/index.js";
+import { PLAIN_OBJECT_KEY_PRIORITY } from "../object/types.js";
 
 export function formatPlainObject(value: unknown): string {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
