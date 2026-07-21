@@ -1,13 +1,13 @@
-import type { ReadonlyDocument } from "../../../../../document/index.js";
+import type { ReadonlyDocument } from "../../../../document/index.js";
 
-import { createNodePosition, createSnippet } from "../../helpers.js";
-import { parseSearchPropertyIntegerOwnerId } from "../hydration.js";
-import type { ArchiveFindHit } from "../../types.js";
+import { createNodePosition, createSnippet } from "../helpers.js";
+import { parseSearchPropertyIntegerOwnerId } from "./hydration.js";
+import type { ArchiveFindHit } from "../types.js";
 import {
   compareMentions,
   parseEntityQid,
   selectEntityLabel,
-} from "../../knowledge.js";
+} from "../knowledge.js";
 
 export async function hydrateCachedObjectBucketHit(
   document: ReadonlyDocument,

@@ -1,6 +1,6 @@
-export { Attention } from "./attention.js";
+export { Attention } from "./core.js";
 export type {
   ChunkBatchContext,
   ChunkGraphDelta,
   ChunkGraphEdge,
-} from "./attention.js";
+} from "./core.js";

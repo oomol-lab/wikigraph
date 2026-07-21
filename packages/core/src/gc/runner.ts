@@ -9,7 +9,7 @@ import { runWikipageCacheGc } from "../wikipage/index.js";
 import { formatError } from "../utils/node-error.js";
 
 import { tryAcquireGcLock } from "./lock.js";
-import { runTempDirectoryGc } from "./tmp-gc.js";
+import { runTempDirectoryGc } from "./temp.js";
 import type { GcContext, GcJob, GcJobReport, GcRunReport } from "./types.js";
 
 interface NamedGcJob {

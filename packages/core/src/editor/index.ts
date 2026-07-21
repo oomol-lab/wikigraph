@@ -1,2 +1,2 @@
-export { compressText } from "./editor.js";
-export type { EditorOptions, EditorScopes } from "./editor.js";
+export { compressText } from "./compression.js";
+export type { EditorOptions, EditorScopes } from "./compression.js";

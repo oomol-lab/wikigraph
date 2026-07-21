@@ -25,7 +25,7 @@ import type {
   FragmentRecord,
   SnakeRecord,
 } from "../../packages/core/src/document/types.js";
-import { compressText } from "../../packages/core/src/editor/editor.js";
+import { compressText } from "../../packages/core/src/editor/compression.js";
 import {
   CLUE_REVIEWER_GENERATOR_PROMPT_TEMPLATE,
   CLUE_REVIEWER_PROMPT_TEMPLATE,

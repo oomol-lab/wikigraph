@@ -1,7 +1,7 @@
 import type {
   ChunkGraphDelta as AttentionChunkGraphDelta,
   ChunkGraphEdge as AttentionChunkGraphEdge,
-} from "./attention/attention.js";
+} from "./attention/core.js";
 import type {
   ChunkBatchOptions,
   ChunkExtractionSentence,

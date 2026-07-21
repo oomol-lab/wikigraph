@@ -53,14 +53,14 @@ import {
 import {
   hydrateCachedChunkBucketHit,
   hydrateCachedObjectBucketHit,
-} from "./bucket/hydration.js";
+} from "./bucket-hydration.js";
 import {
   compareChapterTitleIndexHits,
   compareTextIndexHits,
   getObjectBucketCursorId,
   isAfterChapterTitleKey,
   isAfterTextKey,
-} from "./bucket/order.js";
+} from "./bucket-order.js";
 import type { ArchiveFindHit, ArchiveFindOptions, ArchiveFindResult } from "../types.js";
 
 export async function readBucketedSearchResultPage(

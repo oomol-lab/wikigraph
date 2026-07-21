@@ -16,7 +16,7 @@ import {
   createEvidenceReadContext,
   createMentionEvidencePreview,
   createMentionLinkEvidencePreview,
-} from "./source-evidence.js";
+} from "./source.js";
 import { createTextStreamBacklinks } from "./backlinks.js";
 import {
   createTriplePageLabel,

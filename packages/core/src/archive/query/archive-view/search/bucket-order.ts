@@ -1,14 +1,14 @@
-import { compareNumbers } from "../../helpers.js";
-import { parseSearchPropertyIntegerOwnerId } from "../hydration.js";
+import { compareNumbers } from "../helpers.js";
+import { parseSearchPropertyIntegerOwnerId } from "./hydration.js";
 import type {
   SearchChapterTitleCursorKey,
   SearchTextCursorKey,
-} from "../../../search-cache.js";
+} from "../../search-cache.js";
 import type {
   SearchIndexObjectHit,
   SearchIndexTextHit,
-} from "../../../../search-index/search/index.js";
-import type { ArchiveFindHit } from "../../types.js";
+} from "../../../search-index/search/index.js";
+import type { ArchiveFindHit } from "../types.js";
 
 export function compareChapterTitleIndexHits(
   left: SearchIndexObjectHit,

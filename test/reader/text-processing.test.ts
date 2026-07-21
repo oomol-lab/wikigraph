@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { WaveReflection } from "../../packages/core/src/reader/attention/wave-reflection.js";
-import { segmentTextStream } from "../../packages/core/src/reader/segment/segment.js";
+import { segmentTextStream } from "../../packages/core/src/reader/segment/core.js";
 import {
   normalizeText,
   splitTextIntoSentences,

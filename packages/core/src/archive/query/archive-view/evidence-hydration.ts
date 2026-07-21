@@ -26,7 +26,7 @@ import {
   createMentionEvidenceRanges,
   createMentionLinkEvidencePreview,
   createSourceEvidenceItem,
-} from "./source-evidence.js";
+} from "./source.js";
 
 export async function hydrateFindHitEvidence(
   document: ReadonlyDocument,

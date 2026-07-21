@@ -17,7 +17,7 @@ import {
 import type {
   ArchiveFindMatch,
   ArchiveFindObjectType,
-} from "../../query/archive-view.js";
+} from "../../query/view.js";
 
 export const TEXT_SENTENCE_KIND = {
   source: 1,

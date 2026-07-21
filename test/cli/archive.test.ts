@@ -11,7 +11,7 @@ import type {
   ArchiveFindHit,
   ArchiveListItem,
   ArchivePage,
-} from "../../packages/core/src/archive/query/archive-view.js";
+} from "../../packages/core/src/archive/query/view.js";
 
 const archiveMockState = vi.hoisted(() => ({
   backlinks: {

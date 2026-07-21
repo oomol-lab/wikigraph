@@ -20,7 +20,7 @@ export {
   rankEvidenceQuote,
   resolveEvidenceSelection,
   resolveEvidenceSelectionList,
-} from "./selection-resolver.js";
+} from "./resolver.js";
 export { normalizeText, splitTextIntoSentences } from "./text.js";
 export type {
   EvidenceSelection,

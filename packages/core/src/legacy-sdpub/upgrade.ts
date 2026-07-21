@@ -7,7 +7,7 @@ import { createWikiGraphTempDirectory } from "../common/wiki-graph/temp.js";
 import type { Entry, ZipFile as YauzlZipFile } from "yauzl";
 
 import { Database, type SqlBindValue } from "../document/database.js";
-import { DirectoryDocument } from "../document/document.js";
+import { DirectoryDocument } from "../document/directory.js";
 import { writeWikgArchive } from "../wikg/index.js";
 import { isNodeError } from "../utils/node-error.js";
 import { listTableColumns, listTableNames } from "./upgrade/database.js";

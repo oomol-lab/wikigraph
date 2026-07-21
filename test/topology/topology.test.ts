@@ -18,7 +18,7 @@ import type {
   ReadingEdgeRecord,
   ReadonlySerialFragments,
 } from "../../packages/core/src/document/index.js";
-import { Topology } from "../../packages/core/src/topology/topology.js";
+import { Topology } from "../../packages/core/src/topology/core.js";
 
 describe("topology/topology", () => {
   it("merges deltas, applies annotations, and persists weighted topology output", async () => {

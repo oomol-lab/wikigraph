@@ -2,7 +2,7 @@ import { resolve } from "path";
 
 import { DirectoryDocument } from "../document/index.js";
 
-import { WikgCoordinator } from "./wikg-coordinator.js";
+import { WikgCoordinator } from "./coordinator.js";
 import { deleteArchiveSearchSessions } from "../archive/query/index.js";
 import { WikiGraphArchive } from "../facade/wiki-graph-archive.js";
 

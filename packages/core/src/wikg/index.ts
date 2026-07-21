@@ -29,4 +29,4 @@ export {
 } from "./archive-uri.js";
 export type { LocatedWikiGraphUri } from "./archive-uri.js";
 export { WikiGraphArchiveFile } from "./wiki-graph-archive-file.js";
-export { runWikgCoordinatorGc, WikgCoordinator } from "./wikg-coordinator.js";
+export { runWikgCoordinatorGc, WikgCoordinator } from "./coordinator.js";

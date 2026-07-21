@@ -11,12 +11,12 @@ export type {
   ReadonlyTextStreams,
   ReadonlyTextStreams as ReadonlyFragments,
 } from "./text-streams.js";
-export { DirectoryDocument } from "./document.js";
+export { DirectoryDocument } from "./directory.js";
 export type {
   Document,
   DocumentContext,
   ReadonlyDocument,
-} from "./document.js";
+} from "./directory.js";
 export { SCHEMA_SQL } from "./schema.js";
 export {
   ChunkStore,

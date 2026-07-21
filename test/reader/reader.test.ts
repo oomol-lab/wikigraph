@@ -15,11 +15,11 @@ vi.mock("../../packages/core/src/reader/chunk-batch/extract.js", () => ({
   extractUserFocusedChunkBatch: extractUserFocusedChunkBatchMock,
 }));
 
-vi.mock("../../packages/core/src/reader/segment/segment.js", () => ({
+vi.mock("../../packages/core/src/reader/segment/core.js", () => ({
   segmentTextStream: segmentTextStreamMock,
 }));
 
-import { Reader } from "../../packages/core/src/reader/reader.js";
+import { Reader } from "../../packages/core/src/reader/core.js";
 import { Language } from "../../packages/core/src/common/language.js";
 import {
   WIKI_GRAPH_READER_SCOPES,

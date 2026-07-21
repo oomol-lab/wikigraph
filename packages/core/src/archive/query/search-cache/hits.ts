@@ -2,7 +2,7 @@ import { getNumber, getString } from "../../../document/database.js";
 import type { SqlBindValue } from "../../../document/database.js";
 import type { Database } from "../../../document/index.js";
 
-import type { ArchiveFindHit } from "../archive-view.js";
+import type { ArchiveFindHit } from "../view.js";
 
 import { openSearchSessionDatabase } from "./database.js";
 import { parseNumberArray } from "./parsing.js";

@@ -22,7 +22,7 @@ import {
 
 import { createWikiGraphTempDirectory } from "../common/wiki-graph/temp.js";
 import { Database as DocumentDatabase, DirectoryDocument } from "../document/index.js";
-import type { DocumentFileStore } from "../document/document.js";
+import type { DocumentFileStore } from "../document/directory.js";
 import { createArchiveSearchIndexFingerprint } from "../archive/query/index.js";
 import { readSearchIndexFingerprintFromDatabase } from "../archive/search-index/index.js";
 import {

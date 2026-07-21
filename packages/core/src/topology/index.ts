@@ -1,1 +1,1 @@
-export { Topology } from "./topology.js";
+export { Topology } from "./core.js";

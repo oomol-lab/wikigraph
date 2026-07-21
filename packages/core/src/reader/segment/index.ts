@@ -1,4 +1,4 @@
-export { segmentTextStream } from "./segment.js";
+export { segmentTextStream } from "./core.js";
 export type {
   SegmentTextStreamOptions,
   SentenceStreamAdapter,

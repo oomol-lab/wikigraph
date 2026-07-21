@@ -1,6 +1,6 @@
 import { getNumber } from "../../../document/database.js";
 
-import type { ArchiveFindHit } from "../archive-view.js";
+import type { ArchiveFindHit } from "../view.js";
 
 import { openSearchSessionDatabase } from "./database.js";
 import {

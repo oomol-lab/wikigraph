@@ -1,4 +1,4 @@
-import type { ArchiveFindHit } from "../archive-view.js";
+import type { ArchiveFindHit } from "../view.js";
 
 export interface SearchSessionInput {
   readonly archiveKey: string;

@@ -1,4 +1,4 @@
-import type { ArchiveFindHit } from "../archive-view.js";
+import type { ArchiveFindHit } from "../view.js";
 
 export function parseSearchResultItem(value: string): ArchiveFindHit {
   const parsed: unknown = JSON.parse(value);

@@ -20,7 +20,7 @@ import {
   readArchiveText,
   readArchivePage,
   rebuildArchiveSearchIndex,
-} from "../../../packages/core/src/archive/query/archive-view.js";
+} from "../../../packages/core/src/archive/query/view.js";
 import {
   isSearchIndexCurrent,
   querySearchIndex,

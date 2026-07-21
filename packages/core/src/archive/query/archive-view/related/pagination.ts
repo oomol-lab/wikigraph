@@ -6,7 +6,7 @@ import {
   createMentionLinkEvidencePreview,
   createNodeEvidenceRanges,
   createSourceEvidencePreview,
-} from "../source-evidence.js";
+} from "../source.js";
 import { parseArchiveReference } from "../references.js";
 import type {
   ArchiveListItem,

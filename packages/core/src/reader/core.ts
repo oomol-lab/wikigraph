@@ -1,9 +1,9 @@
-import { Attention } from "./attention/attention.js";
+import { Attention } from "./attention/core.js";
 import {
   extractBookCoherenceChunkBatch,
   extractUserFocusedChunkBatch,
 } from "./chunk-batch/extract.js";
-import { segmentTextStream } from "./segment/segment.js";
+import { segmentTextStream } from "./segment/core.js";
 import type { ChunkBatchOptions } from "./chunk-batch/types.js";
 import type {
   ReaderChunk,

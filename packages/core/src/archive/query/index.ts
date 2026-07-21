@@ -20,7 +20,7 @@ export {
   readArchivePage,
   readArchiveText,
   rebuildArchiveSearchIndex,
-} from "./archive-view.js";
+} from "./view.js";
 export type {
   ArchiveBacklinkBucket,
   ArchiveBacklinks,
@@ -48,7 +48,7 @@ export type {
   ArchivePage,
   ArchiveRelatedResult,
   ArchiveTriplePattern,
-} from "./archive-view.js";
+} from "./view.js";
 export {
   createContinuationCursor,
   readContinuationCursor,

@@ -15,7 +15,7 @@ import {
   createMentionLinkEvidenceRanges,
   createNodeEvidenceRanges,
   createSourceEvidencePage,
-} from "./source-evidence.js";
+} from "./source.js";
 
 export async function listArchiveEvidence(
   document: ReadonlyDocument,
