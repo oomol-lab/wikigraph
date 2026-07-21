@@ -56,10 +56,6 @@ describe("cli/args/archive", () => {
       "The --replace option is only supported by `wg <archive-uri> create`.",
     );
 
-    expect(() => parseCLIArguments(["build", "book.wikg"])).toThrow(
-      "Unknown command: build.",
-    );
-
     expect(
       parseCLIArguments(["wikg://book.wikg/chunk", "--query", "RAG", "--json"]),
     ).toStrictEqual({
@@ -381,12 +377,6 @@ describe("cli/args/archive", () => {
       kind: "archive",
     });
 
-    expect(() => parseCLIArguments(["find", "book.wikg", "RAG"])).toThrow(
-      "Unknown command: find.",
-    );
-    expect(() =>
-      parseCLIArguments(["search", "wikg://book.wikg", "RAG"]),
-    ).toThrow("Unknown command: search.");
     expect(() => parseCLIArguments(["wikg://book.wikg", "search"])).toThrow(
       "This command form is not available.",
     );

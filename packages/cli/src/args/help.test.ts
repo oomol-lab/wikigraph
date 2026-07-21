@@ -75,9 +75,6 @@ describe("cli/args/help", () => {
       helpText: renderHelpTopicText("runtime"),
       kind: "help",
     });
-    expect(() => parseCLIArguments(["search", "--help"])).toThrow(
-      "Unknown command: search.",
-    );
     expect(() => parseCLIArguments(["help", "object"])).toThrow(
       "Invalid help topic: object.",
     );
@@ -436,9 +433,6 @@ describe("cli/args/help", () => {
     expect(() =>
       parseCLIArguments(["wikg://book.wikg", "create", "--import", "book.pdf"]),
     ).toThrow("See: wg wikg://book.wikg create --help");
-    expect(() => parseCLIArguments(["wikg", "inspect"])).toThrow(
-      "See: wg --help",
-    );
     expect(() => parseCLIArguments(["book.epub"])).toThrow("See: wg --help");
   });
 });

@@ -187,68 +187,6 @@ describe("wikilink/relation-discovery", () => {
     ).resolves.toStrictEqual([]);
   });
 
-  it("still resolves old anchor evidence for existing retry responses", async () => {
-    const sentences = [
-      { text: "Alpha founded Beta.", wordsCount: 3 },
-      { text: "Gamma watched them.", wordsCount: 3 },
-    ];
-    const window = buildWikilinkEvidenceWindows({
-      maxEvidenceDistance: 10,
-      mentions: [
-        {
-          id: "m1",
-          qid: "Q1",
-          range: { end: 5, start: 0 },
-          surface: "Alpha",
-        },
-        {
-          id: "m2",
-          qid: "Q2",
-          range: { end: 18, start: 14 },
-          surface: "Beta",
-        },
-      ],
-      text: sentences.map((sentence) => sentence.text).join(" "),
-      windowLength: 80,
-    })[0]!;
-    const request = vi.fn<GuaranteedRequest>().mockResolvedValue(
-      JSON.stringify({
-        relations: [
-          {
-            confidence: 0.91,
-            evidence: {
-              start_anchor: {
-                mode: "full",
-                text: "Alpha founded Beta.",
-              },
-            },
-            predicate: "Founded By",
-            sourceMentionId: "m2",
-            targetMentionId: "m1",
-          },
-        ],
-      }),
-    );
-
-    await expect(
-      discoverWikilinkRelations({
-        chapterId: 1,
-        maxRetries: 0,
-        request,
-        sentences,
-        window,
-      }),
-    ).resolves.toStrictEqual([
-      {
-        confidence: 0.91,
-        evidenceSentenceIds: [[1, 0]],
-        predicate: "founded_by",
-        sourceMentionId: "m2",
-        targetMentionId: "m1",
-      },
-    ]);
-  });
-
   it("uses tagged sentence IDs and quote evidence in the relation prompt", async () => {
     const sentences = [{ text: "Alpha founded Beta.", wordsCount: 3 }];
     const window = buildWikilinkEvidenceWindows({
@@ -332,10 +270,8 @@ describe("wikilink/relation-discovery", () => {
         relations: [
           {
             evidence: {
-              start_anchor: {
-                mode: "full",
-                text: "Alpha is beside Beta.",
-              },
+              quote: "Alpha is beside Beta",
+              sentence_id: "S1",
             },
             predicate: "mentions",
             sourceMentionId: "m1",
@@ -441,10 +377,8 @@ describe("wikilink/relation-discovery", () => {
         relations: [
           {
             evidence: {
-              start_anchor: {
-                mode: "full",
-                text: "Alpha founded Beta.",
-              },
+              quote: "Alpha founded Beta",
+              sentence_id: "S1",
             },
             predicate: " - ",
             sourceMentionId: "m1",

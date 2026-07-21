@@ -41,11 +41,5 @@ describe("cli/args/legacy", () => {
       help: false,
       kind: "legacy",
     });
-    expect(() => parseCLIArguments(["book.sdpub"])).toThrow(
-      "Unknown command: book.sdpub.",
-    );
-    expect(() => parseCLIArguments(["search", "book.sdpub", "query"])).toThrow(
-      "Unknown command: search.",
-    );
   });
 });

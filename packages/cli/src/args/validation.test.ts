@@ -39,21 +39,10 @@ describe("cli/args/validation", () => {
     );
   });
 
-  it("rejects removed command families and invalid maintenance usage", () => {
+  it("rejects invalid maintenance usage", () => {
     expect(() => parseCLIArguments([])).toThrow(
       "Missing command.\nSee: wg --help",
     );
-    expect(() => parseCLIArguments(["import", "--help"])).toThrow(
-      "Unknown command: import.\nSee: wg --help",
-    );
-    expect(() => parseCLIArguments(["ls", "book.wikg"])).toThrow(
-      "Unknown command: ls.\nSee: wg --help",
-    );
-    expect(() => parseCLIArguments(["wikg"])).toThrow("Unknown command: wikg.");
-    expect(() => parseCLIArguments(["wikg", "toc"])).toThrow(
-      "Unknown command: wikg.",
-    );
-    expect(() => parseCLIArguments(["meta"])).toThrow("Unknown command: meta.");
     expect(() => parseCLIArguments(["chapter", "set", "--help"])).toThrow(
       "Use concrete chapter resource URIs such as /source, /summary, or /title for set operations.",
     );

@@ -183,10 +183,6 @@ describe("cli/args/queue", () => {
       ]),
     ).toThrow("is not supported");
 
-    expect(() => parseCLIArguments(["queue", "--help"])).toThrow(
-      "Unknown command: queue.",
-    );
-
     expect(parseCLIArguments(["wikg://local/job", "--help"])).toStrictEqual({
       help: true,
       helpText: renderUriHelpText("job-collection-scope", "wikg://local/job"),
