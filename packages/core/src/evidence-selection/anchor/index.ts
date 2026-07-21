@@ -1,2 +1,2 @@
-export * from "./resolver.js";
+export * from "./resolver/index.js";
 export * from "./types.js";

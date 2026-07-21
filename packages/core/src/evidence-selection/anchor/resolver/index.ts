@@ -1,20 +1,20 @@
-import type { SentenceId } from "../../document/index.js";
+import type { SentenceId } from "../../../document/index.js";
 import type {
   EvidenceResolutionFailure,
   EvidenceResolutionResult,
   RankedSentenceCandidate,
-} from "./types.js";
-import { scoreAnchor } from "./resolver/matcher.js";
-import { anchorLength, normalizeAnchor, parseRawAnchor } from "./resolver/parser.js";
-import { formatCandidate } from "./resolver/scoring.js";
+} from "../types.js";
+import { scoreAnchor } from "./matcher.js";
+import { anchorLength, normalizeAnchor, parseRawAnchor } from "./parser.js";
+import { formatCandidate } from "./scoring.js";
 import {
   MAX_CANDIDATE_DISPLAY,
   MIN_AUTO_RESOLVE_GAP,
   MIN_AUTO_RESOLVE_SCORE,
   MIN_CANDIDATE_SCORE,
   VERY_HIGH_CONFIDENCE_SCORE,
-} from "./resolver/types.js";
-import type { AnchorSpec } from "./resolver/types.js";
+} from "./types.js";
+import type { AnchorSpec } from "./types.js";
 
 export class EvidenceResolver {
   public resolve(
