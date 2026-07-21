@@ -55,7 +55,7 @@ import {
   planGenerationTask,
   type GenerationPerformanceHint,
   type GenerationPlanningCost,
-} from "../generation-planning.js";
+} from "../runtime/index.js";
 import { writeTextToStdout } from "../support/index.js";
 import { formatCLIJSON, formatCLIJSONLine } from "../support/index.js";
 import { formatCliCommand } from "../support/index.js";

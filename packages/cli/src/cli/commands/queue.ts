@@ -56,7 +56,7 @@ import {
   type GenerationConcurrency,
   type GenerationPerformanceHint,
   type GenerationPlanningCost,
-} from "../generation-planning.js";
+} from "../runtime/index.js";
 import { writeTextToStdout } from "../support/index.js";
 import { formatCLIJSON } from "../support/index.js";
 import { formatCliCommand } from "../support/index.js";
@@ -65,13 +65,13 @@ import {
   ProgressOutputWriter,
   type ProgressCounter,
   type ProgressMetricGroup,
-} from "../progress-output.js";
+} from "../runtime/index.js";
 import {
   createStageLLM,
   loadRequiredStageConfig,
   resolveExtractionPrompt,
   resolveKnowledgeGraphRecallPrompt,
-} from "../stage-runtime.js";
+} from "../runtime/index.js";
 
 const TERMINAL_STATES = new Set<BuildJobState>([
   "succeeded",

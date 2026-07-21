@@ -12,7 +12,7 @@ import { formatCLIJSON } from "../support/index.js";
 import {
   ProgressOutputWriter,
   type ProgressCounter,
-} from "../progress-output.js";
+} from "../runtime/index.js";
 
 const INDEX_PROGRESS_OUTPUT_INTERVAL_MS = 6_000;
 

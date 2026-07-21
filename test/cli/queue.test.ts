@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as CLIRuntime from "../../packages/cli/src/cli/runtime/index.js";
 import type * as CLISupport from "../../packages/cli/src/cli/support/index.js";
 
 const queueMockState = vi.hoisted(() => ({
@@ -280,27 +281,37 @@ vi.mock("../../packages/cli/src/cli/config.js", () => ({
   loadCLIConfig: vi.fn(() => Promise.resolve(queueMockState.cliConfig)),
 }));
 
-vi.mock("../../packages/cli/src/cli/stage-runtime.js", () => ({
-  createStageLLM: vi.fn((_config: unknown, options: unknown) => {
-    queueMockState.createStageLLMCalls.push(options);
-    return {};
-  }),
-  loadRequiredStageConfig: vi.fn((options: unknown) => {
-    queueMockState.loadRequiredStageConfigCalls.push(options);
-    if (queueMockState.loadRequiredStageConfigError !== undefined) {
-      return Promise.reject(queueMockState.loadRequiredStageConfigError);
-    }
+vi.mock(
+  "../../packages/cli/src/cli/runtime/index.js",
+  async (importOriginal) => {
+    const actual = await importOriginal<typeof CLIRuntime>();
 
-    return Promise.resolve({
-      ...queueMockState.cliConfig,
-      prompt: "Keep key beats",
-    });
-  }),
-  resolveExtractionPrompt: vi.fn((prompt: string | undefined) => prompt ?? ""),
-  resolveKnowledgeGraphRecallPrompt: vi.fn(
-    (prompt: string | undefined) => prompt ?? "Default KG recall",
-  ),
-}));
+    return {
+      ...actual,
+      createStageLLM: vi.fn((_config: unknown, options: unknown) => {
+        queueMockState.createStageLLMCalls.push(options);
+        return {};
+      }),
+      loadRequiredStageConfig: vi.fn((options: unknown) => {
+        queueMockState.loadRequiredStageConfigCalls.push(options);
+        if (queueMockState.loadRequiredStageConfigError !== undefined) {
+          return Promise.reject(queueMockState.loadRequiredStageConfigError);
+        }
+
+        return Promise.resolve({
+          ...queueMockState.cliConfig,
+          prompt: "Keep key beats",
+        });
+      }),
+      resolveExtractionPrompt: vi.fn(
+        (prompt: string | undefined) => prompt ?? "",
+      ),
+      resolveKnowledgeGraphRecallPrompt: vi.fn(
+        (prompt: string | undefined) => prompt ?? "Default KG recall",
+      ),
+    };
+  },
+);
 
 import {
   runQueueCommand,

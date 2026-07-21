@@ -19,7 +19,7 @@ import {
   removeTemporaryDirectory,
   writeTextFileToStdout,
 } from "../support/index.js";
-import { createCLIProgressRenderer } from "../progress.js";
+import { createCLIProgressRenderer } from "../runtime/index.js";
 
 type TextCLIFormat = Extract<CLIFormat, "markdown" | "txt">;
 
