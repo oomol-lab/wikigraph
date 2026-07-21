@@ -1,2 +1,2 @@
-export * from "./chapter-target.js";
+export * from "./chapter/index.js";
 export * from "./entry.js";

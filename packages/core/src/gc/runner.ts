@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
 
-import { resolveWikiGraphStateRootPath } from "../common/wiki-graph-temp.js";
+import { resolveWikiGraphStateRootPath } from "../common/wiki-graph/temp.js";
 import { runSearchCacheGc } from "../archive/query/index.js";
 import { runBuildQueueGc } from "../facade/index.js";
 import { runWikgCoordinatorGc } from "../wikg/index.js";

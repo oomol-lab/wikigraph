@@ -1,7 +1,7 @@
 import { rm } from "fs/promises";
 import { resolve } from "path";
 
-import { createWikiGraphTempDirectory } from "../common/wiki-graph-temp.js";
+import { createWikiGraphTempDirectory } from "../common/wiki-graph/temp.js";
 import { BOOK_META_VERSION, TOC_FILE_VERSION } from "../source/index.js";
 import {
   EPUB_SOURCE_ADAPTER,

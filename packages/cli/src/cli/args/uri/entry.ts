@@ -15,8 +15,8 @@ import {
   rejectArchiveBooleanFlag,
   stripObjectUriPrefix,
 } from "../helpers.js";
-import { parseArchiveChapterUriArguments } from "./chapter-routing.js";
-import { parseChapterTarget } from "./chapter-target.js";
+import { parseArchiveChapterUriArguments } from "./chapter/routing.js";
+import { parseChapterTarget } from "./chapter/target.js";
 import { parseArchiveUriArchiveArguments, parseArchiveCoverUriArguments, parseArchiveIndexUriArguments } from "./archive-objects.js";
 import { containsMetadataKeySuffix, parseMetadataTarget, parseMetadataUriArguments } from "./metadata.js";
 import { isTripleScopePath } from "./triple-pattern.js";

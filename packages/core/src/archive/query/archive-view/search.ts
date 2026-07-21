@@ -30,7 +30,7 @@ import {
   createSentenceEvidenceSearchCacheInput,
   isEntityOnlySearch,
   isEntitySearchTypes,
-} from "./search-cache-input.js";
+} from "./search/cache-input.js";
 import {
   filterLexicalHitsByMatch,
   findChapters,
@@ -49,8 +49,8 @@ import {
 import {
   readBucketedSearchResultPage,
   tryDecodeBucketSearchSessionCursor,
-} from "./search-buckets.js";
-import { findArchiveObjectsIndexed, isTextOnlySearch } from "./search-hydration.js";
+} from "./search/buckets.js";
+import { findArchiveObjectsIndexed, isTextOnlySearch } from "./search/hydration.js";
 import type { ArchiveFindHit, ArchiveFindOptions, ArchiveFindResult } from "./types.js";
 
 export async function findArchiveObjects(

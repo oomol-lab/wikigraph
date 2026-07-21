@@ -3,7 +3,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from "fs/promises";
 import { dirname, join, resolve } from "path";
 import { pipeline } from "stream/promises";
 
-import { createWikiGraphTempDirectory } from "../common/wiki-graph-temp.js";
+import { createWikiGraphTempDirectory } from "../common/wiki-graph/temp.js";
 import type { Entry, ZipFile as YauzlZipFile } from "yauzl";
 
 import { Database, type SqlBindValue } from "../document/database.js";

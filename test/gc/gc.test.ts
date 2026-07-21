@@ -3,7 +3,7 @@ import { dirname, join } from "path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createWikiGraphTempDirectory } from "../../packages/core/src/common/wiki-graph-temp.js";
+import { createWikiGraphTempDirectory } from "../../packages/core/src/common/wiki-graph/temp.js";
 import {
   Database,
   DirectoryDocument,

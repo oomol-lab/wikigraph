@@ -11,7 +11,7 @@ export {
   SEARCH_OBJECT_PROPERTY_OWNER_KIND,
   setFtsIndexEmbedded,
   TEXT_SENTENCE_KIND,
-} from "./search-index.js";
+} from "./search/index.js";
 export type {
   ArchiveIndexSettings,
   SearchIndexInput,
@@ -25,4 +25,4 @@ export type {
   SearchObjectPropertyKind,
   SearchObjectPropertyOwnerKind,
   TextSentenceKind,
-} from "./search-index.js";
+} from "./search/index.js";

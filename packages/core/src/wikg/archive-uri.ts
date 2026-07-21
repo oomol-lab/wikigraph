@@ -16,4 +16,4 @@ export {
   WIKI_GRAPH_JOB_URI_PREFIX,
   WIKI_GRAPH_URI_PREFIX,
   type LocatedWikiGraphUri,
-} from "../common/wiki-graph-uri.js";
+} from "../common/wiki-graph/uri.js";

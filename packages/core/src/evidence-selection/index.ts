@@ -1,9 +1,9 @@
-export { EvidenceResolver } from "./anchor-resolver.js";
+export { EvidenceResolver } from "./anchor/resolver.js";
 export type {
   EvidenceResolutionFailure,
   EvidenceResolutionResult,
   RankedSentenceCandidate,
-} from "./anchor-types.js";
+} from "./anchor/types.js";
 export {
   EVIDENCE_SELECTION_JSON_SHAPE,
   EVIDENCE_SELECTION_PROMPT_FRAGMENT,

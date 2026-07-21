@@ -1,6 +1,6 @@
 import { stat } from "fs/promises";
 
-import { resolveWikiGraphCacheDatabasePath } from "../common/wiki-graph-dir.js";
+import { resolveWikiGraphCacheDatabasePath } from "../common/wiki-graph/dir.js";
 import { getNumber } from "../document/database.js";
 import { openSharedStateDatabase } from "../document/index.js";
 import type { Database } from "../document/index.js";

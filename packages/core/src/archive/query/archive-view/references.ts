@@ -1,5 +1,5 @@
 import type { ReadingEdgeRecord } from "../../../document/index.js";
-import { WIKI_GRAPH_URI_PREFIX } from "../../../common/wiki-graph-uri.js";
+import { WIKI_GRAPH_URI_PREFIX } from "../../../common/wiki-graph/uri.js";
 
 import { isWikiGraphObjectUri, normalizeWikiGraphObjectUri } from "./helpers.js";
 import type { ArchiveTextStreamKind, ChapterStateTarget } from "./types.js";

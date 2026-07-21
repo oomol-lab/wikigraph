@@ -1,7 +1,7 @@
 import { mkdir } from "fs/promises";
 import { join } from "path";
 
-import { resolveWikiGraphJobsDirectoryPath } from "../../common/wiki-graph-dir.js";
+import { resolveWikiGraphJobsDirectoryPath } from "../../common/wiki-graph/dir.js";
 
 export function getBuildQueueDatabasePath(): string {
   return join(getBuildQueueStateDirectoryPath(), "job.sqlite");

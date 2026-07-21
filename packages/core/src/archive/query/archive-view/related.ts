@@ -10,11 +10,11 @@ import { requireChapter, requireNode } from "./core.js";
 import {
   hydrateRelatedItemsEvidence,
   paginateRelatedItems,
-} from "./related-pagination.js";
-import { listRelatedEntityObjects } from "./related-entity.js";
-import { filterAndSortChunkRelatedItemsByQuery } from "./related-query.js";
-import { sortGraphNeighborsByListMode } from "./related-sort.js";
-export { resolveEntityWikipage } from "./related-wikipage.js";
+} from "./related/pagination.js";
+import { listRelatedEntityObjects } from "./related/entity.js";
+import { filterAndSortChunkRelatedItemsByQuery } from "./related/query.js";
+import { sortGraphNeighborsByListMode } from "./related/sort.js";
+export { resolveEntityWikipage } from "./related/wikipage.js";
 import { formatChapterId, formatNodeId, parseArchiveReference, parseWikiGraphReference } from "./references.js";
 import type {
   ArchiveRelatedOptions,

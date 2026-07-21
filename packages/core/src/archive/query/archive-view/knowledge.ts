@@ -1,5 +1,5 @@
 import type { MentionLinkRecord, MentionRecord, ReadonlyDocument } from "../../../document/index.js";
-import { WIKI_GRAPH_URI_PREFIX } from "../../../common/wiki-graph-uri.js";
+import { WIKI_GRAPH_URI_PREFIX } from "../../../common/wiki-graph/uri.js";
 
 import { compareNumbers, normalizeWikiGraphObjectUri } from "./helpers.js";
 import type { WikiGraphReference } from "./references.js";

@@ -1,7 +1,7 @@
 import { randomBytes } from "crypto";
 import { join } from "path";
 
-import { resolveWikiGraphCacheDirectoryPath } from "../../common/wiki-graph-dir.js";
+import { resolveWikiGraphCacheDirectoryPath } from "../../common/wiki-graph/dir.js";
 import { getOptionalString, getString } from "../../document/database.js";
 import { openSharedStateDatabase } from "../../document/index.js";
 import type { Database } from "../../document/index.js";

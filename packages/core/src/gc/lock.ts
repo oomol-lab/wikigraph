@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { join } from "path";
 
-import { resolveWikiGraphStateRootPath } from "../common/wiki-graph-temp.js";
+import { resolveWikiGraphStateRootPath } from "../common/wiki-graph/temp.js";
 import { getNumber, getString, type SqlRow } from "../document/database.js";
 import { openSharedStateDatabase } from "../document/index.js";
 import type { Database } from "../document/index.js";

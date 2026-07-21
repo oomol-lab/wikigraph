@@ -9,7 +9,7 @@ import {
   TEXT_SENTENCE_KIND,
   type SearchIndexInput,
   type SearchIndexProgressReporter,
-} from "../../search-index/search-index.js";
+} from "../../search-index/search/index.js";
 
 import { createTextStreamIndex } from "./text-streams.js";
 import type { ArchiveTextStreamKind } from "./types.js";

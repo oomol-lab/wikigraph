@@ -37,11 +37,11 @@ export { createEnv } from "./common/template.js";
 export {
   resolveWikiGraphCoreDatabasePath,
   resolveWikiGraphHomeDirectoryPath,
-} from "./common/wiki-graph-dir.js";
+} from "./common/wiki-graph/dir.js";
 export {
   createWikiGraphTempDirectory,
   resolveWikiGraphStateRootPath,
-} from "./common/wiki-graph-temp.js";
+} from "./common/wiki-graph/temp.js";
 export {
   EVIDENCE_SELECTION_JSON_SHAPE,
   EVIDENCE_SELECTION_PROMPT_FRAGMENT,

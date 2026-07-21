@@ -1,7 +1,7 @@
 import { readdir, rm, stat } from "fs/promises";
 import { join } from "path";
 
-import { resolveWikiGraphTempDirectoryPath } from "../common/wiki-graph-temp.js";
+import { resolveWikiGraphTempDirectoryPath } from "../common/wiki-graph/temp.js";
 import { isNodeError } from "../utils/node-error.js";
 
 import { readPathSize } from "./files.js";

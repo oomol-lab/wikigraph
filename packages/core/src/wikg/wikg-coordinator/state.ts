@@ -1,6 +1,6 @@
 import { join } from "path";
 
-import { resolveWikiGraphStagingDirectoryPath } from "../../common/wiki-graph-dir.js";
+import { resolveWikiGraphStagingDirectoryPath } from "../../common/wiki-graph/dir.js";
 import { openSharedStateDatabase } from "../../document/index.js";
 import type { Database } from "../../document/index.js";
 import { AsyncSemaphore } from "../../utils/async-semaphore.js";
