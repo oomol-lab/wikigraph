@@ -6,11 +6,11 @@ import type {
 } from "../document/index.js";
 import type { ReaderChunk, ReaderGraphDelta } from "../reader/index.js";
 import { groupSegments } from "./grouping.js";
-import { buildSnakeGraph } from "./snake/graph-builder.js";
 import {
+  buildSnakeGraph,
   detectSnakesInComponent,
   splitConnectedComponents,
-} from "./snake/detector.js";
+} from "./snake/index.js";
 import {
   computeChunkWeights,
   computeReadingEdgeWeights,
