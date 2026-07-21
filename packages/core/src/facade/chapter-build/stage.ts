@@ -1,0 +1,16 @@
+import type { ReadonlyDocument } from "../../document/index.js";
+import { getChapterDetails, type ChapterDetails } from "../chapter.js";
+
+export async function requireStage(
+  document: ReadonlyDocument,
+  chapterId: number,
+  stage: ChapterDetails["stage"],
+): Promise<void> {
+  const details = await getChapterDetails(document, chapterId);
+
+  if (details.stage !== stage) {
+    throw new Error(
+      `Chapter ${chapterId} is ${details.stage}. Expected ${stage} before committing build output.`,
+    );
+  }
+}
