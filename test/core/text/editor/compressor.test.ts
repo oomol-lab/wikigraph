@@ -7,7 +7,9 @@ import { ScriptedLLM } from "../../../helpers/scripted-llm.js";
 
 describe("editor/compressor", () => {
   it("builds prompts and compression messages with revision history", async () => {
-    const llm = new ScriptedLLM<WikiGraphScope>(["  compressed result  "]);
+    const llm = new ScriptedLLM<WikiGraphScope>([
+      JSON.stringify({ compressedText: "  compressed result  " }),
+    ]);
     const requester = new CompressionRequester(
       llm as never,
       WikiGraphScope.EditorCompress,
@@ -35,6 +37,10 @@ describe("editor/compressor", () => {
         },
         templateName: TEXT_COMPRESSOR_PROMPT_TEMPLATE,
       },
+      {
+        templateContext: {},
+        templateName: "guaranteed/response_intent_classifier",
+      },
     ]);
     expect(llm.calls).toHaveLength(1);
     expect(llm.calls[0]?.options.scope).toBe(WikiGraphScope.EditorCompress);
@@ -51,5 +57,8 @@ describe("editor/compressor", () => {
       );
     }
     expect(originalTextMessage.content).toContain("Original marked text");
+    expect(llm.calls[0]?.messages[2]?.content).toBe(
+      JSON.stringify({ compressedText: "Previous compressed text" }),
+    );
   });
 });

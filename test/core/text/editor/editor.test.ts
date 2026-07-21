@@ -83,7 +83,7 @@ describe("editor/editor", () => {
   it("uses the covered segment when a group starts after the segment start", async () => {
     const llm = new ScriptedLLM<WikiGraphScope>([
       "Keep chronology intact.",
-      ["## Compressed Text", "Focused summary"].join("\n"),
+      JSON.stringify({ compressedText: "Focused summary" }),
       '{"issues":[]}',
     ]);
     const document = createDocument({
@@ -138,16 +138,9 @@ describe("editor/editor", () => {
   it("iterates with reviewer history and language correction before selecting the best version", async () => {
     const llm = new ScriptedLLM<WikiGraphScope>([
       "Keep chronology intact.",
-      [
-        "Planning notes",
-        "",
-        "## Compressed Text",
-        "<chunk>Bad Japanese summary</chunk>",
-      ].join("\n"),
+      JSON.stringify({ compressedText: "<chunk>Bad Japanese summary</chunk>" }),
       '{"issues":[]}',
-      ["## Compressed Text", "```text", "Improved English summary", "```"].join(
-        "\n",
-      ),
+      JSON.stringify({ compressedText: "Improved English summary" }),
       '{"issues":[]}',
     ]);
     const document = createDocument({
@@ -199,10 +192,12 @@ describe("editor/editor", () => {
     expect(llm.prompts.map((prompt) => prompt.templateName)).toStrictEqual([
       CLUE_REVIEWER_GENERATOR_PROMPT_TEMPLATE,
       TEXT_COMPRESSOR_PROMPT_TEMPLATE,
+      RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
       CLUE_REVIEWER_PROMPT_TEMPLATE,
       RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
       REVISION_FEEDBACK_PROMPT_TEMPLATE,
       TEXT_COMPRESSOR_PROMPT_TEMPLATE,
+      RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
       CLUE_REVIEWER_PROMPT_TEMPLATE,
       RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
     ]);
@@ -215,7 +210,9 @@ describe("editor/editor", () => {
     expect(llm.calls[3]?.messages.map((message) => message.role)).toStrictEqual(
       ["system", "user", "assistant", "user"],
     );
-    expect(llm.calls[3]?.messages[2]?.content).toBe("Bad Japanese summary");
+    expect(llm.calls[3]?.messages[2]?.content).toBe(
+      JSON.stringify({ compressedText: "Bad Japanese summary" }),
+    );
     expect(llm.calls[4]?.messages.map((message) => message.role)).toStrictEqual(
       ["system", "user", "assistant", "user"],
     );

@@ -46,6 +46,18 @@ Your compressed text must fall within the acceptable range. Going over the maxim
 
 ---
 
+## Response Protocol (MUST FOLLOW)
+
+Return exactly one JSON object and nothing else:
+
+```json
+{"compressedText":"..."}
+```
+
+The `compressedText` value is the only user-visible compressed content. Do not put your reasoning, approach, analysis, trade-offs, Markdown fences, or any extra fields before or after the JSON object.
+
+---
+
 ## Format Requirements (MUST FOLLOW)
 
 ### 1. Remove ALL `<chunk>` tags from your output
@@ -61,9 +73,9 @@ The input text contains `<chunk>` markup tags like this:
 - ❌ WRONG: `<chunk retention="detailed">比如刮风啊...</chunk>`
 - ✅ CORRECT: `比如刮风啊...`
 
-### 2. Output plain text only
+### 2. `compressedText` must be plain text only
 
-Do NOT add:
+Inside the `compressedText` string, do NOT add:
 - Section headers (like "## Compressed Text")
 - XML/HTML markup of any kind
 - Explanatory comments mixed with the content
@@ -120,8 +132,8 @@ You are compressing a **segment** of a larger work (like part of a book chapter)
 
 ## Output Format
 
-[Optional: If you face difficult trade-offs, write 1-2 sentences about your approach. Keep this brief.]
+Return exactly this JSON shape:
 
----
-
-[Your compressed text - plain text only, no headers, no tags, written as continuous prose]
+```json
+{"compressedText":"Your compressed text - plain text only, no headers, no tags, written as continuous prose"}
+```

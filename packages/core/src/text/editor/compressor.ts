@@ -1,5 +1,15 @@
+import { z } from "zod";
+
+import {
+  requestGuaranteedJson,
+  RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
+} from "../../external/guaranteed/index.js";
 import type { LLMessage, LLM } from "../../external/llm/index.js";
 import { TEXT_COMPRESSOR_PROMPT_TEMPLATE } from "./prompt-templates.js";
+
+const compressionResponseSchema = z.object({
+  compressedText: z.string(),
+});
 
 export class CompressionRequester<S extends string> {
   readonly #compressionRatio: number;
@@ -47,11 +57,24 @@ export class CompressionRequester<S extends string> {
       input.revisionFeedback,
     );
 
-    return (
-      await this.#llm.request(messages, {
-        scope: this.#scope,
-      })
-    ).trim();
+    return await this.#llm.request(
+      async (request) =>
+        await requestGuaranteedJson({
+          messages,
+          parse: (data) => data.compressedText.trim(),
+          request: async (retryMessages, retryIndex, retryMax) =>
+            await request(retryMessages, {
+              retryIndex,
+              retryMax,
+              scope: this.#scope,
+              useCache: false,
+            }),
+          responseIntentClassifierPrompt: this.#llm.loadSystemPrompt(
+            RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
+          ),
+          schema: compressionResponseSchema,
+        }),
+    );
   }
 }
 
@@ -77,7 +100,7 @@ function buildCompressionMessages(
   if (previousCompressedText !== undefined && revisionFeedback !== undefined) {
     messages.push(
       {
-        content: previousCompressedText,
+        content: JSON.stringify({ compressedText: previousCompressedText }),
         role: "assistant",
       },
       {
