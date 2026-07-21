@@ -3,7 +3,7 @@ import type {
   ReadonlyDocument,
   ReadonlySerialFragments,
 } from "../../document/index.js";
-import { compressText } from "../../text/editor/index.js";
+import { compressText } from "../editor/index.js";
 import type { BuildChapterSummaryArtifactOptions } from "./types.js";
 
 export async function buildSummaryFromDocument(

@@ -1,5 +1,6 @@
-import type { ReadonlyDocument } from "../../document/index.js";
-import { getChapterDetails, type ChapterDetails } from "../chapter/index.js";
+import type { ReadonlyDocument } from "../directory/index.js";
+import { getChapterDetails } from "./query.js";
+import type { ChapterDetails } from "./types.js";
 
 export async function requireStage(
   document: ReadonlyDocument,

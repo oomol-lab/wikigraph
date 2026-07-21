@@ -158,8 +158,166 @@ export type {
   GuaranteedRequestController,
 } from "./external/guaranteed/index.js";
 export { formatError } from "./utils/node-error.js";
-export * from "./retrieval/query/index.js";
-export * from "./retrieval/search-index/index.js";
-export * from "./document/index.js";
-export * from "./api/index.js";
-export * from "./external/wikimatch/index.js";
+export {
+  createContinuationCursor,
+  deleteArchiveSearchSessions,
+  findArchiveObjects,
+  formatChapterId,
+  formatEdgeId,
+  formatNodeId,
+  formatSummaryId,
+  getArchiveIndex,
+  grepArchiveObjects,
+  listAllArchiveLinks,
+  listArchiveCollection,
+  listArchiveEvidence,
+  listArchiveLinks,
+  listArchiveObjects,
+  listRelatedArchiveObjects,
+  packArchiveContext,
+  readArchivePage,
+  readArchiveText,
+  readContinuationCursor,
+  rebuildArchiveSearchIndex,
+} from "./api/index.js";
+export type {
+  ArchiveBacklinkBucket,
+  ArchiveBacklinks,
+  ArchiveCollectionOptions,
+  ArchiveCollectionResult,
+  ArchiveCollectionType,
+  ArchiveEvidence,
+  ArchiveEvidenceItem,
+  ArchiveFindEvidencePreview,
+  ArchiveFindField,
+  ArchiveFindFilterType,
+  ArchiveFindHit,
+  ArchiveFindObjectType,
+  ArchiveFindOptions,
+  ArchiveFindOrder,
+  ArchiveFindPosition,
+  ArchiveFindResult,
+  ArchiveIndex,
+  ArchiveListItem,
+  ArchiveListKind,
+  ArchiveNodeLabel,
+  ArchiveNodeSourceFragment,
+  ArchiveObjectType,
+  ArchivePack,
+  ArchivePage,
+  ArchiveRelatedResult,
+  ArchiveTriplePattern,
+  ContinuationCursor,
+} from "./api/index.js";
+export { setFtsIndexEmbedded } from "./retrieval/search-index/index.js";
+export {
+  addBuildJob,
+  assertBuildJobInputRevision,
+  assertNoActiveBuildJobConflicts,
+  assertNoActiveBuildJobs,
+  boostBuildJob,
+  cancelBuildJob,
+  cleanBuildJobs,
+  getBuildJob,
+  listBuildJobs,
+  pauseBuildJob,
+  readBuildJobEvents,
+  recordBuildJobInputRevision,
+  resolveBuildJobId,
+  resumeBuildJob,
+  runBuildJobWorker,
+  updateBuildJobTarget,
+} from "./api/index.js";
+export type {
+  AddBuildJobOptions,
+  BuildJob,
+  BuildJobConflictScope,
+  BuildJobEvent,
+  BuildJobExecutionContext,
+  BuildJobListOptions,
+  BuildJobProgressCounter,
+  BuildJobProgressReporter,
+  BuildJobState,
+  BuildJobTarget,
+  BuildJobWorkerOptions,
+} from "./api/index.js";
+export {
+  addChapter,
+  advanceChapterStages,
+  applyChapterTree,
+  CHAPTER_STAGES,
+  generateChapterGraph,
+  generateChapterSummary,
+  getChapterDetails,
+  getChapterTree,
+  listChapters,
+  moveChapter,
+  parseChapterTreeInput,
+  removeChapter,
+  resetChapter,
+  setChapterSource,
+  setChapterSummary,
+  setChapterTitle,
+} from "./api/index.js";
+export type {
+  AddChapterOptions,
+  AdvanceChapterStagesOptions,
+  AdvanceChapterStagesProgressCallback,
+  AdvanceChapterStagesProgressEvent,
+  AdvanceChapterStagesResult,
+  ChapterDetails,
+  ChapterEntry,
+  ChapterStage,
+  ChapterTree,
+  ChapterTreeApplyResult,
+  ChapterTreeInput,
+  ChapterTreeInputNode,
+  ChapterTreeMoveChange,
+  ChapterTreeNode,
+  ChapterTreeTitleChange,
+  GenerateChapterGraphOptions,
+  GenerateChapterSummaryOptions,
+  MoveChapterOptions,
+} from "./api/index.js";
+export {
+  buildChapterGraphArtifact,
+  buildChapterSummaryArtifact,
+  buildChapterSummaryArtifactFromSnapshot,
+  commitChapterGraphArtifact,
+  commitChapterSummaryArtifact,
+  readChapterBuildInput,
+  snapshotChapterSummaryInput,
+} from "./api/index.js";
+export type {
+  BuildChapterGraphArtifactOptions,
+  BuildChapterSummaryArtifactOptions,
+  ChapterGraphBuildArtifact,
+} from "./api/index.js";
+export {
+  buildChapterKnowledgeGraphArtifact,
+  clearChapterKnowledgeGraph,
+  commitChapterKnowledgeGraphArtifact,
+  createEnrichmentProgressReporter,
+  generateChapterKnowledgeGraphArtifact,
+  generateChapterKnowledgeGraphArtifactFromSnapshot,
+  groundWikimatchCandidates,
+  snapshotChapterKnowledgeGraphInput,
+} from "./api/index.js";
+export type {
+  BuildChapterKnowledgeGraphArtifactOptions,
+  ChapterKnowledgeGraphBuildArtifact,
+  ChapterKnowledgeGraphInputSnapshot,
+} from "./api/index.js";
+export {
+  DEFAULT_EXTRACTION_PROMPT,
+  DEFAULT_KNOWLEDGE_GRAPH_RECALL_PROMPT,
+  resolveExtractionPrompt,
+  resolveKnowledgeGraphRecallPrompt,
+} from "./runtime/common/prompts.js";
+export {
+  DEFAULT_WIKISPINE_FETCH_ENDPOINT,
+  testWikispineRuntime,
+} from "./external/wikimatch/index.js";
+export type { WikispineProvider } from "./external/wikimatch/index.js";
+export { ObjectMetadataKind } from "./document/index.js";
+export type { ObjectMetadataTarget } from "./document/index.js";

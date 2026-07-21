@@ -1,5 +1,6 @@
-import type { ReadonlyDocument, SentenceId } from "../../document/index.js";
-import { Fragments } from "../../document/index.js";
+import type { ReadonlyDocument } from "./directory/index.js";
+import { Fragments } from "./fragments/index.js";
+import type { SentenceId } from "./types.js";
 
 export function createFragmentBackedDocument<TDocument extends ReadonlyDocument>(
   document: TDocument,

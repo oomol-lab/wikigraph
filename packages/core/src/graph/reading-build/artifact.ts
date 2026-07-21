@@ -2,17 +2,22 @@ import { mkdir, rm } from "fs/promises";
 import { join } from "path";
 
 import type { Document } from "../../document/index.js";
-import { DirectoryDocument } from "../../document/index.js";
+import {
+  createFragmentBackedDocument,
+  DirectoryDocument,
+} from "../../document/index.js";
+import {
+  getChapterDetails,
+  requireStage,
+  type ChapterDetails,
+} from "../../document/chapter/index.js";
 import { SerialGeneration } from "../../serial.js";
-import { getChapterDetails, type ChapterDetails } from "../chapter/index.js";
 import { copyChunks, copySnakes } from "./copy.js";
-import { createFragmentBackedDocument } from "./document-adapter.js";
-import { writeGraphArtifactSourceFragments } from "./graph-source.js";
 import {
   createGraphBuildParameterInput,
   createTopologyOptions,
 } from "./options.js";
-import { requireStage } from "./stage.js";
+import { writeGraphArtifactSourceFragments } from "./source-fragments.js";
 import type {
   BuildChapterGraphArtifactOptions,
   ChapterGraphBuildArtifact,

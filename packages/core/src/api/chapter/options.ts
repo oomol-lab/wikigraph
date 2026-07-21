@@ -5,7 +5,7 @@ import type {
   BuildSerialTopologyOptions,
   SerialProgressSink,
 } from "../../serial.js";
-import { resolveExtractionPrompt } from "../prompts.js";
+import { resolveExtractionPrompt } from "../../runtime/common/prompts.js";
 
 export interface GenerateChapterGraphOptions {
   readonly extractionPrompt?: string;

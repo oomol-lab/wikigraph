@@ -86,6 +86,7 @@ export {
 } from "./knowledge-graph-build/index.js";
 export {
   createContinuationCursor,
+  deleteArchiveSearchSessions,
   readContinuationCursor,
 } from "../retrieval/query/index.js";
 export {

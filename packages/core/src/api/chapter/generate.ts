@@ -1,7 +1,7 @@
 import { normalizeLanguageCode } from "../../runtime/common/language.js";
+import { resolveExtractionPrompt } from "../../runtime/common/prompts.js";
 import type { Document } from "../../document/index.js";
 import { SerialGeneration } from "../../serial.js";
-import { resolveExtractionPrompt } from "../prompts.js";
 import { getChapterDetails, requireChapterDetails } from "./details.js";
 import { createTopologyOptions } from "./options.js";
 import type {

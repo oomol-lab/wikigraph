@@ -1,5 +1,5 @@
 import type { Document } from "../../document/index.js";
-import { resolveExtractionPrompt } from "../prompts.js";
+import { resolveExtractionPrompt } from "../../runtime/common/prompts.js";
 import {
   isStageBefore,
   selectChapterEntries,

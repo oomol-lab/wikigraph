@@ -12,6 +12,7 @@ export type {
   ReadonlyTextStreams as ReadonlyFragments,
 } from "./text-streams/index.js";
 export { DirectoryDocument } from "./directory/index.js";
+export { createFragmentBackedDocument } from "./fragment-backed.js";
 export type {
   Document,
   DocumentContext,

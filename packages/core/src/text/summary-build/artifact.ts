@@ -2,20 +2,25 @@ import { mkdir } from "fs/promises";
 import { join } from "path";
 
 import type { Document, ReadonlyDocument } from "../../document/index.js";
-import { DirectoryDocument } from "../../document/index.js";
-import { getChapterDetails, type ChapterDetails } from "../chapter/index.js";
-import { createFragmentBackedDocument } from "./document-adapter.js";
+import {
+  createFragmentBackedDocument,
+  DirectoryDocument,
+} from "../../document/index.js";
+import {
+  getChapterDetails,
+  requireStage,
+  type ChapterDetails,
+} from "../../document/chapter/index.js";
 import { SummaryInputSnapshotDocument } from "./snapshot/index.js";
 import {
   readSummaryInputSnapshot,
   writeSummaryInputSnapshot,
 } from "./snapshot-io.js";
 import { readSerialFragments } from "./source.js";
-import { requireStage } from "./stage.js";
 import {
   buildSummaryFromDocument,
   buildSummaryFromReadyDocument,
-} from "./summary-build.js";
+} from "./build.js";
 import type {
   BuildChapterSummaryArtifactOptions,
   ChapterSummaryInputSnapshot,

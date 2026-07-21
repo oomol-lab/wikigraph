@@ -1,6 +1,6 @@
 import { normalizeLanguageCode } from "../../runtime/common/language.js";
+import { resolveExtractionPrompt } from "../../runtime/common/prompts.js";
 import type { BuildSerialTopologyOptions } from "../../serial.js";
-import { resolveExtractionPrompt } from "../prompts.js";
 import type { GraphBuildParameterInput } from "./types.js";
 
 export function createTopologyOptions(options: {

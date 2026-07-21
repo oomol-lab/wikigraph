@@ -3,7 +3,7 @@ import {
   enrichWikimatchCandidates,
   matchWikispineSentenceCandidates,
 } from "../../external/wikimatch/index.js";
-import { resolveKnowledgeGraphRecallPrompt } from "../prompts.js";
+import { resolveKnowledgeGraphRecallPrompt } from "../../runtime/common/prompts.js";
 import { buildChapterKnowledgeGraphArtifact } from "./artifact.js";
 import { countUniqueQids, screenCandidates } from "./candidates.js";
 import {
