@@ -42,7 +42,7 @@ export default defineConfig([
     ...SHARED_OPTIONS,
     bundle: false,
     dts: true,
-    entry: ["src/**/*.ts"],
+    entry: ["src/**/*.ts", "!src/**/*.test.ts"],
     format: ["esm"],
   },
 ]);
