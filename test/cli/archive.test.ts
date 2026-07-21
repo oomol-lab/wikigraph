@@ -11,7 +11,7 @@ import type {
   ArchiveFindHit,
   ArchiveListItem,
   ArchivePage,
-} from "../../packages/core/src/archive/query/view.js";
+} from "../../packages/core/src/retrieval/query/view.js";
 
 const archiveMockState = vi.hoisted(() => ({
   backlinks: {
@@ -462,7 +462,7 @@ function parseJSONLLastLine(text: string | undefined): unknown {
   return JSON.parse(line) as unknown;
 }
 
-vi.mock("../../packages/core/src/wikg/wiki-graph-archive-file.js", () => ({
+vi.mock("../../packages/core/src/storage/wikg/wiki-graph-archive-file.js", () => ({
   WikiGraphArchiveFile: class {
     readonly #path: string;
 
@@ -484,7 +484,7 @@ vi.mock("../../packages/core/src/wikg/wiki-graph-archive-file.js", () => ({
   },
 }));
 
-vi.mock("../../packages/core/src/facade/index.js", () => ({
+vi.mock("../../packages/core/src/api/index.js", () => ({
   createContinuationCursor: vi.fn(() => Promise.resolve("c_next")),
   findArchiveObjects: vi.fn(
     (
@@ -562,13 +562,13 @@ vi.mock("../../packages/core/src/facade/index.js", () => ({
   ),
 }));
 
-vi.mock("../../packages/core/src/archive/search-index/index.js", () => ({
+vi.mock("../../packages/core/src/retrieval/search-index/index.js", () => ({
   readArchiveIndexSettings: vi.fn(() =>
     Promise.resolve({ ftsEmbedded: archiveMockState.ftsEmbedded }),
   ),
 }));
 
-vi.mock("../../packages/core/src/archive/query/index.js", () => ({
+vi.mock("../../packages/core/src/retrieval/query/index.js", () => ({
   isArchiveSearchIndexCurrent: vi.fn(() =>
     Promise.resolve(archiveMockState.ftsCurrent),
   ),
@@ -624,7 +624,7 @@ import {
   listRelatedArchiveObjects,
   readContinuationCursor,
   readArchivePage,
-} from "../../packages/core/src/facade/index.js";
+} from "../../packages/core/src/api/index.js";
 
 function createArchiveMockDocument(): unknown {
   const document = {};

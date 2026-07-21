@@ -1,6 +1,6 @@
-import type { BookMeta } from "../../source/meta.js";
-import type { TocFile } from "../../source/toc.js";
-import type { SourceAsset } from "../../source/types.js";
+import type { BookMeta } from "../../text/source/meta.js";
+import type { TocFile } from "../../text/source/toc.js";
+import type { SourceAsset } from "../../text/source/types.js";
 import type { Database as DocumentDatabase } from "../database.js";
 import type {
   ReadonlySerialTextStream,

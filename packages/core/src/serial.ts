@@ -1,1 +1,1 @@
-export * from "./serial/index.js";
+export * from "./text/serial/index.js";

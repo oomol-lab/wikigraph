@@ -1,4 +1,4 @@
-import type { TocItem } from "../../source/toc.js";
+import type { TocItem } from "../../text/source/toc.js";
 
 export function listTocSerialIds(items: readonly TocItem[]): number[] {
   const serialIds: number[] = [];

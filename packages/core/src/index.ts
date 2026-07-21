@@ -5,7 +5,7 @@ export {
   Language,
   LanguageCode,
   normalizeLanguageCode,
-} from "./common/language.js";
+} from "./runtime/common/language.js";
 export {
   createWikiGraphTaskId,
   WikiGraphTask,
@@ -14,8 +14,8 @@ export {
   type WikiGraphTaskContextOptions,
   type WikiGraphTaskIdentity,
   type WikiGraphTaskType,
-} from "./context/index.js";
-export { LLM, LLMPaymentRequiredError } from "./llm/index.js";
+} from "./runtime/context/index.js";
+export { LLM, LLMPaymentRequiredError } from "./external/llm/index.js";
 export type {
   LLMessage,
   LLMOptions,
@@ -23,25 +23,25 @@ export type {
   LLMStreamProgressCallback,
   LLMTokenUsage,
   LLMTokenUsageCallback,
-} from "./llm/index.js";
+} from "./external/llm/index.js";
 export {
   WikiGraphScope,
   WIKI_GRAPH_EDITOR_SCOPES,
   WIKI_GRAPH_READER_SCOPES,
   WIKI_GRAPH_SCOPES,
-} from "./common/llm-scope.js";
-export { withLoggingContext } from "./common/logging.js";
-export { CLI_FULL_COMMAND, CLI_PRIMARY_COMMAND } from "./common/cli-command.js";
-export { resolveDataDirPath } from "./common/data-dir.js";
-export { createEnv } from "./common/template.js";
+} from "./runtime/common/llm-scope.js";
+export { withLoggingContext } from "./runtime/common/logging.js";
+export { CLI_FULL_COMMAND, CLI_PRIMARY_COMMAND } from "./runtime/common/cli-command.js";
+export { resolveDataDirPath } from "./runtime/common/data-dir.js";
+export { createEnv } from "./runtime/common/template.js";
 export {
   resolveWikiGraphCoreDatabasePath,
   resolveWikiGraphHomeDirectoryPath,
-} from "./common/wiki-graph/dir.js";
+} from "./runtime/common/wiki-graph/dir.js";
 export {
   createWikiGraphTempDirectory,
   resolveWikiGraphStateRootPath,
-} from "./common/wiki-graph/temp.js";
+} from "./runtime/common/wiki-graph/temp.js";
 export {
   EVIDENCE_SELECTION_JSON_SHAPE,
   EVIDENCE_SELECTION_PROMPT_FRAGMENT,
@@ -61,7 +61,7 @@ export {
   type EvidenceSelectionResolution,
   type EvidenceSelectionSentence,
   type EvidenceSentenceId,
-} from "./evidence-selection/index.js";
+} from "./graph/evidence-selection/index.js";
 export {
   RateLimiter,
   parseRetryAfterMs,
@@ -83,7 +83,7 @@ export {
   type QidResolution,
   type WikipageResolverOptions,
   type WikipageSitelink,
-} from "./wikipage/index.js";
+} from "./external/wikipage/index.js";
 export {
   buildWikimatchWindows,
   judgeWikimatchPolicy,
@@ -104,8 +104,8 @@ export {
   type WikimatchQidOption,
   type WikimatchTextRange,
   type WikimatchWindow,
-} from "./wikimatch/index.js";
-export { createDefaultWikiGraphSampling } from "./facade/llm-sampling.js";
+} from "./external/wikimatch/index.js";
+export { createDefaultWikiGraphSampling } from "./api/llm-sampling.js";
 export {
   type DigestProgressEvent,
   type SerialDiscoveryItem,
@@ -122,8 +122,8 @@ export {
   type SerialProgressEvent,
   type WikiGraphSourceSessionOptions,
   type WikiGraphTextStreamSessionOptions,
-} from "./facade/index.js";
-export type { WikiGraphSerialEntry } from "./facade/index.js";
+} from "./api/index.js";
+export type { WikiGraphSerialEntry } from "./api/index.js";
 export {
   formatLocatedChapterResourceUri,
   formatLocatedChapterSourceCollectionUri,
@@ -141,25 +141,25 @@ export {
   WIKI_GRAPH_JOB_URI_PREFIX,
   WIKI_GRAPH_URI_PREFIX,
   writeWikgArchive,
-} from "./wikg/index.js";
-export type { LocatedWikiGraphUri } from "./wikg/index.js";
+} from "./storage/wikg/index.js";
+export type { LocatedWikiGraphUri } from "./storage/wikg/index.js";
 export {
   DirectoryDocument,
   openSharedStateDatabase,
 } from "./document/index.js";
 export type { Database, Document, ReadonlyDocument } from "./document/index.js";
-export { TOC_FILE_VERSION } from "./source/index.js";
-export type { BookMeta } from "./source/index.js";
-export { isArchiveSearchIndexCurrent } from "./archive/query/index.js";
-export { readArchiveIndexSettings } from "./archive/search-index/index.js";
-export { migrateLegacySdpubToWikg } from "./legacy-sdpub/upgrade/index.js";
+export { TOC_FILE_VERSION } from "./text/source/index.js";
+export type { BookMeta } from "./text/source/index.js";
+export { isArchiveSearchIndexCurrent } from "./retrieval/query/index.js";
+export { readArchiveIndexSettings } from "./retrieval/search-index/index.js";
+export { migrateLegacySdpubToWikg } from "./storage/migration/legacy-sdpub/upgrade/index.js";
 export type {
   GuaranteedRequest,
   GuaranteedRequestController,
-} from "./guaranteed/index.js";
+} from "./external/guaranteed/index.js";
 export { formatError } from "./utils/node-error.js";
-export * from "./archive/query/index.js";
-export * from "./archive/search-index/index.js";
+export * from "./retrieval/query/index.js";
+export * from "./retrieval/search-index/index.js";
 export * from "./document/index.js";
-export * from "./facade/index.js";
-export * from "./wikimatch/index.js";
+export * from "./api/index.js";
+export * from "./external/wikimatch/index.js";

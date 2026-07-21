@@ -2,9 +2,9 @@ import { AsyncLocalStorage } from "async_hooks";
 import { join, resolve } from "path";
 import { z } from "zod";
 
-import { bookMetaSchema, type BookMeta } from "../../source/meta.js";
-import { tocFileSchema, type TocFile } from "../../source/toc.js";
-import type { SourceAsset } from "../../source/types.js";
+import { bookMetaSchema, type BookMeta } from "../../text/source/meta.js";
+import { tocFileSchema, type TocFile } from "../../text/source/toc.js";
+import type { SourceAsset } from "../../text/source/types.js";
 import { Database } from "../database.js";
 import {
   TextStreams,

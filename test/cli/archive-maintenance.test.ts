@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { BookMeta } from "../../packages/core/src/source/index.js";
+import type { BookMeta } from "../../packages/core/src/text/source/index.js";
 
 const archiveMaintenanceMockState = vi.hoisted(() => ({
   binaryWrites: [] as Uint8Array[],

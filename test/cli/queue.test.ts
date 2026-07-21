@@ -70,7 +70,7 @@ const queueMockState = vi.hoisted(() => ({
   writeCalls: [] as string[],
 }));
 
-vi.mock("../../packages/core/src/wikg/wiki-graph-archive-file.js", () => ({
+vi.mock("../../packages/core/src/storage/wikg/wiki-graph-archive-file.js", () => ({
   WikiGraphArchiveFile: class {
     readonly #path: string;
 
@@ -127,7 +127,7 @@ vi.mock("../../packages/core/src/wikg/wiki-graph-archive-file.js", () => ({
   },
 }));
 
-vi.mock("../../packages/core/src/facade/index.js", () => ({
+vi.mock("../../packages/core/src/api/index.js", () => ({
   addBuildJob: vi.fn((options: unknown) => {
     queueMockState.addCalls.push(options);
     return Promise.resolve({

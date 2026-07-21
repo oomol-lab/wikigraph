@@ -70,7 +70,7 @@ const chapterDetails = {
   tocPath: ["Part I", "Chapter 1"],
 };
 
-vi.mock("../../packages/core/src/wikg/wiki-graph-archive-file.js", () => ({
+vi.mock("../../packages/core/src/storage/wikg/wiki-graph-archive-file.js", () => ({
   WikiGraphArchiveFile: class {
     readonly #path: string;
 
@@ -94,7 +94,7 @@ vi.mock("../../packages/core/src/wikg/wiki-graph-archive-file.js", () => ({
   },
 }));
 
-vi.mock("../../packages/core/src/facade/index.js", () => ({
+vi.mock("../../packages/core/src/api/index.js", () => ({
   addChapter: vi.fn((_document: unknown, options: unknown) => {
     chapterMockState.addCalls.push(options);
     return Promise.resolve({
@@ -226,11 +226,11 @@ vi.mock("../../packages/core/src/facade/index.js", () => ({
   ),
 }));
 
-vi.mock("../../packages/core/src/common/data-dir.js", () => ({
+vi.mock("../../packages/core/src/runtime/common/data-dir.js", () => ({
   resolveDataDirPath: vi.fn(() => "/tmp/data"),
 }));
 
-vi.mock("../../packages/core/src/llm/index.js", () => ({
+vi.mock("../../packages/core/src/external/llm/index.js", () => ({
   LLM: class {
     public constructor(_options: unknown) {}
   },

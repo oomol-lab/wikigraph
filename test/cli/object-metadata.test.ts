@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as CLISupport from "../../packages/cli/src/support/index.js";
-import type * as WikiGraphIndex from "../../packages/core/src/wikg/index.js";
+import type * as WikiGraphIndex from "../../packages/core/src/storage/wikg/index.js";
 
 const objectMetadataMockState = vi.hoisted(() => ({
   inputFileContent: '{"file":true}',
@@ -13,7 +13,7 @@ const objectMetadataMockState = vi.hoisted(() => ({
   writeCalls: [] as string[],
 }));
 
-vi.mock("../../packages/core/src/wikg/index.js", async (importOriginal) => {
+vi.mock("../../packages/core/src/storage/wikg/index.js", async (importOriginal) => {
   const actual = await importOriginal<typeof WikiGraphIndex>();
 
   return {

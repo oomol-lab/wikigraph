@@ -127,7 +127,7 @@ vi.mock("../../packages/cli/src/commands/index.js", () => ({
 
 import { main } from "../../packages/cli/src/app/main.js";
 import { renderMainHelpText } from "../../packages/cli/src/args/help.js";
-import { LLMPaymentRequiredError } from "../../packages/core/src/llm/index.js";
+import { LLMPaymentRequiredError } from "../../packages/core/src/external/llm/index.js";
 
 describe("cli/main", () => {
   const originalExitCode = process.exitCode;
