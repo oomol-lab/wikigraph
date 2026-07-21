@@ -8,7 +8,9 @@ export function createArchiveKey(archivePath: string): string {
   return createHash("sha256").update(resolve(archivePath)).digest("hex");
 }
 
-export async function createArchiveSignature(archivePath: string): Promise<string> {
+export async function createArchiveSignature(
+  archivePath: string,
+): Promise<string> {
   const stats = await stat(archivePath);
 
   return `${stats.size}:${stats.mtimeMs}`;

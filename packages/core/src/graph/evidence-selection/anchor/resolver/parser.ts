@@ -134,4 +134,3 @@ function selectBoundarySentence(text: string, fieldName: string): string {
     ? (sentences[sentences.length - 1] ?? text.trim())
     : (sentences[0] ?? text.trim());
 }
-

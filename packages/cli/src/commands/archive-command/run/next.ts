@@ -9,13 +9,19 @@ import {
 } from "wiki-graph-core";
 
 import type { CLIArchiveArguments } from "../../../args/index.js";
-import { writeEvidence, writeFindHits, writeList } from "../../archive-output/index.js";
+import {
+  writeEvidence,
+  writeFindHits,
+  writeList,
+} from "../../archive-output/index.js";
 import { readArchiveDocument } from "./document.js";
 import { createCollectionFindResult } from "./options.js";
 import { DEFAULT_OUTPUT_LIMIT } from "./types.js";
 import { getArchivePath } from "./uri.js";
 
-export async function runNextArchivePage(args: CLIArchiveArguments): Promise<void> {
+export async function runNextArchivePage(
+  args: CLIArchiveArguments,
+): Promise<void> {
   const cursorId = args.cursor ?? args.archivePath;
   const explicitArchivePath =
     args.cursor === undefined ? undefined : args.archivePath;

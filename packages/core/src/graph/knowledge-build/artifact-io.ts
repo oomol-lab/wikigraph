@@ -2,7 +2,11 @@ import { createReadStream, createWriteStream } from "fs";
 import { createInterface } from "readline";
 import { z } from "zod";
 
-import type { MentionLinkRecord, MentionRecord, SentenceId } from "../../document/index.js";
+import type {
+  MentionLinkRecord,
+  MentionRecord,
+  SentenceId,
+} from "../../document/index.js";
 
 const mentionRecordSchema = z.object({
   id: z.string().min(1),

@@ -18,7 +18,11 @@ import type {
   ArchiveOutputResultPage,
   ArchiveOutputSource,
 } from "./types.js";
-import { getTextStreamOutputType, isTextStreamOutputType, toWikiGraphUri } from "./uri.js";
+import {
+  getTextStreamOutputType,
+  isTextStreamOutputType,
+  toWikiGraphUri,
+} from "./uri.js";
 
 export async function createListObject(
   item: ArchiveListItem,
@@ -166,7 +170,9 @@ export async function createEvidencePreviewObject(
   };
 }
 
-export function createSourceObject(item: ArchiveEvidenceItem): ArchiveOutputSource {
+export function createSourceObject(
+  item: ArchiveEvidenceItem,
+): ArchiveOutputSource {
   return {
     ...(item.score === undefined ? {} : { score: item.score }),
     text: item.source,

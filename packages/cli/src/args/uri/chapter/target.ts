@@ -1,7 +1,11 @@
 import type { ArchiveTriplePattern } from "wiki-graph-core";
 
 import type { ArchiveUriLens, ChapterStateUriTarget } from "../../types.js";
-import { parseArchiveUriLensObjectUri, parseTriplePatternObjectUri, parseTriplePatternSuffix } from "../triple-pattern.js";
+import {
+  parseArchiveUriLensObjectUri,
+  parseTriplePatternObjectUri,
+  parseTriplePatternSuffix,
+} from "../triple-pattern.js";
 
 export type ChapterUriTarget =
   | { readonly kind: "collection" }

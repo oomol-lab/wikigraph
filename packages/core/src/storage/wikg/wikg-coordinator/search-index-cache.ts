@@ -3,17 +3,30 @@ import { dirname } from "path";
 
 import { createArchiveSearchIndexFingerprint } from "../../../retrieval/query/index.js";
 import { createWikiGraphTempDirectory } from "../../../runtime/common/wiki-graph/temp.js";
-import { Database as DocumentDatabase, DirectoryDocument } from "../../../document/index.js";
+import {
+  Database as DocumentDatabase,
+  DirectoryDocument,
+} from "../../../document/index.js";
 import { readSearchIndexFingerprintFromDatabase } from "../../../retrieval/search-index/index.js";
 
-import { extractWikgArchive, readWikgArchiveMutationToken } from "../archive/index.js";
+import {
+  extractWikgArchive,
+  readWikgArchiveMutationToken,
+} from "../archive/index.js";
 
 import { createArchiveSignature, pathExists } from "./archive-key.js";
-import { hasActiveArchiveOwnerOrSqliteLease, hasActiveWorkspaceUse } from "./activity.js";
+import {
+  hasActiveArchiveOwnerOrSqliteLease,
+  hasActiveWorkspaceUse,
+} from "./activity.js";
 import { SEARCH_INDEX_DATABASE_ENTRY_PATH } from "./constants.js";
 import { acquireEntryLock } from "./locks.js";
 import { readOverlay } from "./overlays.js";
-import { cleanupStaleState, mapEntryOverlay, withStateDatabase } from "./state.js";
+import {
+  cleanupStaleState,
+  mapEntryOverlay,
+  withStateDatabase,
+} from "./state.js";
 import type { EntryOverlay } from "./types.js";
 import { createWorkspaceFilePath } from "./workspace.js";
 

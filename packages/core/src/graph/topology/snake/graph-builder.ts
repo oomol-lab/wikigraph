@@ -1,4 +1,7 @@
-import type { ChunkRecord, ReadingEdgeRecord } from "../../../document/index.js";
+import type {
+  ChunkRecord,
+  ReadingEdgeRecord,
+} from "../../../document/index.js";
 import { getReadingEdgeKey } from "../weights.js";
 
 export interface SnakeGraphEdge {

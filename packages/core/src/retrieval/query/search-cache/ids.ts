@@ -61,4 +61,3 @@ function normalizeSearchSessionTypes(
 function compareNumbers(left: number, right: number): number {
   return left - right;
 }
-

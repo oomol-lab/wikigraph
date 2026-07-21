@@ -5,7 +5,15 @@ import { pipeline } from "stream/promises";
 
 import type { Entry, ZipFile as YauzlZipFile } from "yauzl";
 
-import { assertWithinDirectory, indexArchiveEntries, isLegacySdpubPath, normalizeArchivePath, openArchive, openArchiveEntryStream, readArchiveEntryText } from "./archive.js";
+import {
+  assertWithinDirectory,
+  indexArchiveEntries,
+  isLegacySdpubPath,
+  normalizeArchivePath,
+  openArchive,
+  openArchiveEntryStream,
+  readArchiveEntryText,
+} from "./archive.js";
 
 const LEGACY_FORMAT_VERSION = 1;
 

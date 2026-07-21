@@ -1,5 +1,8 @@
 import type { ReadonlyDocument } from "../../../../document/index.js";
-import { listChapters, type ChapterEntry } from "../../../../document/chapter/index.js";
+import {
+  listChapters,
+  type ChapterEntry,
+} from "../../../../document/chapter/index.js";
 import {
   querySearchIndex,
   SEARCH_OBJECT_PROPERTY_KIND,
@@ -105,7 +108,9 @@ export async function hydrateSearchIndexHits(
   return hits;
 }
 
-export function createSearchIndexHydrationOptions(options: ArchiveFindOptions): {
+export function createSearchIndexHydrationOptions(
+  options: ArchiveFindOptions,
+): {
   readonly textHitLimit?: number;
 } {
   if (!isTextOnlySearch(options) || options.limit === undefined) {
@@ -115,7 +120,9 @@ export function createSearchIndexHydrationOptions(options: ArchiveFindOptions): 
   return { textHitLimit: createTextOnlySearchCacheWindow(options.limit) };
 }
 
-export function createSearchIndexQueryLimitOptions(options: ArchiveFindOptions): {
+export function createSearchIndexQueryLimitOptions(
+  options: ArchiveFindOptions,
+): {
   readonly textHitLimit?: number;
 } {
   if (!isTextOnlySearch(options) || options.limit === undefined) {
@@ -253,4 +260,3 @@ export async function hydrateSearchTextHit(
     type: stream,
   };
 }
-

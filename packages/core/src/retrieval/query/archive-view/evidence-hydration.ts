@@ -18,7 +18,11 @@ import type {
   TextStreamHitRange,
 } from "./types.js";
 import { DEFAULT_SOURCE_CONTEXT } from "./core.js";
-import { compareMentions, parseEntityQid, selectEntityLabel } from "./knowledge.js";
+import {
+  compareMentions,
+  parseEntityQid,
+  selectEntityLabel,
+} from "./knowledge.js";
 import {
   createEvidenceReadContext,
   createExpandedSourceEvidenceRanges,
@@ -352,7 +356,6 @@ async function mergeTextStreamHitRangeGroup(
     stream: representative.stream,
   };
 }
-
 
 export function createFindEvidenceHydrationOptions(
   options: ArchiveFindOptions,

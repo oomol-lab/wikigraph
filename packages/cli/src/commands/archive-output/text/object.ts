@@ -1,7 +1,14 @@
-import { formatWikiGraphCommandUri, parseLocatedWikiGraphUri } from "wiki-graph-core";
+import {
+  formatWikiGraphCommandUri,
+  parseLocatedWikiGraphUri,
+} from "wiki-graph-core";
 
 import { formatCliCommand } from "../../../support/index.js";
-import type { ArchiveOutputBacklinks, ArchiveOutputContext, ArchiveOutputObject } from "../object/types.js";
+import type {
+  ArchiveOutputBacklinks,
+  ArchiveOutputContext,
+  ArchiveOutputObject,
+} from "../object/types.js";
 import { getTextStreamOutputType } from "../object/uri.js";
 import { formatEvidencePreviewContinuation } from "./evidence.js";
 import { formatScoredLines } from "./lines.js";
@@ -60,7 +67,6 @@ function isShortOutputUri(uri: string): boolean {
     parseLocatedWikiGraphUri(uri).archivePath === undefined
   );
 }
-
 
 function formatBacklinkLines(backlinks: ArchiveOutputBacklinks): string[] {
   const lines = [

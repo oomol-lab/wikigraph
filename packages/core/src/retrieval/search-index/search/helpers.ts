@@ -16,7 +16,9 @@ export function serializeTokens(
   return tokens.map((token) => token.encoded).join(" ");
 }
 
-export function createChapterSql(chapters: readonly number[] | undefined): string {
+export function createChapterSql(
+  chapters: readonly number[] | undefined,
+): string {
   return chapters === undefined || chapters.length === 0
     ? ""
     : `AND r.chapter_id IN (${chapters.map(() => "?").join(", ")})`;
@@ -32,7 +34,9 @@ export function createLimitSql(limit: number | undefined): string {
   return limit === undefined ? "" : "LIMIT ?";
 }
 
-export function createLimitParams(limit: number | undefined): readonly SqlBindValue[] {
+export function createLimitParams(
+  limit: number | undefined,
+): readonly SqlBindValue[] {
   return limit === undefined ? [] : [limit];
 }
 

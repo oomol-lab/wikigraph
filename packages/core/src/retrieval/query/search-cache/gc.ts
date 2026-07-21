@@ -5,7 +5,10 @@ import type { Database } from "../../../document/index.js";
 import type { GcContext, GcJobResult } from "../../../runtime/gc/index.js";
 import { isNodeError } from "../../../utils/node-error.js";
 
-import { getSearchSessionDatabasePath, openSearchSessionDatabase } from "./database.js";
+import {
+  getSearchSessionDatabasePath,
+  openSearchSessionDatabase,
+} from "./database.js";
 import { SEARCH_SESSION_MAX_COUNT } from "./schema.js";
 import { deleteSearchSession, deleteUnusedPredicates } from "./store.js";
 
@@ -130,4 +133,3 @@ async function readFileSize(path: string): Promise<number> {
     throw error;
   }
 }
-

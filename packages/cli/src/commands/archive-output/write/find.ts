@@ -2,7 +2,14 @@ import type { ArchiveFindResult } from "wiki-graph-core";
 
 import { formatCLIJSON, writeTextToStdout } from "../../../support/index.js";
 import { createOutputContinuationCursor } from "../object/cursor.js";
-import { formatFindLensHint, formatFindObject, formatNextCursor, formatNoMatches, formatOpenShortUriHint, getListObjectSeparator } from "../text/index.js";
+import {
+  formatFindLensHint,
+  formatFindObject,
+  formatNextCursor,
+  formatNoMatches,
+  formatOpenShortUriHint,
+  getListObjectSeparator,
+} from "../text/index.js";
 import { writeJSONL } from "./jsonl.js";
 import { createFindObject, createObjectResultPage } from "../object/objects.js";
 import { createPageCursorObject } from "../object/page-cursor.js";

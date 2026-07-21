@@ -1,9 +1,18 @@
 import { parseLocatedWikiGraphUri } from "wiki-graph-core";
 
-import { isUriHelpPredicate, renderUriHelpText, renderUriPredicateHelpText, type UriHelpTargetName } from "../help.js";
+import {
+  isUriHelpPredicate,
+  renderUriHelpText,
+  renderUriPredicateHelpText,
+  type UriHelpTargetName,
+} from "../help.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "../../support/index.js";
 import { parseArchiveArguments } from "../archive.js";
-import type { ArchiveArgumentValues, CLIArchiveUriAction, ParsedCLIArguments } from "../types.js";
+import type {
+  ArchiveArgumentValues,
+  CLIArchiveUriAction,
+  ParsedCLIArguments,
+} from "../types.js";
 import {
   formatMissingArchiveLocatorMessage,
   formatRemovedImplicitVerbMessage,
@@ -17,8 +26,16 @@ import {
 } from "../helpers.js";
 import { parseArchiveChapterUriArguments } from "./chapter/routing.js";
 import { parseChapterTarget } from "./chapter/target.js";
-import { parseArchiveUriArchiveArguments, parseArchiveCoverUriArguments, parseArchiveIndexUriArguments } from "./archive-objects.js";
-import { containsMetadataKeySuffix, parseMetadataTarget, parseMetadataUriArguments } from "./metadata.js";
+import {
+  parseArchiveUriArchiveArguments,
+  parseArchiveCoverUriArguments,
+  parseArchiveIndexUriArguments,
+} from "./archive-objects.js";
+import {
+  containsMetadataKeySuffix,
+  parseMetadataTarget,
+  parseMetadataUriArguments,
+} from "./metadata.js";
 import { isTripleScopePath } from "./triple-pattern.js";
 
 export function parseArchiveUriFirstArguments(

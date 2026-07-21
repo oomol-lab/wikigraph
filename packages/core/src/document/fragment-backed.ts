@@ -2,10 +2,9 @@ import type { ReadonlyDocument } from "./directory/index.js";
 import { Fragments } from "./fragments/index.js";
 import type { SentenceId } from "./types.js";
 
-export function createFragmentBackedDocument<TDocument extends ReadonlyDocument>(
-  document: TDocument,
-  documentPath: string,
-): TDocument {
+export function createFragmentBackedDocument<
+  TDocument extends ReadonlyDocument,
+>(document: TDocument, documentPath: string): TDocument {
   const fragments = new Fragments(documentPath);
 
   return new Proxy(document, {

@@ -70,29 +70,32 @@ const chapterDetails = {
   tocPath: ["Part I", "Chapter 1"],
 };
 
-vi.mock("../../packages/core/src/storage/wikg/wiki-graph-archive-file.js", () => ({
-  WikiGraphArchiveFile: class {
-    readonly #path: string;
+vi.mock(
+  "../../packages/core/src/storage/wikg/wiki-graph-archive-file.js",
+  () => ({
+    WikiGraphArchiveFile: class {
+      readonly #path: string;
 
-    public constructor(path: string) {
-      this.#path = path;
-    }
+      public constructor(path: string) {
+        this.#path = path;
+      }
 
-    public async readDocument(
-      operation: (document: unknown) => Promise<unknown>,
-    ): Promise<unknown> {
-      chapterMockState.readCalls.push(this.#path);
-      return await operation({});
-    }
+      public async readDocument(
+        operation: (document: unknown) => Promise<unknown>,
+      ): Promise<unknown> {
+        chapterMockState.readCalls.push(this.#path);
+        return await operation({});
+      }
 
-    public async write(
-      operation: (document: unknown) => Promise<unknown>,
-    ): Promise<unknown> {
-      chapterMockState.writeCalls.push(this.#path);
-      return await operation({});
-    }
-  },
-}));
+      public async write(
+        operation: (document: unknown) => Promise<unknown>,
+      ): Promise<unknown> {
+        chapterMockState.writeCalls.push(this.#path);
+        return await operation({});
+      }
+    },
+  }),
+);
 
 vi.mock("../../packages/core/src/api/index.js", () => ({
   addChapter: vi.fn((_document: unknown, options: unknown) => {
@@ -236,21 +239,18 @@ vi.mock("../../packages/core/src/external/llm/index.js", () => ({
   },
 }));
 
-vi.mock(
-  "../../packages/cli/src/support/index.js",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof CLISupport>();
+vi.mock("../../packages/cli/src/support/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof CLISupport>();
 
-    return {
-      ...actual,
-      readTextStreamFromStdin: vi.fn(() => chapterMockState.stdinStream),
-      writeTextToStdout: vi.fn((text: string) => {
-        chapterMockState.textWrites.push(text);
-        return Promise.resolve();
-      }),
-    };
-  },
-);
+  return {
+    ...actual,
+    readTextStreamFromStdin: vi.fn(() => chapterMockState.stdinStream),
+    writeTextToStdout: vi.fn((text: string) => {
+      chapterMockState.textWrites.push(text);
+      return Promise.resolve();
+    }),
+  };
+});
 
 vi.mock("fs/promises", () => ({
   readFile: vi.fn(() => Promise.resolve(chapterMockState.inputFileContent)),

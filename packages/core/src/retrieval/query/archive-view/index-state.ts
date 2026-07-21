@@ -150,4 +150,3 @@ async function createTextStreamSearchIndexRecords(
     wordsCount: sentence.wordsCount,
   }));
 }
-

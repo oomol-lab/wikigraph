@@ -1,4 +1,9 @@
-import { BUILD_JOB_STATES, type BuildJob, type BuildJobState, type BuildJobTarget } from "./types.js";
+import {
+  BUILD_JOB_STATES,
+  type BuildJob,
+  type BuildJobState,
+  type BuildJobTarget,
+} from "./types.js";
 
 export function mapBuildJob(row: Record<string, unknown>): BuildJob {
   const currentStep = parseOptionalBuildJobTarget(
@@ -56,7 +61,10 @@ function parseBuildJobState(value: string): BuildJobState {
   throw new Error(`Invalid build job state: ${value}`);
 }
 
-export function parseBuildJobTarget(value: string, field: string): BuildJobTarget {
+export function parseBuildJobTarget(
+  value: string,
+  field: string,
+): BuildJobTarget {
   if (
     value === "reading-graph" ||
     value === "knowledge-graph" ||

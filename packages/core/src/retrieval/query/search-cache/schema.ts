@@ -103,4 +103,3 @@ export const SEARCH_RANKING_VERSION = 6;
 export const SEARCH_SESSION_MAX_COUNT = 500;
 export const SEARCH_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const SEARCH_TOP_SCORE_COUNT = 10;
-

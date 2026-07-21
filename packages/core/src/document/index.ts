@@ -4,7 +4,11 @@ export {
   openSharedStateDatabase,
 } from "./shared-state-database.js";
 export { TextStreams, SerialTextStream } from "./text-streams/index.js";
-export { FragmentDraft, Fragments, SerialFragments } from "./fragments/index.js";
+export {
+  FragmentDraft,
+  Fragments,
+  SerialFragments,
+} from "./fragments/index.js";
 export type {
   ReadonlySerialTextStream,
   ReadonlySerialTextStream as ReadonlySerialFragments,

@@ -1,7 +1,10 @@
 import { createHash } from "crypto";
 import { appendFile } from "fs/promises";
 
-import { getLogger, resolveArtifactPath } from "../../runtime/common/logging.js";
+import {
+  getLogger,
+  resolveArtifactPath,
+} from "../../runtime/common/logging.js";
 import { formatError } from "../../utils/node-error.js";
 
 const MAX_RESPONSE_TEXT_LENGTH = 16_384;

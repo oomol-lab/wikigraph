@@ -16,7 +16,9 @@ export interface ArchiveTextMatch {
 const GROUP_SCORE_EVIDENCE_LIMIT = 10;
 const GROUP_SCORE_MAX_EQUAL_EVIDENCE_BONUS = 0.3;
 
-export function createPhraseSearch(query: string): ArchiveTextSearch | undefined {
+export function createPhraseSearch(
+  query: string,
+): ArchiveTextSearch | undefined {
   const needle = query.trim().toLowerCase();
 
   if (needle === "") {

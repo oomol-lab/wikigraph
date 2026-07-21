@@ -1,11 +1,18 @@
-import type { MentionLinkRecord, MentionRecord, ReadonlyDocument } from "../../../document/index.js";
+import type {
+  MentionLinkRecord,
+  MentionRecord,
+  ReadonlyDocument,
+} from "../../../document/index.js";
 import { WIKI_GRAPH_URI_PREFIX } from "../../../runtime/common/wiki-graph/uri.js";
 
 import { compareNumbers, normalizeWikiGraphObjectUri } from "./helpers.js";
 import type { WikiGraphReference } from "./references.js";
 import type { EntityEvidenceMention } from "./types.js";
 
-export function compareMentions(left: MentionRecord, right: MentionRecord): number {
+export function compareMentions(
+  left: MentionRecord,
+  right: MentionRecord,
+): number {
   return (
     compareNumbers(left.chapterId, right.chapterId) ||
     compareNumbers(left.sentenceIndex ?? 0, right.sentenceIndex ?? 0) ||

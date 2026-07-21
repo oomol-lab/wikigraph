@@ -15,7 +15,12 @@ import { listRelatedEntityObjects } from "./entity.js";
 import { filterAndSortChunkRelatedItemsByQuery } from "./query.js";
 import { sortGraphNeighborsByListMode } from "./sort.js";
 export { resolveEntityWikipage } from "./wikipage.js";
-import { formatChapterId, formatNodeId, parseArchiveReference, parseWikiGraphReference } from "../references.js";
+import {
+  formatChapterId,
+  formatNodeId,
+  parseArchiveReference,
+  parseWikiGraphReference,
+} from "../references.js";
 import type {
   ArchiveRelatedOptions,
   ArchiveRelatedResult,
@@ -187,11 +192,6 @@ async function listRelatedWikiGraphObjects(
       return paginateRelatedItems([], options);
   }
 }
-
-
-
-
-
 
 function rejectRelatedRole(
   role: ArchiveRelatedRole | undefined,

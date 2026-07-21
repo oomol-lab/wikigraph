@@ -4,7 +4,10 @@ import { formatCLIJSON, writeTextToStdout } from "../../../support/index.js";
 import { createOutputContinuationCursor } from "../object/cursor.js";
 import { formatEvidenceItem, formatEvidenceNextCursor } from "../text/index.js";
 import { writeJSONL } from "./jsonl.js";
-import { createObjectResultPage, createSourceObject } from "../object/objects.js";
+import {
+  createObjectResultPage,
+  createSourceObject,
+} from "../object/objects.js";
 import { createPageCursorObject } from "../object/page-cursor.js";
 import type { ArchiveOutputContext, ResultFormat } from "../object/types.js";
 

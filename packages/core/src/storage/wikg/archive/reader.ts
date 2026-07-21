@@ -3,19 +3,10 @@ import { join } from "path";
 
 import type { Entry, ZipFile as YauzlZipFile } from "yauzl";
 
-import {
-  WIKG_MANIFEST_PATH,
-  WIKG_MUTATION_TOKEN_PATH,
-} from "./constants.js";
-import {
-  parseWikgManifest,
-  parseWikgMutationToken,
-} from "./manifest.js";
+import { WIKG_MANIFEST_PATH, WIKG_MUTATION_TOKEN_PATH } from "./constants.js";
+import { parseWikgManifest, parseWikgMutationToken } from "./manifest.js";
 import { isWikgArchivePath, normalizeArchivePath } from "./paths.js";
-import {
-  openIndexedArchive,
-  readArchiveEntryBufferFromFile,
-} from "./zip.js";
+import { openIndexedArchive, readArchiveEntryBufferFromFile } from "./zip.js";
 
 export class WikgArchiveReader {
   readonly #entryByPath: Map<string, Entry>;

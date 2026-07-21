@@ -10,8 +10,15 @@ import {
   createArchiveSignature,
   createOwnerId,
 } from "./archive-key.js";
-import { DATABASE_ENTRY_PATH, SEARCH_INDEX_DATABASE_ENTRY_PATH } from "./constants.js";
-import { acquireSqliteLease, releaseSqliteLease, withEntryLock } from "./locks.js";
+import {
+  DATABASE_ENTRY_PATH,
+  SEARCH_INDEX_DATABASE_ENTRY_PATH,
+} from "./constants.js";
+import {
+  acquireSqliteLease,
+  releaseSqliteLease,
+  withEntryLock,
+} from "./locks.js";
 import {
   deleteOverlay,
   listOverlays,
@@ -22,7 +29,11 @@ import {
 } from "./overlays.js";
 import { tryAdoptSearchIndexCacheOverlay } from "./search-index-cache.js";
 import type { EntryOverlay, WorkspaceWritebackPolicy } from "./types.js";
-import { createWorkspaceFilePath, normalizeEntryDirectoryPrefix, normalizeEntryPath } from "./workspace.js";
+import {
+  createWorkspaceFilePath,
+  normalizeEntryDirectoryPrefix,
+  normalizeEntryPath,
+} from "./workspace.js";
 import type { WikgArchiveSession } from "./session.js";
 
 export class WikgDocumentFileStore implements DocumentFileStore {

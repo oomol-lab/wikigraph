@@ -1,9 +1,6 @@
 import { CLI_HELP_ROUTES, withHelpRoute } from "../../support/index.js";
 import { formatCliCommand } from "../../support/index.js";
-import type {
-  ArchiveArgumentValues,
-  CLIResultFormat,
-} from "../types.js";
+import type { ArchiveArgumentValues, CLIResultFormat } from "../types.js";
 import { isWikiGraphLocalConfigUri, isWikiGraphUri } from "./uri.js";
 
 export function parseWatchFrom(

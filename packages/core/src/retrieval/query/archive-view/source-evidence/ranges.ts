@@ -1,10 +1,16 @@
-import type { MentionLinkRecord, MentionRecord, ReadonlyDocument } from "../../../../document/index.js";
+import type {
+  MentionLinkRecord,
+  MentionRecord,
+  ReadonlyDocument,
+} from "../../../../document/index.js";
 import type { GraphNode } from "../../../../graph/reading.js";
 
 import { getTextStreamIndex } from "../text-streams.js";
 import type { EvidenceReadContext, SourceEvidenceRange } from "../types.js";
 
-export function createNodeEvidenceRanges(node: Pick<GraphNode, "sentenceIds">): Array<{
+export function createNodeEvidenceRanges(
+  node: Pick<GraphNode, "sentenceIds">,
+): Array<{
   readonly chapterId: number;
   readonly endSentenceIndex: number;
   readonly startSentenceIndex: number;

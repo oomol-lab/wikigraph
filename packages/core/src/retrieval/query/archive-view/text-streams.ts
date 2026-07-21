@@ -1,7 +1,14 @@
-import type { ReadonlyDocument, ReadonlySerialTextStream } from "../../../document/index.js";
+import type {
+  ReadonlyDocument,
+  ReadonlySerialTextStream,
+} from "../../../document/index.js";
 
 import { createSnippet } from "./helpers.js";
-import { formatChapterId, formatFragmentId, formatTextStreamRangeUri } from "./references.js";
+import {
+  formatChapterId,
+  formatFragmentId,
+  formatTextStreamRangeUri,
+} from "./references.js";
 import type { WikiGraphReference } from "./references.js";
 import type {
   ArchiveSourceFragment,
@@ -238,10 +245,8 @@ export async function createTextStreamIndex(
   return { sentences };
 }
 
-
 export function countWords(text: string): number {
   const trimmed = text.trim();
 
   return trimmed === "" ? 0 : trimmed.split(/\s+/u).length;
 }
-

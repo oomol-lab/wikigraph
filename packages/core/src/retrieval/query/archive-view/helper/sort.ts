@@ -1,4 +1,8 @@
-import type { ArchiveFindHit, ArchiveFindObjectType, ArchiveFindOrder } from "../types.js";
+import type {
+  ArchiveFindHit,
+  ArchiveFindObjectType,
+  ArchiveFindOrder,
+} from "../types.js";
 import {
   compareNumbers,
   getPositionChapter,

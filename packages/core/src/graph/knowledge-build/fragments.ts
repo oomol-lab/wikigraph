@@ -1,7 +1,4 @@
-import type {
-  FragmentRecord,
-  ReadonlyDocument,
-} from "../../document/index.js";
+import type { FragmentRecord, ReadonlyDocument } from "../../document/index.js";
 import type { WikimatchSentence } from "../../external/wikimatch/index.js";
 
 export async function readChapterFragments(

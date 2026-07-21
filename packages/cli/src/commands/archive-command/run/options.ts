@@ -7,10 +7,16 @@ import {
 } from "wiki-graph-core";
 
 import type { CLIArchiveArguments } from "../../../args/index.js";
-import { DEFAULT_GET_EVIDENCE_LIMIT, DEFAULT_OUTPUT_LIMIT, type ArchiveOutputContext } from "./types.js";
+import {
+  DEFAULT_GET_EVIDENCE_LIMIT,
+  DEFAULT_OUTPUT_LIMIT,
+  type ArchiveOutputContext,
+} from "./types.js";
 import { getArchivePath, parseChapterScope } from "./uri.js";
 
-export function createFindOptions(args: CLIArchiveArguments): ArchiveFindOptions {
+export function createFindOptions(
+  args: CLIArchiveArguments,
+): ArchiveFindOptions {
   const types = args.kinds?.map((kind) => {
     const type = toArchiveFindType(kind);
 

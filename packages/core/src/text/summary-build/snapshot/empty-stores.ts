@@ -37,9 +37,7 @@ export class EmptySnapshotMentionStore implements ReadonlyMentionStore {
   }
 }
 
-export class EmptySnapshotMentionLinkStore
-  implements ReadonlyMentionLinkStore
-{
+export class EmptySnapshotMentionLinkStore implements ReadonlyMentionLinkStore {
   public getById(_linkId: string): Promise<undefined> {
     return Promise.resolve(undefined);
   }
@@ -57,9 +55,7 @@ export class EmptySnapshotMentionLinkStore
   }
 }
 
-export class EmptySnapshotObjectMetadataStore
-  implements ReadonlyObjectMetadataStore
-{
+export class EmptySnapshotObjectMetadataStore implements ReadonlyObjectMetadataStore {
   public getMap(
     _objectPath: string,
   ): Promise<Readonly<Record<string, unknown>>> {
@@ -67,9 +63,7 @@ export class EmptySnapshotObjectMetadataStore
   }
 }
 
-export class EmptySnapshotGraphBuildParameterStore
-  implements ReadonlyGraphBuildParameterStore
-{
+export class EmptySnapshotGraphBuildParameterStore implements ReadonlyGraphBuildParameterStore {
   public getByHash(_hash: string): Promise<undefined> {
     return Promise.resolve(undefined);
   }

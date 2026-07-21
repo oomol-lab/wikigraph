@@ -1,4 +1,7 @@
-import type { MentionRecord, ReadonlyDocument } from "../../../../document/index.js";
+import type {
+  MentionRecord,
+  ReadonlyDocument,
+} from "../../../../document/index.js";
 
 import { aggregateEvidenceScores } from "../helpers.js";
 import { parseArchiveReference } from "../references.js";

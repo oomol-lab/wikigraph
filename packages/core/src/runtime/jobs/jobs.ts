@@ -19,10 +19,7 @@ import {
   resolveBuildJobIdInState,
 } from "./database.js";
 import { recoverStaleBuildJobs } from "./recovery.js";
-import {
-  markBuildJobCanceled,
-  markBuildJobCanceling,
-} from "./state.js";
+import { markBuildJobCanceled, markBuildJobCanceling } from "./state.js";
 import { formatBuildJobLane, mapBuildJob } from "./row.js";
 import type {
   AddBuildJobOptions,
@@ -301,7 +298,9 @@ export async function getBuildJob(jobId: string): Promise<BuildJob> {
   }
 }
 
-export async function readBuildJobForStopCheck(jobId: string): Promise<BuildJob> {
+export async function readBuildJobForStopCheck(
+  jobId: string,
+): Promise<BuildJob> {
   const state = await openReadonlyBuildQueueDatabase();
 
   try {

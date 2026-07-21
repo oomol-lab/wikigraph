@@ -1,4 +1,7 @@
-import { LanguageCode, normalizeLanguageCode } from "../../runtime/common/language.js";
+import {
+  LanguageCode,
+  normalizeLanguageCode,
+} from "../../runtime/common/language.js";
 import type {
   GenerateChapterKnowledgeGraphArtifactOptions,
   GraphBuildParameterInput,

@@ -1,4 +1,7 @@
-import type { ChunkRecord, ReadingEdgeRecord } from "../../../document/index.js";
+import type {
+  ChunkRecord,
+  ReadingEdgeRecord,
+} from "../../../document/index.js";
 import { getReadingEdgeKey } from "../weights.js";
 import { MIN_EDGE_WEIGHT } from "./constants.js";
 import { compareNumber } from "./compare.js";

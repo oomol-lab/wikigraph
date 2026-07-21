@@ -31,7 +31,10 @@ export {
   WIKI_GRAPH_SCOPES,
 } from "./runtime/common/llm-scope.js";
 export { withLoggingContext } from "./runtime/common/logging.js";
-export { CLI_FULL_COMMAND, CLI_PRIMARY_COMMAND } from "./runtime/common/cli-command.js";
+export {
+  CLI_FULL_COMMAND,
+  CLI_PRIMARY_COMMAND,
+} from "./runtime/common/cli-command.js";
 export { resolveDataDirPath } from "./runtime/common/data-dir.js";
 export { createEnv } from "./runtime/common/template.js";
 export {

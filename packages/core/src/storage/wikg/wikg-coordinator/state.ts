@@ -6,7 +6,12 @@ import type { Database } from "../../../document/index.js";
 import { AsyncSemaphore } from "../../../utils/async-semaphore.js";
 
 import { LOCK_STALE_TIMEOUT_MS } from "./constants.js";
-import type { ArchiveCommitLock, EntryLock, EntryLockMode, EntryOverlay } from "./types.js";
+import type {
+  ArchiveCommitLock,
+  EntryLock,
+  EntryLockMode,
+  EntryOverlay,
+} from "./types.js";
 
 const STATE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS entry_overlays (
@@ -230,7 +235,9 @@ export function mapEntryLock(row: Record<string, unknown>): EntryLock {
   };
 }
 
-export function mapArchiveCommitLock(row: Record<string, unknown>): ArchiveCommitLock {
+export function mapArchiveCommitLock(
+  row: Record<string, unknown>,
+): ArchiveCommitLock {
   return {
     ownerId: getString(row, "owner_id"),
   };

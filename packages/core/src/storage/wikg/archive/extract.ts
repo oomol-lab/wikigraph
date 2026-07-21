@@ -1,11 +1,12 @@
 import { mkdir, open as openFile, writeFile } from "fs/promises";
 import { dirname, resolve } from "path";
 
-import { assertWithinDirectory, isWikgArchivePath, normalizeArchivePath } from "./paths.js";
 import {
-  openIndexedArchive,
-  readArchiveEntryBufferFromFile,
-} from "./zip.js";
+  assertWithinDirectory,
+  isWikgArchivePath,
+  normalizeArchivePath,
+} from "./paths.js";
+import { openIndexedArchive, readArchiveEntryBufferFromFile } from "./zip.js";
 
 export async function extractWikgArchive(
   inputPath: string,

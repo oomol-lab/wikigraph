@@ -235,5 +235,4 @@ export class ChunkBatchParser<
 
     return sourceSentences;
   }
-
 }

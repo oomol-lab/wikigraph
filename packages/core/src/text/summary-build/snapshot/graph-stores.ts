@@ -164,9 +164,7 @@ export class SnapshotSnakeEdgeStore implements ReadonlySnakeEdgeStore {
   }
 }
 
-export class SnapshotFragmentGroupStore
-  implements ReadonlyFragmentGroupStore
-{
+export class SnapshotFragmentGroupStore implements ReadonlyFragmentGroupStore {
   readonly #groups: readonly SentenceGroupRecord[];
 
   public constructor(groups: readonly SentenceGroupRecord[]) {

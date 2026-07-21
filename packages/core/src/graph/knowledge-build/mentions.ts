@@ -1,7 +1,4 @@
-import type {
-  FragmentRecord,
-  MentionRecord,
-} from "../../document/index.js";
+import type { FragmentRecord, MentionRecord } from "../../document/index.js";
 import type { GuaranteedRequestController } from "../../external/guaranteed/index.js";
 import type {
   WikimatchAcceptedMention,

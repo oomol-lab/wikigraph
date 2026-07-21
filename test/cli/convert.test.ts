@@ -115,32 +115,29 @@ vi.mock("../../packages/cli/src/runtime/llm.js", () => ({
   }),
 }));
 
-vi.mock(
-  "../../packages/cli/src/support/index.js",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof CLISupport>();
+vi.mock("../../packages/cli/src/support/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof CLISupport>();
 
-    return {
-      ...actual,
-      createTemporaryOutputPath: vi.fn((prefix: string, extension: string) => {
-        cliMockState.createTemporaryOutputPathCalls.push({
-          extension,
-          prefix,
-        });
-        return Promise.resolve(mockTemporaryOutput);
-      }),
-      readTextStreamFromStdin: vi.fn(() => mockStdinStream),
-      removeTemporaryDirectory: vi.fn((directoryPath: string) => {
-        cliMockState.removeTemporaryDirectoryCalls.push(directoryPath);
-        return Promise.resolve();
-      }),
-      writeTextFileToStdout: vi.fn((path: string) => {
-        cliMockState.stdoutWrites.push(path);
-        return Promise.resolve();
-      }),
-    };
-  },
-);
+  return {
+    ...actual,
+    createTemporaryOutputPath: vi.fn((prefix: string, extension: string) => {
+      cliMockState.createTemporaryOutputPathCalls.push({
+        extension,
+        prefix,
+      });
+      return Promise.resolve(mockTemporaryOutput);
+    }),
+    readTextStreamFromStdin: vi.fn(() => mockStdinStream),
+    removeTemporaryDirectory: vi.fn((directoryPath: string) => {
+      cliMockState.removeTemporaryDirectoryCalls.push(directoryPath);
+      return Promise.resolve();
+    }),
+    writeTextFileToStdout: vi.fn((path: string) => {
+      cliMockState.stdoutWrites.push(path);
+      return Promise.resolve();
+    }),
+  };
+});
 
 vi.mock("fs/promises", () => ({
   rm: vi.fn((path: string) => {

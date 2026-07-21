@@ -1,7 +1,12 @@
 import type { Document, ReadonlyDocument } from "../../document/index.js";
 import { TOC_FILE_VERSION, type TocItem } from "../../text/source/index.js";
 
-import { cloneTocItem, normalizeTitle, type MutableTocFile, type MutableTocItem } from "./tree.js";
+import {
+  cloneTocItem,
+  normalizeTitle,
+  type MutableTocFile,
+  type MutableTocItem,
+} from "./tree.js";
 import type { ChapterEntry, ChapterStage } from "./types.js";
 
 export async function normalizeChapterToc(
@@ -204,7 +209,6 @@ async function summarizeSerialSource(
   };
 }
 
-
 export async function resolveChapterStage(
   document: ReadonlyDocument,
   chapterId: number,
@@ -239,4 +243,3 @@ export async function resolveChapterStage(
 
   return "planned";
 }
-

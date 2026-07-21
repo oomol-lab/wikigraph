@@ -1,8 +1,9 @@
-import type { MentionRecord, ReadonlyDocument } from "../../../../document/index.js";
+import type {
+  MentionRecord,
+  ReadonlyDocument,
+} from "../../../../document/index.js";
 
-import {
-  SEARCH_EVIDENCE_KIND,
-} from "../../search-cache/index.js";
+import { SEARCH_EVIDENCE_KIND } from "../../search-cache/index.js";
 import type {
   SearchChunkHitInput,
   SearchEntityHitInput,

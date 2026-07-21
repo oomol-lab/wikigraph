@@ -1,4 +1,7 @@
-import { GuaranteedParseValidationError, ParsedJsonError } from "../../../../external/guaranteed/index.js";
+import {
+  GuaranteedParseValidationError,
+  ParsedJsonError,
+} from "../../../../external/guaranteed/index.js";
 import type { SentenceId } from "../../../../document/index.js";
 import type { RankedSentenceCandidate } from "../../../../graph/evidence-selection/index.js";
 import type { ChunkExtractionSentence, ChunkLink } from "../types.js";

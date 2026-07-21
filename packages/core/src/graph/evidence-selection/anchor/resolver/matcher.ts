@@ -23,7 +23,10 @@ export function scoreAnchor(
   return scoreTextQuery(anchor.text ?? "", candidateText, label);
 }
 
-function scoreHeadTail(anchor: AnchorSpec, candidateText: string): TextMatchScore {
+function scoreHeadTail(
+  anchor: AnchorSpec,
+  candidateText: string,
+): TextMatchScore {
   const head = anchor.head ?? "";
   const tail = anchor.tail ?? "";
   const candidateNormalized = normalizeText(candidateText);
@@ -238,4 +241,3 @@ function calculateBoundaryBonus(input: {
 
   return MAX_BOUNDARY_BONUS * (0.5 + 0.5 * Math.min(1, coverage));
 }
-

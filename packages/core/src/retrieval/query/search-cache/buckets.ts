@@ -92,4 +92,3 @@ export async function readSearchSessionChunkBucketPage(
     await database.close();
   }
 }
-

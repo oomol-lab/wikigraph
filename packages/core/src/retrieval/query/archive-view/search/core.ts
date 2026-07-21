@@ -1,5 +1,9 @@
 import type { ReadonlyDocument } from "../../../../document/index.js";
-import { createLexicalQuery, listLexicalQueryCandidateTerms, type LexicalQuery } from "../../lexical-search.js";
+import {
+  createLexicalQuery,
+  listLexicalQueryCandidateTerms,
+  type LexicalQuery,
+} from "../../lexical-search.js";
 import {
   createEntitySearchSession,
   createSearchSession,
@@ -43,15 +47,17 @@ import {
   createFindEvidenceHydrationOptions,
   hydrateFindHitEvidence,
 } from "../evidence.js";
-import {
-  hydrateFindResultBacklinks,
-} from "../backlinks.js";
+import { hydrateFindResultBacklinks } from "../backlinks.js";
 import {
   readBucketedSearchResultPage,
   tryDecodeBucketSearchSessionCursor,
 } from "./buckets.js";
 import { findArchiveObjectsIndexed, isTextOnlySearch } from "./hydration.js";
-import type { ArchiveFindHit, ArchiveFindOptions, ArchiveFindResult } from "../types.js";
+import type {
+  ArchiveFindHit,
+  ArchiveFindOptions,
+  ArchiveFindResult,
+} from "../types.js";
 
 export async function findArchiveObjects(
   document: ReadonlyDocument,

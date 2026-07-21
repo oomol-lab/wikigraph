@@ -1,7 +1,10 @@
 import { randomUUID } from "crypto";
 import type { Database } from "../../document/index.js";
 import { delay, isProcessAlive } from "./helpers.js";
-import { BuildJobProgressAccumulator, BuildJobStoppedError } from "./progress.js";
+import {
+  BuildJobProgressAccumulator,
+  BuildJobStoppedError,
+} from "./progress.js";
 import { appendBuildJobEvent } from "./events.js";
 import { openBuildQueueDatabase, requireBuildJobById } from "./database.js";
 import { recoverStaleBuildJobs } from "./recovery.js";

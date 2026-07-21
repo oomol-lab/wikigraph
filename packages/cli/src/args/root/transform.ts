@@ -1,7 +1,15 @@
 import { parseCLIFormat, withHelpRoute } from "../../support/index.js";
 import { renderTransformHelpText } from "../help.js";
-import type { ArchiveArgumentValues, CLIArguments, ParsedCLIArguments } from "../types.js";
-import { parseChapterStage, rejectTransformFlag, rejectTransformMetaFlags } from "../helpers.js";
+import type {
+  ArchiveArgumentValues,
+  CLIArguments,
+  ParsedCLIArguments,
+} from "../types.js";
+import {
+  parseChapterStage,
+  rejectTransformFlag,
+  rejectTransformMetaFlags,
+} from "../helpers.js";
 
 export function parseTransformArguments(
   positionals: readonly string[],

@@ -6,7 +6,10 @@ import type {
   SerialStore,
 } from "../stores/index.js";
 import type { TextStreams } from "../text-streams/index.js";
-import { compareNumberDescending, type DirectoryDocumentContext } from "./context.js";
+import {
+  compareNumberDescending,
+  type DirectoryDocumentContext,
+} from "./context.js";
 import type { DocumentFileStore } from "./types.js";
 
 export async function rollbackDocumentContext(input: {
@@ -18,7 +21,10 @@ export async function rollbackDocumentContext(input: {
     input.context.listOwnedSerialIds(),
     input.deleteSerialResources,
   );
-  await rollbackCreatedFiles(input.fileStore, input.context.listCreatedFilePaths());
+  await rollbackCreatedFiles(
+    input.fileStore,
+    input.context.listCreatedFilePaths(),
+  );
 }
 
 export async function deleteSerialResources(input: {

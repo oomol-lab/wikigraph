@@ -6,10 +6,7 @@ import {
 import { resolveKnowledgeGraphRecallPrompt } from "../../runtime/common/prompts.js";
 import { buildChapterKnowledgeGraphArtifact } from "./artifact.js";
 import { countUniqueQids, screenCandidates } from "./candidates.js";
-import {
-  createWikimatchSentences,
-  joinFragmentText,
-} from "./fragments.js";
+import { createWikimatchSentences, joinFragmentText } from "./fragments.js";
 import { judgeCandidates } from "./mentions.js";
 import { createKnowledgeGraphParameterInput } from "./parameter.js";
 import { createEnrichmentProgressReporter } from "./progress.js";

@@ -1,10 +1,7 @@
 import type { ReadonlyDocument } from "../../../document/index.js";
 
 import { parseWikiGraphReference } from "./references.js";
-import type {
-  ArchiveEvidence,
-  ArchiveEvidenceOptions,
-} from "./types.js";
+import type { ArchiveEvidence, ArchiveEvidenceOptions } from "./types.js";
 import { requireNode } from "./core.js";
 import {
   filterMentionLinksByChapter,

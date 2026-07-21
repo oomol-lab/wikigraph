@@ -1,7 +1,4 @@
-import type {
-  FragmentRecord,
-  ReadonlyDocument,
-} from "../../document/index.js";
+import type { FragmentRecord, ReadonlyDocument } from "../../document/index.js";
 import type { ReaderTextStream } from "../reader/index.js";
 
 export async function readSerialFragments(

@@ -13,50 +13,50 @@ const objectMetadataMockState = vi.hoisted(() => ({
   writeCalls: [] as string[],
 }));
 
-vi.mock("../../packages/core/src/storage/wikg/index.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof WikiGraphIndex>();
-
-  return {
-    ...actual,
-    WikiGraphArchiveFile: class {
-      readonly #path: string;
-
-      public constructor(path: string) {
-        this.#path = path;
-      }
-
-      public async readDocument(
-        operation: (document: MockDocument) => Promise<unknown>,
-      ): Promise<unknown> {
-        objectMetadataMockState.readCalls.push(this.#path);
-        return await operation(createMockDocument());
-      }
-
-      public async write(
-        operation: (document: MockDocument) => Promise<unknown>,
-      ): Promise<unknown> {
-        objectMetadataMockState.writeCalls.push(this.#path);
-        return await operation(createMockDocument());
-      }
-    },
-  };
-});
-
 vi.mock(
-  "../../packages/cli/src/support/index.js",
+  "../../packages/core/src/storage/wikg/index.js",
   async (importOriginal) => {
-    const actual = await importOriginal<typeof CLISupport>();
+    const actual = await importOriginal<typeof WikiGraphIndex>();
 
     return {
       ...actual,
-      readTextStreamFromStdin: vi.fn(() => objectMetadataMockState.stdinStream),
-      writeTextToStdout: vi.fn((text: string) => {
-        objectMetadataMockState.textWrites.push(text);
-        return Promise.resolve();
-      }),
+      WikiGraphArchiveFile: class {
+        readonly #path: string;
+
+        public constructor(path: string) {
+          this.#path = path;
+        }
+
+        public async readDocument(
+          operation: (document: MockDocument) => Promise<unknown>,
+        ): Promise<unknown> {
+          objectMetadataMockState.readCalls.push(this.#path);
+          return await operation(createMockDocument());
+        }
+
+        public async write(
+          operation: (document: MockDocument) => Promise<unknown>,
+        ): Promise<unknown> {
+          objectMetadataMockState.writeCalls.push(this.#path);
+          return await operation(createMockDocument());
+        }
+      },
     };
   },
 );
+
+vi.mock("../../packages/cli/src/support/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof CLISupport>();
+
+  return {
+    ...actual,
+    readTextStreamFromStdin: vi.fn(() => objectMetadataMockState.stdinStream),
+    writeTextToStdout: vi.fn((text: string) => {
+      objectMetadataMockState.textWrites.push(text);
+      return Promise.resolve();
+    }),
+  };
+});
 
 vi.mock("fs/promises", () => ({
   readFile: vi.fn(() =>

@@ -15,4 +15,3 @@ export function aggregateCachedScores(scores: readonly number[]): number {
     .slice(0, SEARCH_TOP_SCORE_COUNT)
     .reduce((total, score, index) => total + score / Math.log2(index + 2), 0);
 }
-

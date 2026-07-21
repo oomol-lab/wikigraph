@@ -1,4 +1,7 @@
-import type { ChunkRecord, ReadingEdgeRecord } from "../../../document/index.js";
+import type {
+  ChunkRecord,
+  ReadingEdgeRecord,
+} from "../../../document/index.js";
 
 export interface DetectorGraph {
   readonly chunksById: Readonly<Record<string, ChunkRecord | undefined>>;

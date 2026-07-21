@@ -1,5 +1,8 @@
 import { Fragments } from "../../document/index.js";
-import { segmentTextStream, type ReaderTextStream } from "../../text/reader/index.js";
+import {
+  segmentTextStream,
+  type ReaderTextStream,
+} from "../../text/reader/index.js";
 
 const GRAPH_ARTIFACT_FRAGMENT_WORDS_COUNT = 320;
 

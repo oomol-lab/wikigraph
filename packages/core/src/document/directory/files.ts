@@ -78,7 +78,9 @@ async function readOptionalTextFile(
 ): Promise<string | undefined> {
   const content = await fileStore.readFile(path);
 
-  return content === undefined ? undefined : Buffer.from(content).toString("utf8");
+  return content === undefined
+    ? undefined
+    : Buffer.from(content).toString("utf8");
 }
 
 async function writeFile(input: {

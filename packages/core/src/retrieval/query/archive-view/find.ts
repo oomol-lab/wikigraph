@@ -1,8 +1,15 @@
-import type { MentionRecord, ReadonlyDocument } from "../../../document/index.js";
+import type {
+  MentionRecord,
+  ReadonlyDocument,
+} from "../../../document/index.js";
 import type { BookMeta } from "../../../text/source/index.js";
 import { listChapters } from "../../../document/chapter/index.js";
 
-import { createMentionLexicalHits, scoreLexicalText, type LexicalQuery } from "../lexical-search.js";
+import {
+  createMentionLexicalHits,
+  scoreLexicalText,
+  type LexicalQuery,
+} from "../lexical-search.js";
 import {
   aggregateEvidenceScores,
   ARCHIVE_ROOT_ID,
@@ -16,17 +23,18 @@ import {
   matchText,
 } from "./helpers.js";
 import type { ArchiveTextSearch } from "./helpers.js";
-import { formatChapterTitleId, formatNodeId, formatTextStreamRangeUri } from "./references.js";
+import {
+  formatChapterTitleId,
+  formatNodeId,
+  formatTextStreamRangeUri,
+} from "./references.js";
 import { createTextStreamIndex } from "./text-streams.js";
 import type {
   ArchiveFindHit,
   ArchiveFindMatch,
   ArchiveTextStreamKind,
 } from "./types.js";
-import {
-  formatTripleUri,
-  getMentionForTripleSearch,
-} from "./knowledge.js";
+import { formatTripleUri, getMentionForTripleSearch } from "./knowledge.js";
 
 export function findEntities(
   search: LexicalQuery,
@@ -293,7 +301,6 @@ async function findTextStreamSentences(
     ];
   });
 }
-
 
 export function findMeta(
   meta: BookMeta | undefined,

@@ -1,9 +1,16 @@
 import type { ChunkRecord, ReadonlyDocument } from "../../../document/index.js";
-import { listChapters, type ChapterEntry } from "../../../document/chapter/index.js";
+import {
+  listChapters,
+  type ChapterEntry,
+} from "../../../document/chapter/index.js";
 import { getGraphNode, type GraphNode } from "../../../graph/reading.js";
 
 import { compareArchivePositions, createNodePosition } from "./helpers.js";
-import { formatChapterId, formatNodeId, formatTextStreamRangeUri } from "./references.js";
+import {
+  formatChapterId,
+  formatNodeId,
+  formatTextStreamRangeUri,
+} from "./references.js";
 import { createTextStreamIndex, readSourceFragment } from "./text-streams.js";
 import type {
   ArchiveNodeLabel,
@@ -154,7 +161,9 @@ function truncateSourceExcerpt(text: string): string {
   return text.length <= 1200 ? text : `${text.slice(0, 1200)}...`;
 }
 
-export function createNodeEvidenceRanges(node: Pick<GraphNode, "sentenceIds">): Array<{
+export function createNodeEvidenceRanges(
+  node: Pick<GraphNode, "sentenceIds">,
+): Array<{
   readonly chapterId: number;
   readonly endSentenceIndex: number;
   readonly startSentenceIndex: number;

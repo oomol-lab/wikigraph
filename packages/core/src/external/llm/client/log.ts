@@ -3,7 +3,9 @@ import type { LanguageModelUsage } from "ai";
 import { formatError } from "../../../utils/node-error.js";
 import type { LLMessage, TemperatureSetting } from "../types.js";
 
-export function hasVisibleNonSystemContent(messages: readonly LLMessage[]): boolean {
+export function hasVisibleNonSystemContent(
+  messages: readonly LLMessage[],
+): boolean {
   return messages.some(
     (message) =>
       message.role !== "system" &&

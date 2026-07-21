@@ -26,7 +26,9 @@ WHERE archive_key = ?
   });
 }
 
-export async function hasActiveWorkspaceUse(archiveKey: string): Promise<boolean> {
+export async function hasActiveWorkspaceUse(
+  archiveKey: string,
+): Promise<boolean> {
   return await withStateDatabase(async (state) => {
     await cleanupStaleState(state);
     const ownerCount = await state.queryOne(

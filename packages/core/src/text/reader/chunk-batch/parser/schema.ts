@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-import {
-  ChunkImportance,
-  ChunkRetention,
-} from "../../../../document/index.js";
+import { ChunkImportance, ChunkRetention } from "../../../../document/index.js";
 import type { RankedSentenceCandidate } from "../../../../graph/evidence-selection/index.js";
 import type { LLMessage } from "../../../../external/llm/index.js";
 import type { ChunkBatch } from "../types.js";

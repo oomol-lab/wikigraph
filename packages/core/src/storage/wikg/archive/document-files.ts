@@ -80,8 +80,7 @@ export function shouldWriteDocumentFile(input: {
   }
 
   return (
-    input.archivePath !== SEARCH_INDEX_DATABASE_PATH ||
-    input.includeSearchIndex
+    input.archivePath !== SEARCH_INDEX_DATABASE_PATH || input.includeSearchIndex
   );
 }
 

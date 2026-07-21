@@ -24,7 +24,9 @@ export function getCoordinatorWorkspaceRootPath(): string {
   return join(getCoordinatorStateDirectoryPath(), "work");
 }
 
-export async function ensureEmptyDirectory(directoryPath: string): Promise<void> {
+export async function ensureEmptyDirectory(
+  directoryPath: string,
+): Promise<void> {
   await mkdir(directoryPath, { recursive: true });
 
   const entries = await readdir(directoryPath);
@@ -34,7 +36,9 @@ export async function ensureEmptyDirectory(directoryPath: string): Promise<void>
   }
 }
 
-export async function listWorkspaceFiles(directoryPath: string): Promise<string[]> {
+export async function listWorkspaceFiles(
+  directoryPath: string,
+): Promise<string[]> {
   let entries: readonly WorkspaceDirectoryEntry[];
 
   try {

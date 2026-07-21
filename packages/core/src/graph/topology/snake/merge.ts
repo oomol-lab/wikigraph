@@ -1,10 +1,7 @@
 import { getReadingEdgeKey } from "../weights.js";
 import { ATTRIBUTE_BONUS_WEIGHT } from "./constants.js";
 import { compareEdgeQueueEntry } from "./compare.js";
-import {
-  createBooleanRecord,
-  createOptionalNumberRecord,
-} from "./records.js";
+import { createBooleanRecord, createOptionalNumberRecord } from "./records.js";
 import type {
   DetectorGraph,
   EdgeQueueEntry,

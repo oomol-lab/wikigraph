@@ -1,7 +1,9 @@
 import { Database } from "../../../../document/database.js";
 import { listTableColumns, listTableNames } from "./database.js";
 
-export async function migrateLegacyDatabase(databasePath: string): Promise<void> {
+export async function migrateLegacyDatabase(
+  databasePath: string,
+): Promise<void> {
   const database = await Database.open(databasePath);
 
   try {

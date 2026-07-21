@@ -1,13 +1,7 @@
 import type { Document } from "../../document/index.js";
 import { resolveExtractionPrompt } from "../../runtime/common/prompts.js";
-import {
-  isStageBefore,
-  selectChapterEntries,
-} from "./details.js";
-import {
-  generateChapterGraph,
-  generateChapterSummary,
-} from "./generate.js";
+import { isStageBefore, selectChapterEntries } from "./details.js";
+import { generateChapterGraph, generateChapterSummary } from "./generate.js";
 import type {
   AdvanceChapterStagesOptions,
   AdvanceChapterStagesProgressEvent,

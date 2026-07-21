@@ -20,4 +20,3 @@ export function getSearchSessionDatabasePath(): string {
 function getSearchSessionStateDirectoryPath(): string {
   return resolveWikiGraphCacheDirectoryPath();
 }
-

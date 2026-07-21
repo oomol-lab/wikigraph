@@ -404,7 +404,9 @@ export function toChapterTreeNodes(item: MutableTocItem): ChapterTreeNode[] {
     : [toChapterTreeNode(item)];
 }
 
-export function normalizeTitle(title: string | null | undefined): string | undefined {
+export function normalizeTitle(
+  title: string | null | undefined,
+): string | undefined {
   const normalized = title?.trim();
 
   return normalized === undefined || normalized === "" ? undefined : normalized;

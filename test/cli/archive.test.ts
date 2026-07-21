@@ -462,27 +462,30 @@ function parseJSONLLastLine(text: string | undefined): unknown {
   return JSON.parse(line) as unknown;
 }
 
-vi.mock("../../packages/core/src/storage/wikg/wiki-graph-archive-file.js", () => ({
-  WikiGraphArchiveFile: class {
-    readonly #path: string;
+vi.mock(
+  "../../packages/core/src/storage/wikg/wiki-graph-archive-file.js",
+  () => ({
+    WikiGraphArchiveFile: class {
+      readonly #path: string;
 
-    public constructor(path: string) {
-      this.#path = path;
-    }
+      public constructor(path: string) {
+        this.#path = path;
+      }
 
-    public async readDocument(
-      operation: (document: unknown) => Promise<unknown>,
-    ): Promise<unknown> {
-      archiveMockState.readCalls.push(this.#path);
-      return await operation(createArchiveMockDocument());
-    }
+      public async readDocument(
+        operation: (document: unknown) => Promise<unknown>,
+      ): Promise<unknown> {
+        archiveMockState.readCalls.push(this.#path);
+        return await operation(createArchiveMockDocument());
+      }
 
-    public async write(operation: () => Promise<unknown>): Promise<unknown> {
-      archiveMockState.writeCalls.push(this.#path);
-      return await operation();
-    }
-  },
-}));
+      public async write(operation: () => Promise<unknown>): Promise<unknown> {
+        archiveMockState.writeCalls.push(this.#path);
+        return await operation();
+      }
+    },
+  }),
+);
 
 vi.mock("../../packages/core/src/api/index.js", () => ({
   createContinuationCursor: vi.fn(() => Promise.resolve("c_next")),
@@ -589,20 +592,17 @@ vi.mock("../../packages/cli/src/runtime/config.js", () => ({
   ),
 }));
 
-vi.mock(
-  "../../packages/cli/src/support/index.js",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof CLISupport>();
+vi.mock("../../packages/cli/src/support/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof CLISupport>();
 
-    return {
-      ...actual,
-      writeTextToStdout: vi.fn((text: string) => {
-        archiveMockState.textWrites.push(text);
-        return Promise.resolve();
-      }),
-    };
-  },
-);
+  return {
+    ...actual,
+    writeTextToStdout: vi.fn((text: string) => {
+      archiveMockState.textWrites.push(text);
+      return Promise.resolve();
+    }),
+  };
+});
 
 vi.mock("../../packages/cli/src/commands/convert.js", () => ({
   runConvertCommand: vi.fn(async (args: { readonly outputPath?: string }) => {

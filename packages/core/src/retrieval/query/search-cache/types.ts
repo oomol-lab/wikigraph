@@ -148,4 +148,3 @@ export interface SearchTextCursorKey {
 
 export type SearchSessionCacheInput = Omit<SearchSessionInput, "items">;
 export type EntitySearchSessionCacheInput = EntitySearchSessionInput;
-

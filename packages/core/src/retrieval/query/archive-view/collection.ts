@@ -1,4 +1,7 @@
-import type { MentionRecord, ReadonlyDocument } from "../../../document/index.js";
+import type {
+  MentionRecord,
+  ReadonlyDocument,
+} from "../../../document/index.js";
 import { listChapters } from "../../../document/chapter/index.js";
 
 import {

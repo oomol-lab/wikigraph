@@ -1,7 +1,11 @@
 import { join, resolve } from "path";
 
 import type { Database } from "../database.js";
-import { Sentence, type FragmentRecord, type SentenceRecord } from "../types.js";
+import {
+  Sentence,
+  type FragmentRecord,
+  type SentenceRecord,
+} from "../types.js";
 import { TextStreamDraft } from "./draft.js";
 import {
   getSentenceByteLength,

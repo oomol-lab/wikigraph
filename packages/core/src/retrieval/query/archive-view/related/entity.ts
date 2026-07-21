@@ -1,7 +1,11 @@
 import type { ReadonlyDocument } from "../../../../document/index.js";
 
 import { compareNumbers } from "../helpers.js";
-import { filterMentionsByChapter, formatEntityUri, formatTripleUri } from "../knowledge.js";
+import {
+  filterMentionsByChapter,
+  formatEntityUri,
+  formatTripleUri,
+} from "../knowledge.js";
 import type { WikiGraphReference } from "../references.js";
 import type {
   ArchiveListItem,

@@ -22,7 +22,11 @@ export {
   formatSummaryId,
 } from "./references.js";
 
-export { getArchiveIndex, listArchiveCollection, listArchiveObjects } from "./collection.js";
+export {
+  getArchiveIndex,
+  listArchiveCollection,
+  listArchiveObjects,
+} from "./collection.js";
 export { listArchiveEvidence } from "./evidence.js";
 export { packArchiveContext } from "./pack.js";
 

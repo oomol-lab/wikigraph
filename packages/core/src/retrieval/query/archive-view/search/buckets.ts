@@ -1,6 +1,9 @@
 import type { ReadonlyDocument } from "../../../../document/index.js";
 import { listChapters } from "../../../../document/chapter/index.js";
-import { createLexicalQuery, listLexicalQueryCandidateTerms } from "../../lexical-search.js";
+import {
+  createLexicalQuery,
+  listLexicalQueryCandidateTerms,
+} from "../../lexical-search.js";
 import {
   decodeBucketSearchSessionCursor,
   encodeBucketSearchSessionCursor,
@@ -35,17 +38,12 @@ import {
   assertSearchCursorTypesMatch,
   createEntitySearchCacheInput,
 } from "./cache-input.js";
-import {
-  findEntities,
-  findTriples,
-} from "../find.js";
+import { findEntities, findTriples } from "../find.js";
 import {
   createFindEvidenceHydrationOptions,
   hydrateFindHitEvidence,
 } from "../evidence.js";
-import {
-  hydrateFindResultBacklinks,
-} from "../backlinks.js";
+import { hydrateFindResultBacklinks } from "../backlinks.js";
 import {
   hydrateSearchObjectHit,
   hydrateSearchTextHit,
@@ -63,7 +61,11 @@ import {
   isAfterChapterTitleKey,
   isAfterTextKey,
 } from "./bucket-order.js";
-import type { ArchiveFindHit, ArchiveFindOptions, ArchiveFindResult } from "../types.js";
+import type {
+  ArchiveFindHit,
+  ArchiveFindOptions,
+  ArchiveFindResult,
+} from "../types.js";
 
 export async function readBucketedSearchResultPage(
   document: ReadonlyDocument,
@@ -399,8 +401,6 @@ async function readTextBucketPage(
 function createBucketQueryWindow(limit: number): number {
   return Math.max(limit + 1, limit * 3 + 1, 100);
 }
-
-
 
 export function tryDecodeBucketSearchSessionCursor(cursor: string):
   | {

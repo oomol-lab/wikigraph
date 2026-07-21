@@ -133,5 +133,4 @@ export function parseMetadataTarget(objectUri: string): string | undefined {
 
 export function containsMetadataKeySuffix(objectUri: string): boolean {
   return /(?:^|\/)meta\/.+/u.test(stripObjectUriPrefix(objectUri));
-
 }

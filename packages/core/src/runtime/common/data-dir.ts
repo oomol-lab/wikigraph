@@ -22,6 +22,7 @@ function resolveDataDirPathFromModule(): string | undefined {
   const moduleDirectoryPath = dirname(fileURLToPath(import.meta.url));
 
   for (const candidatePath of [
+    resolve(moduleDirectoryPath, "../../../data"),
     resolve(moduleDirectoryPath, "../../data"),
     resolve(moduleDirectoryPath, "../data"),
   ]) {

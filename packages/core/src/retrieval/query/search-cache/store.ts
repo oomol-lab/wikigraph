@@ -129,7 +129,9 @@ export async function deleteSearchSession(
   ]);
 }
 
-export async function deleteUnusedPredicates(database: Database): Promise<void> {
+export async function deleteUnusedPredicates(
+  database: Database,
+): Promise<void> {
   await database.run(`
     DELETE FROM predicate_dictionary
     WHERE NOT EXISTS (

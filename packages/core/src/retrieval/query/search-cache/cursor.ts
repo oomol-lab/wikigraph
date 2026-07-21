@@ -180,4 +180,3 @@ function isTextCursorKey(value: unknown): value is SearchTextCursorKey {
     typeof (value as SearchTextCursorKey).sentenceIndex === "number"
   );
 }
-

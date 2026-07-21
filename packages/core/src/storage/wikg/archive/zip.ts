@@ -7,14 +7,8 @@ import {
   type ZipFile as YauzlZipFile,
 } from "yauzl";
 
-import {
-  WIKG_MANIFEST_PATH,
-  WIKG_MUTATION_TOKEN_PATH,
-} from "./constants.js";
-import {
-  parseWikgManifest,
-  parseWikgMutationToken,
-} from "./manifest.js";
+import { WIKG_MANIFEST_PATH, WIKG_MUTATION_TOKEN_PATH } from "./constants.js";
+import { parseWikgManifest, parseWikgMutationToken } from "./manifest.js";
 import { normalizeArchivePath } from "./paths.js";
 
 export async function openIndexedArchive(inputPath: string): Promise<{

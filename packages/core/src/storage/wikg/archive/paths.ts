@@ -49,7 +49,9 @@ export function sortArchiveEntriesForWrite<
   );
 }
 
-export function sortArchiveEntryPathsForWrite(paths: Iterable<string>): string[] {
+export function sortArchiveEntryPathsForWrite(
+  paths: Iterable<string>,
+): string[] {
   return [...paths].sort(compareArchiveEntryPathsForWrite);
 }
 

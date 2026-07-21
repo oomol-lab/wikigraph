@@ -1,4 +1,7 @@
-import { ParsedJsonError, requestGuaranteedJson } from "../../../../external/guaranteed/index.js";
+import {
+  ParsedJsonError,
+  requestGuaranteedJson,
+} from "../../../../external/guaranteed/index.js";
 import type { LLMessage } from "../../../../external/llm/index.js";
 import type { SentenceId } from "../../../../document/index.js";
 import {

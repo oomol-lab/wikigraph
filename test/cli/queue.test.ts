@@ -70,62 +70,65 @@ const queueMockState = vi.hoisted(() => ({
   writeCalls: [] as string[],
 }));
 
-vi.mock("../../packages/core/src/storage/wikg/wiki-graph-archive-file.js", () => ({
-  WikiGraphArchiveFile: class {
-    readonly #path: string;
+vi.mock(
+  "../../packages/core/src/storage/wikg/wiki-graph-archive-file.js",
+  () => ({
+    WikiGraphArchiveFile: class {
+      readonly #path: string;
 
-    public constructor(path: string) {
-      this.#path = path;
-    }
+      public constructor(path: string) {
+        this.#path = path;
+      }
 
-    public async read(
-      operation: (digest: unknown) => Promise<unknown>,
-    ): Promise<unknown> {
-      queueMockState.openPaths.push(this.#path);
-      return await operation({
-        readChapterStage: () => {
-          if (queueMockState.readChapterStageError !== undefined) {
-            throw queueMockState.readChapterStageError;
-          }
-
-          return Promise.resolve(queueMockState.chapterStage);
-        },
-      });
-    }
-
-    public async readDocument(
-      operation: (document: unknown) => Promise<unknown>,
-    ): Promise<unknown> {
-      queueMockState.readDocumentCalls.push(this.#path);
-      queueMockState.stepLog.push("read:start");
-      try {
+      public async read(
+        operation: (digest: unknown) => Promise<unknown>,
+      ): Promise<unknown> {
+        queueMockState.openPaths.push(this.#path);
         return await operation({
-          serials: {
-            getRevision: () => Promise.resolve(queueMockState.revision),
+          readChapterStage: () => {
+            if (queueMockState.readChapterStageError !== undefined) {
+              throw queueMockState.readChapterStageError;
+            }
+
+            return Promise.resolve(queueMockState.chapterStage);
           },
         });
-      } finally {
-        queueMockState.stepLog.push("read:end");
       }
-    }
 
-    public async write(
-      operation: (document: unknown) => Promise<unknown>,
-    ): Promise<unknown> {
-      queueMockState.writeCalls.push(this.#path);
-      queueMockState.stepLog.push("write:start");
-      try {
-        return await operation({
-          serials: {
-            getRevision: () => Promise.resolve(queueMockState.revision),
-          },
-        });
-      } finally {
-        queueMockState.stepLog.push("write:end");
+      public async readDocument(
+        operation: (document: unknown) => Promise<unknown>,
+      ): Promise<unknown> {
+        queueMockState.readDocumentCalls.push(this.#path);
+        queueMockState.stepLog.push("read:start");
+        try {
+          return await operation({
+            serials: {
+              getRevision: () => Promise.resolve(queueMockState.revision),
+            },
+          });
+        } finally {
+          queueMockState.stepLog.push("read:end");
+        }
       }
-    }
-  },
-}));
+
+      public async write(
+        operation: (document: unknown) => Promise<unknown>,
+      ): Promise<unknown> {
+        queueMockState.writeCalls.push(this.#path);
+        queueMockState.stepLog.push("write:start");
+        try {
+          return await operation({
+            serials: {
+              getRevision: () => Promise.resolve(queueMockState.revision),
+            },
+          });
+        } finally {
+          queueMockState.stepLog.push("write:end");
+        }
+      }
+    },
+  }),
+);
 
 vi.mock("../../packages/core/src/api/index.js", () => ({
   addBuildJob: vi.fn((options: unknown) => {
@@ -262,56 +265,50 @@ vi.mock("../../packages/core/src/api/index.js", () => ({
   updateBuildJobTarget: vi.fn(),
 }));
 
-vi.mock(
-  "../../packages/cli/src/support/index.js",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof CLISupport>();
+vi.mock("../../packages/cli/src/support/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof CLISupport>();
 
-    return {
-      ...actual,
-      writeTextToStdout: vi.fn((text: string) => {
-        queueMockState.textWrites.push(text);
-        return Promise.resolve();
-      }),
-    };
-  },
-);
+  return {
+    ...actual,
+    writeTextToStdout: vi.fn((text: string) => {
+      queueMockState.textWrites.push(text);
+      return Promise.resolve();
+    }),
+  };
+});
 
 vi.mock("../../packages/cli/src/runtime/config.js", () => ({
   loadCLIConfig: vi.fn(() => Promise.resolve(queueMockState.cliConfig)),
 }));
 
-vi.mock(
-  "../../packages/cli/src/runtime/index.js",
-  async (importOriginal) => {
-    const actual = await importOriginal<typeof CLIRuntime>();
+vi.mock("../../packages/cli/src/runtime/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof CLIRuntime>();
 
-    return {
-      ...actual,
-      createStageLLM: vi.fn((_config: unknown, options: unknown) => {
-        queueMockState.createStageLLMCalls.push(options);
-        return {};
-      }),
-      loadRequiredStageConfig: vi.fn((options: unknown) => {
-        queueMockState.loadRequiredStageConfigCalls.push(options);
-        if (queueMockState.loadRequiredStageConfigError !== undefined) {
-          return Promise.reject(queueMockState.loadRequiredStageConfigError);
-        }
+  return {
+    ...actual,
+    createStageLLM: vi.fn((_config: unknown, options: unknown) => {
+      queueMockState.createStageLLMCalls.push(options);
+      return {};
+    }),
+    loadRequiredStageConfig: vi.fn((options: unknown) => {
+      queueMockState.loadRequiredStageConfigCalls.push(options);
+      if (queueMockState.loadRequiredStageConfigError !== undefined) {
+        return Promise.reject(queueMockState.loadRequiredStageConfigError);
+      }
 
-        return Promise.resolve({
-          ...queueMockState.cliConfig,
-          prompt: "Keep key beats",
-        });
-      }),
-      resolveExtractionPrompt: vi.fn(
-        (prompt: string | undefined) => prompt ?? "",
-      ),
-      resolveKnowledgeGraphRecallPrompt: vi.fn(
-        (prompt: string | undefined) => prompt ?? "Default KG recall",
-      ),
-    };
-  },
-);
+      return Promise.resolve({
+        ...queueMockState.cliConfig,
+        prompt: "Keep key beats",
+      });
+    }),
+    resolveExtractionPrompt: vi.fn(
+      (prompt: string | undefined) => prompt ?? "",
+    ),
+    resolveKnowledgeGraphRecallPrompt: vi.fn(
+      (prompt: string | undefined) => prompt ?? "Default KG recall",
+    ),
+  };
+});
 
 import {
   runQueueCommand,

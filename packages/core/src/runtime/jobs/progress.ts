@@ -10,10 +10,7 @@ import type {
 } from "./types.js";
 
 export interface BuildJobProgressAccumulatorActions {
-  appendBuildJobEvent(
-    job: BuildJob,
-    event: BuildJobEvent,
-  ): Promise<void>;
+  appendBuildJobEvent(job: BuildJob, event: BuildJobEvent): Promise<void>;
   markBuildJobStep(jobId: string, step: BuildJobTarget): Promise<void>;
   readBuildJobForStopCheck(jobId: string): Promise<BuildJob>;
 }

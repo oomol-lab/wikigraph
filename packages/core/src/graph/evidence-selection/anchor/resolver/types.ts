@@ -12,4 +12,3 @@ export interface AnchorSpec {
   readonly head?: string;
   readonly tail?: string;
 }
-

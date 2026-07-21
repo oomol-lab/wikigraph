@@ -1,8 +1,5 @@
 import { getReadingEdgeKey } from "../weights.js";
-import {
-  DECAY_FACTOR,
-  DEFAULT_LINK_STRENGTH_WEIGHT,
-} from "./constants.js";
+import { DECAY_FACTOR, DEFAULT_LINK_STRENGTH_WEIGHT } from "./constants.js";
 import {
   createBooleanRecord,
   createNumberMatrixRecord,

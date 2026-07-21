@@ -1,7 +1,14 @@
-import { formatWikiGraphCommandUri, type ArchiveFindEvidencePreview, type ArchivePage } from "wiki-graph-core";
+import {
+  formatWikiGraphCommandUri,
+  type ArchiveFindEvidencePreview,
+  type ArchivePage,
+} from "wiki-graph-core";
 
 import { formatCLIJSON, formatCliCommand } from "../../../support/index.js";
-import { createEvidencePreviewObject, createPageObject } from "../object/objects.js";
+import {
+  createEvidencePreviewObject,
+  createPageObject,
+} from "../object/objects.js";
 import type { ArchiveOutputContext } from "../object/types.js";
 import { toWikiGraphUri } from "../object/uri.js";
 import { formatEvidencePreviewBlocks } from "./evidence.js";
@@ -88,7 +95,6 @@ function formatEntityWikipageLocaleLines(
     ...(locale.description === undefined ? [] : [locale.description]),
   ];
 }
-
 
 export function formatNeighborLines(
   neighbors: Extract<ArchivePage, { readonly type: "node" }>["neighbors"],

@@ -1,6 +1,8 @@
 import type { SentenceRecord } from "../types.js";
 
-export function splitTextIntoSentences(text: string): readonly SentenceRecord[] {
+export function splitTextIntoSentences(
+  text: string,
+): readonly SentenceRecord[] {
   return text
     .split(/\n+/u)
     .map((sentence) => sentence.trim())

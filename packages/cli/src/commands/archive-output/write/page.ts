@@ -16,7 +16,11 @@ import {
 } from "../text/index.js";
 import { writeJSONL } from "./jsonl.js";
 import { createPageObject } from "../object/objects.js";
-import type { ArchiveOutputContext, ArchiveOutputObject, ResultFormat } from "../object/types.js";
+import type {
+  ArchiveOutputContext,
+  ArchiveOutputObject,
+  ResultFormat,
+} from "../object/types.js";
 
 export async function writePage(
   page: ArchivePage,

@@ -1,4 +1,7 @@
-import type { CLIArchiveChapterAction, CLIArchiveMaintenanceCommand } from "../../types.js";
+import type {
+  CLIArchiveChapterAction,
+  CLIArchiveMaintenanceCommand,
+} from "../../types.js";
 
 export function isArchiveChapterAction(
   value: string | undefined,

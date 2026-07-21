@@ -5,10 +5,7 @@ import { finished } from "stream/promises";
 
 import { ZipFile as YazlZipFile } from "yazl";
 
-import {
-  WIKG_MANIFEST_PATH,
-  WIKG_MUTATION_TOKEN_PATH,
-} from "./constants.js";
+import { WIKG_MANIFEST_PATH, WIKG_MUTATION_TOKEN_PATH } from "./constants.js";
 import {
   listDocumentFiles,
   shouldEmbedSearchIndex,
@@ -25,10 +22,7 @@ import {
   sortArchiveEntryPathsForWrite,
 } from "./paths.js";
 import type { WikgArchiveOverlay } from "./types.js";
-import {
-  openIndexedArchive,
-  readArchiveEntryBufferFromFile,
-} from "./zip.js";
+import { openIndexedArchive, readArchiveEntryBufferFromFile } from "./zip.js";
 
 export async function writeWikgArchive(
   documentDirectoryPath: string,

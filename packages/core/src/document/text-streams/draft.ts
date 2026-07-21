@@ -1,4 +1,9 @@
-import { Sentence, type FragmentRecord, type SentenceId, type SentenceRecord } from "../types.js";
+import {
+  Sentence,
+  type FragmentRecord,
+  type SentenceId,
+  type SentenceRecord,
+} from "../types.js";
 
 export class TextStreamDraft {
   #committed = false;

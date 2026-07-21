@@ -563,5 +563,4 @@ export class EvidenceResolver {
         "Please provide a more specific anchor or surrounding context.",
     };
   }
-
 }

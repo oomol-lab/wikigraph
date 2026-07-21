@@ -1,5 +1,9 @@
 import { posix, resolve, sep } from "path";
-import { open as openZip, type Entry, type ZipFile as YauzlZipFile } from "yauzl";
+import {
+  open as openZip,
+  type Entry,
+  type ZipFile as YauzlZipFile,
+} from "yauzl";
 
 const LEGACY_SDPUB_PATTERNS = [
   /^manifest\.json$/u,

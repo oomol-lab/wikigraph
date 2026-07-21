@@ -17,7 +17,10 @@ import {
   createDigestProgressTracker,
   type WikiGraphProgressCallback,
 } from "../runtime/progress/index.js";
-import type { ReaderSegmenter, ReaderTextStream } from "../text/reader/index.js";
+import type {
+  ReaderSegmenter,
+  ReaderTextStream,
+} from "../text/reader/index.js";
 import type { LLM } from "../external/llm/index.js";
 import { SerialGeneration, writeSerialSource } from "../serial.js";
 

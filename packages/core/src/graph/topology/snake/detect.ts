@@ -1,4 +1,7 @@
-import type { ChunkRecord, ReadingEdgeRecord } from "../../../document/index.js";
+import type {
+  ChunkRecord,
+  ReadingEdgeRecord,
+} from "../../../document/index.js";
 import { isWeaklyConnected } from "./components.js";
 import { DEFAULT_SNAKE_WORDS_COUNT } from "./constants.js";
 import { compareChunkBySentence } from "./compare.js";

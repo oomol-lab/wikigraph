@@ -5,8 +5,15 @@ import { basename, dirname, join, resolve } from "path";
 import { writeWikgArchiveWithOverlays } from "../archive/index.js";
 
 import { createArchiveKey } from "./archive-key.js";
-import { DATABASE_ENTRY_PATH, SEARCH_INDEX_DATABASE_ENTRY_PATH } from "./constants.js";
-import { acquireArchiveCommitLock, acquireEntryLock, waitForSqliteLeasesToDrain } from "./locks.js";
+import {
+  DATABASE_ENTRY_PATH,
+  SEARCH_INDEX_DATABASE_ENTRY_PATH,
+} from "./constants.js";
+import {
+  acquireArchiveCommitLock,
+  acquireEntryLock,
+  waitForSqliteLeasesToDrain,
+} from "./locks.js";
 import {
   deleteOverlay,
   listOverlays,

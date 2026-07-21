@@ -2,10 +2,7 @@ import { randomBytes } from "crypto";
 
 import { z } from "zod";
 
-import {
-  WIKG_MANIFEST_PATH,
-  WIKG_MUTATION_TOKEN_PATH,
-} from "./constants.js";
+import { WIKG_MANIFEST_PATH, WIKG_MUTATION_TOKEN_PATH } from "./constants.js";
 
 export const WIKG_FORMAT_VERSION = 1;
 export const WIKG_MANIFEST_CONTENT = `${JSON.stringify({

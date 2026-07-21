@@ -62,4 +62,3 @@ export function parseNumberArray(value: string): readonly number[] {
 
   return [];
 }
-

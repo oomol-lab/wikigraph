@@ -7,10 +7,18 @@ import type { DocumentFileStore } from "../../../document/directory/index.js";
 import { listWikgArchiveEntries } from "../archive/index.js";
 
 import { createArchiveKey, createOwnerId } from "./archive-key.js";
-import { ARCHIVE_SESSION_CONSTRUCTOR_TOKEN, OWNER_HEARTBEAT_INTERVAL_MS } from "./constants.js";
+import {
+  ARCHIVE_SESSION_CONSTRUCTOR_TOKEN,
+  OWNER_HEARTBEAT_INTERVAL_MS,
+} from "./constants.js";
 import { WikgDocumentFileStore } from "./file-store.js";
 import { flushArchiveOverlays } from "./flusher.js";
-import { heartbeatArchiveOwner, reapArchive, registerArchiveOwner, unregisterArchiveOwner } from "./owners.js";
+import {
+  heartbeatArchiveOwner,
+  reapArchive,
+  registerArchiveOwner,
+  unregisterArchiveOwner,
+} from "./owners.js";
 import { listVisibleEntryPaths } from "./overlays.js";
 import type { WorkspaceWritebackPolicy } from "./types.js";
 import { ensureEmptyDirectory } from "./workspace.js";

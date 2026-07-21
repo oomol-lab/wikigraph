@@ -1,6 +1,11 @@
 import { LOCK_STALE_TIMEOUT_MS } from "./constants.js";
 import { flushArchiveOverlays } from "./flusher.js";
-import { cleanupStaleState, createPlaceholders, getString, withStateDatabase } from "./state.js";
+import {
+  cleanupStaleState,
+  createPlaceholders,
+  getString,
+  withStateDatabase,
+} from "./state.js";
 
 export async function registerArchiveOwner(input: {
   readonly archiveKey: string;

@@ -12,7 +12,9 @@ import { migrateLegacySummariesToTextStreams } from "./summaries.js";
 import { writeLegacySourceTextStream } from "./source-text.js";
 import type { SentenceIndexRemap } from "./types.js";
 
-export async function migrateLegacyTextStorage(workspacePath: string): Promise<void> {
+export async function migrateLegacyTextStorage(
+  workspacePath: string,
+): Promise<void> {
   const sourceSerials = await listLegacySourceSerials(workspacePath);
   const remaps = new Map<number, SentenceIndexRemap>();
 

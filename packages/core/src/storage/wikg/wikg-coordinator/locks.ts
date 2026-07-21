@@ -1,6 +1,12 @@
 import { createOwnerId, delay } from "./archive-key.js";
 import { LOCK_POLL_INTERVAL_MS, LOCK_STALE_TIMEOUT_MS } from "./constants.js";
-import { cleanupStaleState, getNumber, mapArchiveCommitLock, mapEntryLock, withStateDatabase } from "./state.js";
+import {
+  cleanupStaleState,
+  getNumber,
+  mapArchiveCommitLock,
+  mapEntryLock,
+  withStateDatabase,
+} from "./state.js";
 import type { EntryLockMode, SqliteLeaseMode } from "./types.js";
 
 export async function acquireArchiveCommitLock(

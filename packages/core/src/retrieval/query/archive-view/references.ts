@@ -1,7 +1,10 @@
 import type { ReadingEdgeRecord } from "../../../document/index.js";
 import { WIKI_GRAPH_URI_PREFIX } from "../../../runtime/common/wiki-graph/uri.js";
 
-import { isWikiGraphObjectUri, normalizeWikiGraphObjectUri } from "./helpers.js";
+import {
+  isWikiGraphObjectUri,
+  normalizeWikiGraphObjectUri,
+} from "./helpers.js";
 import type { ArchiveTextStreamKind, ChapterStateTarget } from "./types.js";
 
 export function formatChapterId(chapterId: number): string {
@@ -28,7 +31,6 @@ export function formatFragmentId(serialId: number, fragmentId: number): string {
   return `fragment:${serialId}:${fragmentId}`;
 }
 
-
 export function formatTextStreamRangeUri(
   chapterId: number,
   stream: ArchiveTextStreamKind,
@@ -44,7 +46,6 @@ export function formatTextStreamRangeUri(
 
   return `wikg://chapter/${chapterId}/${stream}#${hash}`;
 }
-
 
 export type WikiGraphReference =
   | {

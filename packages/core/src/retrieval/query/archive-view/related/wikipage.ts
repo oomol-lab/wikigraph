@@ -1,5 +1,8 @@
 import { WikipageResolver } from "../../../../external/wikipage/index.js";
-import type { QidResolution, WikipageSitelink } from "../../../../external/wikipage/index.js";
+import type {
+  QidResolution,
+  WikipageSitelink,
+} from "../../../../external/wikipage/index.js";
 
 import type { ArchiveEntityWikipageLocale } from "../types.js";
 import type { ArchivePageOptions } from "../pages.js";

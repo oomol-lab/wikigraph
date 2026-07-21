@@ -1,4 +1,7 @@
-import type { MentionLinkRecord, SentenceId } from "../../../../document/index.js";
+import type {
+  MentionLinkRecord,
+  SentenceId,
+} from "../../../../document/index.js";
 import type { GraphNeighbor, GraphNode } from "../../../../graph/reading.js";
 
 import {

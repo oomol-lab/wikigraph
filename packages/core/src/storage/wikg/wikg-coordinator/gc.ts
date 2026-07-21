@@ -11,15 +11,29 @@ import {
 import type { GcContext, GcJobResult } from "../../../runtime/gc/index.js";
 import { isNodeError } from "../../../utils/node-error.js";
 
-import { hasActiveArchiveOwnerOrSqliteLease, hasActiveWorkspaceUse } from "./activity.js";
+import {
+  hasActiveArchiveOwnerOrSqliteLease,
+  hasActiveWorkspaceUse,
+} from "./activity.js";
 import { pathExists } from "./archive-key.js";
-import { DATABASE_ENTRY_PATH, SEARCH_INDEX_DATABASE_ENTRY_PATH, SQLITE_CACHE_TTL_MS } from "./constants.js";
+import {
+  DATABASE_ENTRY_PATH,
+  SEARCH_INDEX_DATABASE_ENTRY_PATH,
+  SQLITE_CACHE_TTL_MS,
+} from "./constants.js";
 import { acquireEntryLock } from "./locks.js";
 import { deleteOverlay, listOverlays, readOverlay } from "./overlays.js";
 import { readSearchIndexCacheStatus } from "./search-index-cache.js";
-import { cleanupStaleState, mapEntryOverlay, withStateDatabase } from "./state.js";
+import {
+  cleanupStaleState,
+  mapEntryOverlay,
+  withStateDatabase,
+} from "./state.js";
 import type { EntryOverlay, WorkspaceDirectoryEntry } from "./types.js";
-import { getCoordinatorWorkspaceRootPath, listWorkspaceFiles } from "./workspace.js";
+import {
+  getCoordinatorWorkspaceRootPath,
+  listWorkspaceFiles,
+} from "./workspace.js";
 
 export async function runWikgCoordinatorGc(
   context: GcContext,

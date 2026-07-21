@@ -1,10 +1,16 @@
 import { withHelpRoute } from "../../../support/index.js";
-import type { CLIArchiveChapterAction, CLIArchiveChapterArguments } from "../../types.js";
+import type {
+  CLIArchiveChapterAction,
+  CLIArchiveChapterArguments,
+} from "../../types.js";
 import { requireChapterId } from "../flags.js";
 import { parseChapterRef, parseSerialId } from "./ids.js";
 import { parseResetStage } from "./stages.js";
-import { rejectActionBooleanFlag, rejectActionFlag, rejectConflictingMoveFlags } from "./rejections.js";
-
+import {
+  rejectActionBooleanFlag,
+  rejectActionFlag,
+  rejectConflictingMoveFlags,
+} from "./rejections.js";
 
 export function normalizeArchiveChapterArguments(
   action: CLIArchiveChapterAction,

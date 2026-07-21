@@ -25,7 +25,9 @@ ON continuation_cursors(expires_at);
 `;
 
 export const CURSOR_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-export async function createUniqueCursorId(database: Database): Promise<string> {
+export async function createUniqueCursorId(
+  database: Database,
+): Promise<string> {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const cursorId = `c_${randomBytes(6).toString("base64url")}`;
     const existing = await database.queryOne(

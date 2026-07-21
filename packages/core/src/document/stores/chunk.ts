@@ -1,10 +1,6 @@
 import { getNumber, getOptionalString, getString } from "../database.js";
 import type { Database, SqlRow } from "../database.js";
-import type {
-  ChunkRecord,
-  CreateChunkRecord,
-  SentenceId,
-} from "../types.js";
+import type { ChunkRecord, CreateChunkRecord, SentenceId } from "../types.js";
 import {
   deduplicateById,
   parseChunkImportance,

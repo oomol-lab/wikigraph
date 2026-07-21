@@ -10,7 +10,13 @@ import type {
   ArchiveTriplePattern,
 } from "../types.js";
 import { BROAD_FIND_LENS_HINT, DEFAULT_FIND_LIMIT } from "./constants.js";
-import { decodeFindCursor, encodeFindCursor, createSearchTerms, isCollectionType, isFindFilterType } from "./parse.js";
+import {
+  decodeFindCursor,
+  encodeFindCursor,
+  createSearchTerms,
+  isCollectionType,
+  isFindFilterType,
+} from "./parse.js";
 import { compareListHits, compareSearchHits } from "./sort.js";
 import { aggregateEvidenceScores, compareFindEvidenceHits } from "./text.js";
 

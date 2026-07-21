@@ -6,14 +6,8 @@ import { bookMetaSchema, type BookMeta } from "../../text/source/meta.js";
 import { tocFileSchema, type TocFile } from "../../text/source/toc.js";
 import type { SourceAsset } from "../../text/source/types.js";
 import { Database } from "../database.js";
-import {
-  TextStreams,
-  type SerialTextStream,
-} from "../text-streams/index.js";
-import {
-  initializeDocumentSchema,
-  SCHEMA_SQL,
-} from "../schema.js";
+import { TextStreams, type SerialTextStream } from "../text-streams/index.js";
+import { initializeDocumentSchema, SCHEMA_SQL } from "../schema.js";
 import {
   ChunkStore,
   FragmentGroupStore,
@@ -47,11 +41,7 @@ import {
   rollbackDocumentContext,
 } from "./serial-cleanup.js";
 import { listTocSerialIds } from "./toc.js";
-import type {
-  Document,
-  DocumentContext,
-  DocumentFileStore,
-} from "./types.js";
+import type { Document, DocumentContext, DocumentFileStore } from "./types.js";
 
 const coverFileSchema = z.object({
   mediaType: z.string().min(1),

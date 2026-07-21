@@ -1,4 +1,8 @@
-import type { MentionLinkRecord, MentionRecord, ReadonlyDocument } from "../../../../document/index.js";
+import type {
+  MentionLinkRecord,
+  MentionRecord,
+  ReadonlyDocument,
+} from "../../../../document/index.js";
 
 import { TEXT_SENTENCE_KIND } from "../../../search-index/search/index.js";
 import {
@@ -23,15 +27,9 @@ import {
   createMentionLinkEvidenceRanges,
   mergeSourceEvidenceRanges,
 } from "./ranges.js";
-import {
-  createEvidenceReadContext,
-  createSourceEvidenceItem,
-} from "./read.js";
+import { createEvidenceReadContext, createSourceEvidenceItem } from "./read.js";
 
-export {
-  createEvidenceReadContext,
-  createSourceEvidenceItem,
-} from "./read.js";
+export { createEvidenceReadContext, createSourceEvidenceItem } from "./read.js";
 export {
   createExpandedSourceEvidenceRanges,
   createMentionEvidenceRanges,

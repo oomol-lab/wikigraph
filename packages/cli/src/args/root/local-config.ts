@@ -1,7 +1,15 @@
-import { isUriHelpPredicate, renderUriHelpText, renderUriPredicateHelpText } from "../help.js";
+import {
+  isUriHelpPredicate,
+  renderUriHelpText,
+  renderUriPredicateHelpText,
+} from "../help.js";
 import type { LocalConfigSection } from "../../runtime/local-config.js";
 import { CLI_HELP_ROUTES, withHelpRoute } from "../../support/index.js";
-import type { ArchiveArgumentValues, CLILocalConfigAction, ParsedCLIArguments } from "../types.js";
+import type {
+  ArchiveArgumentValues,
+  CLILocalConfigAction,
+  ParsedCLIArguments,
+} from "../types.js";
 import {
   formatRemovedImplicitVerbMessage,
   formatWikiGraphHelpCommand,

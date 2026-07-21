@@ -1,10 +1,7 @@
 import type { ReaderChunk, ReaderGraphDelta } from "../reader/index.js";
 import type { Topology } from "../../graph/topology/index.js";
 
-export function createNumberListRecord(): Record<
-  string,
-  number[] | undefined
-> {
+export function createNumberListRecord(): Record<string, number[] | undefined> {
   return Object.create(null) as Record<string, number[] | undefined>;
 }
 

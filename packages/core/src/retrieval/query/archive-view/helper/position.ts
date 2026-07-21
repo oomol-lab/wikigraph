@@ -1,5 +1,9 @@
 import type { SentenceId } from "../../../../document/index.js";
-import type { ArchiveFindHit, ArchiveFindObjectType, ArchiveFindPosition } from "../types.js";
+import type {
+  ArchiveFindHit,
+  ArchiveFindObjectType,
+  ArchiveFindPosition,
+} from "../types.js";
 
 export function getPositionChapter(hit: ArchiveFindHit): number {
   return hit.position?.chapter ?? Number.MAX_SAFE_INTEGER;

@@ -35,10 +35,7 @@ import {
   type SerialProgressSink,
 } from "./options.js";
 import { getSerialRecord, resolveDocument } from "./record.js";
-import {
-  createNumberListRecord,
-  saveDelta,
-} from "./reader-graph.js";
+import { createNumberListRecord, saveDelta } from "./reader-graph.js";
 import { writeSerialSource } from "./source.js";
 import { Serial } from "./topology.js";
 
