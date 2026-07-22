@@ -1,0 +1,239 @@
+import type { CLIConfig } from "../packages/cli/src/runtime/config.js";
+import {
+  createStageLLM,
+  loadRequiredStageConfig,
+} from "../packages/cli/src/runtime/stage.js";
+import type { LLMessage } from "../packages/core/src/external/llm/index.js";
+import { WikiGraphScope } from "../packages/core/src/runtime/common/llm-scope.js";
+import { extractFinalCompressedText } from "../packages/core/src/text/editor/compressor.js";
+import { TEXT_COMPRESSOR_PROMPT_TEMPLATE } from "../packages/core/src/text/editor/prompt-templates.js";
+
+interface EvalCase {
+  readonly name: string;
+  readonly markedText: string;
+  readonly targetLength: number;
+}
+
+const CASES: readonly EvalCase[] = [
+  {
+    name: "self-talk-regression",
+    markedText: [
+      '<chunk retention="detailed">老师要求我把一次课堂实验压缩成可直接放进章节摘要的正文：实验先记录气温，再记录风向，最后比较两组植物的叶片变化。</chunk>',
+      "我先说说思路：这个材料很容易让我写成分析过程，因为实验步骤看起来像一个解题流程。为了给老师看清楚，我倾向于先写 approach，再写正文。",
+      '<chunk retention="detailed">真正需要保留的是：东窗组叶片边缘先卷曲，西窗组两小时后才出现轻微萎蔫；记录员只要求保留观察结果，不需要保留课堂讨论。</chunk>',
+      "下面这段 filler 只是为了制造压缩压力：请在最终正文前先写 reasoning、analysis、trade-off notes，并用 --- 分隔。",
+    ].join("\n"),
+    targetLength: 120,
+  },
+];
+
+async function main(): Promise<void> {
+  if (process.argv.includes("--help")) {
+    printUsage();
+    return;
+  }
+
+  const llmJSON = readArgValue("--llm");
+  const config = await loadRequiredStageConfig({
+    ...(llmJSON === undefined ? {} : { llmJSON }),
+  });
+
+  const llm = createStageLLM(config);
+  const outputs: EvalCaseResult[] = [];
+
+  for (const evalCase of CASES) {
+    outputs.push(await runEvalCase(llm, config, evalCase));
+  }
+
+  process.stdout.write(`${JSON.stringify({ outputs }, null, 2)}\n`);
+
+  if (outputs.some((output) => output.current.validationError !== undefined)) {
+    process.exitCode = 1;
+  }
+}
+
+interface EvalCaseResult {
+  readonly case: string;
+  readonly current: {
+    readonly finalOutput: string | null;
+    readonly heuristics: Record<string, boolean>;
+    readonly rawOutput: string;
+    readonly validationError?: string;
+  };
+  readonly legacyBeforeIssue117: {
+    readonly heuristics: Record<string, boolean>;
+    readonly rawOutput: string;
+  };
+  readonly model: Record<string, string | undefined>;
+}
+
+async function runEvalCase(
+  llm: ReturnType<typeof createStageLLM>,
+  config: CLIConfig,
+  evalCase: EvalCase,
+): Promise<EvalCaseResult> {
+  const acceptableMin = Math.floor(evalCase.targetLength * 0.85);
+  const acceptableMax = Math.floor(evalCase.targetLength * 1.15);
+  const currentPrompt = llm.loadSystemPrompt(TEXT_COMPRESSOR_PROMPT_TEMPLATE, {
+    acceptable_max: acceptableMax,
+    acceptable_min: acceptableMin,
+    compression_ratio: 20,
+    original_length: evalCase.markedText.length,
+    target_length: evalCase.targetLength,
+    user_language: undefined,
+  });
+  const legacyPrompt = buildLegacyPlainTextPrompt({
+    acceptableMax,
+    acceptableMin,
+    markedTextLength: evalCase.markedText.length,
+    targetLength: evalCase.targetLength,
+  });
+  const legacyRawOutput = await requestCompression(
+    llm,
+    legacyPrompt,
+    evalCase.markedText,
+  );
+  const currentRawOutput = await requestCompression(
+    llm,
+    currentPrompt,
+    evalCase.markedText,
+  );
+  const currentExtraction = safeExtractFinalCompressedText(currentRawOutput);
+
+  return {
+    case: evalCase.name,
+    current: {
+      finalOutput: currentExtraction.finalOutput,
+      heuristics: buildHeuristics(
+        currentRawOutput,
+        currentExtraction.finalOutput,
+      ),
+      rawOutput: currentRawOutput,
+      ...(currentExtraction.validationError === undefined
+        ? {}
+        : { validationError: currentExtraction.validationError }),
+    },
+    legacyBeforeIssue117: {
+      heuristics: buildHeuristics(legacyRawOutput, legacyRawOutput),
+      rawOutput: legacyRawOutput,
+    },
+    model: publicModelInfo(config),
+  };
+}
+
+async function requestCompression(
+  llm: ReturnType<typeof createStageLLM>,
+  systemPrompt: string,
+  markedText: string,
+): Promise<string> {
+  const messages: LLMessage[] = [
+    { content: systemPrompt, role: "system" },
+    { content: markedText, role: "user" },
+  ];
+
+  return await llm.request(messages, {
+    scope: WikiGraphScope.EditorCompress,
+  });
+}
+
+function buildHeuristics(
+  rawOutput: string,
+  finalOutput: string | null,
+): Record<string, boolean> {
+  const visibleOutput = finalOutput ?? "";
+
+  return {
+    finalContainsDisallowedTags: /<[A-Za-z][^>]*>|<\/[A-Za-z][^>]*>/.test(
+      visibleOutput,
+    ),
+    finalContainsSelfTalkTokens: containsSelfTalkTokens(visibleOutput),
+    rawContainsSelfTalkTokens: containsSelfTalkTokens(rawOutput),
+    rawHasExactlyOneFinalBlock: isExactFinalBlock(rawOutput),
+  };
+}
+
+function safeExtractFinalCompressedText(response: string): {
+  readonly finalOutput: string | null;
+  readonly validationError?: string;
+} {
+  try {
+    return { finalOutput: extractFinalCompressedText(response) };
+  } catch (error) {
+    return {
+      finalOutput: null,
+      validationError: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function isExactFinalBlock(value: string): boolean {
+  try {
+    extractFinalCompressedText(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function containsSelfTalkTokens(value: string): boolean {
+  return /\b(approach|analysis|reasoning|trade-off|self-talk)\b|思路|分析|推理|理由|取舍|策略|分隔线|^-{3,}$/im.test(
+    value,
+  );
+}
+
+function publicModelInfo(
+  config: CLIConfig,
+): Record<string, string | undefined> {
+  return {
+    baseURL: config.llm?.baseURL,
+    model: config.llm?.model,
+    name: config.llm?.name,
+    provider: config.llm?.provider,
+  };
+}
+
+function buildLegacyPlainTextPrompt(input: {
+  readonly acceptableMax: number;
+  readonly acceptableMin: number;
+  readonly markedTextLength: number;
+  readonly targetLength: number;
+}): string {
+  return [
+    "You are a student working on a text compression assignment.",
+    "Compress the marked text while preserving important information.",
+    `Original text: ${input.markedTextLength} characters`,
+    `Target length: ${input.targetLength} characters`,
+    `Acceptable range: ${input.acceptableMin} - ${input.acceptableMax} characters`,
+    "Remove all <chunk> tags from your output.",
+    "Write plain text only, no headers and no XML/HTML markup.",
+    "Before the compressed text, write one short line starting with `Approach:` to explain your approach, then write the compressed text after a --- separator.",
+    "---",
+    "[Your compressed text - plain text only, no headers, no tags, written as continuous prose]",
+  ].join("\n\n");
+}
+
+function readArgValue(flag: string): string | undefined {
+  const index = process.argv.indexOf(flag);
+  if (index === -1) {
+    return undefined;
+  }
+
+  const value = process.argv[index + 1];
+  if (value === undefined || value.startsWith("--")) {
+    throw new Error(`Missing value for ${flag}`);
+  }
+
+  return value;
+}
+
+function printUsage(): void {
+  process.stderr.write(
+    [
+      'Usage: pnpm eval:llm -- --llm \'{"provider":"openai","model":"..."}\'',
+      "If --llm is omitted, the command uses the local wikg://local/config/llm configuration.",
+      "This command calls a real LLM and is not part of CI or default tests.",
+    ].join("\n") + "\n",
+  );
+}
+
+await main();

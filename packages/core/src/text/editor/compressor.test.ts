@@ -21,9 +21,9 @@ describe("editor/compressor", () => {
         [
           "My approach is to keep the highlighted facts and remove filler.",
           "---",
-          "只保留正文。",
+          "<final>只保留正文。</final>",
         ].join("\n"),
-        JSON.stringify({ compressedText: "只保留正文。" }),
+        "<final>只保留正文。</final>",
       ],
     });
     const requester = new CompressionRequester(llm, "compress", 0.2);
@@ -39,15 +39,15 @@ describe("editor/compressor", () => {
     const retryMessages = calls[1]?.messages;
 
     expect(retryMessages?.[retryMessages.length - 1]?.content).toContain(
-      "Regenerate",
+      "Return exactly one <final>...</final> block",
     );
   });
 
-  it("keeps revision history in the same JSON protocol", async () => {
+  it("keeps revision history in the same final-tag protocol", async () => {
     const calls: RequestCall<"compress">[] = [];
     const llm = createFakeLlm<"compress">({
       calls,
-      responses: [JSON.stringify({ compressedText: "修订后的正文。" })],
+      responses: ["<final>修订后的正文。</final>"],
     });
     const requester = new CompressionRequester(llm, "compress", 0.2);
 
@@ -61,13 +61,73 @@ describe("editor/compressor", () => {
     const initialMessages = calls[0]?.messages;
 
     expect(initialMessages?.[2]).toMatchObject({
-      content: JSON.stringify({ compressedText: "上一版正文。" }),
+      content: "<final>上一版正文。</final>",
       role: "assistant",
     });
     expect(initialMessages?.[3]).toMatchObject({
       content: "补充缺失信息。",
       role: "user",
     });
+  });
+
+  it("rejects output that escapes the final tag wrapper", async () => {
+    const calls: RequestCall<"compress">[] = [];
+    const llm = createFakeLlm<"compress">({
+      calls,
+      responses: [
+        "前言 <final>坏输出</final>",
+        "前言 <final>坏输出</final>",
+        "前言 <final>坏输出</final>",
+      ],
+    });
+    const requester = new CompressionRequester(llm, "compress", 0.2);
+
+    await expect(
+      requester.request({
+        markedText: '<chunk retention="detailed">只保留正文。</chunk>',
+        targetLength: 12,
+      }),
+    ).rejects.toThrow(
+      "Compression response must be exactly one <final>...</final> block.",
+    );
+
+    expect(calls).toHaveLength(3);
+  });
+
+  it("retains correction history across retries", async () => {
+    const calls: RequestCall<"compress">[] = [];
+    const llm = createFakeLlm<"compress">({
+      calls,
+      responses: [
+        "前言 <final>第一次坏输出</final>",
+        "<final><b>第二次坏输出</b></final>",
+        "<final>最终正文。</final>",
+      ],
+    });
+    const requester = new CompressionRequester(llm, "compress", 0.2);
+
+    await expect(
+      requester.request({
+        markedText: '<chunk retention="detailed">最终正文。</chunk>',
+        targetLength: 12,
+      }),
+    ).resolves.toBe("最终正文。");
+
+    expect(calls).toHaveLength(3);
+    expect(calls[2]?.messages.map((message) => message.role)).toStrictEqual([
+      "system",
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+      "user",
+    ]);
+    expect(calls[2]?.messages[2]?.content).toBe(
+      "前言 <final>第一次坏输出</final>",
+    );
+    expect(calls[2]?.messages[4]?.content).toBe(
+      "<final><b>第二次坏输出</b></final>",
+    );
   });
 });
 

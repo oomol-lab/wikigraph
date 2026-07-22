@@ -83,7 +83,7 @@ describe("editor/editor", () => {
   it("uses the covered segment when a group starts after the segment start", async () => {
     const llm = new ScriptedLLM<WikiGraphScope>([
       "Keep chronology intact.",
-      JSON.stringify({ compressedText: "Focused summary" }),
+      "<final>Focused summary</final>",
       '{"issues":[]}',
     ]);
     const document = createDocument({
@@ -138,9 +138,9 @@ describe("editor/editor", () => {
   it("iterates with reviewer history and language correction before selecting the best version", async () => {
     const llm = new ScriptedLLM<WikiGraphScope>([
       "Keep chronology intact.",
-      JSON.stringify({ compressedText: "<chunk>Bad Japanese summary</chunk>" }),
+      "<final>Bad Japanese summary</final>",
       '{"issues":[]}',
-      JSON.stringify({ compressedText: "Improved English summary" }),
+      "<final>Improved English summary</final>",
       '{"issues":[]}',
     ]);
     const document = createDocument({
@@ -192,12 +192,10 @@ describe("editor/editor", () => {
     expect(llm.prompts.map((prompt) => prompt.templateName)).toStrictEqual([
       CLUE_REVIEWER_GENERATOR_PROMPT_TEMPLATE,
       TEXT_COMPRESSOR_PROMPT_TEMPLATE,
-      RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
       CLUE_REVIEWER_PROMPT_TEMPLATE,
       RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
       REVISION_FEEDBACK_PROMPT_TEMPLATE,
       TEXT_COMPRESSOR_PROMPT_TEMPLATE,
-      RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
       CLUE_REVIEWER_PROMPT_TEMPLATE,
       RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
     ]);
@@ -211,7 +209,7 @@ describe("editor/editor", () => {
       ["system", "user", "assistant", "user"],
     );
     expect(llm.calls[3]?.messages[2]?.content).toBe(
-      JSON.stringify({ compressedText: "Bad Japanese summary" }),
+      "<final>Bad Japanese summary</final>",
     );
     expect(llm.calls[4]?.messages.map((message) => message.role)).toStrictEqual(
       ["system", "user", "assistant", "user"],

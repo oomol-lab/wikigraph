@@ -26,11 +26,11 @@ Your compressed text must fall within the acceptable range. Going over the maxim
 - Natural expression (sound native in {{ user_language }}, not machine-translated)
 - Terminology consistency (technical terms and proper nouns should be accurately rendered)
 
-**Process:**
-1. Read and understand the marked content in whatever language(s) it uses
-2. Compress according to retention levels (`verbatim`, `detailed`, etc.)
-3. Translate the compressed result to {{ user_language }}
-4. Ensure the output reads naturally in {{ user_language }}
+Apply these constraints silently:
+- Understand the marked content in whatever language(s) it uses.
+- Compress according to retention levels (`verbatim`, `detailed`, etc.).
+- Translate the compressed result to {{ user_language }}.
+- Ensure the output reads naturally in {{ user_language }}.
 
 **Important Notes:**
 - The input text may be in any language or mix of languages (e.g., an English book with French quotes)
@@ -48,13 +48,9 @@ Your compressed text must fall within the acceptable range. Going over the maxim
 
 ## Response Protocol (MUST FOLLOW)
 
-Return exactly one JSON object and nothing else:
+Return exactly one XML block matching this shape and nothing else: `<final>...</final>`
 
-```json
-{"compressedText":"..."}
-```
-
-The `compressedText` value is the only user-visible compressed content. Do not put your reasoning, approach, analysis, trade-offs, Markdown fences, or any extra fields before or after the JSON object.
+The content inside `<final>` is the only user-visible compressed content. Do not put any extra text before or after this block. Do not use Markdown fences, headings, separators, explanations, processing notes, or prefaces.
 
 ---
 
@@ -73,9 +69,9 @@ The input text contains `<chunk>` markup tags like this:
 - ❌ WRONG: `<chunk retention="detailed">比如刮风啊...</chunk>`
 - ✅ CORRECT: `比如刮风啊...`
 
-### 2. `compressedText` must be plain text only
+### 2. The content inside `<final>` must be plain text only
 
-Inside the `compressedText` string, do NOT add:
+Inside `<final>`, do NOT add:
 - Section headers (like "## Compressed Text")
 - XML/HTML markup of any kind
 - Explanatory comments mixed with the content
@@ -101,7 +97,7 @@ Your output should read like a natural excerpt from a longer article.
 - Delete entire paragraphs if they don't have markup
 - Only keep ultra-short transitions if absolutely necessary (e.g., "三年后", "1344年", "此时")
 
-### Your compression strategy:
+### Compression priority:
 
 1. **First, preserve all marked content** (`<chunk>` tags) - this is your priority
 2. **Then, delete most unmarked text** - this is where you achieve compression
@@ -132,8 +128,4 @@ You are compressing a **segment** of a larger work (like part of a book chapter)
 
 ## Output Format
 
-Return exactly this JSON shape:
-
-```json
-{"compressedText":"Your compressed text - plain text only, no headers, no tags, written as continuous prose"}
-```
+Return exactly this XML shape with no Markdown code fence: `<final>Your compressed text - plain text only, no headers, no tags, written as continuous prose</final>`
