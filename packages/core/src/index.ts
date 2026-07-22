@@ -292,6 +292,7 @@ export type {
 export {
   buildChapterGraphArtifact,
   buildChapterSummaryArtifact,
+  buildChapterSummaryArtifactFromReadingGraphObjects,
   buildChapterSummaryArtifactFromSnapshot,
   commitChapterGraphArtifact,
   commitChapterSummaryArtifact,
@@ -331,3 +332,15 @@ export {
 export type { WikispineProvider } from "./external/wikimatch/index.js";
 export { ObjectMetadataKind } from "./document/index.js";
 export type { ObjectMetadataTarget } from "./document/index.js";
+export {
+  collectChapterKnowledgeGraphObjects,
+  collectReadingGraphObjects,
+  createChapterKnowledgeGraphObjectStream,
+  createChapterReadingGraphObjectStream,
+  createSummaryInputSnapshotFromReadingGraphObjects,
+  parseWikgObject,
+  readWikgObjectsFromJsonl,
+  WIKG_OBJECT_SCHEMA_VERSION,
+  writeWikgObjectsToJsonl,
+} from "./object-stream.js";
+export type { WikgObject } from "./object-stream.js";

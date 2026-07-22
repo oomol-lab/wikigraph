@@ -66,11 +66,16 @@ import {
 } from "../../../packages/core/src/api/chapter/index.js";
 import {
   buildChapterGraphArtifact,
+  buildChapterSummaryArtifactFromReadingGraphObjects,
   buildChapterSummaryArtifactFromSnapshot,
   commitChapterGraphArtifact,
   readChapterBuildInput,
   snapshotChapterSummaryInput,
 } from "../../../packages/core/src/api/chapter-build/index.js";
+import {
+  createChapterReadingGraphObjectStream,
+  writeWikgObjectsToJsonl,
+} from "../../../packages/core/src/object-stream.js";
 import { withTempDir } from "../../helpers/temp.js";
 
 describe("facade/chapter graph", () => {
@@ -149,6 +154,7 @@ describe("facade/chapter graph", () => {
             `${artifact.documentPath}/fragments/serial-${chapter.chapterId}/fragment_0.json`,
           ),
         ).resolves.toBeUndefined();
+        await expect(access(artifact.objectsPath)).resolves.toBeUndefined();
         await commitChapterGraphArtifact(document, artifact);
 
         await expect(
@@ -338,6 +344,7 @@ describe("facade/chapter graph", () => {
           `${path}/job-workspace/summary-input.json`,
         );
         await expect(pathExists(snapshot.filePath)).resolves.toBe(true);
+        await expect(pathExists(snapshot.objectsPath)).resolves.toBe(true);
         await expect(
           pathExists(`${path}/job-workspace/summary-input-document`),
         ).resolves.toBe(false);
@@ -345,6 +352,71 @@ describe("facade/chapter graph", () => {
           pathExists(`${path}/job-workspace/summary-document`),
         ).resolves.toBe(false);
         expect(summary).toBe("Alpha beta. Gamma delta.");
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("builds summary from a reading graph object stream", async () => {
+    await withTempDir("wikigraph-chapter-summary-stream-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/archive`);
+
+      try {
+        const chapter = await addChapter(document, {
+          title: "Chapter 1",
+        });
+        await setChapterSource(document, chapter.chapterId, ["Alpha beta."]);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.chunks.save({
+            content: "Alpha beta.",
+            generation: 0,
+            id: 1,
+            label: "Alpha",
+            retention: ChunkRetention.Verbatim,
+            sentenceId: [chapter.chapterId, 0],
+            sentenceIds: [[chapter.chapterId, 0]],
+            weight: 1,
+            wordsCount: 2,
+          });
+          await openedDocument.fragmentGroups.save({
+            endSentenceIndex: 0,
+            groupId: 1,
+            serialId: chapter.chapterId,
+            startSentenceIndex: 0,
+          });
+          const snakeId = await openedDocument.snakes.create({
+            firstLabel: "Alpha",
+            groupId: 1,
+            lastLabel: "Alpha",
+            localSnakeId: 1,
+            serialId: chapter.chapterId,
+            size: 1,
+          });
+          await openedDocument.snakeChunks.save({
+            chunkId: 1,
+            position: 0,
+            snakeId,
+          });
+          await openedDocument.serials.setTopologyReady(chapter.chapterId);
+        });
+
+        const snapshot = await snapshotChapterSummaryInput(
+          document,
+          chapter.chapterId,
+          `${path}/job-workspace`,
+        );
+        const summary =
+          await buildChapterSummaryArtifactFromReadingGraphObjects(
+            chapter.chapterId,
+            {
+              llm: {} as never,
+              readingGraphObjectsPath: snapshot.objectsPath,
+              workspacePath: `${path}/job-workspace`,
+            },
+          );
+
+        expect(summary).toBe("Alpha beta.");
       } finally {
         await document.release();
       }
@@ -359,6 +431,7 @@ async function createSingleChunkGraphArtifact(input: {
   documentPath: string;
 }) {
   const document = await DirectoryDocument.open(input.documentPath);
+  const objectsPath = `${input.documentPath}.jsonl`;
 
   try {
     await document.openSession(async (openedDocument) => {
@@ -402,6 +475,16 @@ async function createSingleChunkGraphArtifact(input: {
       });
       await openedDocument.serials.setTopologyReady(input.chapterId);
     });
+    await writeWikgObjectsToJsonl(
+      objectsPath,
+      createChapterReadingGraphObjectStream({
+        chapterId: input.chapterId,
+        document,
+        parameter: {
+          prompt: "test graph prompt",
+        },
+      }),
+    );
   } finally {
     await document.release();
   }
@@ -409,6 +492,7 @@ async function createSingleChunkGraphArtifact(input: {
   return {
     chapterId: input.chapterId,
     documentPath: input.documentPath,
+    objectsPath,
     parameter: {
       prompt: "test graph prompt",
     },

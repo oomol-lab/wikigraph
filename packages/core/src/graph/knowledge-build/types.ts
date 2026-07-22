@@ -13,6 +13,7 @@ export interface ChapterKnowledgeGraphBuildArtifact {
   readonly chapterId: number;
   readonly mentionLinksPath: string;
   readonly mentionsPath: string;
+  readonly objectsPath: string;
   readonly parameter: GraphBuildParameterInput;
   readonly workspacePath: string;
 }

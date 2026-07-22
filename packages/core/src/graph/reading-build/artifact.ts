@@ -12,7 +12,12 @@ import {
   type ChapterDetails,
 } from "../../document/chapter/index.js";
 import { SerialGeneration } from "../../serial.js";
-import { copyChunks, copySnakes } from "./copy.js";
+import {
+  collectReadingGraphObjects,
+  createChapterReadingGraphObjectStream,
+  readWikgObjectsFromJsonl,
+  writeWikgObjectsToJsonl,
+} from "../../object-stream.js";
 import {
   createGraphBuildParameterInput,
   createTopologyOptions,
@@ -28,6 +33,8 @@ export async function buildChapterGraphArtifact(
   options: BuildChapterGraphArtifactOptions,
 ): Promise<ChapterGraphBuildArtifact> {
   const documentPath = join(options.workspacePath, "graph-document");
+  const objectsPath = join(options.workspacePath, "reading-graph.jsonl");
+  const parameter = createGraphBuildParameterInput(options);
 
   await rm(documentPath, { force: true, recursive: true });
   await mkdir(options.workspacePath, { recursive: true });
@@ -59,6 +66,14 @@ export async function buildChapterGraphArtifact(
         options.progressTracker,
       );
     });
+    await writeWikgObjectsToJsonl(
+      objectsPath,
+      createChapterReadingGraphObjectStream({
+        chapterId,
+        document: createFragmentBackedDocument(document, documentPath),
+        parameter,
+      }),
+    );
   } finally {
     await document.release();
   }
@@ -66,7 +81,8 @@ export async function buildChapterGraphArtifact(
   return {
     chapterId,
     documentPath,
-    parameter: createGraphBuildParameterInput(options),
+    objectsPath,
+    parameter,
   };
 }
 
@@ -74,58 +90,112 @@ export async function commitChapterGraphArtifact(
   document: Document,
   artifact: ChapterGraphBuildArtifact,
 ): Promise<ChapterDetails> {
-  const sourceDocument = await DirectoryDocument.open(artifact.documentPath);
+  const graph = await collectReadingGraphObjects(
+    artifact.chapterId,
+    readWikgObjectsFromJsonl(artifact.objectsPath),
+  );
 
-  try {
-    await document.openSession(async (openedDocument) => {
-      await requireStage(openedDocument, artifact.chapterId, "sourced");
-      await openedDocument.clearSerialGraph(artifact.chapterId);
-      await openedDocument.serials.ensure(artifact.chapterId);
+  await document.openSession(async (openedDocument) => {
+    await requireStage(openedDocument, artifact.chapterId, "sourced");
+    await openedDocument.clearSerialGraph(artifact.chapterId);
+    await openedDocument.serials.ensure(artifact.chapterId);
 
-      const chunkIdMap = await copyChunks(
-        sourceDocument,
-        openedDocument,
-        artifact.chapterId,
-      );
+    const chunkIdMap = new Map<string, number>();
 
-      for (const edge of await sourceDocument.readingEdges.listBySerial(
-        artifact.chapterId,
-      )) {
-        const fromId = chunkIdMap.get(edge.fromId);
-        const toId = chunkIdMap.get(edge.toId);
+    for (const chunk of graph.chunks) {
+      const createdChunk = await openedDocument.chunks.create({
+        content: chunk.content,
+        generation: chunk.generation,
+        label: chunk.label,
+        sentenceId: [artifact.chapterId, chunk.sentenceIndex],
+        sentenceIds: chunk.sentenceIndexes.map(
+          (sentenceIndex) => [artifact.chapterId, sentenceIndex] as const,
+        ),
+        weight: chunk.weight,
+        wordsCount: chunk.wordsCount,
+        ...(chunk.importance === undefined
+          ? {}
+          : { importance: chunk.importance }),
+        ...(chunk.retention === undefined
+          ? {}
+          : { retention: chunk.retention }),
+      });
 
-        if (fromId === undefined || toId === undefined) {
-          continue;
-        }
+      chunkIdMap.set(chunk.id, createdChunk.id);
+    }
 
-        await openedDocument.readingEdges.save({
-          ...edge,
-          fromId,
-          toId,
-        });
-      }
+    for (const edge of graph.readingEdges) {
+      await openedDocument.readingEdges.save({
+        fromId: requireMappedId(chunkIdMap, edge.fromChunkId, "chunk"),
+        ...(edge.strength === undefined ? {} : { strength: edge.strength }),
+        toId: requireMappedId(chunkIdMap, edge.toChunkId, "chunk"),
+        weight: edge.weight,
+      });
+    }
 
-      await openedDocument.fragmentGroups.saveMany(
-        await sourceDocument.fragmentGroups.listBySerial(artifact.chapterId),
-      );
-      await copySnakes(
-        sourceDocument,
-        openedDocument,
-        artifact.chapterId,
-        chunkIdMap,
-      );
-      const parameter = await openedDocument.graphBuildParameters.save(
-        artifact.parameter,
-      );
-      await openedDocument.serials.setTopologyReady(
-        artifact.chapterId,
-        true,
-        parameter.hash,
-      );
-    });
+    await openedDocument.fragmentGroups.saveMany(
+      graph.fragmentGroups.map((group) => ({
+        endSentenceIndex: group.endSentenceIndex,
+        groupId: group.groupId,
+        serialId: artifact.chapterId,
+        startSentenceIndex: group.startSentenceIndex,
+      })),
+    );
 
-    return await getChapterDetails(document, artifact.chapterId);
-  } finally {
-    await sourceDocument.release();
+    const snakeIdMap = new Map<string, number>();
+
+    for (const snake of graph.snakes) {
+      const snakeId = await openedDocument.snakes.create({
+        firstLabel: snake.firstLabel,
+        groupId: snake.groupId,
+        lastLabel: snake.lastLabel,
+        localSnakeId: snake.localSnakeId,
+        serialId: artifact.chapterId,
+        size: snake.size,
+        weight: snake.weight,
+        wordsCount: snake.wordsCount,
+      });
+
+      snakeIdMap.set(snake.id, snakeId);
+    }
+
+    for (const snakeChunk of graph.snakeChunks) {
+      await openedDocument.snakeChunks.save({
+        chunkId: requireMappedId(chunkIdMap, snakeChunk.chunkId, "chunk"),
+        position: snakeChunk.position,
+        snakeId: requireMappedId(snakeIdMap, snakeChunk.snakeId, "snake"),
+      });
+    }
+
+    for (const edge of graph.snakeEdges) {
+      await openedDocument.snakeEdges.save({
+        fromSnakeId: requireMappedId(snakeIdMap, edge.fromSnakeId, "snake"),
+        toSnakeId: requireMappedId(snakeIdMap, edge.toSnakeId, "snake"),
+        weight: edge.weight,
+      });
+    }
+
+    const parameter = await openedDocument.graphBuildParameters.save(
+      graph.parameter ?? artifact.parameter,
+    );
+    await openedDocument.serials.setTopologyReady(
+      artifact.chapterId,
+      true,
+      parameter.hash,
+    );
+  });
+
+  return await getChapterDetails(document, artifact.chapterId);
+}
+
+function requireMappedId(
+  ids: ReadonlyMap<string, number>,
+  id: string,
+  kind: string,
+): number {
+  const mapped = ids.get(id);
+  if (mapped === undefined) {
+    throw new Error(`Unknown ${kind} id ${id}.`);
   }
+  return mapped;
 }
