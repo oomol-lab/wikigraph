@@ -291,6 +291,18 @@ export const SCHEMA_SQL = `
   );
 `;
 
+export const SEARCH_INDEX_TEXT_SENTENCE_RECORDS_COLUMNS_SQL = `
+  id INTEGER PRIMARY KEY,
+  archive_id INTEGER NOT NULL,
+  kind INTEGER NOT NULL,
+  chapter_id INTEGER NOT NULL,
+  sentence_index INTEGER NOT NULL,
+  words_count INTEGER NOT NULL DEFAULT 0,
+  byte_offset INTEGER NOT NULL DEFAULT 0,
+  byte_length INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(archive_id, kind, chapter_id, sentence_index)
+`;
+
 export const SEARCH_INDEX_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS search_index_state (
     key TEXT PRIMARY KEY,
@@ -298,15 +310,7 @@ export const SEARCH_INDEX_SCHEMA_SQL = `
   );
 
   CREATE TABLE IF NOT EXISTS text_sentence_records (
-    id INTEGER PRIMARY KEY,
-    archive_id INTEGER NOT NULL,
-    kind INTEGER NOT NULL,
-    chapter_id INTEGER NOT NULL,
-    sentence_index INTEGER NOT NULL,
-    words_count INTEGER NOT NULL DEFAULT 0,
-    byte_offset INTEGER NOT NULL DEFAULT 0,
-    byte_length INTEGER NOT NULL DEFAULT 0,
-    UNIQUE(archive_id, kind, chapter_id, sentence_index)
+${SEARCH_INDEX_TEXT_SENTENCE_RECORDS_COLUMNS_SQL}
   );
 
   CREATE INDEX IF NOT EXISTS idx_text_sentence_records_chapter

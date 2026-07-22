@@ -54,16 +54,17 @@ export async function hasDirtySearchIndexChapters(
     return false;
   }
 
-  const count = await database.queryOne(
+  const dirty = await database.queryOne(
     `
-      SELECT COUNT(*) AS count
+      SELECT 1 AS found
       FROM index_dirty_chapters
+      LIMIT 1
     `,
     undefined,
-    (row) => getNumber(row, "count"),
+    (row) => getNumber(row, "found"),
   );
 
-  return (count ?? 0) > 0;
+  return dirty === 1;
 }
 
 async function hasTable(database: Database, table: string): Promise<boolean> {

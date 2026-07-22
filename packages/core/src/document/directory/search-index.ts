@@ -3,7 +3,10 @@ import { join } from "path";
 
 import { isNodeError } from "../../utils/node-error.js";
 import { Database } from "../database.js";
-import { SEARCH_INDEX_SCHEMA_SQL } from "../schema.js";
+import {
+  SEARCH_INDEX_SCHEMA_SQL,
+  SEARCH_INDEX_TEXT_SENTENCE_RECORDS_COLUMNS_SQL,
+} from "../schema.js";
 import type { DocumentFileStore } from "./types.js";
 
 export async function openSearchIndexDatabase<T>(input: {
@@ -93,15 +96,7 @@ async function rebuildTextSentenceRecordsTable(
   await database.transaction(async () => {
     await database.run(`
       CREATE TABLE text_sentence_records_next (
-        id INTEGER PRIMARY KEY,
-        archive_id INTEGER NOT NULL,
-        kind INTEGER NOT NULL,
-        chapter_id INTEGER NOT NULL,
-        sentence_index INTEGER NOT NULL,
-        words_count INTEGER NOT NULL DEFAULT 0,
-        byte_offset INTEGER NOT NULL DEFAULT 0,
-        byte_length INTEGER NOT NULL DEFAULT 0,
-        UNIQUE(archive_id, kind, chapter_id, sentence_index)
+${SEARCH_INDEX_TEXT_SENTENCE_RECORDS_COLUMNS_SQL}
       )
     `);
     await database.run(`
