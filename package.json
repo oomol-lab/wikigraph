@@ -26,6 +26,7 @@
     "release:check:cli": "pnpm verify && pnpm test:run && pnpm build && pnpm smoke:pack-install && pnpm publish:dry-run:cli",
     "release:check:core": "pnpm verify && pnpm test:run && pnpm build && pnpm smoke:pack-install && pnpm publish:dry-run:core",
     "smoke:pack-install": "node ./scripts/smoke-pack-install.mjs",
+    "eval:llm": "tsx ./evals/summarize-self-talk.ts",
     "test": "vitest --passWithNoTests",
     "test:run": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",

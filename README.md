@@ -70,6 +70,12 @@ $ wg wikg://quickstart.wikg --query alpha
 Alpha is connected to beta.
 ```
 
+## Manual LLM Evals
+
+`pnpm eval:llm` runs a manual summarize/compressor evaluation against a real LLM. It is intentionally not part of `pnpm test`, `pnpm test:run`, or CI. The script prints the case name, model info, raw output, final user-visible output, and heuristic checks so you can judge prompt changes before release.
+
+Running it requires a configured `--llm` JSON or local LLM config, and it may incur model usage costs. The bundled case is a sanitized self-talk regression sample for the summarize compressor path; adjust or extend it as the prompt evolves.
+
 ## Why We Built This
 
 Wiki Graph is built around a long-text knowledge problem: how can an LLM read large source material, preserve useful evidence, and compile the durable entities and relations into a maintainable knowledge base? It uses public entity grounding, source evidence, and graph structure to make long text searchable, traceable, and reusable.

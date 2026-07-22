@@ -30,6 +30,7 @@
     "test/**/*.ts",
     "eslint.config.mjs",
     "packages/*/tsup.config.ts",
+    "evals/**/*.ts",
     "vitest.config.ts"
   ],
   "exclude": ["packages/*/dist", "dist", "coverage", "node_modules"]

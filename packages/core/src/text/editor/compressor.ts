@@ -1,15 +1,7 @@
-import { z } from "zod";
-
-import {
-  requestGuaranteedJson,
-  RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
-} from "../../external/guaranteed/index.js";
 import type { LLMessage, LLM } from "../../external/llm/index.js";
 import { TEXT_COMPRESSOR_PROMPT_TEMPLATE } from "./prompt-templates.js";
 
-const compressionResponseSchema = z.object({
-  compressedText: z.string(),
-});
+const MAX_RETRIES = 2;
 
 export class CompressionRequester<S extends string> {
   readonly #compressionRatio: number;
@@ -57,24 +49,40 @@ export class CompressionRequester<S extends string> {
       input.revisionFeedback,
     );
 
-    return await this.#llm.request(
-      async (request) =>
-        await requestGuaranteedJson({
-          messages,
-          parse: (data) => data.compressedText.trim(),
-          request: async (retryMessages, retryIndex, retryMax) =>
-            await request(retryMessages, {
-              retryIndex,
-              retryMax,
-              scope: this.#scope,
-              useCache: false,
-            }),
-          responseIntentClassifierPrompt: this.#llm.loadSystemPrompt(
-            RESPONSE_INTENT_CLASSIFIER_PROMPT_TEMPLATE,
-          ),
-          schema: compressionResponseSchema,
-        }),
-    );
+    return await this.#llm.request(async (request) => {
+      let currentMessages = messages;
+
+      for (let retryIndex = 0; retryIndex <= MAX_RETRIES; retryIndex += 1) {
+        const response = await request(currentMessages, {
+          retryIndex,
+          retryMax: MAX_RETRIES,
+          scope: this.#scope,
+          ...(retryIndex === 0 ? {} : { useCache: false }),
+        });
+
+        try {
+          return extractFinalCompressedText(response);
+        } catch (error) {
+          if (retryIndex >= MAX_RETRIES) {
+            throw error;
+          }
+
+          currentMessages = [
+            ...messages,
+            {
+              content: response,
+              role: "assistant",
+            },
+            {
+              content: buildCompressionRetryFeedback(error),
+              role: "user",
+            },
+          ];
+        }
+      }
+
+      throw new Error("Compression request failed unexpectedly");
+    });
   }
 }
 
@@ -100,7 +108,7 @@ function buildCompressionMessages(
   if (previousCompressedText !== undefined && revisionFeedback !== undefined) {
     messages.push(
       {
-        content: JSON.stringify({ compressedText: previousCompressedText }),
+        content: `<final>${previousCompressedText}</final>`,
         role: "assistant",
       },
       {
@@ -111,4 +119,38 @@ function buildCompressionMessages(
   }
 
   return messages;
+}
+
+function extractFinalCompressedText(response: string): string {
+  const trimmedResponse = response.trim();
+  const match = /^<final>([\s\S]*)<\/final>$/.exec(trimmedResponse);
+
+  if (match === null) {
+    throw new Error(
+      "Compression response must be exactly one <final>...</final> block.",
+    );
+  }
+
+  const compressedText = match[1]?.trim();
+
+  if (compressedText === undefined || compressedText === "") {
+    throw new Error("Compression response contained an empty <final> block.");
+  }
+
+  if (/<\/?[A-Za-z][^>]*>/.test(compressedText)) {
+    throw new Error("Compressed text must not contain XML or HTML tags.");
+  }
+
+  return compressedText;
+}
+
+function buildCompressionRetryFeedback(error: unknown): string {
+  const reason = error instanceof Error ? error.message : String(error);
+
+  return [
+    "Your previous response was invalid.",
+    reason,
+    "Return exactly one <final>...</final> block and nothing else.",
+    "The content inside <final> must be plain text only, with no tags, headings, fences, or explanatory text.",
+  ].join(" ");
 }
