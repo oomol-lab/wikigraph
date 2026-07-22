@@ -137,6 +137,9 @@ describe("cli/library args", () => {
     expect(() => parseCLIArguments(["wikg://lib/archive123"])).toThrow(
       "requires an explicit action: move or remove",
     );
+    expect(() => parseCLIArguments(["wikg://lib/meta", "move"])).toThrow(
+      "does not support `move`",
+    );
     expect(() =>
       parseCLIArguments(["wikg://lib/abc123abc123.lib", "inspect"]),
     ).toThrow("does not support `inspect`");

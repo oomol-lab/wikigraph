@@ -79,9 +79,9 @@ export function parseLibraryUriFirstArguments(
       ),
     );
   }
+  validateLibraryActionForTarget(uri, target, action);
 
   if (values.help === true) {
-    validateLibraryActionForTarget(uri, target, action);
     return {
       help: true,
       helpText: renderLibraryPredicateHelpText(uri, target, action),

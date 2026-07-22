@@ -173,9 +173,17 @@ function readCursorIndexScope(
 
   const indexScope = value as Record<string, unknown>;
   if (indexScope.kind === "archive-index") {
+    const archiveKey = getPayloadString(indexScope, "archiveKey");
+    const archivePath = getPayloadString(indexScope, "archivePath");
+    if (
+      archiveKey !== record.archiveKey ||
+      archivePath !== record.archivePath
+    ) {
+      throw new Error("Invalid continuation cursor payload.");
+    }
     return {
-      archiveKey: getPayloadString(indexScope, "archiveKey"),
-      archivePath: getPayloadString(indexScope, "archivePath"),
+      archiveKey,
+      archivePath,
       kind: "archive-index",
     };
   }
