@@ -96,6 +96,7 @@ export function parseArchiveArguments(
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--context", values.context, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
+      rejectArchiveFlag(action, "--depth", values.depth, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
@@ -151,6 +152,7 @@ export function parseArchiveArguments(
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--context", values.context, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
+      rejectArchiveFlag(action, "--depth", values.depth, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
@@ -187,6 +189,7 @@ export function parseArchiveArguments(
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--context", values.context, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+      rejectArchiveFlag(action, "--depth", values.depth, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--query", values.query, helpRoute);

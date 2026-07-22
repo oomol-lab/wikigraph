@@ -1149,6 +1149,15 @@ describe("cli/args/archive", () => {
       ]),
     ).toThrow("The `get` command does not support --depth.");
     expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "create", "--depth", "1"]),
+    ).toThrow("The `create` command does not support --depth.");
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "export", "--depth", "1"]),
+    ).toThrow("The `export` command does not support --depth.");
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg", "inspect", "--depth", "1"]),
+    ).toThrow("The `inspect` command does not support --depth.");
+    expect(() =>
       parseCLIArguments([
         "wikg://book.wikg/chapter/part",
         "move",
