@@ -1,0 +1,69 @@
+Help Type: command
+Command: {{ commandName }} {{ uri }}
+
+{% if target.kind == "metadata" %}
+Library metadata object
+
+Default behavior:
+  - `{{ commandName }} {{ uri }}` reads this library metadata map.
+  - Metadata keys are free-form user fields.
+  - System registry fields such as id, public id, folder path, default marker, and staging path are not metadata.
+
+Use when:
+  - You need to read or edit user metadata attached to a library scope.
+
+Usage:
+  {{ commandName }} {{ uri }} [--json]
+  {{ commandName }} {{ uri }} set <json> [--json]
+  {{ commandName }} {{ uri }} set --json-input <json> [--json]
+  {{ commandName }} {{ uri }} set --json --input <path|->
+  {{ commandName }} {{ uri }} put <key> <value> [--json]
+  {{ commandName }} {{ uri }} put <key> --json <value>
+  {{ commandName }} {{ uri }} put <key> --json-input <value> [--json]
+  {{ commandName }} {{ uri }} put <key> --input <path|-> [--json]
+  {{ commandName }} {{ uri }} delete <key> [--json]
+  {{ commandName }} {{ uri }} clear [--json]
+
+Predicate commands:
+  - set: replace the whole metadata map. Help: {{ commandName }} {{ uri }} set --help
+  - put: write one metadata key. Help: {{ commandName }} {{ uri }} put --help
+  - delete: delete one metadata key. Help: {{ commandName }} {{ uri }} delete --help
+  - clear: clear the metadata map. Help: {{ commandName }} {{ uri }} clear --help
+{% else %}
+Library scope
+
+Default behavior:
+  - `{{ commandName }} {{ uri }}` enumerates objects in this library scope.
+  - First-stage library support does not scan the library folder, so the scope can be empty even when the folder contains `.wikg` files.
+
+Use when:
+  - You need the library entry point before future library-level archive enumeration or search.
+{% if target.isDefault %}
+  - You need to create another library registry.
+{% else %}
+  - You need to address a specific non-default library.
+{% endif %}
+
+URI forms:
+  - `{{ commandName }} wikg://lib` addresses the default library.
+  - `{{ commandName }} wikg://lib/<lib-id>.lib` addresses a non-default library.
+  - Non-default library URIs require the `.lib` suffix so future `wikg://lib/<archive-id>/` archive shortcuts remain unambiguous.
+
+Usage:
+{% if target.isDefault %}
+  {{ commandName }} wikg://lib
+  {{ commandName }} wikg://lib create --path <folder> [--json]
+  {{ commandName }} wikg://lib/meta [--json]
+{% else %}
+  {{ commandName }} {{ uri }}
+  {{ commandName }} {{ uri }} remove [--json]
+  {{ commandName }} {{ uri }}/meta [--json]
+{% endif %}
+
+Predicate commands:
+{% if target.isDefault %}
+  - create: create a non-default library registry and an empty folder. Help: {{ commandName }} wikg://lib create --help
+{% else %}
+  - remove: remove this library registry without deleting its folder. Help: {{ commandName }} {{ uri }} remove --help
+{% endif %}
+{% endif %}

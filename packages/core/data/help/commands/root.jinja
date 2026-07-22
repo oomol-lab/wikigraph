@@ -41,7 +41,7 @@ Core concepts:
   - Cursor: a continuation token consumed by `{{ commandName }} next`.
 
 Important object families:
-  chapter, chunk, entity, triple, summary, index, job, config, meta.
+  chapter, chunk, entity, triple, summary, index, library, job, config, meta.
 
 What to learn where:
   - Normal workflow, object choice, and practical Agent behavior:
@@ -72,6 +72,9 @@ Non-predicate command entry points:
   {{ commandName }} gc --help
   {{ commandName }} legacy --help
   {{ commandName }} help [topic] [--help|-h]
+
+Library entry point:
+  {{ commandName }} wikg://lib --help
 
 Help topics:
 {% for topic in helpTopics %}

@@ -4,6 +4,8 @@ import {
   renderArchiveMaintenanceChapterActionHelpText,
   renderArchiveMaintenanceCommandHelpText,
   renderHelpTopicText,
+  renderLibraryPredicateHelpText,
+  renderLibraryUriHelpText,
   renderMainHelpText,
   renderUriHelpText,
   renderUriPredicateHelpText,
@@ -178,6 +180,7 @@ describe("cli/args/help", () => {
     expect(rootHelpText).toContain("wg help uri");
     expect(rootHelpText).toContain("wg <archive-uri> inspect");
     expect(rootHelpText).toContain("wg transform");
+    expect(rootHelpText).toContain("wg wikg://lib --help");
     expect(rootHelpText).not.toContain("wg import");
     expect(rootHelpText).not.toContain("wg wikg://local/job add");
     expect(rootHelpText).not.toContain("wg <archive-uri>/index build");
@@ -427,6 +430,44 @@ describe("cli/args/help", () => {
     expect(renderArchiveMaintenanceCommandHelpText("meta")).toContain(
       "<object-uri>/meta put <key>",
     );
+  });
+
+  it("renders library help through templates", () => {
+    const scopeHelpText = renderLibraryUriHelpText("wikg://lib", {
+      isDefault: true,
+      kind: "scope",
+    });
+    const metadataHelpText = renderLibraryUriHelpText("wikg://lib/meta", {
+      isDefault: true,
+      kind: "metadata",
+    });
+    const createHelpText = renderLibraryPredicateHelpText(
+      "wikg://lib",
+      { isDefault: true, kind: "scope" },
+      "create",
+    );
+
+    expect(scopeHelpText).toContain("Library scope");
+    expect(scopeHelpText).toContain("wg wikg://lib create --path <folder>");
+    expect(scopeHelpText).toContain(".lib` suffix");
+    expect(metadataHelpText).toContain("Library metadata object");
+    expect(metadataHelpText).toContain("Metadata keys are free-form");
+    expect(createHelpText).toContain("Library Predicate Command");
+    expect(createHelpText).toContain("Create a non-default library registry");
+    expect(
+      renderLibraryPredicateHelpText(
+        "wikg://lib",
+        { isDefault: true, kind: "scope" },
+        "list",
+      ),
+    ).toContain("Enumerate objects in this library scope");
+    expect(
+      renderLibraryPredicateHelpText(
+        "wikg://lib/meta",
+        { isDefault: true, kind: "metadata" },
+        "get",
+      ),
+    ).toContain("Read this library metadata map");
   });
 
   it("supports a first-contact recovery chain from root help to parse failures", () => {
