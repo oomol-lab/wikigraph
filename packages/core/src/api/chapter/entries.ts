@@ -1,6 +1,5 @@
 import type { Document, ReadonlyDocument } from "../../document/index.js";
 import {
-  collectChapterKeys,
   createChapterKey,
   formatChapterUri,
 } from "../../document/chapter/path.js";
@@ -18,7 +17,7 @@ export async function normalizeChapterToc(
   document: Document,
 ): Promise<MutableTocFile> {
   const existingToc = await document.readToc();
-  const toc = await readChapterToc(document);
+  const items = existingToc?.items.map(cloneTocItem) ?? [];
   let changed = false;
 
   const normalizeItems = async (items: MutableTocItem[]): Promise<void> => {
@@ -34,8 +33,13 @@ export async function normalizeChapterToc(
     }
   };
 
-  await normalizeItems(toc.items);
-  changed ||= ensureChapterKeys(toc.items);
+  await normalizeItems(items);
+  changed ||= ensureChapterKeys(items);
+
+  const toc: MutableTocFile = {
+    items,
+    version: existingToc?.version ?? TOC_FILE_VERSION,
+  };
 
   if (existingToc === undefined || changed) {
     await document.replaceToc(toc);
@@ -60,20 +64,30 @@ export async function readChapterToc(
 }
 
 function ensureChapterKeys(items: MutableTocItem[]): boolean {
-  const existingKeys = collectChapterKeys(items);
+  const existingKeys = new Set<string>();
   let changed = false;
+  const collectExistingKeys = (nodes: MutableTocItem[]): void => {
+    for (const item of nodes) {
+      if (item.key !== undefined) {
+        if (existingKeys.has(item.key)) {
+          throw new Error(`Duplicate chapter key: ${item.key}.`);
+        }
+        existingKeys.add(item.key);
+      }
+      collectExistingKeys(item.children);
+    }
+  };
   const visit = (nodes: MutableTocItem[]): void => {
     for (const item of nodes) {
       if (item.key === undefined) {
         item.key = createChapterKey(normalizeTitle(item.title), existingKeys);
         existingKeys.add(item.key);
         changed = true;
-      } else {
-        existingKeys.add(item.key);
       }
       visit(item.children);
     }
   };
+  collectExistingKeys(items);
   visit(items);
   return changed;
 }

@@ -30,8 +30,11 @@ export function toChapterTreeNodes(
   item: MutableTocItem,
   parentPath: readonly string[] = [],
 ): ChapterTreeNode[] {
+  const key = item.key ?? `chapter-${item.serialId ?? "group"}`;
+  const path = [...parentPath, key];
+
   return item.serialId === undefined
-    ? item.children.flatMap((child) => toChapterTreeNodes(child, parentPath))
+    ? item.children.flatMap((child) => toChapterTreeNodes(child, path))
     : [toChapterTreeNode(item, parentPath)];
 }
 

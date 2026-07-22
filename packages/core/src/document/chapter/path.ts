@@ -63,6 +63,9 @@ export function validateChapterKey(key: string, label = "chapter key"): string {
       `Invalid ${label}: ${key}. Use lowercase letters, numbers, and hyphens.`,
     );
   }
+  if (/^\d+$/u.test(key)) {
+    throw new Error(`Invalid ${label}: numeric chapter keys are not accepted.`);
+  }
   if (RESERVED_CHAPTER_KEYS.has(key)) {
     throw new Error(`Invalid ${label}: ${key} is reserved.`);
   }
@@ -149,6 +152,9 @@ function slugify(value: string): string {
 
 function ensureValidKeyBase(value: string): string {
   const normalized = value.replace(/^-+/u, "").replace(/-+$/u, "");
+  if (/^\d+$/u.test(normalized)) {
+    return `chapter-${normalized}`;
+  }
   if (/^[a-z0-9][a-z0-9-]*$/u.test(normalized)) {
     return normalized;
   }

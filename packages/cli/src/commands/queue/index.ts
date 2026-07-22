@@ -5,7 +5,7 @@ import {
   getBuildJob,
   listBuildJobs,
   pauseBuildJob,
-  resolveChapterPath,
+  resolveChapterPathReadonly,
   resolveBuildJobId,
   resumeBuildJob,
   updateBuildJobTarget,
@@ -140,7 +140,7 @@ async function resolveQueueChapterId(
   let chapterId: number | undefined;
   await new WikiGraphArchiveFile(args.archivePath!).readDocument(
     async (document) => {
-      chapterId = await resolveChapterPath(document, args.chapterPath!);
+      chapterId = await resolveChapterPathReadonly(document, args.chapterPath!);
     },
   );
   return chapterId;

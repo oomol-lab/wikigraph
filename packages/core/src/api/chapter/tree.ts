@@ -120,9 +120,12 @@ export function createTocItemsFromChapterTree(
   if (missingIds.length > 0) {
     throw new Error(
       `Chapter tree is missing chapter URIs: ${missingIds
-        .map((id) =>
-          formatChapterUri(collectChapterPathById(oldItems, id) ?? String(id)),
-        )
+        .map((id) => {
+          const path = collectChapterPathById(oldItems, id);
+          return path === undefined
+            ? "<unresolved internal chapter>"
+            : formatChapterUri(path);
+        })
         .join(", ")}.`,
     );
   }

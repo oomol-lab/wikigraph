@@ -1,4 +1,4 @@
-import type { Document } from "../../document/index.js";
+import type { Document, ReadonlyDocument } from "../../document/index.js";
 import type { ReaderTextStream } from "../../text/reader/index.js";
 import { writeSerialSource } from "../../serial.js";
 import type { TocItem } from "../../text/source/index.js";
@@ -8,7 +8,7 @@ import {
   resolveChapterIdByPath,
 } from "../../document/chapter/path.js";
 import { getChapterDetails, requireChapterDetails } from "./details.js";
-import { normalizeChapterToc } from "./entries.js";
+import { normalizeChapterToc, readChapterToc } from "./entries.js";
 import {
   appendChildToChapter,
   cloneTocItem,
@@ -69,6 +69,18 @@ export async function resolveChapterPath(
   chapterPath: string,
 ): Promise<number> {
   const toc = await normalizeChapterToc(document);
+  const chapterId = resolveChapterIdByPath(toc.items, chapterPath);
+  if (chapterId === undefined) {
+    throw new Error(`Chapter path ${chapterPath} does not exist.`);
+  }
+  return chapterId;
+}
+
+export async function resolveChapterPathReadonly(
+  document: ReadonlyDocument,
+  chapterPath: string,
+): Promise<number> {
+  const toc = await readChapterToc(document);
   const chapterId = resolveChapterIdByPath(toc.items, chapterPath);
   if (chapterId === undefined) {
     throw new Error(`Chapter path ${chapterPath} does not exist.`);

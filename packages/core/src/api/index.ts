@@ -121,6 +121,7 @@ export {
   removeChapter,
   resetChapter,
   resolveChapterPath,
+  resolveChapterPathReadonly,
   setChapterSource,
   setChapterSummary,
   setChapterTitle,

@@ -109,7 +109,7 @@ describe("facade/chapter", () => {
             {
               children: [],
               title: "Chapter 1",
-              uri: "wikg://chapter/chapter-1",
+              uri: "wikg://chapter/part-i/chapter-1",
             },
           ],
         });

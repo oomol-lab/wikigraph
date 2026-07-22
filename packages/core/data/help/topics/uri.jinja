@@ -99,8 +99,8 @@ Triple pattern scopes:
   A complete triple URI with concrete subject, predicate, and object is an object URI.
 
 Object boundaries:
-  - `chapter/<id>` is a scope, not an object.
-  - `chapter/<id>/title` is the queryable chapter title object.
+  - `chapter/<path>` is a scope, not an object.
+  - `chapter/<path>/title` is the queryable chapter title object.
   - Whole `source` and `summary` objects are readable text streams, not collection scopes.
   - Ranged fragments such as `/source#4..8` and `/summary#4..8` are structured range objects.
   - Source and summary range numbers are 1-based and inclusive. `/source#1..2` means the first two source sentences.
@@ -126,13 +126,13 @@ Lens selection:
   - `/chunk` targets Reading Graph chunks.
   - `/entity` targets grounded entities.
   - `/triple` targets Knowledge Graph relations.
-  - `chapter/<id>` is a scope; `--query` over chapter titles returns `chapter/<id>/title` objects.
+  - `chapter/<path>` is a scope; `--query` over chapter titles returns `chapter/<path>/title` objects.
 
 Literal source passages:
   Use `--query` on the narrowest useful scope when the task is to find source wording or passages mentioning a literal term:
     {{ commandName }} <archive-uri> --query "term"
-    {{ commandName }} <archive-uri>/chapter/<id> --query "term"
-    {{ commandName }} <archive-uri>/chapter/<id>/source#20..30
+    {{ commandName }} <archive-uri>/chapter/<path> --query "term"
+    {{ commandName }} <archive-uri>/chapter/<path>/source#20..30
 
 Entity-grounded evidence:
   Use entity evidence when you already have an entity URI or QID and need grounded mentions, aliases, translations, variants, or source-backed support:

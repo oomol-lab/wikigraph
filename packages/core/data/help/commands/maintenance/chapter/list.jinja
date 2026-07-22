@@ -10,7 +10,7 @@ Usage:
   {{ commandName }} <archive-uri>/chapter [--all] [--limit <n>] [--cursor <token>] [--json|--jsonl] [--llm <json>] [--help|-h]
 
 Output shape:
-  wikg://chapter/<id>  <title-or-[untitled]>  source:<ready|missing> reading-graph:<ready|missing> reading-summary:<ready|missing> knowledge-graph:<ready|missing>
+  wikg://chapter/<path>  <title-or-[untitled]>  source:<ready|missing> reading-graph:<ready|missing> reading-summary:<ready|missing> knowledge-graph:<ready|missing>
 
   With machine-readable output, each chapter object includes `uri`, `title`, and `state`.
 
@@ -18,12 +18,12 @@ Behavior:
   - Includes sourced, generated, and unfinished chapters.
   - Some chapters are structural table-of-contents nodes that organize child chapters; missing generated artifacts alone does not make them abnormal.
   - Read `{{ commandName }} help uri` before choosing `--limit`, `--all`, `--json`, or `--jsonl`.
-  - Chapter ids are encoded in the returned `wikg://chapter/<id>` URIs.
+  - Chapter paths are encoded in the returned `wikg://chapter/<path>` URIs.
   - Does not call an LLM provider.
   - Does not mutate chapter content or summaries.
 
 Use this before mutation:
-  Discover ids and missing generated artifacts with:
+  Discover chapter URIs and missing generated artifacts with:
     {{ commandName }} <archive-uri>/chapter
 
 See also:

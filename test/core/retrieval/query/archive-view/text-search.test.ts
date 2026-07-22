@@ -76,11 +76,11 @@ describe("archive/query/archive-view/text search", () => {
 
         const fullPage = await readArchivePage(
           document,
-          "wikg://chapter/1/source",
+          "wikg://chapter/chapter-1/source",
         );
         const rangePage = await readArchivePage(
           document,
-          "wikg://chapter/1/source#1..2",
+          "wikg://chapter/chapter-1/source#1..2",
         );
 
         expect(fullPage.type).toBe("fragment");
