@@ -4,6 +4,10 @@ import {
 } from "wiki-graph-core";
 
 import { withHelpRoute } from "../../support/index.js";
+import {
+  renderLibraryPredicateHelpText,
+  renderLibraryUriHelpText,
+} from "../help.js";
 import type {
   ArchiveArgumentValues,
   CLILibraryAction,
@@ -40,10 +44,10 @@ export function parseLibraryUriFirstArguments(
     throw new Error(`Expected a Wiki Graph library URI: ${uri}`);
   }
 
-  if (values.help === true) {
+  if (values.help === true && explicitAction === undefined) {
     return {
       help: true,
-      helpText: renderLibraryHelpText(uri, target),
+      helpText: renderLibraryUriHelpText(uri, target),
       kind: "help",
     };
   }
@@ -57,6 +61,15 @@ export function parseLibraryUriFirstArguments(
         formatWikiGraphHelpCommand(uri),
       ),
     );
+  }
+
+  if (values.help === true) {
+    validateLibraryActionForTarget(uri, target, action);
+    return {
+      help: true,
+      helpText: renderLibraryPredicateHelpText(uri, target, action),
+      kind: "help",
+    };
   }
 
   if (target.kind === "metadata") {
@@ -269,36 +282,35 @@ function isLibraryAction(action: string): action is CLILibraryAction {
   );
 }
 
-function renderLibraryHelpText(
+function validateLibraryActionForTarget(
   uri: string,
   target: ParsedWikiGraphLibraryUri,
-): string {
+  action: CLILibraryAction,
+): void {
+  const helpRoute = formatWikiGraphHelpCommand(uri);
   if (target.kind === "metadata") {
-    return [
-      "Help Type: command",
-      `Command: wg ${uri}`,
-      "",
-      "Library metadata object",
-      "",
-      "Usage:",
-      `  wg ${uri}`,
-      `  wg ${uri} set <json> [--json]`,
-      `  wg ${uri} put <key> <value> [--json]`,
-      `  wg ${uri} delete <key> [--json]`,
-      `  wg ${uri} clear [--json]`,
-    ].join("\n");
+    if (!LIBRARY_METADATA_ACTIONS.has(action)) {
+      throw new Error(
+        withHelpRoute(
+          `The library metadata object ${uri} does not support \`${action}\`.`,
+          helpRoute,
+        ),
+      );
+    }
+    return;
   }
-  return [
-    "Help Type: command",
-    `Command: wg ${uri}`,
-    "",
-    "Library scope",
-    "",
-    "Usage:",
-    ...(target.isDefault
-      ? ["  wg wikg://lib create --path <folder> [--json]"]
-      : []),
-    `  wg ${uri}`,
-    ...(target.isDefault ? [] : [`  wg ${uri} remove [--json]`]),
-  ].join("\n");
+
+  if (!LIBRARY_SCOPE_ACTIONS.has(action)) {
+    throw new Error(
+      withHelpRoute(
+        `The library scope ${uri} does not support \`${action}\`.`,
+        helpRoute,
+      ),
+    );
+  }
+  if (action === "create" && !target.isDefault) {
+    throw new Error(
+      withHelpRoute("Create libraries from wikg://lib.", helpRoute),
+    );
+  }
 }

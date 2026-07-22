@@ -1,0 +1,96 @@
+Help Type: command
+Command: {{ commandName }} {{ uri }} {{ predicate }}
+
+Library Predicate Command
+
+Target:
+  {{ uri }}
+
+Predicate:
+  {{ predicate }}
+
+{% if target.kind == "scope" and predicate == "create" %}
+Purpose:
+  Create a non-default library registry and create its empty library folder.
+
+Usage:
+  {{ commandName }} wikg://lib create --path <folder> [--json]
+
+Notes:
+  - Libraries are created from the default library scope, `wikg://lib`.
+  - `<folder>` must not already exist; the command creates it as an empty directory.
+  - The folder is not scanned, and contained `.wikg` files are not registered in this stage.
+  - Registry data is stored in the global core database, not in the library folder.
+  - Text output is the new public library URI. With `--json`, output includes the public id, URI, folder path, default marker, staging path, and timestamps.
+
+Examples:
+  {{ commandName }} wikg://lib create --path ./research-library
+  {{ commandName }} wikg://lib create --path ./research-library --json
+{% elif target.kind == "scope" and predicate == "remove" %}
+Purpose:
+  Remove this non-default library registry.
+
+Usage:
+  {{ commandName }} {{ uri }} remove [--json]
+
+Notes:
+  - The default library is system-managed and cannot be removed.
+  - Removing a library deletes the core registry record and library metadata.
+  - Removing a library does not delete, inspect, scan, or clean the library folder.
+  - First-stage library support does not remove library index or archive membership because those are not created yet.
+{% elif target.kind == "metadata" and predicate == "set" %}
+Purpose:
+  Replace the whole library metadata map.
+
+Usage:
+  {{ commandName }} {{ uri }} set <json> [--json]
+  {{ commandName }} {{ uri }} set --json-input <json> [--json]
+  {{ commandName }} {{ uri }} set --json --input <path|-> [--json]
+
+Notes:
+  - `set` requires a JSON object.
+  - Metadata keys are free-form user fields.
+  - System registry fields such as id, public id, folder path, default marker, and staging path cannot be modified through metadata.
+  - With `--json`, success output is the resulting metadata map.
+{% elif target.kind == "metadata" and predicate == "put" %}
+Purpose:
+  Write one library metadata key.
+
+Usage:
+  {{ commandName }} {{ uri }} put <key> <value> [--json]
+  {{ commandName }} {{ uri }} put <key> --json <value>
+  {{ commandName }} {{ uri }} put <key> --json-input <value> [--json]
+  {{ commandName }} {{ uri }} put <key> --input <path|-> [--json]
+
+Notes:
+  - Without JSON input, the value is stored as a string.
+  - With JSON input, the value is parsed as JSON.
+  - Metadata keys are command arguments, not URI segments.
+  - System registry fields such as id, public id, folder path, default marker, and staging path cannot be modified through metadata.
+{% elif target.kind == "metadata" and predicate == "delete" %}
+Purpose:
+  Delete one library metadata key.
+
+Usage:
+  {{ commandName }} {{ uri }} delete <key> [--json]
+
+Notes:
+  - Missing keys are ignored.
+  - With `--json`, success output is the resulting metadata map.
+{% elif target.kind == "metadata" and predicate == "clear" %}
+Purpose:
+  Clear this library metadata map.
+
+Usage:
+  {{ commandName }} {{ uri }} clear [--json]
+
+Notes:
+  - This clears user metadata only.
+  - It does not remove the library registry or change the library folder.
+{% else %}
+This library target does not support `{{ predicate }}`.
+{% endif %}
+
+Related help:
+  - {{ commandName }} {{ uri }} --help
+  - {{ commandName }} help uri

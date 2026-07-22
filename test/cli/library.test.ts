@@ -88,12 +88,12 @@ describe("cli/library args", () => {
     });
 
     expect(
-      parseCLIArguments(["wikg://lib/meta", "put", "title", "Default"]),
+      parseCLIArguments(["wikg://lib/meta", "put", "note", "Default"]),
     ).toMatchObject({
       args: {
         action: "put",
         inputValue: "Default",
-        key: "title",
+        key: "note",
         target: { isDefault: true, kind: "metadata" },
       },
       help: false,
@@ -108,6 +108,28 @@ describe("cli/library args", () => {
     expect(() =>
       parseCLIArguments(["wikg://lib/abc123abc123.lib", "inspect"]),
     ).toThrow("does not support `inspect`");
+  });
+
+  it("routes library URI and predicate help through command pages", () => {
+    const scopeHelp = parseCLIArguments(["wikg://lib", "--help"]);
+    const createHelp = parseCLIArguments(["wikg://lib", "create", "--help"]);
+    const putHelp = parseCLIArguments(["wikg://lib/meta", "put", "--help"]);
+
+    expect(scopeHelp).toMatchObject({
+      help: true,
+      kind: "help",
+    });
+    if (!scopeHelp.help || !createHelp.help || !putHelp.help) {
+      throw new Error("Expected help output.");
+    }
+    expect(scopeHelp.helpText).toContain("Library scope");
+    expect(createHelp.helpText).toContain(
+      "Create a non-default library registry",
+    );
+    expect(putHelp.helpText).toContain("Write one library metadata key");
+    expect(() =>
+      parseCLIArguments(["wikg://lib/abc123abc123.lib", "create", "--help"]),
+    ).toThrow("Create libraries from wikg://lib.");
   });
 
   it("does not steal archive URIs below a lib path segment", () => {
