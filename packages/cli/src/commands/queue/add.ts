@@ -85,11 +85,26 @@ export async function addArchiveJobs(
 
 export async function assertQueueAddReady(
   args: CLIQueueArguments,
+  chapterId: number,
 ): Promise<void> {
+  let chapter: ChapterEntry | undefined;
+  await new WikiGraphArchiveFile(args.archivePath!).readDocument(
+    async (document) => {
+      chapter = (await listChapters(document)).find(
+        (entry) => entry.chapterId === chapterId,
+      );
+    },
+  );
+
+  if (chapter === undefined) {
+    throw new Error(`Chapter does not exist.`);
+  }
+  const chapterUri = chapter.uri;
+
   await new WikiGraphArchiveFile(args.archivePath!).read(async (digest) => {
-    if ((await digest.readChapterStage(args.chapterId!)) === "planned") {
+    if ((await digest.readChapterStage(chapterId)) === "planned") {
       throw new Error(
-        `Chapter ${args.chapterId!} is planned. Set source before queueing a build job.`,
+        `Chapter ${chapterUri} is planned. Set source before queueing a build job.`,
       );
     }
   });
