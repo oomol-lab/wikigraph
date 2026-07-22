@@ -96,7 +96,11 @@ export {
   resolveExtractionPrompt,
   resolveKnowledgeGraphRecallPrompt,
 } from "./prompts.js";
-export type { ContinuationCursor } from "../retrieval/query/index.js";
+export type {
+  ContinuationCursor,
+  QueryIndexScope,
+  QueryScope,
+} from "../retrieval/query/index.js";
 export type {
   BuildChapterGraphArtifactOptions,
   BuildChapterSummaryArtifactOptions,

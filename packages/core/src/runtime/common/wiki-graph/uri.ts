@@ -26,6 +26,10 @@ export function parseLocatedWikiGraphUri(uri: string): LocatedWikiGraphUri {
   }
 
   const body = uri.slice(prefix.length);
+  const libraryArchive = parseLibraryArchiveLocatorBody(body);
+  if (libraryArchive !== undefined) {
+    return libraryArchive;
+  }
   const split = body.split("#", 2);
   const path = split[0] ?? "";
   const hash = split[1] ?? "";
@@ -56,6 +60,42 @@ export function parseLocatedWikiGraphUri(uri: string): LocatedWikiGraphUri {
           ),
         }),
   };
+}
+
+function parseLibraryArchiveLocatorBody(
+  body: string,
+): LocatedWikiGraphUri | undefined {
+  const match =
+    /^lib\/(?:(?<library>[^/]+\.lib)\/)?(?<archive>[^/.][^/]*)(?:\/(?<object>.*))?$/u.exec(
+      body,
+    );
+  const groups = match?.groups;
+  const archive = groups?.archive;
+  if (archive === undefined || isLibraryScopeSegment(archive)) {
+    return undefined;
+  }
+  const library = groups?.library;
+  const archivePath = `${WIKI_GRAPH_URI_PREFIX}lib/${
+    library === undefined ? "" : `${library}/`
+  }${archive}`;
+  const objectPath = groups?.object;
+
+  return {
+    archivePath,
+    ...(objectPath === undefined || objectPath === ""
+      ? {}
+      : { objectUri: formatWikiGraphObjectUri(objectPath) }),
+  };
+}
+
+function isLibraryScopeSegment(segment: string): boolean {
+  return (
+    segment === "meta" ||
+    segment === "chapter" ||
+    segment === "chunk" ||
+    segment === "entity" ||
+    segment === "triple"
+  );
 }
 
 function resolveArchivePath(archivePath: string): string {

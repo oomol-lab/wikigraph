@@ -89,9 +89,19 @@ describe("wiki graph library registry", () => {
       kind: "metadata",
       publicId: "abc123abc123",
     });
-    expect(() => parseWikiGraphLibraryUri("wikg://lib/abc123abc123")).toThrow(
-      ".lib suffix",
-    );
+    expect(
+      parseWikiGraphLibraryUri("wikg://lib/archive123/chapter"),
+    ).toStrictEqual({
+      archivePublicId: "archive123",
+      isDefault: true,
+      kind: "archive",
+      objectUri: "wikg://chapter",
+    });
+    expect(parseWikiGraphLibraryUri("wikg://lib/entity/Q42")).toStrictEqual({
+      isDefault: true,
+      kind: "scope",
+      objectUri: "wikg://entity/Q42",
+    });
     const parsed = parseLocatedWikiGraphUri(
       "wikg://tmp/lib/book.wikg/entity/Q42",
     );

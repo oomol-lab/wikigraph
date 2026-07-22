@@ -1,7 +1,23 @@
-export type ContinuationCursor =
+export type QueryScope =
+  | { readonly kind: "archive"; readonly archiveId: number }
+  | { readonly kind: "library"; readonly libraryId: number };
+
+export type QueryIndexScope =
   | {
-      readonly archiveKey: string;
+      readonly kind: "archive-index";
       readonly archivePath: string;
+      readonly archiveKey: string;
+    }
+  | { readonly kind: "library-index"; readonly libraryId: number };
+
+type ContinuationCursorBase = {
+  readonly archiveKey: string;
+  readonly archivePath: string;
+  readonly indexScope?: QueryIndexScope;
+};
+
+export type ContinuationCursor =
+  | (ContinuationCursorBase & {
       readonly backlinks?: boolean;
       readonly chapters: readonly number[] | null;
       readonly cursor: string;
@@ -17,10 +33,8 @@ export type ContinuationCursor =
         readonly subjectQid?: string;
       };
       readonly types: readonly string[] | null;
-    }
-  | {
-      readonly archiveKey: string;
-      readonly archivePath: string;
+    })
+  | (ContinuationCursorBase & {
       readonly backlinks?: boolean;
       readonly chapters?: readonly number[] | null;
       readonly cursor: string;
@@ -35,10 +49,8 @@ export type ContinuationCursor =
         readonly subjectQid?: string;
       };
       readonly types: readonly string[] | null;
-    }
-  | {
-      readonly archiveKey: string;
-      readonly archivePath: string;
+    })
+  | (ContinuationCursorBase & {
       readonly cursor: string;
       readonly format: "json" | "jsonl" | "text";
       readonly kind: "evidence";
@@ -46,10 +58,8 @@ export type ContinuationCursor =
       readonly query?: string;
       readonly sourceContext?: number;
       readonly targetUri: string;
-    }
-  | {
-      readonly archiveKey: string;
-      readonly archivePath: string;
+    })
+  | (ContinuationCursorBase & {
       readonly cursor: string;
       readonly evidenceLimit?: number;
       readonly format: "json" | "jsonl" | "text";
@@ -59,4 +69,4 @@ export type ContinuationCursor =
       readonly role?: "any" | "object" | "self" | "subject";
       readonly sourceContext?: number;
       readonly targetUri: string;
-    };
+    });

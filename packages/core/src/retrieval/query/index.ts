@@ -53,7 +53,11 @@ export {
   createContinuationCursor,
   readContinuationCursor,
 } from "./continuation-cursor/index.js";
-export type { ContinuationCursor } from "./continuation-cursor/index.js";
+export type {
+  ContinuationCursor,
+  QueryIndexScope,
+  QueryScope,
+} from "./continuation-cursor/index.js";
 export {
   createSearchSession,
   deleteArchiveSearchSessions,
