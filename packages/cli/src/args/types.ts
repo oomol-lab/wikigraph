@@ -161,7 +161,9 @@ export interface CLIQueueArguments {
   readonly archivePath?: string;
   readonly boost?: boolean;
   readonly chapterId?: number;
+  readonly chapterIds?: readonly number[];
   readonly chapterPath?: string;
+  readonly depth?: number;
   readonly from?: "beginning" | "now";
   readonly inputPath?: string;
   readonly jobId?: string;
@@ -226,6 +228,7 @@ export interface CLIArchiveArguments {
   readonly confirm?: boolean;
   readonly context?: number;
   readonly cursor?: string;
+  readonly depth?: number;
   readonly evidenceLimit?: number;
   readonly format?: CLIResultFormat;
   readonly inputFormat?: CLIFormat;
@@ -284,6 +287,7 @@ export interface ArchiveArgumentValues extends ArchiveMetaFlagValues {
   readonly confirm?: boolean;
   readonly context?: string;
   readonly cursor?: string;
+  readonly depth?: string;
   readonly "digest-dir"?: string;
   readonly "dry-run"?: boolean;
   readonly evidence?: string;

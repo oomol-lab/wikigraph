@@ -59,6 +59,12 @@ Common command shapes:
 
 Scope URIs:
   Scope URIs enumerate objects by default. With `--query <query>`, they apply keyword retrieval within that scope.
+  A chapter URI used as a scope covers that chapter's full subtree by default.
+  Add `--depth <N>` to limit chapter subtree expansion:
+    - no `--depth`: full subtree
+    - `--depth 0`: only the current chapter, or root-level chapters for `<archive-uri>/chapter`
+    - `--depth 1`: current/root-level chapters plus direct children
+  `--depth` must include a non-negative integer value; naked `--depth`, negative values, and non-integers are invalid.
     wikg://book.wikg
     wikg://book.wikg/chapter
     wikg://book.wikg/chapter/part
@@ -102,6 +108,8 @@ Object boundaries:
   - `chapter/<path>` is a scope, not an object.
   - `chapter/<path>/title` is the queryable chapter title object.
   - Whole `source` and `summary` objects are readable text streams, not collection scopes.
+  - Chapter-qualified object/resource URIs do not expand to subtrees and do not support `--depth`.
+  - `move`, `remove`, and `reset` are chapter node maintenance predicates; they target the chapter node itself, not the subtree. Use `remove --recursive` for explicit recursive deletion.
   - Ranged fragments such as `/source#4..8` and `/summary#4..8` are structured range objects.
   - Source and summary range numbers are 1-based and inclusive. `/source#1..2` means the first two source sentences.
   - Source text is the grounding material. `evidence` is not available for source, summary, or chapter scope URIs.

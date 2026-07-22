@@ -115,11 +115,12 @@ Purpose:
   Add a local generation job.
 
 Usage:
-  {{ commandName }} {{ uri }} add --input <archive-uri|chapter-uri> --task reading-graph|reading-summary|knowledge-graph --accept-cost [--boost] [--llm <json>] [--prompt <text>]
+  {{ commandName }} {{ uri }} add --input <archive-uri|chapter-uri> --task reading-graph|reading-summary|knowledge-graph --accept-cost [--depth <N>] [--boost] [--llm <json>] [--prompt <text>]
 
 Notes:
   - Generation jobs may call an LLM provider and incur cost.
-  - Archive input adds jobs for all eligible chapters; chapter input adds one job.
+  - Archive input adds jobs for all eligible chapters; chapter input expands to the chapter subtree by default.
+  - Use `--depth <N>` with chapter input to limit the affected chapters; `--depth 0` means only that chapter.
   - `--llm <json>` stores a job-local LLM object; it does not update `wikg://local/config/llm`.
 {% elif predicate == "move" %}
 Purpose:

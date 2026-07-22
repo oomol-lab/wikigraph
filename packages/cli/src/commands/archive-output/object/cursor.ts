@@ -83,6 +83,7 @@ export async function createOutputContinuationCursor(
     input = {
       archiveKey: context.archiveKey,
       archivePath: context.archivePath,
+      chapters: context.chapters ?? null,
       cursor,
       ...(context.backlinks === undefined
         ? {}

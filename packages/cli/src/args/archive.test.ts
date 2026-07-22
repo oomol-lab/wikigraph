@@ -378,7 +378,7 @@ describe("cli/args/archive", () => {
     });
 
     expect(() => parseCLIArguments(["wikg://book.wikg", "search"])).toThrow(
-      "This command form is not available.",
+      "Scope keyword retrieval requires --query.",
     );
     expect(() =>
       parseCLIArguments([
@@ -1098,5 +1098,69 @@ describe("cli/args/archive", () => {
         "book.epub",
       ]),
     ).toThrow("The `chapter tree` action does not support --import.");
+  });
+
+  it("parses chapter subtree depth only for scope reads", () => {
+    expect(
+      parseCLIArguments([
+        "wikg://book.wikg/chapter/part/source",
+        "list",
+        "--depth",
+        "1",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "list",
+        archivePath: `wikg://${archivePath}/chapter/part`,
+        depth: 1,
+        format: "text",
+        kinds: ["source"],
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments([
+        "wikg://book.wikg/chapter",
+        "--query",
+        "agent",
+        "--depth",
+        "0",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "search",
+        archivePath: "wikg://book.wikg/chapter",
+        depth: 0,
+        format: "text",
+        kinds: ["chapter"],
+        query: "agent",
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(() =>
+      parseCLIArguments([
+        "wikg://book.wikg/chapter/part/source",
+        "--depth",
+        "1",
+      ]),
+    ).toThrow("The `get` command does not support --depth.");
+    expect(() =>
+      parseCLIArguments([
+        "wikg://book.wikg/chapter/part",
+        "move",
+        "--depth",
+        "1",
+      ]),
+    ).toThrow("The `chapter` command does not support --depth.");
+    expect(() => parseCLIArguments(["next", "cursor", "--depth", "1"])).toThrow(
+      "The `next` command does not support --depth.",
+    );
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg/chapter/part", "--depth", "-1"]),
+    ).toThrow("--depth must be a non-negative integer.");
   });
 });

@@ -85,6 +85,9 @@ export function parseCLIArguments(
       "digest-dir": {
         type: "string",
       },
+      depth: {
+        type: "string",
+      },
       "dry-run": {
         type: "boolean",
       },

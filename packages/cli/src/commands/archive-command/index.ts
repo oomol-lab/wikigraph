@@ -39,6 +39,7 @@ import {
   runNextArchivePage,
   writeArchiveRoot,
 } from "./run/index.js";
+import { resolveArchiveChapterScope } from "./run/scope.js";
 
 export async function runArchiveCommand(
   args: CLIArchiveArguments,
@@ -71,13 +72,18 @@ export async function runArchiveCommand(
       await readArchiveDocument(
         getArchivePath(args.archivePath),
         async (document) => {
-          const context = createArchiveOutputContext(args);
+          const scope = await resolveArchiveChapterScope(document, args);
+          const scopedArgs =
+            scope === undefined
+              ? args
+              : { ...args, chapters: scope.chapterIds };
+          const context = createArchiveOutputContext(scopedArgs);
 
           if (args.all === true) {
             await writeAllFindHits(
               async (cursor) =>
-                await findArchiveObjects(document, args.query!, {
-                  ...createFindOptions(args),
+                await findArchiveObjects(document, scopedArgs.query!, {
+                  ...createFindOptions(scopedArgs),
                   ...(cursor === undefined ? {} : { cursor }),
                 }),
               context,
@@ -89,8 +95,8 @@ export async function runArchiveCommand(
           await writeFindHits(
             await findArchiveObjects(
               document,
-              args.query!,
-              createFindOptions(args),
+              scopedArgs.query!,
+              createFindOptions(scopedArgs),
             ),
             context,
             args.format ?? "text",
@@ -102,7 +108,12 @@ export async function runArchiveCommand(
       await readArchiveDocument(
         getArchivePath(args.archivePath),
         async (document) => {
-          const context = createArchiveOutputContext(args, {
+          const scope = await resolveArchiveChapterScope(document, args);
+          const scopedArgs =
+            scope === undefined
+              ? args
+              : { ...args, chapters: scope.chapterIds };
+          const context = createArchiveOutputContext(scopedArgs, {
             continuationKind: "collection",
           });
 
@@ -112,7 +123,7 @@ export async function runArchiveCommand(
                 async (cursor) =>
                   createCollectionFindResult(
                     await listArchiveCollection(document, {
-                      ...createCollectionOptions(args),
+                      ...createCollectionOptions(scopedArgs),
                       ...(cursor === undefined ? {} : { cursor }),
                     }),
                   ),
@@ -125,7 +136,7 @@ export async function runArchiveCommand(
             await writeFindHitsWithoutContinuation(
               createCollectionFindResult(
                 await listArchiveCollection(document, {
-                  ...createCollectionOptions(args),
+                  ...createCollectionOptions(scopedArgs),
                   limit: ALL_COLLECTION_OUTPUT_LIMIT,
                 }),
               ),
@@ -139,7 +150,7 @@ export async function runArchiveCommand(
             createCollectionFindResult(
               await listArchiveCollection(
                 document,
-                createCollectionOptions(args),
+                createCollectionOptions(scopedArgs),
               ),
             ),
             context,

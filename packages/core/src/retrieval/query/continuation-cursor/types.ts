@@ -22,6 +22,7 @@ export type ContinuationCursor =
       readonly archiveKey: string;
       readonly archivePath: string;
       readonly backlinks?: boolean;
+      readonly chapters: readonly number[] | null;
       readonly cursor: string;
       readonly evidenceLimit?: number;
       readonly format: "json" | "jsonl" | "text";

@@ -2,6 +2,8 @@ import {
   boostBuildJob,
   cancelBuildJob,
   cleanBuildJobs,
+  formatLocatedChapterUri,
+  formatLocatedWikiGraphUri,
   getBuildJob,
   listBuildJobs,
   pauseBuildJob,
@@ -27,16 +29,14 @@ import { createQueueAddEstimate } from "./estimate.js";
 import { writeJobList, writeJobStatus, writeJobSummary } from "./output.js";
 import { watchBuildJob } from "./watch.js";
 import { requireKnowledgeGraphWikispineConfig } from "./worker.js";
+import { resolveArchiveChapterScope } from "../archive-command/run/scope.js";
 
 export { runQueueWorker } from "./worker.js";
 
 export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
   switch (args.action) {
     case "add": {
-      const chapterId = await resolveQueueChapterId(args);
-      if (chapterId !== undefined) {
-        await assertQueueAddReady(args, chapterId);
-      }
+      const chapterIds = await resolveQueueChapterIds(args);
       assertBuildCostAccepted(args);
       const config = await loadRequiredStageConfig({
         ...(args.llmJSON === undefined ? {} : { llmJSON: args.llmJSON }),
@@ -45,9 +45,11 @@ export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
         requireKnowledgeGraphWikispineConfig(config);
       }
 
-      if (chapterId === undefined) {
+      if (chapterIds === undefined) {
         await addArchiveJobs(args, config);
-      } else {
+      } else if (chapterIds.length === 1) {
+        const chapterId = chapterIds[0]!;
+        await assertQueueAddReady(args, chapterId);
         const chapter = await readQueueAddChapter(args, chapterId);
         const estimate = createQueueAddEstimate({
           chapters: [chapter],
@@ -60,6 +62,8 @@ export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
           json: args.json ?? false,
           watch: true,
         });
+      } else {
+        await addArchiveJobs({ ...args, chapterIds }, config);
       }
 
       tryStartQueueWorker();
@@ -127,21 +131,43 @@ async function resolveQueueJobId(args: CLIQueueArguments): Promise<string> {
   return await resolveBuildJobId(args.jobId!);
 }
 
-async function resolveQueueChapterId(
+async function resolveQueueChapterIds(
   args: CLIQueueArguments,
-): Promise<number | undefined> {
+): Promise<readonly number[] | undefined> {
   if (args.chapterId !== undefined) {
-    return args.chapterId;
+    return [args.chapterId];
   }
-  if (args.chapterPath === undefined) {
+  if (args.chapterPath === undefined && args.depth === undefined) {
     return undefined;
   }
 
-  let chapterId: number | undefined;
+  let chapterIds: readonly number[] | undefined;
   await new WikiGraphArchiveFile(args.archivePath!).readDocument(
     async (document) => {
-      chapterId = await resolveChapterPathReadonly(document, args.chapterPath!);
+      if (args.chapterPath === undefined) {
+        chapterIds = (
+          await resolveArchiveChapterScope(document, {
+            archivePath: formatLocatedWikiGraphUri(
+              args.archivePath!,
+              "wikg://chapter",
+            ),
+            ...(args.depth === undefined ? {} : { depth: args.depth }),
+          })
+        )?.chapterIds;
+        return;
+      }
+      chapterIds = (
+        await resolveArchiveChapterScope(document, {
+          archivePath: formatLocatedChapterUri(
+            args.archivePath!,
+            args.chapterPath,
+          ),
+          ...(args.depth === undefined ? {} : { depth: args.depth }),
+        })
+      )?.chapterIds ?? [
+        await resolveChapterPathReadonly(document, args.chapterPath),
+      ];
     },
   );
-  return chapterId;
+  return chapterIds;
 }

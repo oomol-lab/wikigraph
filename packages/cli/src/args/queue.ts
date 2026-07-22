@@ -16,6 +16,7 @@ import {
   isJobUriAction,
   isRemovedImplicitArchiveAction,
   parseBuildJobTarget,
+  parseNonNegativeIntegerFlag,
   parseWatchFrom,
   parseWikiGraphJobTargetUri,
   parseWikiGraphJobUri,
@@ -256,6 +257,15 @@ function parseQueueAddArguments(
       ...(input.chapterPath === undefined
         ? {}
         : { chapterPath: input.chapterPath }),
+      ...(values.depth === undefined
+        ? {}
+        : {
+            depth: parseNonNegativeIntegerFlag(
+              values.depth,
+              "--depth",
+              helpRoute,
+            ),
+          }),
       inputPath: values.input,
       ...(values.json === undefined ? {} : { json: values.json }),
       ...(values.llm === undefined ? {} : { llmJSON: values.llm }),

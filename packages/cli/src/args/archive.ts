@@ -16,6 +16,7 @@ import {
   normalizeArchiveInlineOptions,
   parseArchiveInspectChapterId,
   parseEvidenceFlag,
+  parseNonNegativeIntegerFlag,
   parsePositiveIntegerFlag,
   parseRelatedRoleFlag,
   parseResultFormat,
@@ -230,6 +231,7 @@ export function parseArchiveArguments(
       rejectArchiveBooleanFlag(action, "--reverse", values.reverse, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      rejectNonChapterDepthFlag(action, archivePath, values.depth, helpRoute);
 
       return {
         args: {
@@ -240,6 +242,15 @@ export function parseArchiveArguments(
             ? {}
             : { backlinks: values.backlinks }),
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
+          ...(values.depth === undefined
+            ? {}
+            : {
+                depth: parseNonNegativeIntegerFlag(
+                  values.depth,
+                  "--depth",
+                  helpRoute,
+                ),
+              }),
           ...parseSourceContextFlag(values.context, helpRoute),
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
@@ -275,6 +286,7 @@ export function parseArchiveArguments(
       rejectArchiveReverseQuery(values, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
       rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+      rejectNonChapterDepthFlag(action, archivePath, values.depth, helpRoute);
       return {
         args: {
           action,
@@ -284,6 +296,15 @@ export function parseArchiveArguments(
             ? {}
             : { backlinks: values.backlinks }),
           ...(values.cursor === undefined ? {} : { cursor: values.cursor }),
+          ...(values.depth === undefined
+            ? {}
+            : {
+                depth: parseNonNegativeIntegerFlag(
+                  values.depth,
+                  "--depth",
+                  helpRoute,
+                ),
+              }),
           ...parseSourceContextFlag(values.context, helpRoute),
           ...parseEvidenceFlag(values.evidence, helpRoute),
           format: parseResultFormat(values),
@@ -316,6 +337,7 @@ export function parseArchiveArguments(
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+      rejectArchiveFlag(action, "--depth", values.depth, helpRoute);
       rejectArchiveFlag(action, "--query", values.query, helpRoute);
       rejectArchiveReverseQuery(values, helpRoute);
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
@@ -350,6 +372,7 @@ export function parseArchiveArguments(
       );
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
+      rejectArchiveFlag(action, "--depth", values.depth, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       const relatedTarget = validateRelatedTargetUri(archivePath, helpRoute);
       if (relatedTarget === "chunk") {
@@ -398,6 +421,7 @@ export function parseArchiveArguments(
       );
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
+      rejectArchiveFlag(action, "--depth", values.depth, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--role", values.role, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
@@ -441,6 +465,7 @@ export function parseArchiveArguments(
       );
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
       rejectArchiveFlag(action, "--context", values.context, helpRoute);
+      rejectArchiveFlag(action, "--depth", values.depth, helpRoute);
       rejectArchiveFlag(action, "--from", values.from, helpRoute);
       rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
@@ -470,6 +495,7 @@ export function parseArchiveArguments(
       rejectArchiveNonReadFlags(action, values, helpRoute);
       rejectArchiveFlag(action, "--budget", values.budget, helpRoute);
       rejectArchiveFlag(action, "--chapter", values.chapter, helpRoute);
+      rejectArchiveFlag(action, "--depth", values.depth, helpRoute);
       rejectArchiveFlag(action, "--context", values.context, helpRoute);
       rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
       rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
@@ -500,4 +526,25 @@ export function parseArchiveArguments(
       };
     }
   }
+}
+
+function rejectNonChapterDepthFlag(
+  action: CLIArchiveAction,
+  archivePath: string,
+  depth: string | undefined,
+  helpRoute: string,
+): void {
+  if (depth === undefined) {
+    return;
+  }
+
+  const objectUri = parseLocatedWikiGraphUri(archivePath).objectUri;
+  if (
+    objectUri === "wikg://chapter" ||
+    objectUri?.startsWith("wikg://chapter/") === true
+  ) {
+    return;
+  }
+
+  rejectArchiveFlag(action, "--depth", depth, helpRoute);
 }

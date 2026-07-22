@@ -23,6 +23,7 @@ URI type:
 Default behavior:
   - `{{ commandName }} {{ uri }}` enumerates chapters.
   - `{{ commandName }} {{ uri }} --query <query>` applies keyword retrieval to chapter objects.
+  - Chapter collection scope covers the full chapter tree by default; use `--depth 0` for root-level chapters only.
 
 Use when:
   - You need chapter URIs, chapter readiness, or a starting point for chapter-scoped retrieval.
@@ -31,8 +32,9 @@ URI type:
   Chapter scope
 
 Default behavior:
-  - `{{ commandName }} {{ uri }}` enumerates objects inside this chapter.
-  - `{{ commandName }} {{ uri }} --query <query>` applies keyword retrieval inside this chapter.
+  - `{{ commandName }} {{ uri }}` enumerates objects inside this chapter subtree.
+  - `{{ commandName }} {{ uri }} --query <query>` applies keyword retrieval inside this chapter subtree.
+  - Use `--depth 0` to restrict the scope to this chapter only; `--depth 1` includes direct children.
 
 Use when:
   - You already selected a chapter and want local source, summary, chunk, entity, or triple objects.
