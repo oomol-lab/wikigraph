@@ -19,7 +19,6 @@ import {
   formatWikiGraphHelpCommand,
   isArchiveUriAction,
   isImplicitArchiveReadAction,
-  isRemovedImplicitArchiveAction,
   isUriFirstArchiveAction,
   rejectArchiveBooleanFlag,
   stripObjectUriPrefix,
@@ -52,7 +51,7 @@ export function parseArchiveUriFirstArguments(
   const action =
     explicitAction ?? resolveImplicitArchiveUriAction(uri, values.query);
 
-  if (isRemovedImplicitArchiveAction(explicitAction)) {
+  if (explicitAction === "get") {
     throw new Error(formatRemovedImplicitVerbMessage(explicitAction));
   }
 

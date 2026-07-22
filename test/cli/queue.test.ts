@@ -220,6 +220,17 @@ vi.mock("../../packages/core/src/api/index.js", () => ({
   listChapters: vi.fn(() => Promise.resolve(queueMockState.chapters)),
   pauseBuildJob: vi.fn(),
   readBuildJobEvents: vi.fn(() => Promise.resolve(queueMockState.events)),
+  resolveChapterPathReadonly: vi.fn(
+    (_document: unknown, chapterPath: string) => {
+      const chapterId = Number(chapterPath);
+      if (Number.isInteger(chapterId)) {
+        return Promise.resolve(chapterId);
+      }
+      return Promise.reject(
+        new Error(`Chapter path ${chapterPath} does not exist.`),
+      );
+    },
+  ),
   recordBuildJobInputRevision: vi.fn((input: unknown) => {
     queueMockState.inputRevisionRecords.push(input);
     return Promise.resolve(queueMockState.job);

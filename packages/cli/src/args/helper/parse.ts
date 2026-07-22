@@ -134,6 +134,7 @@ export function normalizeArchiveInlineOptions(
       case "--chapter":
       case "--context":
       case "--cursor":
+      case "--depth":
       case "--import":
       case "--input":
       case "--input-format":
@@ -210,7 +211,7 @@ export function normalizeArchiveValueFlagArgv(
       continue;
     }
 
-    if (item !== "--evidence" && item !== "--context") {
+    if (item !== "--evidence" && item !== "--context" && item !== "--depth") {
       normalized.push(item);
       continue;
     }

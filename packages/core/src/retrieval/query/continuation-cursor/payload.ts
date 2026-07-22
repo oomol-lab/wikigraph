@@ -27,6 +27,7 @@ export function createCursorPayload(input: ContinuationCursor): object {
         ...(input.backlinks === undefined
           ? {}
           : { backlinks: input.backlinks }),
+        chapters: input.chapters,
         cursor: input.cursor,
         ...(input.evidenceLimit === undefined
           ? {}
@@ -99,6 +100,7 @@ export function parseContinuationCursorRecord(record: {
       archiveKey: record.archiveKey,
       archivePath: record.archivePath,
       ...getPayloadOptionalBoolean(payload, "backlinks"),
+      chapters: getPayloadNumberArrayOrNull(payload, "chapters"),
       cursor: getPayloadString(payload, "cursor"),
       ...getPayloadOptionalPositiveInteger(payload, "evidenceLimit"),
       format: record.format,
@@ -204,7 +206,7 @@ function getPayloadNumberArrayOrNull(
 ): readonly number[] | null {
   const value = payload[key];
 
-  if (value === null) {
+  if (value === undefined || value === null) {
     return null;
   }
   if (Array.isArray(value)) {

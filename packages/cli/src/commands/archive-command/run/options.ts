@@ -30,7 +30,7 @@ export function createFindOptions(
   return {
     archiveKey: getArchivePath(args.archivePath),
     ...(args.backlinks === undefined ? {} : { backlinks: args.backlinks }),
-    ...createScopeOptions(args.archivePath),
+    ...createScopeOptions(args),
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
     ...createOptionalEvidenceLimit(args),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
@@ -78,7 +78,7 @@ export function createArchiveOutputContext(
         : { query: args.query }),
     ...(args.role === undefined ? {} : { role: args.role }),
     ...(options.continuationKind === "collection"
-      ? createScopeOptions(args.archivePath)
+      ? createScopeOptions(args)
       : {}),
     ...(args.triplePattern === undefined
       ? {}
@@ -158,7 +158,7 @@ export function createCollectionOptions(
 
   return {
     ...(args.backlinks === undefined ? {} : { backlinks: args.backlinks }),
-    ...createScopeOptions(args.archivePath),
+    ...createScopeOptions(args),
     ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
     ...createOptionalEvidenceLimit(args),
     ...(args.limit === undefined ? {} : { limit: args.limit }),
@@ -188,10 +188,16 @@ export function createCollectionFindResult(
   };
 }
 
-export function createScopeOptions(uri: string): {
+export function createScopeOptions(
+  args: Pick<CLIArchiveArguments, "archivePath" | "chapters">,
+): {
   readonly chapters?: readonly number[];
 } {
-  const objectUri = parseLocatedWikiGraphUri(uri).objectUri;
+  if (args.chapters !== undefined) {
+    return { chapters: args.chapters };
+  }
+
+  const objectUri = parseLocatedWikiGraphUri(args.archivePath).objectUri;
 
   if (objectUri === undefined) {
     return {};

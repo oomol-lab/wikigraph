@@ -43,7 +43,16 @@ export async function addArchiveJobs(
 
   await new WikiGraphArchiveFile(args.archivePath!).readDocument(
     async (document) => {
+      const chapterIdSet =
+        args.chapterIds === undefined ? undefined : new Set(args.chapterIds);
+
       for (const chapter of await listChapters(document)) {
+        if (
+          chapterIdSet !== undefined &&
+          !chapterIdSet.has(chapter.chapterId)
+        ) {
+          continue;
+        }
         if (chapter.stage === "planned") {
           skipped.push({
             chapterId: chapter.chapterId,

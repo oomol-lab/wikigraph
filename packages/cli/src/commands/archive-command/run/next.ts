@@ -106,6 +106,7 @@ export async function runNextArchivePage(
           ...(cursor.backlinks === undefined
             ? {}
             : { backlinks: cursor.backlinks }),
+          ...(cursor.chapters === null ? {} : { chapters: cursor.chapters }),
           cursor: cursor.cursor,
           ...(cursor.evidenceLimit === undefined
             ? {}
@@ -133,6 +134,7 @@ export async function runNextArchivePage(
             ...(cursor.backlinks === undefined
               ? {}
               : { backlinks: cursor.backlinks }),
+            ...(cursor.chapters === null ? {} : { chapters: cursor.chapters }),
             ...(cursor.evidenceLimit === undefined
               ? {}
               : { evidenceLimit: cursor.evidenceLimit }),

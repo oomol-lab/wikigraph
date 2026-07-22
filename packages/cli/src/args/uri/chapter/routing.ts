@@ -377,11 +377,21 @@ function parseChapterResourceUriArguments(
   const resourceHelpRoute = `wg <chapter-uri>/${resource} --help`;
 
   if (action === "list" || action === "search") {
-    throw new Error(
-      withHelpRoute(
-        `The chapter ${resource} resource does not support \`${action}\`.`,
-        resourceHelpRoute,
-      ),
+    if (resource === "title") {
+      throw new Error(
+        withHelpRoute(
+          `The chapter ${resource} resource does not support \`${action}\`.`,
+          resourceHelpRoute,
+        ),
+      );
+    }
+
+    return parseArchiveArguments(
+      action,
+      [formatLocatedChapterUri(archivePath, chapterPath), ...tail],
+      values,
+      helpRoute,
+      { defaultKinds: [resource] },
     );
   }
 
@@ -461,6 +471,7 @@ function parseArchiveChapterLikeArguments(
   }
 
   rejectArchiveChapterFlag("digest-dir", values["digest-dir"], helpRoute);
+  rejectArchiveChapterFlag("depth", values.depth, helpRoute);
   rejectArchiveChapterFlag("jsonl", values.jsonl, helpRoute);
   rejectArchiveChapterFlag("limit", values.limit, helpRoute);
   rejectArchiveChapterFlag("output", values.output, helpRoute);

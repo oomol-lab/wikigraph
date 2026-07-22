@@ -146,6 +146,7 @@ const archiveMockState = vi.hoisted(() => ({
       childCount: 0,
       depth: 0,
       fragmentCount: 1,
+      path: "1",
       stage: "summarized",
       title: "Ready chapter",
       tocPath: ["Ready chapter"],
@@ -156,6 +157,7 @@ const archiveMockState = vi.hoisted(() => ({
       childCount: 0,
       depth: 0,
       fragmentCount: 1,
+      path: "2",
       stage: "sourced",
       title: "Missing chapter",
       tocPath: ["Missing chapter"],
@@ -166,6 +168,7 @@ const archiveMockState = vi.hoisted(() => ({
       childCount: 0,
       depth: 0,
       fragmentCount: 0,
+      path: "3",
       stage: "planned",
       title: "Planned chapter",
       tocPath: ["Planned chapter"],
@@ -193,6 +196,7 @@ const archiveMockState = vi.hoisted(() => ({
         childCount: 0,
         depth: 0,
         fragmentCount: 1,
+        path: "2",
         stage: "graphed",
         title: "Chapter 2",
         tocPath: ["Chapter 2"],
@@ -517,6 +521,17 @@ vi.mock("../../../packages/core/src/api/index.js", () => ({
     Promise.resolve(archiveMockState.collection),
   ),
   listChapters: vi.fn(() => Promise.resolve(archiveMockState.inspectChapters)),
+  resolveChapterPathReadonly: vi.fn(
+    (_document: unknown, chapterPath: string) => {
+      const chapterId = Number(chapterPath);
+      if (Number.isInteger(chapterId)) {
+        return Promise.resolve(chapterId);
+      }
+      return Promise.reject(
+        new Error(`Chapter path ${chapterPath} does not exist.`),
+      );
+    },
+  ),
   getArchiveIndex: vi.fn(() => Promise.resolve(archiveMockState.index)),
   listRelatedArchiveObjects: vi.fn(() =>
     Promise.resolve({
@@ -653,6 +668,7 @@ function createDefaultInspectChapters(): typeof archiveMockState.inspectChapters
       childCount: 0,
       depth: 0,
       fragmentCount: 1,
+      path: "1",
       stage: "summarized",
       title: "Ready chapter",
       tocPath: ["Ready chapter"],
@@ -663,6 +679,7 @@ function createDefaultInspectChapters(): typeof archiveMockState.inspectChapters
       childCount: 0,
       depth: 0,
       fragmentCount: 1,
+      path: "2",
       stage: "sourced",
       title: "Missing chapter",
       tocPath: ["Missing chapter"],
@@ -673,6 +690,7 @@ function createDefaultInspectChapters(): typeof archiveMockState.inspectChapters
       childCount: 0,
       depth: 0,
       fragmentCount: 0,
+      path: "3",
       stage: "planned",
       title: "Planned chapter",
       tocPath: ["Planned chapter"],

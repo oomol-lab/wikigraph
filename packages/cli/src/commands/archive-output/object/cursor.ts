@@ -92,6 +92,7 @@ export async function createOutputContinuationCursor(
         : { evidenceLimit: context.evidenceLimit }),
       format: context.format,
       kind: "search",
+      ...(context.chapters === undefined ? {} : { chapters: context.chapters }),
       ...(context.query === undefined ? {} : { query: context.query }),
       ...(context.sourceContext === undefined
         ? {}
