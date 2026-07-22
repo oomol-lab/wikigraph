@@ -75,7 +75,9 @@ export interface WikiGraphLibraryRecord {
 }
 
 export interface ParsedWikiGraphLibraryUri {
-  readonly kind: "metadata" | "scope";
+  readonly archivePublicId?: string;
+  readonly kind: "archive" | "metadata" | "scope";
+  readonly objectUri?: string;
   readonly publicId?: string;
   readonly isDefault: boolean;
 }
@@ -87,7 +89,6 @@ export function isWikiGraphLibraryUri(uri: string | undefined): uri is string {
   if (uri?.startsWith("wikg://lib/") !== true) {
     return false;
   }
-
   return !uri
     .slice("wikg://lib/".length)
     .split("/")
@@ -107,9 +108,44 @@ export function parseWikiGraphLibraryUri(
     return undefined;
   }
 
-  const path = uri.slice("wikg://lib/".length);
-  const match = /^([^/]+)\.lib(?:\/(meta))?$/u.exec(path);
+  const path = uri.slice("wikg://lib/".length).replace(/\/+$/u, "");
+  const explicitLibraryArchiveMatch =
+    /^([^/]+)\.lib\/(?!meta(?:\/|$)|chapter(?:\/|$)|chunk(?:\/|$)|entity(?:\/|$)|triple(?:\/|$))([^/]+)(?:\/(.*))?$/u.exec(
+      path,
+    );
+  const explicitLibraryPublicId = explicitLibraryArchiveMatch?.[1];
+  const explicitArchivePublicId = explicitLibraryArchiveMatch?.[2];
+  const explicitObjectPath = explicitLibraryArchiveMatch?.[3];
+  if (
+    explicitLibraryPublicId !== undefined &&
+    explicitArchivePublicId !== undefined
+  ) {
+    return {
+      archivePublicId: explicitArchivePublicId,
+      isDefault: false,
+      kind: "archive",
+      ...(explicitObjectPath === undefined
+        ? {}
+        : { objectUri: formatWikiGraphLibraryObjectUri(explicitObjectPath) }),
+      publicId: explicitLibraryPublicId,
+    };
+  }
+
+  const match =
+    /^([^/]+)\.lib(?:\/(meta|chapter|chunk|entity|triple)(?:\/(.*))?)?$/u.exec(
+      path,
+    );
   if (match?.[1] !== undefined) {
+    if (match[2] !== undefined && match[2] !== "meta") {
+      return {
+        isDefault: false,
+        kind: "scope",
+        objectUri: formatWikiGraphLibraryObjectUri(
+          [match[2], match[3]].filter(Boolean).join("/"),
+        ),
+        publicId: match[1],
+      };
+    }
     return {
       isDefault: false,
       kind: match[2] === "meta" ? "metadata" : "scope",
@@ -117,15 +153,43 @@ export function parseWikiGraphLibraryUri(
     };
   }
 
-  if (/^[^/.][^/]*(?:\/meta)?$/u.test(path)) {
-    throw new Error(
-      "Specified library URIs must use the .lib suffix: wikg://lib/<lib-id>.lib",
-    );
+  const defaultLibraryScopeMatch =
+    /^(chapter|chunk|entity|triple)(?:\/(.*))?$/u.exec(path);
+  if (defaultLibraryScopeMatch?.[1] !== undefined) {
+    return {
+      isDefault: true,
+      kind: "scope",
+      objectUri: formatWikiGraphLibraryObjectUri(
+        [defaultLibraryScopeMatch[1], defaultLibraryScopeMatch[2]]
+          .filter(Boolean)
+          .join("/"),
+      ),
+    };
+  }
+
+  const defaultLibraryArchiveMatch = /^([^/.][^/]*)(?:\/(.*))?$/u.exec(path);
+  if (defaultLibraryArchiveMatch?.[1] !== undefined) {
+    return {
+      archivePublicId: defaultLibraryArchiveMatch[1],
+      isDefault: true,
+      kind: "archive",
+      ...(defaultLibraryArchiveMatch[2] === undefined
+        ? {}
+        : {
+            objectUri: formatWikiGraphLibraryObjectUri(
+              defaultLibraryArchiveMatch[2],
+            ),
+          }),
+    };
   }
 
   throw new Error(
     `Invalid Wiki Graph library URI: ${uri}. Expected wikg://lib, wikg://lib/meta, wikg://lib/<lib-id>.lib, or wikg://lib/<lib-id>.lib/meta.`,
   );
+}
+
+function formatWikiGraphLibraryObjectUri(path: string): string {
+  return `wikg://${path.replace(/^\/+|\/+$/gu, "")}`;
 }
 
 export function formatWikiGraphLibraryUri(publicId?: string): string {

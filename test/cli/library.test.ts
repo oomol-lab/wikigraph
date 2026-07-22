@@ -101,9 +101,44 @@ describe("cli/library args", () => {
     });
   });
 
-  it("rejects unsupported specified library URI and inspect", () => {
-    expect(() => parseCLIArguments(["wikg://lib/abc123abc123"])).toThrow(
-      ".lib suffix",
+  it("parses library archive member commands and rejects unsupported inspect", () => {
+    expect(
+      parseCLIArguments(["wikg://lib/archive123", "remove", "--confirm"]),
+    ).toMatchObject({
+      args: {
+        action: "remove",
+        confirm: true,
+        target: {
+          archivePublicId: "archive123",
+          isDefault: true,
+          kind: "archive",
+        },
+      },
+      kind: "library",
+    });
+    expect(
+      parseCLIArguments([
+        "wikg://lib/archive123",
+        "move",
+        "--to",
+        "nested/book.wikg",
+      ]),
+    ).toMatchObject({
+      args: {
+        action: "move",
+        target: { archivePublicId: "archive123", kind: "archive" },
+        to: "nested/book.wikg",
+      },
+      kind: "library",
+    });
+    expect(() =>
+      parseCLIArguments(["wikg://lib/archive123", "remove"]),
+    ).toThrow("Missing --confirm");
+    expect(() => parseCLIArguments(["wikg://lib/archive123"])).toThrow(
+      "requires an explicit action: move or remove",
+    );
+    expect(() => parseCLIArguments(["wikg://lib/meta", "move"])).toThrow(
+      "does not support `move`",
     );
     expect(() =>
       parseCLIArguments(["wikg://lib/abc123abc123.lib", "inspect"]),

@@ -39,24 +39,32 @@ export { resolveDataDirPath } from "./runtime/common/data-dir.js";
 export { createEnv } from "./runtime/common/template.js";
 export {
   clearWikiGraphLibraryMetadata,
+  addWikiGraphLibraryArchive,
   createWikiGraphLibrary,
   deleteWikiGraphLibraryMetadataKey,
   ensureDefaultWikiGraphLibrary,
   formatWikiGraphLibraryUri,
+  getWikiGraphLibraryArchive,
   getWikiGraphLibraryMetadata,
   isWikiGraphLibraryUri,
+  listWikiGraphLibraryArchives,
   listWikiGraphLibraryScope,
+  moveWikiGraphLibraryArchive,
   parseWikiGraphLibraryUri,
   putWikiGraphLibraryMetadata,
+  removeWikiGraphLibraryArchive,
   removeWikiGraphLibrary,
   replaceWikiGraphLibraryMetadata,
   resolveDefaultWikiGraphLibraryDirectoryPath,
   resolveWikiGraphLibrary,
   resolveWikiGraphLibraryStagingDirectoryPath,
+  scanWikiGraphLibrary,
 } from "./library/index.js";
 export type {
   ParsedWikiGraphLibraryUri,
+  WikiGraphLibraryArchiveRecord,
   WikiGraphLibraryRecord,
+  WikiGraphLibraryScanResult,
 } from "./library/index.js";
 export {
   resolveWikiGraphCoreDatabasePath,
@@ -237,6 +245,8 @@ export type {
   ArchiveRelatedResult,
   ArchiveTriplePattern,
   ContinuationCursor,
+  QueryIndexScope,
+  QueryScope,
 } from "./api/index.js";
 export { setFtsIndexEmbedded } from "./retrieval/search-index/index.js";
 export {

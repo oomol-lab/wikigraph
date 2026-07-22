@@ -19,6 +19,7 @@ import {
   rejectArchiveFlag,
 } from "../helpers.js";
 
+const LIBRARY_ARCHIVE_ACTIONS = new Set(["move", "remove"]);
 const LIBRARY_METADATA_ACTIONS = new Set([
   "clear",
   "delete",
@@ -26,7 +27,14 @@ const LIBRARY_METADATA_ACTIONS = new Set([
   "put",
   "set",
 ]);
-const LIBRARY_SCOPE_ACTIONS = new Set(["create", "get", "list", "remove"]);
+const LIBRARY_SCOPE_ACTIONS = new Set([
+  "add",
+  "create",
+  "get",
+  "list",
+  "remove",
+  "scan",
+]);
 
 export function parseLibraryUriFirstArguments(
   positionals: readonly string[],
@@ -52,6 +60,15 @@ export function parseLibraryUriFirstArguments(
     };
   }
 
+  if (target.kind === "archive" && explicitAction === undefined) {
+    throw new Error(
+      withHelpRoute(
+        `The library archive ${uri} requires an explicit action: move or remove.`,
+        formatWikiGraphHelpCommand(uri),
+      ),
+    );
+  }
+
   const action =
     explicitAction ?? (target.kind === "metadata" ? "get" : "list");
   if (!isLibraryAction(action)) {
@@ -62,14 +79,24 @@ export function parseLibraryUriFirstArguments(
       ),
     );
   }
+  validateLibraryActionForTarget(uri, target, action);
 
   if (values.help === true) {
-    validateLibraryActionForTarget(uri, target, action);
     return {
       help: true,
       helpText: renderLibraryPredicateHelpText(uri, target, action),
       kind: "help",
     };
+  }
+
+  if (target.kind === "archive") {
+    return parseLibraryArchiveArguments(
+      uri,
+      target,
+      action,
+      explicitAction === undefined ? [] : positionals.slice(2),
+      values,
+    );
   }
 
   if (target.kind === "metadata") {
@@ -91,6 +118,56 @@ export function parseLibraryUriFirstArguments(
   );
 }
 
+function parseLibraryArchiveArguments(
+  uri: string,
+  target: ParsedWikiGraphLibraryUri,
+  action: CLILibraryAction,
+  tail: readonly string[],
+  values: ArchiveArgumentValues,
+): ParsedCLIArguments {
+  const helpRoute = formatWikiGraphHelpCommand(uri, action);
+  if (!LIBRARY_ARCHIVE_ACTIONS.has(action)) {
+    throw new Error(
+      withHelpRoute(
+        `The library archive ${uri} does not support \`${action}\`.`,
+        helpRoute,
+      ),
+    );
+  }
+  rejectCommonLibraryFlags(action, values, helpRoute, {
+    allowConfirm: action === "remove",
+  });
+  rejectArchiveFlag(action, "--path", values.path, helpRoute);
+  rejectArchiveFlag(action, "--input", values.input, helpRoute);
+  rejectArchiveFlag(action, "--json-input", values["json-input"], helpRoute);
+  rejectArchiveBooleanFlag(action, "--jsonl", values.jsonl, helpRoute);
+  rejectExtraPositionals(action, tail, 0, helpRoute);
+
+  if (action === "remove") {
+    if (values.confirm !== true) {
+      throw new Error(withHelpRoute("Missing --confirm.", helpRoute));
+    }
+    rejectArchiveFlag(action, "--to", values.to, helpRoute);
+    return {
+      args: { action, confirm: true, json: values.json, target },
+      help: false,
+      kind: "library",
+    };
+  }
+
+  if (values.to === undefined) {
+    throw new Error(
+      withHelpRoute("Missing --to <relative-wikg-path>.", helpRoute),
+    );
+  }
+  rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+  return {
+    args: { action, json: values.json, target, to: values.to },
+    help: false,
+    kind: "library",
+  };
+}
+
 function parseLibraryScopeArguments(
   uri: string,
   target: ParsedWikiGraphLibraryUri,
@@ -109,10 +186,26 @@ function parseLibraryScopeArguments(
   }
   rejectCommonLibraryFlags(action, values, helpRoute);
   rejectArchiveBooleanFlag(action, "--jsonl", values.jsonl, helpRoute);
-  rejectArchiveFlag(action, "--input", values.input, helpRoute);
   rejectArchiveFlag(action, "--json-input", values["json-input"], helpRoute);
 
   switch (action) {
+    case "add":
+      rejectExtraPositionals(action, tail, 0, helpRoute);
+      rejectArchiveFlag(action, "--path", values.path, helpRoute);
+      if (values.input === undefined) {
+        throw new Error(withHelpRoute("Missing --input <path>.", helpRoute));
+      }
+      return {
+        args: {
+          action,
+          inputPath: values.input,
+          json: values.json,
+          target,
+          ...(values.to === undefined ? {} : { to: values.to }),
+        },
+        help: false,
+        kind: "library",
+      };
     case "create":
       if (!target.isDefault) {
         throw new Error(
@@ -123,6 +216,8 @@ function parseLibraryScopeArguments(
       if (values.path === undefined) {
         throw new Error(withHelpRoute("Missing --path <folder>.", helpRoute));
       }
+      rejectArchiveFlag(action, "--input", values.input, helpRoute);
+      rejectArchiveFlag(action, "--to", values.to, helpRoute);
       return {
         args: { action, json: values.json, path: values.path, target },
         help: false,
@@ -131,6 +226,8 @@ function parseLibraryScopeArguments(
     case "remove":
       rejectExtraPositionals(action, tail, 0, helpRoute);
       rejectArchiveFlag(action, "--path", values.path, helpRoute);
+      rejectArchiveFlag(action, "--input", values.input, helpRoute);
+      rejectArchiveFlag(action, "--to", values.to, helpRoute);
       return {
         args: { action, json: values.json, target },
         help: false,
@@ -138,8 +235,11 @@ function parseLibraryScopeArguments(
       };
     case "get":
     case "list":
+    case "scan":
       rejectExtraPositionals(action, tail, 0, helpRoute);
       rejectArchiveFlag(action, "--path", values.path, helpRoute);
+      rejectArchiveFlag(action, "--input", values.input, helpRoute);
+      rejectArchiveFlag(action, "--to", values.to, helpRoute);
       return {
         args: { action, json: values.json, target },
         help: false,
@@ -149,6 +249,7 @@ function parseLibraryScopeArguments(
     case "put":
     case "delete":
     case "clear":
+    case "move":
       throw new Error(
         "Internal error: metadata action routed to library scope.",
       );
@@ -223,6 +324,9 @@ function parseLibraryMetadataArguments(
     case "create":
     case "list":
     case "remove":
+    case "add":
+    case "move":
+    case "scan":
       throw new Error(
         "Internal error: scope action routed to library metadata.",
       );
@@ -233,6 +337,7 @@ function rejectCommonLibraryFlags(
   action: string,
   values: ArchiveArgumentValues,
   helpRoute: string,
+  options: { readonly allowConfirm?: boolean } = {},
 ): void {
   rejectArchiveFlag(action, "--query", values.query, helpRoute);
   rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
@@ -250,7 +355,9 @@ function rejectCommonLibraryFlags(
   rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
   rejectArchiveBooleanFlag(action, "--backlinks", values.backlinks, helpRoute);
   rejectArchiveBooleanFlag(action, "--reverse", values.reverse, helpRoute);
-  rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+  if (options.allowConfirm !== true) {
+    rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+  }
 }
 
 function rejectExtraPositionals(
@@ -271,13 +378,16 @@ function rejectExtraPositionals(
 
 function isLibraryAction(action: string): action is CLILibraryAction {
   return (
+    action === "add" ||
     action === "clear" ||
     action === "create" ||
     action === "delete" ||
     action === "get" ||
     action === "list" ||
+    action === "move" ||
     action === "put" ||
     action === "remove" ||
+    action === "scan" ||
     action === "set"
   );
 }
@@ -293,6 +403,18 @@ function validateLibraryActionForTarget(
       throw new Error(
         withHelpRoute(
           `The library metadata object ${uri} does not support \`${action}\`.`,
+          helpRoute,
+        ),
+      );
+    }
+    return;
+  }
+
+  if (target.kind === "archive") {
+    if (!LIBRARY_ARCHIVE_ACTIONS.has(action)) {
+      throw new Error(
+        withHelpRoute(
+          `The library archive ${uri} does not support \`${action}\`.`,
           helpRoute,
         ),
       );
