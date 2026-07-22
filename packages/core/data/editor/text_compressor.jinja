@@ -48,13 +48,9 @@ Apply these constraints silently:
 
 ## Response Protocol (MUST FOLLOW)
 
-Return exactly one XML block and nothing else:
+Return exactly one XML block matching this shape and nothing else: `<final>...</final>`
 
-```xml
-<final>...</final>
-```
-
-The content inside `<final>` is the only user-visible compressed content. Do not put any extra text before or after the XML block. Do not use Markdown fences, headings, separators, explanations, processing notes, or prefaces.
+The content inside `<final>` is the only user-visible compressed content. Do not put any extra text before or after this block. Do not use Markdown fences, headings, separators, explanations, processing notes, or prefaces.
 
 ---
 
@@ -132,8 +128,4 @@ You are compressing a **segment** of a larger work (like part of a book chapter)
 
 ## Output Format
 
-Return exactly this XML shape:
-
-```xml
-<final>Your compressed text - plain text only, no headers, no tags, written as continuous prose</final>
-```
+Return exactly this XML shape with no Markdown code fence: `<final>Your compressed text - plain text only, no headers, no tags, written as continuous prose</final>`

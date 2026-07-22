@@ -93,6 +93,42 @@ describe("editor/compressor", () => {
 
     expect(calls).toHaveLength(3);
   });
+
+  it("retains correction history across retries", async () => {
+    const calls: RequestCall<"compress">[] = [];
+    const llm = createFakeLlm<"compress">({
+      calls,
+      responses: [
+        "前言 <final>第一次坏输出</final>",
+        "<final><b>第二次坏输出</b></final>",
+        "<final>最终正文。</final>",
+      ],
+    });
+    const requester = new CompressionRequester(llm, "compress", 0.2);
+
+    await expect(
+      requester.request({
+        markedText: '<chunk retention="detailed">最终正文。</chunk>',
+        targetLength: 12,
+      }),
+    ).resolves.toBe("最终正文。");
+
+    expect(calls).toHaveLength(3);
+    expect(calls[2]?.messages.map((message) => message.role)).toStrictEqual([
+      "system",
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+      "user",
+    ]);
+    expect(calls[2]?.messages[2]?.content).toBe(
+      "前言 <final>第一次坏输出</final>",
+    );
+    expect(calls[2]?.messages[4]?.content).toBe(
+      "<final><b>第二次坏输出</b></final>",
+    );
+  });
 });
 
 function createFakeLlm<S extends string>(input: {

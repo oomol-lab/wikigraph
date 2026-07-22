@@ -5,6 +5,7 @@ import {
 } from "../packages/cli/src/runtime/stage.js";
 import type { LLMessage } from "../packages/core/src/external/llm/index.js";
 import { WikiGraphScope } from "../packages/core/src/runtime/common/llm-scope.js";
+import { extractFinalCompressedText } from "../packages/core/src/text/editor/compressor.js";
 import { TEXT_COMPRESSOR_PROMPT_TEMPLATE } from "../packages/core/src/text/editor/prompt-templates.js";
 
 interface EvalCase {
@@ -120,10 +121,17 @@ function buildHeuristics(
     ),
     finalContainsSelfTalkTokens: containsSelfTalkTokens(finalOutput),
     rawContainsSelfTalkTokens: containsSelfTalkTokens(rawOutput),
-    rawHasExactlyOneFinalBlock: /^\s*<final>[\s\S]*<\/final>\s*$/.test(
-      rawOutput,
-    ),
+    rawHasExactlyOneFinalBlock: isExactFinalBlock(rawOutput),
   };
+}
+
+function isExactFinalBlock(value: string): boolean {
+  try {
+    extractFinalCompressedText(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function containsSelfTalkTokens(value: string): boolean {
@@ -161,20 +169,6 @@ function buildLegacyPlainTextPrompt(input: {
     "---",
     "[Your compressed text - plain text only, no headers, no tags, written as continuous prose]",
   ].join("\n\n");
-}
-
-function extractFinalCompressedText(response: string): string {
-  const match = /^\s*<final>([\s\S]*)<\/final>\s*$/.exec(response);
-  if (match === null) {
-    throw new Error("Eval output did not contain exactly one <final> block.");
-  }
-
-  const compressedText = match[1]?.trim();
-  if (compressedText === undefined || compressedText === "") {
-    throw new Error("Eval output contained an empty <final> block.");
-  }
-
-  return compressedText;
 }
 
 function readArgValue(flag: string): string | undefined {

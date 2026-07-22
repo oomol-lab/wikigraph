@@ -68,7 +68,7 @@ export class CompressionRequester<S extends string> {
           }
 
           currentMessages = [
-            ...messages,
+            ...currentMessages,
             {
               content: response,
               role: "assistant",
@@ -121,7 +121,7 @@ function buildCompressionMessages(
   return messages;
 }
 
-function extractFinalCompressedText(response: string): string {
+export function extractFinalCompressedText(response: string): string {
   const trimmedResponse = response.trim();
   const match = /^<final>([\s\S]*)<\/final>$/.exec(trimmedResponse);
 
