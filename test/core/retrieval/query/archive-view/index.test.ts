@@ -7,8 +7,11 @@ import {
   isSearchIndexCurrent,
   listArchiveEvidence,
   listRelatedArchiveObjects,
+  markDirtySearchIndexChapters,
+  querySearchIndex,
   readArchiveIndexSettings,
   rebuildArchiveSearchIndex,
+  seedSourcedDocument,
   setupArchiveViewTestState,
   teardownArchiveViewTestState,
   withTempDir,
@@ -18,6 +21,86 @@ beforeEach(setupArchiveViewTestState);
 afterEach(teardownArchiveViewTestState);
 
 describe("archive/query/archive-view/index", () => {
+  it("projects single-archive search rows with archive_id 0", async () => {
+    await withTempDir("wikigraph-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+
+        await expect(
+          document.readSearchIndexDatabase(async (database) => {
+            const textArchiveIds = await database.queryAll(
+              `
+                SELECT DISTINCT archive_id
+                FROM text_sentence_records
+                ORDER BY archive_id
+              `,
+              undefined,
+              (row) => Number(row.archive_id),
+            );
+            const objectArchiveIds = await database.queryAll(
+              `
+                SELECT DISTINCT archive_id
+                FROM search_object_properties_records
+                ORDER BY archive_id
+              `,
+              undefined,
+              (row) => Number(row.archive_id),
+            );
+
+            return { objectArchiveIds, textArchiveIds };
+          }),
+        ).resolves.toStrictEqual({
+          objectArchiveIds: [0],
+          textArchiveIds: [0],
+        });
+
+        const result = await querySearchIndex(document, "Wiki");
+
+        expect(result?.textHits[0]).toMatchObject({ archiveId: 0 });
+        expect(result?.objectHits[0]).toMatchObject({ archiveId: 0 });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("treats dirty chapter projection rows as an index-backed read blocker", async () => {
+    await withTempDir("wikigraph-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await expect(isArchiveSearchIndexCurrent(document)).resolves.toBe(true);
+
+        await markDirtySearchIndexChapters(document, [1]);
+
+        await expect(isArchiveSearchIndexCurrent(document)).resolves.toBe(
+          false,
+        );
+        await expect(findArchiveObjects(document, "Wiki")).rejects.toThrow(
+          "Wiki Graph search index is missing or outdated. Run `<archive-uri>/index enable` before searching.",
+        );
+        await expect(querySearchIndex(document, "Wiki")).rejects.toThrow(
+          "Archive search index is dirty; rebuild the index before querying.",
+        );
+        await expect(document.readSummary(1)).resolves.toContain("Summary");
+
+        await rebuildArchiveSearchIndex(document);
+
+        await expect(isArchiveSearchIndexCurrent(document)).resolves.toBe(true);
+        await expect(
+          findArchiveObjects(document, "Wiki"),
+        ).resolves.toMatchObject({
+          query: "Wiki",
+        });
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
   it("distinguishes a missing index from a current empty index", async () => {
     await withTempDir("wikigraph-archive-view-", async (path) => {
       const document = await DirectoryDocument.open(`${path}/document`);

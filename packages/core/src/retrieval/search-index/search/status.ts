@@ -1,3 +1,4 @@
+import { getNumber, type Database } from "../../../document/database.js";
 import type { ReadonlyDocument } from "../../../document/index.js";
 import { isMissingSearchIndexError } from "./errors.js";
 import {
@@ -22,6 +23,10 @@ export async function readSearchIndexStatus(
 
   try {
     return await document.readSearchIndexDatabase(async (database) => {
+      if (await hasDirtySearchIndexChapters(database)) {
+        return "dirty";
+      }
+
       const indexedFingerprint =
         await readSearchIndexFingerprintFromDatabase(database);
 
@@ -39,5 +44,41 @@ export async function readSearchIndexStatus(
     }
 
     throw error;
+  }
+}
+
+export async function hasDirtySearchIndexChapters(
+  database: Database,
+): Promise<boolean> {
+  const count = await database
+    .queryOne(
+      `
+        SELECT COUNT(*) AS count
+        FROM index_dirty_chapters
+      `,
+      undefined,
+      (row) => getNumber(row, "count"),
+    )
+    .catch((error: unknown) => {
+      if (
+        error instanceof Error &&
+        error.message.includes("no such table: index_dirty_chapters")
+      ) {
+        return undefined;
+      }
+
+      throw error;
+    });
+
+  return (count ?? 0) > 0;
+}
+
+export async function assertSearchIndexNotDirty(
+  database: Database,
+): Promise<void> {
+  if (await hasDirtySearchIndexChapters(database)) {
+    throw new Error(
+      "Archive search index is dirty; rebuild the index before querying.",
+    );
   }
 }

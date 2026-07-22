@@ -2,13 +2,14 @@ import type { Document, ReadonlyDocument } from "../../../document/index.js";
 import { listChapters } from "../../../document/chapter/index.js";
 import {
   createSearchIndexFingerprint,
-  ensureSearchIndex,
   readSearchIndexStatus,
   SEARCH_OBJECT_PROPERTY_KIND,
   SEARCH_OBJECT_PROPERTY_OWNER_KIND,
+  SINGLE_ARCHIVE_INDEX_ID,
   TEXT_SENTENCE_KIND,
   type SearchIndexInput,
   type SearchIndexProgressReporter,
+  writeArchiveIndexProjection,
 } from "../../search-index/search/index.js";
 
 import { createTextStreamIndex } from "./text-streams.js";
@@ -18,13 +19,13 @@ export async function rebuildArchiveSearchIndex(
   document: Document,
   progress?: SearchIndexProgressReporter,
 ): Promise<void> {
-  const input = await createSearchIndexRecords(document, progress);
+  const input = await buildArchiveIndexProjection(document, progress);
 
   if ((await readSearchIndexStatus(document, input)) === "dirty") {
     await document.deleteSearchIndexDatabase();
   }
 
-  await ensureSearchIndex(document, input, progress);
+  await writeArchiveIndexProjection(document, input, progress);
 }
 
 export async function isArchiveSearchIndexCurrent(
@@ -38,7 +39,7 @@ export async function readArchiveSearchIndexStatus(
 ): Promise<"current" | "dirty" | "missing"> {
   return await readSearchIndexStatus(
     document,
-    await createSearchIndexRecords(document),
+    await buildArchiveIndexProjection(document),
   );
 }
 
@@ -53,10 +54,12 @@ export async function clearDirtyArchiveSearchIndex(
 export async function createArchiveSearchIndexFingerprint(
   document: ReadonlyDocument,
 ): Promise<string> {
-  return createSearchIndexFingerprint(await createSearchIndexRecords(document));
+  return createSearchIndexFingerprint(
+    await buildArchiveIndexProjection(document),
+  );
 }
 
-async function createSearchIndexRecords(
+export async function buildArchiveIndexProjection(
   document: ReadonlyDocument,
   progress?: SearchIndexProgressReporter,
 ): Promise<SearchIndexInput> {
@@ -69,6 +72,7 @@ async function createSearchIndexRecords(
     const title = chapter.title ?? `[chapter ${chapter.chapterId}]`;
 
     objectProperties.push({
+      archiveId: SINGLE_ARCHIVE_INDEX_ID,
       chapterId: chapter.chapterId,
       ownerId: String(chapter.chapterId),
       ownerKind: SEARCH_OBJECT_PROPERTY_OWNER_KIND.chapter,
@@ -103,6 +107,7 @@ async function createSearchIndexRecords(
 
   for (const node of await document.chunks.listAll()) {
     objectProperties.push({
+      archiveId: SINGLE_ARCHIVE_INDEX_ID,
       chapterId: node.sentenceId[0],
       ownerId: String(node.id),
       ownerKind: SEARCH_OBJECT_PROPERTY_OWNER_KIND.chunk,
@@ -110,6 +115,7 @@ async function createSearchIndexRecords(
       text: node.label,
     });
     objectProperties.push({
+      archiveId: SINGLE_ARCHIVE_INDEX_ID,
       chapterId: node.sentenceId[0],
       ownerId: String(node.id),
       ownerKind: SEARCH_OBJECT_PROPERTY_OWNER_KIND.chunk,
@@ -120,6 +126,7 @@ async function createSearchIndexRecords(
 
   for (const mention of await document.mentions.listAll()) {
     objectProperties.push({
+      archiveId: SINGLE_ARCHIVE_INDEX_ID,
       chapterId: mention.chapterId,
       ownerId: mention.qid,
       ownerKind: SEARCH_OBJECT_PROPERTY_OWNER_KIND.entity,
@@ -140,6 +147,7 @@ async function createTextStreamSearchIndexRecords(
   const index = await createTextStreamIndex(document, chapterId, stream);
 
   return index.sentences.map((sentence) => ({
+    archiveId: SINGLE_ARCHIVE_INDEX_ID,
     chapterId,
     kind:
       stream === "source"
