@@ -39,20 +39,39 @@ async function main(): Promise<void> {
   });
 
   const llm = createStageLLM(config);
-  const outputs: unknown[] = [];
+  const outputs: EvalCaseResult[] = [];
 
   for (const evalCase of CASES) {
     outputs.push(await runEvalCase(llm, config, evalCase));
   }
 
   process.stdout.write(`${JSON.stringify({ outputs }, null, 2)}\n`);
+
+  if (outputs.some((output) => output.current.validationError !== undefined)) {
+    process.exitCode = 1;
+  }
+}
+
+interface EvalCaseResult {
+  readonly case: string;
+  readonly current: {
+    readonly finalOutput: string | null;
+    readonly heuristics: Record<string, boolean>;
+    readonly rawOutput: string;
+    readonly validationError?: string;
+  };
+  readonly legacyBeforeIssue117: {
+    readonly heuristics: Record<string, boolean>;
+    readonly rawOutput: string;
+  };
+  readonly model: Record<string, string | undefined>;
 }
 
 async function runEvalCase(
   llm: ReturnType<typeof createStageLLM>,
   config: CLIConfig,
   evalCase: EvalCase,
-): Promise<Record<string, unknown>> {
+): Promise<EvalCaseResult> {
   const acceptableMin = Math.floor(evalCase.targetLength * 0.85);
   const acceptableMax = Math.floor(evalCase.targetLength * 1.15);
   const currentPrompt = llm.loadSystemPrompt(TEXT_COMPRESSOR_PROMPT_TEMPLATE, {
@@ -79,14 +98,20 @@ async function runEvalCase(
     currentPrompt,
     evalCase.markedText,
   );
-  const finalOutput = extractFinalCompressedText(currentRawOutput);
+  const currentExtraction = safeExtractFinalCompressedText(currentRawOutput);
 
   return {
     case: evalCase.name,
     current: {
-      finalOutput,
-      heuristics: buildHeuristics(currentRawOutput, finalOutput),
+      finalOutput: currentExtraction.finalOutput,
+      heuristics: buildHeuristics(
+        currentRawOutput,
+        currentExtraction.finalOutput,
+      ),
       rawOutput: currentRawOutput,
+      ...(currentExtraction.validationError === undefined
+        ? {}
+        : { validationError: currentExtraction.validationError }),
     },
     legacyBeforeIssue117: {
       heuristics: buildHeuristics(legacyRawOutput, legacyRawOutput),
@@ -113,16 +138,32 @@ async function requestCompression(
 
 function buildHeuristics(
   rawOutput: string,
-  finalOutput: string,
+  finalOutput: string | null,
 ): Record<string, boolean> {
+  const visibleOutput = finalOutput ?? "";
+
   return {
     finalContainsDisallowedTags: /<[A-Za-z][^>]*>|<\/[A-Za-z][^>]*>/.test(
-      finalOutput,
+      visibleOutput,
     ),
-    finalContainsSelfTalkTokens: containsSelfTalkTokens(finalOutput),
+    finalContainsSelfTalkTokens: containsSelfTalkTokens(visibleOutput),
     rawContainsSelfTalkTokens: containsSelfTalkTokens(rawOutput),
     rawHasExactlyOneFinalBlock: isExactFinalBlock(rawOutput),
   };
+}
+
+function safeExtractFinalCompressedText(response: string): {
+  readonly finalOutput: string | null;
+  readonly validationError?: string;
+} {
+  try {
+    return { finalOutput: extractFinalCompressedText(response) };
+  } catch (error) {
+    return {
+      finalOutput: null,
+      validationError: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 function isExactFinalBlock(value: string): boolean {
@@ -165,7 +206,7 @@ function buildLegacyPlainTextPrompt(input: {
     `Acceptable range: ${input.acceptableMin} - ${input.acceptableMax} characters`,
     "Remove all <chunk> tags from your output.",
     "Write plain text only, no headers and no XML/HTML markup.",
-    "If you face difficult trade-offs, first write 1-2 sentences about your approach, then write the compressed text after a --- separator.",
+    "Before the compressed text, write one short line starting with `Approach:` to explain your approach, then write the compressed text after a --- separator.",
     "---",
     "[Your compressed text - plain text only, no headers, no tags, written as continuous prose]",
   ].join("\n\n");
