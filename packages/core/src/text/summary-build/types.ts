@@ -14,11 +14,13 @@ import type { WikiGraphScope } from "../../runtime/common/llm-scope.js";
 
 export interface ChapterSummaryInputSnapshot {
   readonly filePath: string;
+  readonly objectsPath: string;
 }
 
 export interface BuildChapterSummaryArtifactOptions {
   readonly llm: LLM<WikiGraphScope>;
   readonly logDirPath?: string;
+  readonly readingGraphObjectsPath?: string;
   readonly snapshotPath?: string;
   readonly sourceDocumentPath?: string;
   readonly userLanguage?: Language;

@@ -1,21 +1,22 @@
 import type { Document } from "../../document/index.js";
 import {
-  parseMentionLinkRecord,
-  parseMentionRecord,
-  readJsonl,
-  validateChapterKnowledgeGraphArtifact,
-} from "./artifact-io.js";
+  collectChapterKnowledgeGraphObjects,
+  readWikgObjectsFromJsonl,
+} from "../../object-stream.js";
+import { validateChapterKnowledgeGraphArtifact } from "./artifact-io.js";
 import type { ChapterKnowledgeGraphBuildArtifact } from "./types.js";
 
 export async function commitChapterKnowledgeGraphArtifact(
   document: Document,
   artifact: ChapterKnowledgeGraphBuildArtifact,
 ): Promise<void> {
-  const mentions = await readJsonl(artifact.mentionsPath, parseMentionRecord);
-  const mentionLinks = await readJsonl(
-    artifact.mentionLinksPath,
-    parseMentionLinkRecord,
+  const objects = await collectChapterKnowledgeGraphObjects(
+    artifact.chapterId,
+    readWikgObjectsFromJsonl(artifact.objectsPath),
   );
+  const mentions = objects.mentions;
+  const mentionLinks = objects.mentionLinks;
+  const parameter = objects.parameter ?? artifact.parameter;
 
   validateChapterKnowledgeGraphArtifact(artifact.chapterId, {
     mentionLinks,
@@ -38,13 +39,12 @@ export async function commitChapterKnowledgeGraphArtifact(
     await openedDocument.mentions.deleteByChapter(artifact.chapterId);
     await openedDocument.mentions.saveMany(mentions);
     await openedDocument.mentionLinks.saveMany(mentionLinks);
-    const parameter = await openedDocument.graphBuildParameters.save(
-      artifact.parameter,
-    );
+    const savedParameter =
+      await openedDocument.graphBuildParameters.save(parameter);
     await openedDocument.serials.setKnowledgeGraphReady(
       artifact.chapterId,
       true,
-      parameter.hash,
+      savedParameter.hash,
     );
   });
 }

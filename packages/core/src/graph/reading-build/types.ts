@@ -6,6 +6,7 @@ import type { SerialProgressSink } from "../../serial.js";
 export interface ChapterGraphBuildArtifact {
   readonly documentPath: string;
   readonly chapterId: number;
+  readonly objectsPath: string;
   readonly parameter: GraphBuildParameterInput;
 }
 

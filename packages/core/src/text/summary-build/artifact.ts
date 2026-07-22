@@ -21,6 +21,12 @@ import {
   buildSummaryFromDocument,
   buildSummaryFromReadyDocument,
 } from "./build.js";
+import {
+  createChapterReadingGraphObjectStream,
+  createSummaryInputSnapshotFromReadingGraphObjects,
+  readWikgObjectsFromJsonl,
+  writeWikgObjectsToJsonl,
+} from "../../object-stream.js";
 import type {
   BuildChapterSummaryArtifactOptions,
   ChapterSummaryInputSnapshot,
@@ -32,6 +38,15 @@ export async function buildChapterSummaryArtifact(
   chapterId: number,
   options: BuildChapterSummaryArtifactOptions,
 ): Promise<string> {
+  const readingGraphObjectsPath = options.readingGraphObjectsPath;
+
+  if (readingGraphObjectsPath !== undefined) {
+    return await buildChapterSummaryArtifactFromReadingGraphObjects(chapterId, {
+      ...options,
+      readingGraphObjectsPath,
+    });
+  }
+
   const snapshotPath = options.snapshotPath;
 
   if (snapshotPath !== undefined) {
@@ -67,6 +82,20 @@ export async function buildChapterSummaryArtifactFromSnapshot(
   return await buildSummaryFromSnapshot(snapshot, chapterId, options);
 }
 
+export async function buildChapterSummaryArtifactFromReadingGraphObjects(
+  chapterId: number,
+  options: BuildChapterSummaryArtifactOptions & {
+    readonly readingGraphObjectsPath: string;
+  },
+): Promise<string> {
+  const snapshot = await createSummaryInputSnapshotFromReadingGraphObjects(
+    chapterId,
+    readWikgObjectsFromJsonl(options.readingGraphObjectsPath),
+  );
+
+  return await buildSummaryFromSnapshot(snapshot, chapterId, options);
+}
+
 export async function commitChapterSummaryArtifact(
   document: Document,
   chapterId: number,
@@ -86,6 +115,7 @@ export async function snapshotChapterSummaryInput(
   workspacePath: string,
 ): Promise<ChapterSummaryInputSnapshot> {
   const filePath = join(workspacePath, "summary-input.json");
+  const objectsPath = join(workspacePath, "reading-graph.jsonl");
 
   await mkdir(workspacePath, { recursive: true });
   await requireStage(document, chapterId, "graphed");
@@ -116,8 +146,15 @@ export async function snapshotChapterSummaryInput(
     snakeEdges: await document.snakeEdges.listBySerial(chapterId),
     snakes,
   });
+  await writeWikgObjectsToJsonl(
+    objectsPath,
+    createChapterReadingGraphObjectStream({
+      chapterId,
+      document,
+    }),
+  );
 
-  return { filePath };
+  return { filePath, objectsPath };
 }
 
 async function buildChapterSummaryArtifactFromDocumentSnapshot(

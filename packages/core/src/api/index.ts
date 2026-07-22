@@ -68,6 +68,7 @@ export type {
 export {
   buildChapterGraphArtifact,
   buildChapterSummaryArtifact,
+  buildChapterSummaryArtifactFromReadingGraphObjects,
   buildChapterSummaryArtifactFromSnapshot,
   commitChapterGraphArtifact,
   commitChapterSummaryArtifact,
