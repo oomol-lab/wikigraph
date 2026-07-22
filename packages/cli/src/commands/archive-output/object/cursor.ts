@@ -83,7 +83,6 @@ export async function createOutputContinuationCursor(
     input = {
       archiveKey: context.archiveKey,
       archivePath: context.archivePath,
-      chapters: context.chapters ?? null,
       cursor,
       ...(context.backlinks === undefined
         ? {}
@@ -93,6 +92,7 @@ export async function createOutputContinuationCursor(
         : { evidenceLimit: context.evidenceLimit }),
       format: context.format,
       kind: "search",
+      ...(context.chapters === undefined ? {} : { chapters: context.chapters }),
       ...(context.query === undefined ? {} : { query: context.query }),
       ...(context.sourceContext === undefined
         ? {}

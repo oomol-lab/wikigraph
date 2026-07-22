@@ -37,6 +37,11 @@ export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
   switch (args.action) {
     case "add": {
       const chapterIds = await resolveQueueChapterIds(args);
+      const singleChapterId =
+        chapterIds?.length === 1 ? chapterIds[0]! : undefined;
+      if (singleChapterId !== undefined) {
+        await assertQueueAddReady(args, singleChapterId);
+      }
       assertBuildCostAccepted(args);
       const config = await loadRequiredStageConfig({
         ...(args.llmJSON === undefined ? {} : { llmJSON: args.llmJSON }),
@@ -49,7 +54,6 @@ export async function runQueueCommand(args: CLIQueueArguments): Promise<void> {
         await addArchiveJobs(args, config);
       } else if (chapterIds.length === 1) {
         const chapterId = chapterIds[0]!;
-        await assertQueueAddReady(args, chapterId);
         const chapter = await readQueueAddChapter(args, chapterId);
         const estimate = createQueueAddEstimate({
           chapters: [chapter],

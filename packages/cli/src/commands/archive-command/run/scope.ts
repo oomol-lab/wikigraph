@@ -27,6 +27,9 @@ export async function resolveArchiveChapterScope(
   if (scope === undefined) {
     return undefined;
   }
+  if (scope.kind === "collection" && args.depth === undefined) {
+    return undefined;
+  }
 
   const chapters = await listChapters(document);
   const entries =
