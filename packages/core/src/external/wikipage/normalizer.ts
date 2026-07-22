@@ -135,6 +135,8 @@ function buildNormalizerMessages(
         "Only use QIDs from the pageQidLinks list.",
         "The information field must only copy or summarize text present on the disambiguation page itself.",
         "Do not use Wikidata descriptions or external knowledge to fill information.",
+        "When a bullet contains multiple links, treat administrative divisions, parent locations, categories, and locator/explanatory links as context only.",
+        "Do not include context-only links as meanings unless the link itself is the disambiguated target.",
         "Prefer common and context-independent meanings over exhaustive long-tail lists.",
       ].join("\n"),
     },
@@ -215,17 +217,17 @@ function extractPageItems(text: string): readonly object[] {
     }));
 }
 
+const WIKG_QID_LINK_PATTERN = /\[\[([^\]|]+)\|wikg:\/\/qid=(Q[1-9]\d*)\]\]/gu;
+
 function extractWikgLinks(text: string): readonly object[] {
-  return [
-    ...text.matchAll(/\[\[([^\]|]+)\|wikg:\/\/qid=(Q[1-9]\d*)\]\]/gu),
-  ].map((match) => ({
+  return [...text.matchAll(WIKG_QID_LINK_PATTERN)].map((match) => ({
     label: match[1]!,
     qid: match[2]!,
   }));
 }
 
 function stripWikiLinks(text: string): string {
-  return text.replace(/\[\[([^\]|]+)\|wikg:\/\/qid=Q[1-9]\d*\]\]/gu, "$1");
+  return text.replace(WIKG_QID_LINK_PATTERN, "$1");
 }
 
 function truncatePageText(text: string): string {

@@ -175,6 +175,12 @@ describe("wikipage/normalizer", () => {
     expect(prompt).toContain('"qid": "Q16963"');
     expect(prompt).toContain('"qid": "Q42651"');
     expect(prompt).toContain('"qid": "Q13779122"');
+    expect(prompt).toContain(
+      "administrative divisions, parent locations, categories, and locator/explanatory links as context only",
+    );
+    expect(prompt).toContain(
+      "Do not include context-only links as meanings unless the link itself is the disambiguated target.",
+    );
   });
 });
 
