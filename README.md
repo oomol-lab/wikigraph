@@ -74,7 +74,7 @@ Alpha is connected to beta.
 
 `pnpm eval:llm` runs a manual summarize/compressor evaluation against a real LLM. It is intentionally not part of `pnpm test`, `pnpm test:run`, or CI. The script prints the case name, model info, raw output, final user-visible output, and heuristic checks so you can judge prompt changes before release.
 
-Running it requires a configured `--llm` JSON or local LLM config, and it may incur model usage costs. The bundled case is a sanitized self-talk regression sample for the summarize compressor path; adjust or extend it as the prompt evolves.
+Running it uses a configured `--llm` JSON or local LLM config, and it may incur model usage costs. The bundled case is a sanitized self-talk regression sample for the summarize compressor path; it compares a legacy pre-#117-style prompt with the current `<final>` protocol prompt so regressions are visible during manual review. Adjust or extend it as the prompt evolves.
 
 ## Why We Built This
 

@@ -74,7 +74,7 @@ Alpha is connected to beta.
 
 `pnpm eval:llm` 会用真实大语言模型跑一组手动的 summarize/compressor 评估。它不会被 `pnpm test`、`pnpm test:run` 或 CI 自动触发。脚本会输出 case 名称、模型信息、原始输出、最终用户可见输出和基础启发式检查结果，方便在改 prompt 或切模型前人工判断。
 
-运行时需要配置 `--llm` JSON 或本地 LLM 配置，并且可能产生模型调用费用。内置 case 使用了脱敏的自言自语回归样本，用来覆盖 summarize 压缩链路；prompt 演进后可以继续补充或调整。
+运行时会使用 `--llm` JSON 或本地 LLM 配置，并且可能产生模型调用费用。内置 case 使用了脱敏的自言自语回归样本，用来覆盖 summarize 压缩链路；它会对比 #117 之前风格的 legacy prompt 和当前 `<final>` 协议 prompt，方便人工确认回归是否仍存在。prompt 演进后可以继续补充或调整。
 
 ## 为什么要做 Wiki Graph
 
