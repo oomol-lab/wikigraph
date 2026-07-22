@@ -472,15 +472,25 @@ describe("facade/chapter graph", () => {
           chapter.chapterId,
           `${path}/job-workspace`,
         );
-        const summary = await buildChapterSummaryArtifact(
-          document,
-          chapter.chapterId,
-          {
-            llm: {} as never,
-            readingGraphObjectsPath: snapshot.objectsPath,
-            workspacePath: `${path}/job-workspace`,
-          },
+        const unrelatedDocument = await DirectoryDocument.open(
+          `${path}/unrelated-archive`,
         );
+
+        const summary = await (async () => {
+          try {
+            return await buildChapterSummaryArtifact(
+              unrelatedDocument,
+              chapter.chapterId,
+              {
+                llm: {} as never,
+                readingGraphObjectsPath: snapshot.objectsPath,
+                workspacePath: `${path}/job-workspace`,
+              },
+            );
+          } finally {
+            await unrelatedDocument.release();
+          }
+        })();
 
         expect(summary).toBe("Alpha beta.");
       } finally {
