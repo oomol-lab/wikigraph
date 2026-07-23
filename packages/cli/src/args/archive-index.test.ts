@@ -117,5 +117,8 @@ describe("cli/args/archive index", () => {
     expect(() =>
       parseCLIArguments(["wikg://lib/index", "enable", "--json"]),
     ).toThrow("Use --jsonl for line-delimited progress output.");
+    expect(() =>
+      parseCLIArguments(["wikg://lib/index", "enable", "--to", "x.wikg"]),
+    ).toThrow("The `enable` command does not support --to.");
   });
 });

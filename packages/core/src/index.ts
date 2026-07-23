@@ -81,6 +81,7 @@ export type {
   WikiGraphLibraryArchiveRecord,
   WikiGraphLibraryIndexObjectHit,
   WikiGraphLibraryIndexQueryResult,
+  WikiGraphLibraryIndexSource,
   WikiGraphLibraryIndexState,
   WikiGraphLibraryIndexStatus,
   WikiGraphLibraryIndexTextHit,

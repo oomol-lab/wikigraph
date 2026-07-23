@@ -128,14 +128,13 @@ export async function rebuildWikiGraphLibraryIndex(
   return await withWikiGraphLibraryLock(library.id, "write", async () => {
     await rm(createDisabledPath(library), { force: true });
     const archives = await listWikiGraphLibraryArchives(target);
+    const sources = archives.map(formatLibraryIndexSource);
     const present = archives.filter(
       (archive) => archive.exists && archive.status === "present",
     );
     const projection = await buildLibraryIndexProjection(present, progress);
     const document = new LibraryIndexDocument(library);
-    const sourceFingerprint = createLibraryIndexSourceFingerprint(
-      present.map(formatLibraryIndexSource),
-    );
+    const sourceFingerprint = createLibraryIndexSourceFingerprint(sources);
 
     await ensureSearchIndex(document as never, projection, progress);
     await document.writeSearchIndexDatabase(async (database) => {
@@ -300,9 +299,11 @@ export async function runLibraryIndexGc(
   context: GcContext,
 ): Promise<GcJobResult> {
   const rootPath = join(resolveWikiGraphStagingDirectoryPath(), "library");
-  const validLibraryIds = new Set(
-    (await listKnownLibraryIds()).map((id) => String(id)),
-  );
+  const knownLibraryIds = await listKnownLibraryIds();
+  if (knownLibraryIds === undefined) {
+    return { freedBytes: 0, removed: 0, scanned: 0 };
+  }
+  const validLibraryIds = new Set(knownLibraryIds.map((id) => String(id)));
   const entries = await readdir(rootPath, { withFileTypes: true }).catch(
     (error: unknown) => {
       if (isNodeError(error) && error.code === "ENOENT") {
@@ -450,7 +451,7 @@ function createLibraryIndexSourceFingerprint(
   return hash.digest("hex");
 }
 
-async function listKnownLibraryIds(): Promise<readonly number[]> {
+async function listKnownLibraryIds(): Promise<readonly number[] | undefined> {
   const database = await openSharedStateDatabase(
     resolveWikiGraphCoreDatabasePath(),
     "",
@@ -463,7 +464,7 @@ async function listKnownLibraryIds(): Promise<readonly number[]> {
       (row) => getNumber(row, "id"),
     );
   } catch {
-    return [];
+    return undefined;
   } finally {
     await database.close();
   }

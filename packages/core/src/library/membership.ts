@@ -267,19 +267,18 @@ export async function addWikiGraphLibraryArchive(input: {
     targetRelativePath,
   );
 
-  await mkdir(dirname(targetPath), { recursive: true });
-  await assertInsideLibrary(
-    await realpath(dirname(targetPath)),
-    library.folderPath,
-  );
-  await copyFile(sourcePath, targetPath, constants.COPYFILE_EXCL);
-  await assertInsideLibrary(await realpath(targetPath), library.folderPath);
-  const targetFile = await inspectLibraryArchiveFile(
-    library.folderPath,
-    targetRelativePath,
-  );
-
   return await withWikiGraphLibraryLock(library.id, "write", async () => {
+    await mkdir(dirname(targetPath), { recursive: true });
+    await assertInsideLibrary(
+      await realpath(dirname(targetPath)),
+      library.folderPath,
+    );
+    await copyFile(sourcePath, targetPath, constants.COPYFILE_EXCL);
+    await assertInsideLibrary(await realpath(targetPath), library.folderPath);
+    const targetFile = await inspectLibraryArchiveFile(
+      library.folderPath,
+      targetRelativePath,
+    );
     const archive = await withLibraryArchiveMembershipDatabase(
       async (database) => {
         await database.transaction(async () => {
@@ -333,24 +332,23 @@ export async function moveWikiGraphLibraryArchive(input: {
     targetRelativePath,
   );
 
-  await mkdir(dirname(targetPath), { recursive: true });
-  await assertInsideLibrary(
-    await realpath(dirname(targetPath)),
-    library.folderPath,
-  );
-  if (await pathExists(targetPath)) {
-    throw new Error(
-      `Library archive target already exists: ${targetRelativePath}`,
-    );
-  }
-  await rename(archive.path, targetPath);
-  await assertInsideLibrary(await realpath(targetPath), library.folderPath);
-  const targetFile = await inspectLibraryArchiveFile(
-    library.folderPath,
-    targetRelativePath,
-  );
-
   return await withWikiGraphLibraryLock(library.id, "write", async () => {
+    await mkdir(dirname(targetPath), { recursive: true });
+    await assertInsideLibrary(
+      await realpath(dirname(targetPath)),
+      library.folderPath,
+    );
+    if (await pathExists(targetPath)) {
+      throw new Error(
+        `Library archive target already exists: ${targetRelativePath}`,
+      );
+    }
+    await rename(archive.path, targetPath);
+    await assertInsideLibrary(await realpath(targetPath), library.folderPath);
+    const targetFile = await inspectLibraryArchiveFile(
+      library.folderPath,
+      targetRelativePath,
+    );
     const moved = await withLibraryArchiveMembershipDatabase(
       async (database) => {
         await database.run(

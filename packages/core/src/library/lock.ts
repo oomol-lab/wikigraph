@@ -40,17 +40,24 @@ export async function acquireWikiGraphLibraryLock(
   try {
     await database.transaction(async () => {
       const existing = await database.queryOne(
-        "SELECT mode, owner_id FROM library_locks WHERE library_id = ?",
+        "SELECT mode, owner_id, owner_pid FROM library_locks WHERE library_id = ?",
         [libraryId],
         (row) => ({
           mode: getString(row, "mode"),
           ownerId: getString(row, "owner_id"),
+          ownerPid: getNumber(row, "owner_pid"),
         }),
       );
 
       if (existing !== undefined) {
-        throw new Error(
-          `Wiki Graph library is locked for ${existing.mode}: ${libraryId}.`,
+        if (isProcessAlive(existing.ownerPid)) {
+          throw new Error(
+            `Wiki Graph library is locked for ${existing.mode}: ${libraryId}.`,
+          );
+        }
+        await database.run(
+          "DELETE FROM library_locks WHERE library_id = ? AND owner_id = ?",
+          [libraryId, existing.ownerId],
         );
       }
 
@@ -80,6 +87,20 @@ export async function acquireWikiGraphLibraryLock(
       await releaseDatabase.close();
     }
   };
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return !(
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "ESRCH"
+    );
+  }
 }
 
 export async function isWikiGraphLibraryLocked(

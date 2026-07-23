@@ -282,26 +282,11 @@ function parseLibraryIndexArguments(
   }
 
   rejectExtraPositionals(action, tail, 0, helpRoute);
+  rejectCommonLibraryFlags(action, values, helpRoute);
   rejectArchiveFlag(action, "--path", values.path, helpRoute);
   rejectArchiveFlag(action, "--input", values.input, helpRoute);
   rejectArchiveFlag(action, "--json-input", values["json-input"], helpRoute);
-  rejectArchiveFlag(action, "--query", values.query, helpRoute);
-  rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
-  rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
-  rejectArchiveFlag(action, "--context", values.context, helpRoute);
-  rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
-  rejectArchiveFlag(action, "--llm", values.llm, helpRoute);
-  rejectArchiveFlag(action, "--output", values.output, helpRoute);
-  rejectArchiveFlag(
-    action,
-    "--output-format",
-    values["output-format"],
-    helpRoute,
-  );
-  rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
-  rejectArchiveBooleanFlag(action, "--backlinks", values.backlinks, helpRoute);
-  rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
-  rejectArchiveBooleanFlag(action, "--reverse", values.reverse, helpRoute);
+  rejectArchiveFlag(action, "--to", values.to, helpRoute);
 
   if (action === "enable") {
     if (values.json === true) {

@@ -91,16 +91,15 @@ export async function runLibraryCommand(
       const state = await rebuildWikiGraphLibraryIndex(
         args.target,
         async (event) => {
+          const counters =
+            event.done === undefined || event.total === undefined
+              ? []
+              : [formatIndexCounter(event)];
+
           await writer.write({
-            counters:
-              event.done === undefined || event.total === undefined
-                ? []
-                : [formatIndexCounter(event)],
+            counters,
             json: {
-              counters:
-                event.done === undefined || event.total === undefined
-                  ? []
-                  : [formatIndexCounter(event)],
+              counters,
               phase: event.phase,
               type: "status_snapshot",
             },
@@ -325,11 +324,18 @@ function formatIndexCounter(input: {
   readonly total?: number;
   readonly unit?: "chapter" | "object" | "sentence";
 }): ProgressCounter {
+  const unit =
+    input.unit === "chapter"
+      ? "chapters"
+      : input.unit === "sentence"
+        ? "sentences"
+        : "objects";
+
   return {
     done: input.done ?? 0,
-    name: input.unit === "sentence" ? "sentences" : "objects",
+    name: unit,
     total: input.total ?? 0,
-    unit: input.unit === "sentence" ? "sentences" : "objects",
+    unit,
   };
 }
 

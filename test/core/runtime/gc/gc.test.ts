@@ -9,6 +9,7 @@ import {
   DirectoryDocument,
 } from "../../../../packages/core/src/document/index.js";
 import { addBuildJob } from "../../../../packages/core/src/api/index.js";
+import { createWikiGraphLibrary } from "../../../../packages/core/src/index.js";
 import { tryRunWikiGraphGc } from "../../../../packages/core/src/runtime/gc/index.js";
 import {
   createSearchSession,
@@ -147,6 +148,56 @@ describe("gc", () => {
 
       expect(report.skipped).toBe(true);
       expect(report.jobs).toStrictEqual([]);
+    });
+  });
+
+  it("removes orphan library index staging while preserving valid and locked libraries", async () => {
+    await withTempDir("wikigraph-gc-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
+      const library = await createWikiGraphLibrary({
+        folderPath: join(path, "library"),
+      });
+      const validPath = join(library.stagingPath, "index");
+      const orphanPath = join(path, "state", "staging", "library", "999");
+      const lockedPath = join(path, "state", "staging", "library", "1000");
+
+      await mkdir(validPath, { recursive: true });
+      await mkdir(orphanPath, { recursive: true });
+      await mkdir(lockedPath, { recursive: true });
+      await writeFile(join(validPath, "fts.db"), "valid", "utf8");
+      await writeFile(join(orphanPath, "fts.db"), "orphan", "utf8");
+      await writeFile(join(lockedPath, "fts.db"), "locked", "utf8");
+      await insertLibraryLock(1000);
+
+      const report = await tryRunWikiGraphGc();
+      const libraryIndexJob = report.jobs.find(
+        (item) => item.name === "library-index",
+      );
+
+      expect(report.skipped).toBe(false);
+      expect(libraryIndexJob).toMatchObject({ removed: 1, scanned: 3 });
+      await expect(stat(validPath)).resolves.toBeDefined();
+      await expect(stat(orphanPath)).rejects.toThrow();
+      await expect(stat(lockedPath)).resolves.toBeDefined();
+    });
+  });
+
+  it("keeps library index staging when registry ids cannot be read", async () => {
+    await withTempDir("wikigraph-gc-", async (path) => {
+      process.env.WIKIGRAPH_STATE_DIR = join(path, "state");
+      const libraryPath = join(path, "state", "staging", "library", "1");
+
+      await mkdir(libraryPath, { recursive: true });
+      await writeFile(join(libraryPath, "fts.db"), "library", "utf8");
+
+      const report = await tryRunWikiGraphGc();
+      const libraryIndexJob = report.jobs.find(
+        (item) => item.name === "library-index",
+      );
+
+      expect(report.skipped).toBe(false);
+      expect(libraryIndexJob).toMatchObject({ removed: 0, scanned: 0 });
+      await expect(stat(libraryPath)).resolves.toBeDefined();
     });
   });
 
@@ -786,6 +837,34 @@ INSERT INTO gc_locks (
 ) VALUES ('global', 'test-owner', ?, ?, ?)
 `,
       [process.pid, now, now],
+    );
+  } finally {
+    await database.close();
+  }
+}
+
+async function insertLibraryLock(libraryId: number): Promise<void> {
+  const database = await openStateDatabase(
+    "core.sqlite",
+    `
+CREATE TABLE IF NOT EXISTS library_locks (
+  library_id INTEGER PRIMARY KEY,
+  mode TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  owner_pid INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+`,
+  );
+
+  try {
+    await database.run(
+      `
+INSERT INTO library_locks (
+  library_id, mode, owner_id, owner_pid, created_at
+) VALUES (?, 'write', 'test-owner', ?, ?)
+`,
+      [libraryId, process.pid, Date.now()],
     );
   } finally {
     await database.close();
