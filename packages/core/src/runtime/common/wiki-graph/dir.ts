@@ -19,6 +19,12 @@ export function resolveWikiGraphHomeDirectoryPath(): string {
     return resolve(devStateDirPath);
   }
 
+  const legacyStateDirPath = process.env.WIKIGRAPH_STATE_DIR;
+
+  if (legacyStateDirPath !== undefined && legacyStateDirPath.trim() !== "") {
+    return resolve(legacyStateDirPath);
+  }
+
   return join(homedir(), ".wikigraph");
 }
 
