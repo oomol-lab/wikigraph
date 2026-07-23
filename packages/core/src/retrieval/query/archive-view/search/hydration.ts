@@ -15,6 +15,10 @@ import {
 
 import { createSnippet, createNodePosition } from "../helpers.js";
 import { formatNodeId, formatTextStreamRangeUri } from "../references.js";
+import {
+  createUnscoredEntityEvidenceMention,
+  selectEntityLabel,
+} from "../knowledge.js";
 import { readTextStreamRange } from "../text-streams.js";
 import { TEXT_ONLY_SEARCH_CACHE_WINDOW } from "../helpers.js";
 import { isArchiveSearchIndexCurrent } from "../index-state.js";
@@ -207,8 +211,32 @@ export async function hydrateSearchObjectHit(
         type: "node",
       };
     }
-    case SEARCH_OBJECT_PROPERTY_OWNER_KIND.entity:
-      return undefined;
+    case SEARCH_OBJECT_PROPERTY_OWNER_KIND.entity: {
+      const mentions = await document.mentions.listByQid(hit.ownerId);
+      const first = mentions[0];
+
+      if (first === undefined) {
+        return undefined;
+      }
+
+      return {
+        chapter: first.chapterId,
+        evidenceMentions: mentions.map((mention) =>
+          createUnscoredEntityEvidenceMention(mention),
+        ),
+        field: "title",
+        id: `wikg://entity/${hit.ownerId}`,
+        matchCount: 1,
+        position: {
+          chapter: first.chapterId,
+          sentence: first.sentenceIndex ?? 0,
+        },
+        score: hit.score,
+        snippet: `${mentions.length} mentions`,
+        title: selectEntityLabel(mentions),
+        type: "entity",
+      };
+    }
   }
 }
 

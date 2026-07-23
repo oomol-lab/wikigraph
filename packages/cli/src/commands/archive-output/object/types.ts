@@ -17,11 +17,13 @@ export const PLAIN_OBJECT_KEY_PRIORITY = [
 ] as const;
 
 export interface ArchiveOutputObject {
+  readonly archiveId?: number;
   readonly authors?: readonly string[];
   readonly backlinks?: ArchiveOutputBacklinks;
   readonly description?: string;
   readonly evidence?: ArchiveOutputEvidencePreview;
   readonly label?: string;
+  readonly libraryArchiveUri?: string;
   readonly objectLabel?: string;
   readonly predicate?: string;
   readonly publisher?: string;
@@ -55,6 +57,8 @@ export interface ArchiveOutputEvidencePreview {
 }
 
 export interface ArchiveOutputSource {
+  readonly archiveId?: number;
+  readonly libraryArchiveUri?: string;
   readonly score?: number;
   readonly text: string;
   readonly uri: string;

@@ -72,7 +72,12 @@ export interface ArchiveIndex {
   readonly summaryCount: number;
 }
 
-export interface ArchiveFindHit {
+export interface ArchiveLibrarySourceFields {
+  readonly archiveId?: number;
+  readonly libraryArchiveUri?: string;
+}
+
+export interface ArchiveFindHit extends ArchiveLibrarySourceFields {
   readonly backlinks?: ArchiveBacklinks;
   readonly chapter?: number;
   readonly evidence?: ArchiveFindEvidencePreview;
@@ -224,119 +229,123 @@ export type ArchiveListKind =
   | "nodes"
   | "summaries";
 
-export type ArchiveListItem =
-  | {
-      readonly evidence?: ArchiveFindEvidencePreview;
-      readonly id: string;
-      readonly label: string;
-      readonly score?: number;
-      readonly state?: ChapterState;
-      readonly summary: string;
-      readonly type: Exclude<ArchiveObjectType, "triple">;
-    }
-  | {
-      readonly evidence?: ArchiveFindEvidencePreview;
-      readonly id: string;
-      readonly label: string;
-      readonly evidenceLinks?: readonly MentionLinkRecord[];
-      readonly objectLabel: string;
-      readonly objectQid: string;
-      readonly predicate: string;
-      readonly score?: number;
-      readonly subjectLabel: string;
-      readonly subjectQid: string;
-      readonly summary: string;
-      readonly type: "triple";
-    };
+export type ArchiveListItem = ArchiveLibrarySourceFields &
+  (
+    | {
+        readonly evidence?: ArchiveFindEvidencePreview;
+        readonly id: string;
+        readonly label: string;
+        readonly score?: number;
+        readonly state?: ChapterState;
+        readonly summary: string;
+        readonly type: Exclude<ArchiveObjectType, "triple">;
+      }
+    | {
+        readonly evidence?: ArchiveFindEvidencePreview;
+        readonly id: string;
+        readonly label: string;
+        readonly evidenceLinks?: readonly MentionLinkRecord[];
+        readonly objectLabel: string;
+        readonly objectQid: string;
+        readonly predicate: string;
+        readonly score?: number;
+        readonly subjectLabel: string;
+        readonly subjectQid: string;
+        readonly summary: string;
+        readonly type: "triple";
+      }
+  );
 
-export type ArchivePage =
-  | {
-      readonly id: string;
-      readonly state: ChapterState;
-      readonly title: string;
-      readonly type: "chapter";
-    }
-  | {
-      readonly id: string;
-      readonly title: string;
-      readonly type: "chapter-title";
-    }
-  | {
-      readonly id: string;
-      readonly title: string;
-      readonly tree: ChapterTree;
-      readonly type: "chapter-tree";
-    }
-  | {
-      readonly generatedNodeSummary: string;
-      readonly id: string;
-      readonly incoming: readonly GraphNeighbor[];
-      readonly neighbors: readonly GraphNeighbor[];
-      readonly outgoing: readonly GraphNeighbor[];
-      readonly position: ArchiveFindPosition | undefined;
-      readonly sourceFragments: readonly ArchiveNodeSourceFragment[];
-      readonly title: string;
-      readonly type: "node";
-    }
-  | {
-      readonly backlinks?: ArchiveBacklinks;
-      readonly fragment: ArchiveSourceFragment;
-      readonly id: string;
-      readonly nextFragmentId: string | undefined;
-      readonly nodes: readonly ArchiveNodeLabel[];
-      readonly previousFragmentId: string | undefined;
-      readonly title: string;
-      readonly type: "fragment";
-    }
-  | {
-      readonly content: string;
-      readonly id: string;
-      readonly title: string;
-      readonly type: "summary";
-    }
-  | {
-      readonly evidence: ArchiveFindEvidencePreview;
-      readonly id: string;
-      readonly label: string;
-      readonly labels: readonly string[];
-      readonly mentionCount: number;
-      readonly qid: string;
-      readonly type: "entity";
-    }
-  | {
-      readonly en: ArchiveEntityWikipageLocale | null;
-      readonly id: string;
-      readonly type: "entity-wikipage";
-      readonly zh: ArchiveEntityWikipageLocale | null;
-    }
-  | {
-      readonly evidence: ArchiveFindEvidencePreview;
-      readonly id: string;
-      readonly label: string;
-      readonly objectQid: string;
-      readonly predicate: string;
-      readonly subjectQid: string;
-      readonly type: "triple";
-    }
-  | {
-      readonly authors?: readonly string[];
-      readonly description?: string;
-      readonly id: string;
-      readonly publisher?: string;
-      readonly title: string;
-      readonly type: "meta";
-    }
-  | {
-      readonly id: string;
-      readonly state: ChapterState;
-      readonly type: "state";
-    }
-  | {
-      readonly id: string;
-      readonly target: ChapterStateTarget;
-      readonly type: "state";
-      readonly value: ChapterStateValue;
-    };
+export type ArchivePage = ArchiveLibrarySourceFields &
+  (
+    | {
+        readonly id: string;
+        readonly state: ChapterState;
+        readonly title: string;
+        readonly type: "chapter";
+      }
+    | {
+        readonly id: string;
+        readonly title: string;
+        readonly type: "chapter-title";
+      }
+    | {
+        readonly id: string;
+        readonly title: string;
+        readonly tree: ChapterTree;
+        readonly type: "chapter-tree";
+      }
+    | {
+        readonly generatedNodeSummary: string;
+        readonly id: string;
+        readonly incoming: readonly GraphNeighbor[];
+        readonly neighbors: readonly GraphNeighbor[];
+        readonly outgoing: readonly GraphNeighbor[];
+        readonly position: ArchiveFindPosition | undefined;
+        readonly sourceFragments: readonly ArchiveNodeSourceFragment[];
+        readonly title: string;
+        readonly type: "node";
+      }
+    | {
+        readonly backlinks?: ArchiveBacklinks;
+        readonly fragment: ArchiveSourceFragment;
+        readonly id: string;
+        readonly nextFragmentId: string | undefined;
+        readonly nodes: readonly ArchiveNodeLabel[];
+        readonly previousFragmentId: string | undefined;
+        readonly title: string;
+        readonly type: "fragment";
+      }
+    | {
+        readonly content: string;
+        readonly id: string;
+        readonly title: string;
+        readonly type: "summary";
+      }
+    | {
+        readonly evidence: ArchiveFindEvidencePreview;
+        readonly id: string;
+        readonly label: string;
+        readonly labels: readonly string[];
+        readonly mentionCount: number;
+        readonly qid: string;
+        readonly type: "entity";
+      }
+    | {
+        readonly en: ArchiveEntityWikipageLocale | null;
+        readonly id: string;
+        readonly type: "entity-wikipage";
+        readonly zh: ArchiveEntityWikipageLocale | null;
+      }
+    | {
+        readonly evidence: ArchiveFindEvidencePreview;
+        readonly id: string;
+        readonly label: string;
+        readonly objectQid: string;
+        readonly predicate: string;
+        readonly subjectQid: string;
+        readonly type: "triple";
+      }
+    | {
+        readonly authors?: readonly string[];
+        readonly description?: string;
+        readonly id: string;
+        readonly publisher?: string;
+        readonly title: string;
+        readonly type: "meta";
+      }
+    | {
+        readonly id: string;
+        readonly state: ChapterState;
+        readonly type: "state";
+      }
+    | {
+        readonly id: string;
+        readonly target: ChapterStateTarget;
+        readonly type: "state";
+        readonly value: ChapterStateValue;
+      }
+  );
 
 export interface ArchiveEntityWikipageLocale {
   readonly description?: string;
@@ -374,7 +383,7 @@ export interface ArchiveEvidence {
   readonly nextCursor: string | null;
 }
 
-export interface ArchiveEvidenceItem {
+export interface ArchiveEvidenceItem extends ArchiveLibrarySourceFields {
   readonly chapterId: number;
   readonly endSentenceIndex: number;
   readonly fragmentId?: number;

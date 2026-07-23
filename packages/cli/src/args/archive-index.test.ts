@@ -69,4 +69,56 @@ describe("cli/args/archive index", () => {
       ]),
     ).toThrow("The `disable` command does not support --title.");
   });
+
+  it("parses library index object commands", () => {
+    expect(parseCLIArguments(["wikg://lib/index"])).toStrictEqual({
+      args: {
+        action: "get-index",
+        target: {
+          isDefault: true,
+          kind: "scope",
+          objectUri: "wikg://index",
+        },
+      },
+      help: false,
+      kind: "library",
+    });
+    expect(
+      parseCLIArguments(["wikg://lib/team.lib/index", "enable", "--jsonl"]),
+    ).toStrictEqual({
+      args: {
+        action: "enable-index",
+        jsonl: true,
+        target: {
+          isDefault: false,
+          kind: "scope",
+          objectUri: "wikg://index",
+          publicId: "team",
+        },
+      },
+      help: false,
+      kind: "library",
+    });
+    expect(
+      parseCLIArguments(["wikg://lib/index", "disable", "--json"]),
+    ).toStrictEqual({
+      args: {
+        action: "disable-index",
+        json: true,
+        target: {
+          isDefault: true,
+          kind: "scope",
+          objectUri: "wikg://index",
+        },
+      },
+      help: false,
+      kind: "library",
+    });
+    expect(() =>
+      parseCLIArguments(["wikg://lib/index", "enable", "--json"]),
+    ).toThrow("Use --jsonl for line-delimited progress output.");
+    expect(() =>
+      parseCLIArguments(["wikg://lib/index", "enable", "--to", "x.wikg"]),
+    ).toThrow("The `enable` command does not support --to.");
+  });
 });

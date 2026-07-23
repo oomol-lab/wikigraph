@@ -204,6 +204,19 @@ describe("library URI locators", () => {
       kind: "scope",
       objectUri: "wikg://entity/Q23",
     });
+    expect(parseWikiGraphLibraryUri("wikg://lib/index")).toMatchObject({
+      isDefault: true,
+      kind: "scope",
+      objectUri: "wikg://index",
+    });
+    expect(parseWikiGraphLibraryUri("wikg://lib/team.lib/index")).toMatchObject(
+      {
+        isDefault: false,
+        kind: "scope",
+        objectUri: "wikg://index",
+        publicId: "team",
+      },
+    );
     expect(
       parseWikiGraphLibraryUri("wikg://lib/team.lib/archive123/entity"),
     ).toMatchObject({
