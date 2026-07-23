@@ -95,6 +95,15 @@ Recommended subdirectories:
 - `.wikigraph/out/`: generated `.wikg` archives and exported regression output;
 - `.wikigraph/input/`: private or temporary local input files.
 
+Remove all local development state and generated regression output with:
+
+```bash
+pnpm cli:clean-dev-state
+```
+
+This deletes only `project/.wikigraph/`. It does not affect the installed CLI's
+machine-level `~/.wikigraph` directory.
+
 For repeated shell use, define a local helper from the repository root:
 
 ```bash
