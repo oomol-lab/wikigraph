@@ -68,10 +68,10 @@ The extra `--` is passed to the CLI and changes the parsed command.
 
 ## Development State Directory
 
-Wiki Graph stores local runtime state under `~/.wikigraph` unless
-`WIKIGRAPH_STATE_DIR` is set. The `pnpm --filter wiki-graph dev` script sets
-`WIKIGRAPH_STATE_DIR=../../.wikigraph/state` from `packages/cli`, which resolves
-to the repository-level `project/.wikigraph/state` directory.
+The installed CLI stores local runtime state under `~/.wikigraph`. The
+development CLI entry point is compiled to use the repository-level
+`project/.wikigraph/state` directory instead, so users cannot change CLI state
+location through environment variables.
 
 Use `project/.wikigraph/` for local development data:
 
