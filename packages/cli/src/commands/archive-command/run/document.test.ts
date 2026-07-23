@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { markWikiGraphLibraryIndexDirty } from "wiki-graph-core";
 import { writeArchiveDocument } from "./document.js";
@@ -7,6 +7,8 @@ import { resolveArchiveRuntimeLocation } from "./uri.js";
 const mocks = vi.hoisted(() => ({
   writeArchive: vi.fn(),
 }));
+
+let restoreStderrWrite: (() => void) | undefined;
 
 vi.mock("wiki-graph-core", () => ({
   markWikiGraphLibraryIndexDirty: vi.fn(),
@@ -32,7 +34,13 @@ describe("writeArchiveDocument", () => {
     mocks.writeArchive.mockReset();
   });
 
+  afterEach(() => {
+    restoreStderrWrite?.();
+    restoreStderrWrite = undefined;
+  });
+
   it("preserves a successful write result when dirty marking fails", async () => {
+    const libraryDirtyTarget = { isDefault: true, kind: "scope" } as const;
     vi.mocked(resolveArchiveRuntimeLocation).mockResolvedValue({
       archiveKey: "/tmp/book.wikg",
       archivePath: "/tmp/book.wikg",
@@ -41,7 +49,7 @@ describe("writeArchiveDocument", () => {
         archivePath: "/tmp/book.wikg",
         kind: "archive-index",
       },
-      libraryDirtyTarget: { alias: "lib" } as never,
+      libraryDirtyTarget,
       locatedUri: "wikg:///tmp/book.wikg",
     });
     mocks.writeArchive.mockResolvedValue("written");
@@ -51,14 +59,18 @@ describe("writeArchiveDocument", () => {
     const stderrWrite = vi
       .spyOn(process.stderr, "write")
       .mockImplementation((() => true) as typeof process.stderr.write);
+    restoreStderrWrite = () => {
+      stderrWrite.mockRestore();
+    };
 
     await expect(
       writeArchiveDocument("wikg://lib/book", () => undefined),
     ).resolves.toBe("written");
+    expect(markWikiGraphLibraryIndexDirty).toHaveBeenCalledWith(
+      libraryDirtyTarget,
+    );
     expect(stderrWrite).toHaveBeenCalledWith(
       expect.stringContaining("sqlite is locked"),
     );
-
-    stderrWrite.mockRestore();
   });
 });
