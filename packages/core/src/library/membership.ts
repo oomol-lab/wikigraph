@@ -24,6 +24,7 @@ import { WIKI_GRAPH_ARCHIVE_EXTENSION } from "../runtime/common/wiki-graph/uri.j
 import { readWikgArchiveMutationToken } from "../storage/wikg/index.js";
 import { isNodeError } from "../utils/node-error.js";
 import {
+  parseWikiGraphLibraryUri,
   resolveWikiGraphLibrary,
   type ParsedWikiGraphLibraryUri,
   type WikiGraphLibraryRecord,
@@ -187,6 +188,29 @@ export async function getWikiGraphLibraryArchive(
 ): Promise<WikiGraphLibraryArchiveRecord> {
   const library = await resolveWikiGraphLibrary(target);
   return await resolveLibraryArchiveTarget(target, library);
+}
+
+export async function resolveWikiGraphLibraryArchivePath(
+  archiveLocator: string,
+): Promise<string> {
+  const target = parseWikiGraphLibraryUri(archiveLocator);
+  if (target === undefined || target.kind !== "archive") {
+    throw new Error(
+      `Expected a Wiki Graph library archive locator: ${archiveLocator}`,
+    );
+  }
+
+  const archive = await getWikiGraphLibraryArchive(target);
+  if (!archive.exists || archive.status === "missing") {
+    throw new Error(`Wiki Graph library archive is missing: ${archiveLocator}`);
+  }
+  if (archive.status === "conflict") {
+    throw new Error(
+      `Wiki Graph library archive has a conflict and cannot be resolved: ${archiveLocator}`,
+    );
+  }
+
+  return archive.path;
 }
 
 export async function addWikiGraphLibraryArchive(input: {

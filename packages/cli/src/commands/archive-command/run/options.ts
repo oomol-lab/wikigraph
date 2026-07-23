@@ -12,7 +12,11 @@ import {
   DEFAULT_OUTPUT_LIMIT,
   type ArchiveOutputContext,
 } from "./types.js";
-import { getArchivePath, parseChapterScope } from "./uri.js";
+import {
+  getArchiveIndexScope,
+  getArchivePath,
+  parseChapterScope,
+} from "./uri.js";
 
 export function createFindOptions(
   args: CLIArchiveArguments,
@@ -57,6 +61,7 @@ export function createArchiveOutputContext(
   return {
     archiveKey: getArchivePath(args.archivePath),
     archivePath: getArchivePath(args.archivePath),
+    indexScope: getArchiveIndexScope(args.archivePath),
     ...(args.backlinks === undefined ? {} : { backlinks: args.backlinks }),
     ...(isEvidenceDisabled(args.evidenceLimit)
       ? { evidenceDisabled: true }

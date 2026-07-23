@@ -25,7 +25,7 @@ export async function createOutputContinuationCursor(
       archivePath: context.archivePath,
       cursor,
       format: context.format,
-      indexScope: createArchiveIndexScope(context),
+      indexScope: context.indexScope,
       kind: "evidence",
       order: context.order ?? "doc-asc",
       ...(context.query === undefined ? {} : { query: context.query }),
@@ -47,7 +47,7 @@ export async function createOutputContinuationCursor(
         ? {}
         : { evidenceLimit: context.evidenceLimit }),
       format: context.format,
-      indexScope: createArchiveIndexScope(context),
+      indexScope: context.indexScope,
       kind: "related",
       order: context.order ?? "doc-asc",
       ...(context.query === undefined ? {} : { query: context.query }),
@@ -71,7 +71,7 @@ export async function createOutputContinuationCursor(
         : { evidenceLimit: context.evidenceLimit }),
       format: context.format,
       ids: context.ids ?? null,
-      indexScope: createArchiveIndexScope(context),
+      indexScope: context.indexScope,
       kind: "collection",
       order: context.order ?? "doc-asc",
       ...(context.sourceContext === undefined
@@ -94,7 +94,7 @@ export async function createOutputContinuationCursor(
         ? {}
         : { evidenceLimit: context.evidenceLimit }),
       format: context.format,
-      indexScope: createArchiveIndexScope(context),
+      indexScope: context.indexScope,
       kind: "search",
       ...(context.chapters === undefined ? {} : { chapters: context.chapters }),
       ...(context.query === undefined ? {} : { query: context.query }),
@@ -109,12 +109,4 @@ export async function createOutputContinuationCursor(
   }
 
   return await createContinuationCursor(input);
-}
-
-function createArchiveIndexScope(context: ArchiveOutputContext) {
-  return {
-    archiveKey: context.archiveKey,
-    archivePath: context.archivePath,
-    kind: "archive-index" as const,
-  };
 }

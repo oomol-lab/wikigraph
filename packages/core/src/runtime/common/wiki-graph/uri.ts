@@ -71,7 +71,11 @@ function parseLibraryArchiveLocatorBody(
     );
   const groups = match?.groups;
   const archive = groups?.archive;
-  if (archive === undefined || isLibraryScopeSegment(archive)) {
+  if (
+    archive === undefined ||
+    archive.endsWith(WIKI_GRAPH_ARCHIVE_EXTENSION) ||
+    isLibraryScopeSegment(archive)
+  ) {
     return undefined;
   }
   const library = groups?.library;

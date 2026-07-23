@@ -56,6 +56,7 @@ export {
   removeWikiGraphLibrary,
   replaceWikiGraphLibraryMetadata,
   resolveDefaultWikiGraphLibraryDirectoryPath,
+  resolveWikiGraphLibraryArchivePath,
   resolveWikiGraphLibrary,
   resolveWikiGraphLibraryStagingDirectoryPath,
   scanWikiGraphLibrary,

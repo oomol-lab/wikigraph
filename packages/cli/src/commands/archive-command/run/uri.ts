@@ -1,9 +1,81 @@
-import { requireLocatedObjectOrArchiveUri } from "wiki-graph-core";
+import {
+  formatLocatedWikiGraphUri,
+  parseLocatedWikiGraphUri,
+  requireLocatedObjectOrArchiveUri,
+  resolveWikiGraphLibraryArchivePath,
+  type QueryIndexScope,
+} from "wiki-graph-core";
 
 import type { CLIArchiveArguments } from "../../../args/index.js";
 
+export interface ArchiveRuntimeLocation {
+  readonly archiveKey: string;
+  readonly archivePath: string;
+  readonly indexScope: QueryIndexScope;
+  readonly locatedUri: string;
+}
+
+export async function resolveArchiveRuntimeLocation(
+  uriOrPath: string,
+): Promise<ArchiveRuntimeLocation> {
+  if (!uriOrPath.startsWith("wikg://")) {
+    return {
+      archiveKey: uriOrPath,
+      archivePath: uriOrPath,
+      indexScope: {
+        archiveKey: uriOrPath,
+        archivePath: uriOrPath,
+        kind: "archive-index",
+      },
+      locatedUri: formatLocatedWikiGraphUri(uriOrPath),
+    };
+  }
+
+  const parsed = parseLocatedWikiGraphUri(uriOrPath);
+  const archiveLocator = parsed.archivePath ?? uriOrPath;
+  const archivePath = archiveLocator.startsWith("wikg://lib/")
+    ? await resolveWikiGraphLibraryArchivePath(archiveLocator)
+    : archiveLocator;
+
+  return {
+    archiveKey: archivePath,
+    archivePath,
+    indexScope: { archiveKey: archivePath, archivePath, kind: "archive-index" },
+    locatedUri: formatLocatedWikiGraphUri(archivePath, parsed.objectUri),
+  };
+}
+
+export async function resolveArchiveCommandRuntimeArguments(
+  args: CLIArchiveArguments,
+): Promise<CLIArchiveArguments> {
+  if (
+    args.action === "create" ||
+    args.action === "export" ||
+    args.action === "next"
+  ) {
+    return args;
+  }
+  if (!args.archivePath.startsWith("wikg://lib/")) {
+    return args;
+  }
+
+  const location = await resolveArchiveRuntimeLocation(args.archivePath);
+  return {
+    ...args,
+    archivePath: location.locatedUri,
+    ...(args.objectId === args.archivePath
+      ? { objectId: location.locatedUri }
+      : {}),
+  };
+}
+
 export function getArchivePath(uri: string): string {
   return requireLocatedObjectOrArchiveUri(uri).archivePath;
+}
+
+export function getArchiveIndexScope(uri: string): QueryIndexScope {
+  const archivePath = getArchivePath(uri);
+  return { archiveKey: archivePath, archivePath, kind: "archive-index" };
 }
 
 export function getObjectUri(uri: string): string {

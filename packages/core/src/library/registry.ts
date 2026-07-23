@@ -14,6 +14,7 @@ import {
   resolveWikiGraphHomeDirectoryPath,
   resolveWikiGraphStagingDirectoryPath,
 } from "../runtime/common/wiki-graph/dir.js";
+import { WIKI_GRAPH_ARCHIVE_EXTENSION } from "../runtime/common/wiki-graph/uri.js";
 import { isNodeError } from "../utils/node-error.js";
 
 const DEFAULT_LIBRARY_FOLDER_NAME = "default-library";
@@ -83,16 +84,18 @@ export interface ParsedWikiGraphLibraryUri {
 }
 
 export function isWikiGraphLibraryUri(uri: string | undefined): uri is string {
-  if (uri === "wikg://lib") {
-    return true;
-  }
-  if (uri?.startsWith("wikg://lib/") !== true) {
+  if (uri?.startsWith("wikg://lib") !== true) {
     return false;
   }
-  return !uri
-    .slice("wikg://lib/".length)
-    .split("/")
-    .some((part) => part.endsWith(".wikg"));
+  try {
+    const target = parseWikiGraphLibraryUri(uri);
+    return (
+      target !== undefined &&
+      (target.kind !== "archive" || target.objectUri === undefined)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function parseWikiGraphLibraryUri(
@@ -109,6 +112,11 @@ export function parseWikiGraphLibraryUri(
   }
 
   const path = uri.slice("wikg://lib/".length).replace(/\/+$/u, "");
+  if (
+    path.split("/").some((part) => part.endsWith(WIKI_GRAPH_ARCHIVE_EXTENSION))
+  ) {
+    return undefined;
+  }
   const explicitLibraryArchiveMatch =
     /^([^/]+)\.lib\/(?!meta(?:\/|$)|chapter(?:\/|$)|chunk(?:\/|$)|entity(?:\/|$)|triple(?:\/|$))([^/]+)(?:\/(.*))?$/u.exec(
       path,

@@ -1,3 +1,4 @@
+import type { QueryIndexScope } from "wiki-graph-core";
 import type { CLIArchiveArguments } from "../../../args/index.js";
 
 export type ResultFormat = "json" | "jsonl" | "text";
@@ -69,6 +70,7 @@ export interface ArchiveOutputContext {
   readonly evidenceLimit?: number;
   readonly format: ResultFormat;
   readonly ids?: readonly string[];
+  readonly indexScope: QueryIndexScope;
   readonly limit: number;
   readonly order?: "doc-asc" | "doc-desc";
   readonly query?: string;

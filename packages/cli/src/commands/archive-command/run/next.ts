@@ -17,7 +17,7 @@ import {
 import { readArchiveDocument } from "./document.js";
 import { createCollectionFindResult } from "./options.js";
 import { DEFAULT_OUTPUT_LIMIT } from "./types.js";
-import { getArchivePath } from "./uri.js";
+import { resolveArchiveRuntimeLocation } from "./uri.js";
 
 export async function runNextArchivePage(
   args: CLIArchiveArguments,
@@ -28,16 +28,18 @@ export async function runNextArchivePage(
   const cursor = await readContinuationCursor(cursorId);
 
   if (explicitArchivePath !== undefined) {
-    const archivePath = getArchivePath(explicitArchivePath);
+    const { archivePath } =
+      await resolveArchiveRuntimeLocation(explicitArchivePath);
+    const cursorArchivePath = getCursorArchivePath(cursor);
 
-    if (archivePath !== cursor.archivePath) {
+    if (archivePath !== cursorArchivePath) {
       throw new Error(
-        `Continuation cursor ${cursorId} belongs to ${cursor.archivePath}, not ${archivePath}.`,
+        `Continuation cursor ${cursorId} belongs to ${cursorArchivePath}, not ${archivePath}.`,
       );
     }
   }
 
-  await readArchiveDocument(cursor.archivePath, async (document) => {
+  await readArchiveDocument(getCursorArchivePath(cursor), async (document) => {
     const format = args.format ?? cursor.format;
     const limit = args.limit ?? DEFAULT_OUTPUT_LIMIT;
 
@@ -85,6 +87,7 @@ export async function runNextArchivePage(
               ? {}
               : { evidenceLimit: cursor.evidenceLimit }),
             format,
+            indexScope: cursor.indexScope,
             ...(cursor.ids === null ? {} : { ids: cursor.ids }),
             limit,
             order: cursor.order,
@@ -139,6 +142,7 @@ export async function runNextArchivePage(
               ? {}
               : { evidenceLimit: cursor.evidenceLimit }),
             format,
+            indexScope: cursor.indexScope,
             limit,
             ...(cursor.sourceContext === undefined
               ? {}
@@ -168,6 +172,7 @@ export async function runNextArchivePage(
             archivePath: cursor.archivePath,
             continuationKind: "evidence",
             format,
+            indexScope: cursor.indexScope,
             limit,
             order: cursor.order,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
@@ -203,6 +208,7 @@ export async function runNextArchivePage(
               ? {}
               : { evidenceLimit: cursor.evidenceLimit }),
             format,
+            indexScope: cursor.indexScope,
             limit,
             order: cursor.order,
             ...(cursor.query === undefined ? {} : { query: cursor.query }),
@@ -218,4 +224,16 @@ export async function runNextArchivePage(
         return;
     }
   });
+}
+
+function getCursorArchivePath(
+  cursor: Awaited<ReturnType<typeof readContinuationCursor>>,
+): string {
+  if (cursor.indexScope === undefined) {
+    return cursor.archivePath;
+  }
+  if (cursor.indexScope.kind === "archive-index") {
+    return cursor.indexScope.archivePath;
+  }
+  return cursor.archivePath;
 }

@@ -97,6 +97,42 @@ describe("cli/args/archive", () => {
       kind: "archive",
     });
 
+    expect(parseCLIArguments(["wikg://lib/archive123/chapter"])).toStrictEqual({
+      args: {
+        action: "list",
+        archivePath: "wikg://lib/archive123/chapter",
+        format: "text",
+        kinds: ["chapter"],
+      },
+      help: false,
+      kind: "archive",
+    });
+    expect(
+      parseCLIArguments(["wikg://lib/team.lib/archive123/entity/Q23"]),
+    ).toStrictEqual({
+      args: {
+        action: "get",
+        archivePath: "wikg://lib/team.lib/archive123/entity/Q23",
+        format: "text",
+        objectId: "wikg://lib/team.lib/archive123/entity/Q23",
+      },
+      help: false,
+      kind: "archive",
+    });
+    expect(parseCLIArguments(["wikg://lib/entity/Q23"])).toStrictEqual({
+      args: {
+        action: "list",
+        json: undefined,
+        target: {
+          isDefault: true,
+          kind: "scope",
+          objectUri: "wikg://entity/Q23",
+        },
+      },
+      help: false,
+      kind: "library",
+    });
+
     expect(
       parseCLIArguments([
         "wikg://book.wikg/entity/Q1",

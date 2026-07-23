@@ -14,10 +14,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   addWikiGraphLibraryArchive,
   ensureDefaultWikiGraphLibrary,
+  isWikiGraphLibraryUri,
   moveWikiGraphLibraryArchive,
   parseLocatedWikiGraphUri,
   parseWikiGraphLibraryUri,
   removeWikiGraphLibraryArchive,
+  resolveWikiGraphLibraryArchivePath,
   scanWikiGraphLibrary,
 } from "../index.js";
 import { writeWikgArchive } from "../storage/wikg/index.js";
@@ -183,6 +185,14 @@ describe("library archive membership", () => {
 
 describe("library URI locators", () => {
   it("separates library archives from library scopes", () => {
+    expect(isWikiGraphLibraryUri("wikg://lib")).toBe(true);
+    expect(isWikiGraphLibraryUri("wikg://lib/team.lib")).toBe(true);
+    expect(isWikiGraphLibraryUri("wikg://lib/entity/Q23")).toBe(true);
+    expect(isWikiGraphLibraryUri("wikg://lib/archive123/chapter")).toBe(false);
+    expect(
+      isWikiGraphLibraryUri("wikg://lib/team.lib/archive123/chapter"),
+    ).toBe(false);
+
     expect(
       parseLocatedWikiGraphUri("wikg://lib/archive123/chapter"),
     ).toStrictEqual({
@@ -202,6 +212,26 @@ describe("library URI locators", () => {
       objectUri: "wikg://entity",
       publicId: "team",
     });
+  });
+
+  it("resolves a library archive locator to the managed .wikg file", async () => {
+    const target = parseWikiGraphLibraryUri("wikg://lib");
+    expect(target).toBeDefined();
+    const source = join(tempDir, "source.wikg");
+    await writeFile(source, "content");
+
+    const added = await addWikiGraphLibraryArchive({
+      inputPath: source,
+      target: target!,
+      to: "nested/book.wikg",
+    });
+
+    await expect(resolveWikiGraphLibraryArchivePath(added.uri)).resolves.toBe(
+      added.path,
+    );
+    await expect(
+      resolveWikiGraphLibraryArchivePath(`${added.uri}-missing`),
+    ).rejects.toThrow("Unknown Wiki Graph library archive");
   });
 });
 

@@ -1,4 +1,4 @@
-import type { ArchiveCollectionResult } from "wiki-graph-core";
+import type { ArchiveCollectionResult, QueryIndexScope } from "wiki-graph-core";
 
 import type { CLIArchiveArguments } from "../../../args/index.js";
 
@@ -18,6 +18,7 @@ export interface ArchiveOutputContext {
   readonly evidenceLimit?: number;
   readonly format: ResultFormat;
   readonly ids?: readonly string[];
+  readonly indexScope: QueryIndexScope;
   readonly limit: number;
   readonly order?: ArchiveCollectionResult["order"];
   readonly query?: string;
