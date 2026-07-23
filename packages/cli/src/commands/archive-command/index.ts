@@ -37,6 +37,7 @@ import {
   isArchiveRootGet,
   readArchiveDocument,
   resolveArchiveCommandRuntimeArguments,
+  resolveArchiveRuntimeLocation,
   runNextArchivePage,
   writeArchiveRoot,
 } from "./run/index.js";
@@ -67,9 +68,12 @@ export async function runArchiveCommand(
       });
       return;
     case "inspect":
-      await readArchiveDocument(args.archivePath, async (document) => {
-        await writeArchiveInspectReport(document, args);
-      });
+      await readArchiveDocument(
+        (await resolveArchiveRuntimeLocation(args.archivePath)).archivePath,
+        async (document) => {
+          await writeArchiveInspectReport(document, args);
+        },
+      );
       return;
     case "search":
       await readArchiveDocument(

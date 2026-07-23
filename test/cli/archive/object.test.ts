@@ -239,6 +239,18 @@ describe("cli/archive/object", () => {
     expect(archiveMockState.textWrites[0]).not.toContain("Cost: $");
   });
 
+  it("inspects a resolved located archive URI via its filesystem path", async () => {
+    await runArchiveCommand({
+      action: "inspect",
+      archivePath: "wikg:///tmp/library/book.wikg",
+    });
+
+    expect(archiveMockState.readCalls).toStrictEqual([
+      "/tmp/library/book.wikg",
+    ]);
+    expect(archiveMockState.textWrites[0]).toContain("Archive Inspect");
+  });
+
   it("prints request and job performance hints for multi-chapter generation", async () => {
     archiveMockState.inspectChapters = [
       {
