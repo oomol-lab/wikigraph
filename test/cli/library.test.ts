@@ -14,6 +14,7 @@ vi.mock("wiki-graph-core", async (importOriginal) => {
 
   return {
     ...actual,
+    assertWikiGraphLibrarySchemaCurrent: vi.fn(() => Promise.resolve()),
     putWikiGraphLibraryMetadata: vi.fn(
       (_target: unknown, key: string, value: unknown) => {
         libraryMockState.putCalls.push({ key, value });

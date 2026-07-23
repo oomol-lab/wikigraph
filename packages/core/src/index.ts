@@ -221,6 +221,13 @@ export {
   readWikiGraphHomeSchemaVersion,
   upgradeWikiGraphArchiveSchema,
 } from "./storage/schema-upgrade/index.js";
+export {
+  assertWikiGraphLibrarySchemaCurrent,
+  upgradeWikiGraphLibrarySchema,
+  upgradeWikiGraphMaintenanceTarget,
+  type WikiGraphLibraryUpgradeResult,
+  type WikiGraphMaintenanceUpgradeResult,
+} from "./maintenance/upgrade.js";
 export { readArchiveIndexSettings } from "./retrieval/search-index/index.js";
 export { migrateLegacySdpubToWikg } from "./storage/migration/legacy-sdpub/upgrade/index.js";
 export type {

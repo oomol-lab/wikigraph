@@ -26,7 +26,7 @@ export {
   readWikiGraphHomeSchemaVersion,
 } from "../../document/home-schema-upgrade.js";
 
-const CURRENT_ARCHIVE_SCHEMA_VERSION = 2;
+export const CURRENT_ARCHIVE_SCHEMA_VERSION = 2;
 const LOCK_STALE_TIMEOUT_MS = 5 * 60 * 1000;
 
 export async function ensureWikiGraphArchiveSchemaCurrent(
@@ -40,7 +40,9 @@ export async function ensureWikiGraphArchiveSchemaCurrent(
     );
   }
   if (schemaVersion < CURRENT_ARCHIVE_SCHEMA_VERSION) {
-    await upgradeWikiGraphArchiveSchema(archivePath);
+    throw new Error(
+      `This Wiki Graph archive uses schema v${schemaVersion} and must be upgraded before use.\nRun: wg maintenance upgrade ${archivePath}`,
+    );
   }
 }
 

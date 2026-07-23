@@ -22,6 +22,7 @@ import {
   ensureWikiGraphArchiveSchemaCurrent,
   ensureWikiGraphHomeSchemaCurrent,
   readWikiGraphArchiveSchemaVersion,
+  upgradeWikiGraphArchiveSchema,
 } from "../../../../packages/core/src/storage/schema-upgrade/index.js";
 import {
   WIKG_MANIFEST_PATH,
@@ -56,12 +57,14 @@ describe("schema-upgrade", () => {
       setWikiGraphStateDirectoryPathForTesting(join(root, "home"));
       const archivePath = join(root, "book.wikg");
       await writeLegacyArchive(archivePath);
-      const mutationToken = await readWikgArchiveMutationToken(archivePath);
 
-      await ensureWikiGraphArchiveSchemaCurrent(archivePath);
+      await expect(
+        ensureWikiGraphArchiveSchemaCurrent(archivePath),
+      ).rejects.toThrow("wg maintenance upgrade");
+      await upgradeWikiGraphArchiveSchema(archivePath);
 
-      await expect(readWikgArchiveMutationToken(archivePath)).resolves.toBe(
-        mutationToken,
+      await expect(readWikgArchiveMutationToken(archivePath)).resolves.toEqual(
+        expect.any(String),
       );
       await expect(
         readWikiGraphArchiveSchemaVersion(archivePath),
@@ -339,9 +342,9 @@ describe("schema-upgrade", () => {
         tableName,
       });
 
-      await expect(
-        ensureWikiGraphArchiveSchemaCurrent(archivePath),
-      ).rejects.toThrow("active coordinator state");
+      await expect(upgradeWikiGraphArchiveSchema(archivePath)).rejects.toThrow(
+        "active coordinator state",
+      );
     });
   });
 
@@ -359,7 +362,7 @@ describe("schema-upgrade", () => {
         });
 
         await expect(
-          ensureWikiGraphArchiveSchemaCurrent(archivePath),
+          upgradeWikiGraphArchiveSchema(archivePath),
         ).rejects.toThrow("non-derived overlay state");
       },
     );

@@ -2,7 +2,10 @@ Help Type: command
 Command: {{ commandName }} legacy migrate
 
 Purpose:
-  Convert an `.sdpub` archive into the current `.wikg` format.
+  Deprecated alias for converting an `.sdpub` archive into the current `.wikg` format.
+
+Deprecated:
+  Use `{{ commandName }} maintenance upgrade <path.sdpub>` instead.
 
 Usage:
   {{ commandName }} legacy migrate <path.sdpub> [--output <path.wikg>]
@@ -16,5 +19,7 @@ Examples:
   {{ commandName }} legacy migrate ./book.sdpub --output ./book.wikg
 
 Related help:
+  - Current maintenance upgrade entry point:
+    {{ commandName }} maintenance upgrade --help
   - Current archive format, create/import, and export boundaries:
     {{ commandName }} help format

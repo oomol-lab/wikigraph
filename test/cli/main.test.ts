@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
+import type * as WikiGraphCore from "wiki-graph-core";
 
 const mainMockState = vi.hoisted(() => ({
   argsResult: {
@@ -124,6 +125,14 @@ vi.mock("../../packages/cli/src/commands/index.js", () => ({
     return Promise.resolve();
   }),
 }));
+
+vi.mock("wiki-graph-core", async (importOriginal) => {
+  const actual = await importOriginal<typeof WikiGraphCore>();
+  return {
+    ...actual,
+    ensureWikiGraphHomeSchemaCurrent: vi.fn(() => Promise.resolve()),
+  };
+});
 
 import { main } from "../../packages/cli/src/app/index.js";
 import { renderMainHelpText } from "../../packages/cli/src/args/help.js";

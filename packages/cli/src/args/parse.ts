@@ -26,6 +26,7 @@ import {
   parseHelpArguments,
   parseLegacyArguments,
   parseLocalConfigUriFirstArguments,
+  parseMaintenanceArguments,
   parseTransformArguments,
 } from "./root/index.js";
 import { parseArchiveUriFirstArguments } from "./uri/index.js";
@@ -275,6 +276,10 @@ export function parseCLIArguments(
 
   if (positionals[0] === "legacy") {
     return parseLegacyArguments(positionals.slice(1), values);
+  }
+
+  if (positionals[0] === "maintenance") {
+    return parseMaintenanceArguments(positionals.slice(1), values);
   }
 
   if (positionals[0] === "transform") {

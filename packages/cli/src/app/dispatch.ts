@@ -11,12 +11,17 @@ import {
   runLegacyCommand,
   runLibraryCommand,
   runLocalConfigCommand,
+  runMaintenanceCommand,
   runObjectMetadataCommand,
   runQueueCommand,
 } from "../commands/index.js";
 import { formatCLIJSON, formatCLIJSONLine } from "../support/index.js";
 import { readCLIVersion } from "../support/index.js";
-import { formatError, LLMPaymentRequiredError } from "wiki-graph-core";
+import {
+  ensureWikiGraphHomeSchemaCurrent,
+  formatError,
+  LLMPaymentRequiredError,
+} from "wiki-graph-core";
 
 export interface WikiGraphCLIDispatchInput {
   readonly argv: readonly string[];
@@ -49,6 +54,11 @@ export async function dispatchWikiGraphCLI(
       case "version":
         input.stdout.write(`${readCLIVersion()}\n`);
         return { exitCode: 0 };
+    }
+
+    await ensureWikiGraphHomeSchemaCurrent();
+
+    switch (parsed.kind) {
       case "convert":
         await runConvertCommand(parsed.args);
         return { exitCode: 0 };
@@ -81,6 +91,9 @@ export async function dispatchWikiGraphCLI(
         return { exitCode: 0 };
       case "legacy":
         await runLegacyCommand(parsed.args);
+        return { exitCode: 0 };
+      case "maintenance-command":
+        await runMaintenanceCommand(parsed.args);
         return { exitCode: 0 };
       case "local-config":
         await runLocalConfigCommand(parsed.args);

@@ -9,6 +9,7 @@ import type {
   CLIGcArguments,
   CLILegacyArguments,
   CLILocalConfigArguments,
+  CLIMaintenanceArguments,
   CLIObjectMetadataArguments,
   CLIQueueArguments,
 } from "../args/index.js";
@@ -71,6 +72,14 @@ export async function runLegacyCommand(
   const command = await import("./legacy.js");
 
   return command.runLegacyCommand(args);
+}
+
+export async function runMaintenanceCommand(
+  args: CLIMaintenanceArguments,
+): Promise<void> {
+  const command = await import("./maintenance.js");
+
+  return command.runMaintenanceCommand(args);
 }
 
 export async function runLocalConfigCommand(

@@ -163,6 +163,13 @@ export interface CLILegacyArguments {
   readonly outputPath?: string;
 }
 
+export interface CLIMaintenanceArguments {
+  readonly action: "upgrade";
+  readonly json?: boolean;
+  readonly outputPath?: string;
+  readonly target: string;
+}
+
 export type CLIQueueAction =
   | "add"
   | "boost"
@@ -440,4 +447,9 @@ export type ParsedCLIArguments =
       readonly args: CLILegacyArguments;
       readonly help: false;
       readonly kind: "legacy";
+    }
+  | {
+      readonly args: CLIMaintenanceArguments;
+      readonly help: false;
+      readonly kind: "maintenance-command";
     };
