@@ -27,8 +27,25 @@ export async function writeArchiveDocument<T>(
   );
 
   if (location.libraryDirtyTarget !== undefined) {
-    await markWikiGraphLibraryIndexDirty(location.libraryDirtyTarget);
+    try {
+      await markWikiGraphLibraryIndexDirty(location.libraryDirtyTarget);
+    } catch (error) {
+      reportLibraryDirtyMarkFailure(error);
+    }
   }
 
   return result;
+}
+
+function reportLibraryDirtyMarkFailure(error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+
+  try {
+    process.stderr.write(
+      `Warning: failed to mark library index dirty after archive write: ${message}\n`,
+    );
+  } catch {
+    // The archive write already succeeded; diagnostics must not turn it into a
+    // reported failure.
+  }
 }
