@@ -34,8 +34,7 @@ import { markWikiGraphLibraryIndexDirty } from "./search-index.js";
 import { withWikiGraphLibraryLock } from "./lock.js";
 
 const PUBLIC_ID_BYTES = 6;
-const LIBRARY_ARCHIVE_MEMBERSHIP_SCHEMA_SQL = `
-  CREATE TABLE IF NOT EXISTS library_archives (
+const LIBRARY_ARCHIVES_TABLE_COLUMNS_SQL = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     library_id INTEGER NOT NULL,
     public_id TEXT NOT NULL,
@@ -48,6 +47,10 @@ const LIBRARY_ARCHIVE_MEMBERSHIP_SCHEMA_SQL = `
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     UNIQUE(library_id, public_id)
+`;
+const LIBRARY_ARCHIVE_MEMBERSHIP_SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS library_archives (
+${LIBRARY_ARCHIVES_TABLE_COLUMNS_SQL}
   );
 
   CREATE INDEX IF NOT EXISTS idx_library_archives_library
@@ -164,7 +167,9 @@ async function scanWikiGraphLibraryUnlocked(
                   !seenArchiveIds.has(archive.id),
               );
         const adoptable = matchingTokenArchives.filter(
-          (archive) => !currentPaths.has(archive.relativePath),
+          (archive) =>
+            archive.relativePath === file.relativePath ||
+            !currentPaths.has(archive.relativePath),
         );
 
         if (
@@ -890,18 +895,7 @@ async function rebuildLibraryArchiveMembershipTable(
     );
     await database.run(`
       CREATE TABLE library_archives (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        library_id INTEGER NOT NULL,
-        public_id TEXT NOT NULL,
-        relative_path TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'present',
-        last_seen_mutation_token TEXT,
-        last_seen_size INTEGER,
-        last_seen_mtime_ms INTEGER,
-        last_scanned_at TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        UNIQUE(library_id, public_id)
+${LIBRARY_ARCHIVES_TABLE_COLUMNS_SQL}
       )
     `);
     await database.run(`
