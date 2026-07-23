@@ -344,6 +344,198 @@ describe("library archive membership", () => {
     });
   });
 
+  it("keeps ordinary scan path identity trusted when a same-path archive token changes", async () => {
+    await withLibraryTestState(async (tempDir) => {
+      const library = await ensureDefaultWikiGraphLibrary();
+      const target = parseWikiGraphLibraryUri("wikg://lib");
+      expect(target).toBeDefined();
+      await createTestWikgArchive(
+        tempDir,
+        join(library.folderPath, "book.wikg"),
+      );
+      const first = await scanWikiGraphLibrary(target!);
+      const original = first.archives.find(
+        (archive) => archive.relativePath === "book.wikg",
+      );
+      expect(original?.lastSeenMutationToken).toBeDefined();
+
+      await rm(join(library.folderPath, "book.wikg"));
+      await createTestWikgArchive(
+        tempDir,
+        join(library.folderPath, "book.wikg"),
+      );
+      const second = await scanWikiGraphLibrary(target!);
+      const replaced = second.archives.find(
+        (archive) => archive.relativePath === "book.wikg",
+      );
+
+      expect(replaced?.publicId).toBe(original?.publicId);
+      expect(replaced?.lastSeenMutationToken).not.toBe(
+        original?.lastSeenMutationToken,
+      );
+      expect(second.archives).toHaveLength(1);
+    });
+  });
+
+  it("does not inherit archive public ids by same relative path during rebind", async () => {
+    await withLibraryTestState(async (tempDir) => {
+      const library = await ensureDefaultWikiGraphLibrary();
+      const target = parseWikiGraphLibraryUri("wikg://lib");
+      expect(target).toBeDefined();
+      await createTestWikgArchive(
+        tempDir,
+        join(library.folderPath, "book.wikg"),
+      );
+      const first = await scanWikiGraphLibrary(target!);
+      const oldArchive = first.archives.find(
+        (archive) => archive.relativePath === "book.wikg",
+      );
+      expect(oldArchive?.lastSeenMutationToken).toBeDefined();
+
+      const newFolder = join(tempDir, "new-library-folder");
+      await mkdir(newFolder);
+      await createTestWikgArchive(tempDir, join(newFolder, "book.wikg"));
+      const rebound = await rebindWikiGraphLibrary({
+        folderPath: newFolder,
+        target: target!,
+      });
+      const archivesAtPath = rebound.archives.filter(
+        (archive) => archive.relativePath === "book.wikg",
+      );
+      const fresh = archivesAtPath.find(
+        (archive) => archive.publicId !== oldArchive?.publicId,
+      );
+
+      expect(fresh?.status).toBe("present");
+      expect(fresh?.lastSeenMutationToken).not.toBe(
+        oldArchive?.lastSeenMutationToken,
+      );
+      expect(rebound.archives).toContainEqual(
+        expect.objectContaining({
+          publicId: oldArchive?.publicId,
+          relativePath: "book.wikg",
+          status: "missing",
+        }),
+      );
+    });
+  });
+
+  it("preserves archive public ids when rebind renames a same-token archive", async () => {
+    await withLibraryTestState(async (tempDir) => {
+      const library = await ensureDefaultWikiGraphLibrary();
+      const target = parseWikiGraphLibraryUri("wikg://lib");
+      expect(target).toBeDefined();
+      await createTestWikgArchive(
+        tempDir,
+        join(library.folderPath, "book.wikg"),
+      );
+      const first = await scanWikiGraphLibrary(target!);
+      const original = first.archives.find(
+        (archive) => archive.relativePath === "book.wikg",
+      );
+      expect(original?.lastSeenMutationToken).toBeDefined();
+
+      const newFolder = join(tempDir, "new-library-folder");
+      await mkdir(newFolder);
+      await copyFile(
+        join(library.folderPath, "book.wikg"),
+        join(newFolder, "renamed-book.wikg"),
+      );
+      const rebound = await rebindWikiGraphLibrary({
+        folderPath: newFolder,
+        target: target!,
+      });
+      const reboundArchive = rebound.archives.find(
+        (archive) => archive.relativePath === "renamed-book.wikg",
+      );
+
+      expect(reboundArchive?.publicId).toBe(original?.publicId);
+      expect(reboundArchive?.lastSeenMutationToken).toBe(
+        original?.lastSeenMutationToken,
+      );
+      expect(reboundArchive?.relativePath).toBe("renamed-book.wikg");
+      expect(reboundArchive?.status).toBe("present");
+      expect(rebound.archives).toHaveLength(1);
+    });
+  });
+
+  it("preserves archive public ids when rebind keeps the same path and mutation token", async () => {
+    await withLibraryTestState(async (tempDir) => {
+      const library = await ensureDefaultWikiGraphLibrary();
+      const target = parseWikiGraphLibraryUri("wikg://lib");
+      expect(target).toBeDefined();
+      await createTestWikgArchive(
+        tempDir,
+        join(library.folderPath, "book.wikg"),
+      );
+      const first = await scanWikiGraphLibrary(target!);
+      const original = first.archives.find(
+        (archive) => archive.relativePath === "book.wikg",
+      );
+      expect(original?.lastSeenMutationToken).toBeDefined();
+
+      const newFolder = join(tempDir, "new-library-folder");
+      await mkdir(newFolder);
+      await copyFile(
+        join(library.folderPath, "book.wikg"),
+        join(newFolder, "book.wikg"),
+      );
+      const rebound = await rebindWikiGraphLibrary({
+        folderPath: newFolder,
+        target: target!,
+      });
+      const reboundArchive = rebound.archives.find(
+        (archive) => archive.relativePath === "book.wikg",
+      );
+
+      expect(reboundArchive?.publicId).toBe(original?.publicId);
+      expect(reboundArchive?.status).toBe("present");
+      expect(rebound.archives).toHaveLength(1);
+    });
+  });
+
+  it("does not silently adopt a rebind archive when mutation tokens conflict", async () => {
+    await withLibraryTestState(async (tempDir) => {
+      const library = await ensureDefaultWikiGraphLibrary();
+      const target = parseWikiGraphLibraryUri("wikg://lib");
+      expect(target).toBeDefined();
+      await createTestWikgArchive(
+        tempDir,
+        join(library.folderPath, "original.wikg"),
+      );
+      await copyFile(
+        join(library.folderPath, "original.wikg"),
+        join(library.folderPath, "copy.wikg"),
+      );
+      const first = await scanWikiGraphLibrary(target!);
+      const original = first.archives.find(
+        (archive) => archive.relativePath === "original.wikg",
+      );
+      const copy = first.archives.find(
+        (archive) => archive.relativePath === "copy.wikg",
+      );
+      expect(original?.lastSeenMutationToken).toBe(copy?.lastSeenMutationToken);
+
+      const newFolder = join(tempDir, "new-library-folder");
+      await mkdir(newFolder);
+      await copyFile(
+        join(library.folderPath, "original.wikg"),
+        join(newFolder, "renamed.wikg"),
+      );
+      const rebound = await rebindWikiGraphLibrary({
+        folderPath: newFolder,
+        target: target!,
+      });
+      const renamed = rebound.archives.find(
+        (archive) => archive.relativePath === "renamed.wikg",
+      );
+
+      expect(renamed?.status).toBe("conflict");
+      expect(renamed?.publicId).not.toBe(original?.publicId);
+      expect(renamed?.publicId).not.toBe(copy?.publicId);
+    });
+  });
+
   it("rejects rebind on library archive URI targets", async () => {
     await withLibraryTestState(async (tempDir) => {
       const target = parseWikiGraphLibraryUri("wikg://lib");
