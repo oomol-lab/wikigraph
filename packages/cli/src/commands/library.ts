@@ -2,6 +2,7 @@ import { readFile } from "fs/promises";
 
 import {
   addWikiGraphLibraryArchive,
+  assertWikiGraphLibrarySchemaCurrent,
   clearWikiGraphLibraryMetadata,
   createWikiGraphLibrary,
   deleteWikiGraphLibraryMetadataKey,
@@ -35,6 +36,14 @@ const INDEX_PROGRESS_OUTPUT_INTERVAL_MS = 6_000;
 export async function runLibraryCommand(
   args: CLILibraryArguments,
 ): Promise<void> {
+  if (
+    args.action !== "add" &&
+    args.action !== "create" &&
+    args.action !== "scan"
+  ) {
+    await assertWikiGraphLibrarySchemaCurrent(args.target);
+  }
+
   switch (args.action) {
     case "add": {
       if (args.inputPath === undefined) {

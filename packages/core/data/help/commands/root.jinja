@@ -61,15 +61,17 @@ Help contract:
   The CLI help system is part of the product contract. When you do not know what a target or operation supports, ask the CLI for the next document.
   - Use `{{ commandName }} <uri> --help` to inspect a URI command, its default behavior, and supported predicates.
   - Use `{{ commandName }} <uri> <predicate> --help` to inspect a URI-bound predicate command.
-  - Use `{{ commandName }} <non-predicate-command> --help` for non-predicate commands such as `transform`, `gc`, `legacy`, and `next`.
+  - Use `{{ commandName }} <non-predicate-command> --help` for non-predicate commands such as `transform`, `gc`, `maintenance`, `legacy`, and `next`.
   - Use `{{ commandName }} help <topic>` for cross-command concepts, constraints, and runtime behavior.
   - Treat `{{ commandName }} --help` as the root page of the same help system.
-  - Use `{{ commandName }} legacy migrate --help` only when upgrading an `.sdpub` archive.
+  - Use `{{ commandName }} maintenance upgrade --help` for home, `.wikg`, library, and `.sdpub` upgrades.
+  - `{{ commandName }} legacy migrate --help` is a deprecated compatibility alias for `.sdpub` migration.
 
 Non-predicate command entry points:
   {{ commandName }} transform --help
   {{ commandName }} next --help
   {{ commandName }} gc --help
+  {{ commandName }} maintenance --help
   {{ commandName }} legacy --help
   {{ commandName }} help [topic] [--help|-h]
 

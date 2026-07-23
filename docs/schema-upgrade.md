@@ -94,6 +94,30 @@ bound to both the resolved `core.sqlite` path and a file fingerprint (`dev`,
 same path forces the next gated access to re-read the home schema version before
 opening other home SQLite state.
 
+## Product Upgrade Entry Points
+
+User-visible upgrade targets are limited to home, standalone archive, library,
+and legacy sdpub inputs. Internal SQLite files such as search sessions, job
+state, staging state, and library `fts.db` are implementation details of the
+home or library target and must not become CLI targets.
+
+- `wg maintenance upgrade ~/.wikigraph` explicitly upgrades home state. Real CLI
+  commands also run a centralized home preflight before touching local state;
+  `wg --version`, `wg --help`, `wg help ...`, and other pure help rendering paths
+  remain rescue paths and do not create or upgrade home.
+- `wg maintenance upgrade <archive.wikg>` and archive URI forms upgrade a
+  standalone archive in place. Normal archive access only checks schema and
+  reports `wg maintenance upgrade <archive>` when old data is found; it must not
+  silently rewrite user archives.
+- `wg maintenance upgrade wikg://lib` and
+  `wg maintenance upgrade wikg://lib/<lib-id>.lib` upgrade a registered library
+  under the library write lock. The command clears rebuildable derived library
+  state and only visits archives registered in `library_archives`; it does not
+  scan the folder for unmanaged `.wikg` files.
+- `wg maintenance upgrade <path.sdpub> [--output <path.wikg>]` is the formal
+  sdpub migration entry. `wg legacy migrate` remains as a deprecated alias and
+  must share the same implementation.
+
 ## Module Boundary
 
 `document` owns low-level SQLite/shared-state opening helpers and the home gate

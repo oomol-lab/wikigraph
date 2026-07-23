@@ -229,6 +229,14 @@ export function renderLegacyCommandHelpText(action?: "migrate"): string {
   );
 }
 
+export function renderMaintenanceCommandHelpText(action?: "upgrade"): string {
+  return renderHelpTemplate(
+    action === undefined
+      ? "help/commands/maintenance"
+      : `help/commands/maintenance/${action}`,
+  );
+}
+
 export function renderArchiveCommandHelpText(action: CLIArchiveAction): string {
   return renderHelpTemplate(`help/commands/archive/${action}`);
 }

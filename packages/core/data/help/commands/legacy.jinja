@@ -2,18 +2,19 @@ Help Type: command
 Command: {{ commandName }} legacy
 
 Purpose:
-  Expose the single `.sdpub` upgrade command.
+  Deprecated compatibility entry point for `.sdpub` upgrade.
 
 Usage:
   {{ commandName }} legacy migrate <path.sdpub> [--output <path.wikg>]
 
 Commands:
-  migrate    Convert an `.sdpub` archive into the current `.wikg` format.
+  migrate    Deprecated alias for `{{ commandName }} maintenance upgrade <path.sdpub>`.
 
 Examples:
   {{ commandName }} legacy migrate ./book.sdpub
   {{ commandName }} legacy migrate ./book.sdpub --output ./book.wikg
 
 See Also:
+  {{ commandName }} maintenance upgrade --help
   {{ commandName }} legacy migrate --help
   {{ commandName }} help format
