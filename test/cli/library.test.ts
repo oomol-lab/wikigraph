@@ -77,11 +77,21 @@ describe("cli/library args", () => {
       kind: "library",
     });
 
-    expect(
+    expect(() =>
       parseCLIArguments(["wikg://lib/abc123abc123.lib", "remove", "--json"]),
+    ).toThrow("Missing --confirm");
+
+    expect(
+      parseCLIArguments([
+        "wikg://lib/abc123abc123.lib",
+        "remove",
+        "--confirm",
+        "--json",
+      ]),
     ).toMatchObject({
       args: {
         action: "remove",
+        confirm: true,
         json: true,
         target: { publicId: "abc123abc123" },
       },

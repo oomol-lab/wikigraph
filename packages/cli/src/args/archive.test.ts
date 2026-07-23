@@ -84,7 +84,7 @@ describe("cli/args/archive", () => {
         "2",
         "--jsonl",
       ]),
-    ).toThrow("`--query` requires a scope URI");
+    ).toThrow("numeric chapter ids are internal and are not accepted");
 
     expect(parseCLIArguments(["wikg://book.wikg/entity"])).toStrictEqual({
       args: {
@@ -1128,6 +1128,25 @@ describe("cli/args/archive", () => {
       kind: "chapter",
     });
     expect(
+      parseCLIArguments([
+        "wikg://book.wikg/chapter/tree",
+        "apply",
+        "--input",
+        "tree.json",
+        "--dry-run",
+      ]),
+    ).toStrictEqual({
+      args: {
+        action: "tree",
+        dryRun: true,
+        inputPath: "tree.json",
+        path: archivePath,
+        treeAction: "apply",
+      },
+      help: false,
+      kind: "chapter",
+    });
+    expect(
       parseCLIArguments(["wikg://book.wikg/chapter/tree", "set", "--dry-run"]),
     ).toStrictEqual({
       args: {
@@ -1198,6 +1217,9 @@ describe("cli/args/archive", () => {
         "book.epub",
       ]),
     ).toThrow("The `chapter tree` action does not support --import.");
+    expect(() =>
+      parseCLIArguments(["wikg://book.wikg/chapter/3/source", "--json"]),
+    ).toThrow("numeric chapter ids are internal and are not accepted");
   });
 
   it("parses chapter subtree depth only for scope reads", () => {

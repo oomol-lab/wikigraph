@@ -60,7 +60,9 @@ describe("cli/args/validation", () => {
     ).toThrow("The `cover` command does not support --json.");
     expect(() =>
       parseCLIArguments(["wikg://book.wikg/chapter/../source", "set"]),
-    ).toThrow("does not support `set`");
+    ).toThrow(
+      "chapter paths do not support empty, '.', '..', or relative segments",
+    );
     expect(() => parseCLIArguments(["wikg://entity/Q9957"])).toThrow(
       "Short object URIs from output are archive-relative handles.",
     );

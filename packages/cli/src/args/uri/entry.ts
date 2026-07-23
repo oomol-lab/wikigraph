@@ -48,8 +48,10 @@ export function parseArchiveUriFirstArguments(
     throw new Error("Internal error: missing URI-first archive URI.");
   }
 
-  const action =
-    explicitAction ?? resolveImplicitArchiveUriAction(uri, values.query);
+  const action = normalizeArchiveUriAction(
+    uri,
+    explicitAction ?? resolveImplicitArchiveUriAction(uri, values.query),
+  );
 
   if (explicitAction === "get") {
     throw new Error(formatRemovedImplicitVerbMessage(explicitAction));
@@ -103,6 +105,19 @@ export function parseArchiveUriFirstArguments(
 }
 
 type ArchiveUriKind = "object" | "scope";
+
+function normalizeArchiveUriAction(uri: string, action: string): string {
+  if (action !== "apply") {
+    return action;
+  }
+
+  const parsed = parseLocatedWikiGraphUri(uri);
+  if (parsed.objectUri === "wikg://chapter/tree") {
+    return "set";
+  }
+
+  return action;
+}
 
 function resolveImplicitArchiveUriAction(
   uri: string,

@@ -133,15 +133,11 @@ function parseChapterPathAndSuffix(
   const pathParts = suffixStart === -1 ? parts : parts.slice(0, suffixStart);
   const suffixParts = suffixStart === -1 ? [] : parts.slice(suffixStart);
 
-  try {
-    const chapterPath = parseChapterPath(pathParts.join("/"), "chapter URI");
-    return {
-      chapterPath,
-      ...(suffixParts.length === 0 ? {} : { suffix: suffixParts.join("/") }),
-    };
-  } catch {
-    return undefined;
-  }
+  const chapterPath = parseChapterPath(pathParts.join("/"), "chapter URI");
+  return {
+    chapterPath,
+    ...(suffixParts.length === 0 ? {} : { suffix: suffixParts.join("/") }),
+  };
 }
 
 function parseChapterStateSuffix(

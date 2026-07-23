@@ -383,7 +383,9 @@ function parseLibraryScopeArguments(
       ),
     );
   }
-  rejectCommonLibraryFlags(action, values, helpRoute);
+  rejectCommonLibraryFlags(action, values, helpRoute, {
+    allowConfirm: action === "remove",
+  });
   rejectArchiveBooleanFlag(action, "--jsonl", values.jsonl, helpRoute);
   rejectArchiveFlag(action, "--json-input", values["json-input"], helpRoute);
 
@@ -427,8 +429,16 @@ function parseLibraryScopeArguments(
       rejectArchiveFlag(action, "--path", values.path, helpRoute);
       rejectArchiveFlag(action, "--input", values.input, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
+      if (!target.isDefault && values.confirm !== true) {
+        throw new Error(withHelpRoute("Missing --confirm.", helpRoute));
+      }
       return {
-        args: { action, json: values.json, target },
+        args: {
+          action,
+          ...(values.confirm === undefined ? {} : { confirm: values.confirm }),
+          json: values.json,
+          target,
+        },
         help: false,
         kind: "library",
       };
