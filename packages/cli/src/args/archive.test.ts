@@ -121,16 +121,80 @@ describe("cli/args/archive", () => {
     });
     expect(parseCLIArguments(["wikg://lib/entity/Q23"])).toStrictEqual({
       args: {
-        action: "list",
-        json: undefined,
-        target: {
-          isDefault: true,
-          kind: "scope",
-          objectUri: "wikg://entity/Q23",
-        },
+        action: "get",
+        archivePath: "wikg://lib/entity/Q23",
+        format: "text",
+        objectId: "wikg://lib/entity/Q23",
       },
       help: false,
-      kind: "library",
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments(["wikg://lib/entity", "--query", "memory"]),
+    ).toStrictEqual({
+      args: {
+        action: "search",
+        archivePath: "wikg://lib/entity",
+        format: "text",
+        kinds: ["entity"],
+        query: "memory",
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(parseCLIArguments(["wikg://lib/team.lib/entity"])).toStrictEqual({
+      args: {
+        action: "list",
+        archivePath: "wikg://lib/team.lib/entity",
+        format: "text",
+        kinds: ["entity"],
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments(["wikg://lib/entity/Q23", "evidence", "--limit", "2"]),
+    ).toStrictEqual({
+      args: {
+        action: "evidence",
+        archivePath: "wikg://lib/entity/Q23",
+        format: "text",
+        limit: 2,
+        objectId: "wikg://lib/entity/Q23",
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments(["wikg://lib/entity/Q23", "related", "--cursor", "4"]),
+    ).toStrictEqual({
+      args: {
+        action: "related",
+        archivePath: "wikg://lib/entity/Q23",
+        cursor: "4",
+        format: "text",
+        objectId: "wikg://lib/entity/Q23",
+      },
+      help: false,
+      kind: "archive",
+    });
+
+    expect(
+      parseCLIArguments(["wikg://lib/entity/Q23", "pack", "--budget", "2000"]),
+    ).toStrictEqual({
+      args: {
+        action: "pack",
+        archivePath: "wikg://lib/entity/Q23",
+        budget: 2000,
+        format: "text",
+        objectId: "wikg://lib/entity/Q23",
+      },
+      help: false,
+      kind: "archive",
     });
 
     expect(

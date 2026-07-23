@@ -118,7 +118,7 @@ export function parseWikiGraphLibraryUri(
     return undefined;
   }
   const explicitLibraryArchiveMatch =
-    /^([^/]+)\.lib\/(?!meta(?:\/|$)|chapter(?:\/|$)|chunk(?:\/|$)|entity(?:\/|$)|triple(?:\/|$))([^/]+)(?:\/(.*))?$/u.exec(
+    /^([^/]+)\.lib\/(?!meta(?:\/|$)|index(?:\/|$)|chapter(?:\/|$)|chunk(?:\/|$)|entity(?:\/|$)|triple(?:\/|$))([^/]+)(?:\/(.*))?$/u.exec(
       path,
     );
   const explicitLibraryPublicId = explicitLibraryArchiveMatch?.[1];
@@ -140,7 +140,7 @@ export function parseWikiGraphLibraryUri(
   }
 
   const match =
-    /^([^/]+)\.lib(?:\/(meta|chapter|chunk|entity|triple)(?:\/(.*))?)?$/u.exec(
+    /^([^/]+)\.lib(?:\/(meta|index|chapter|chunk|entity|triple)(?:\/(.*))?)?$/u.exec(
       path,
     );
   if (match?.[1] !== undefined) {
@@ -162,7 +162,7 @@ export function parseWikiGraphLibraryUri(
   }
 
   const defaultLibraryScopeMatch =
-    /^(chapter|chunk|entity|triple)(?:\/(.*))?$/u.exec(path);
+    /^(index|chapter|chunk|entity|triple)(?:\/(.*))?$/u.exec(path);
   if (defaultLibraryScopeMatch?.[1] !== undefined) {
     return {
       isDefault: true,
@@ -282,6 +282,14 @@ export async function resolveWikiGraphLibrary(
   return await withLibraryRegistryDatabase(
     async (database) =>
       await requireLibraryRecordByPublicId(database, target.publicId!),
+  );
+}
+
+export async function resolveWikiGraphLibraryById(
+  id: number,
+): Promise<WikiGraphLibraryRecord> {
+  return await withLibraryRegistryDatabase(
+    async (database) => await requireLibraryRecordById(database, id),
   );
 }
 
@@ -442,6 +450,27 @@ async function requireLibraryRecordByPublicId(
   if (record === undefined) {
     throw new Error(`Unknown Wiki Graph library: ${publicId}`);
   }
+  return record;
+}
+
+async function requireLibraryRecordById(
+  database: Database,
+  id: number,
+): Promise<WikiGraphLibraryRecord> {
+  const record = await database.queryOne(
+    `
+      SELECT id, public_id, folder_path, is_default, created_at, updated_at
+      FROM libraries
+      WHERE id = ?
+    `,
+    [id],
+    mapLibraryRecord,
+  );
+
+  if (record === undefined) {
+    throw new Error(`Unknown Wiki Graph library: ${id}`);
+  }
+
   return record;
 }
 

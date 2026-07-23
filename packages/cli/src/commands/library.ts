@@ -9,7 +9,10 @@ import {
   getWikiGraphLibraryArchive,
   listWikiGraphLibraryArchives,
   moveWikiGraphLibraryArchive,
+  disableWikiGraphLibraryIndex,
   putWikiGraphLibraryMetadata,
+  readWikiGraphLibraryIndexState,
+  rebuildWikiGraphLibraryIndex,
   removeWikiGraphLibrary,
   removeWikiGraphLibraryArchive,
   replaceWikiGraphLibraryMetadata,
@@ -22,6 +25,12 @@ import {
   readTextStreamFromStdin,
   writeTextToStdout,
 } from "../support/index.js";
+import {
+  ProgressOutputWriter,
+  type ProgressCounter,
+} from "../runtime/index.js";
+
+const INDEX_PROGRESS_OUTPUT_INTERVAL_MS = 6_000;
 
 export async function runLibraryCommand(
   args: CLILibraryArguments,
@@ -59,6 +68,64 @@ export async function runLibraryCommand(
     case "scan": {
       const result = await scanWikiGraphLibrary(args.target);
       await writeLibraryArchives(result.archives, args.json ?? false);
+      return;
+    }
+    case "get-index": {
+      await writeLibraryIndexState(
+        await readWikiGraphLibraryIndexState(args.target),
+        args.json ?? false,
+      );
+      return;
+    }
+    case "enable-index": {
+      const writer = new ProgressOutputWriter({
+        jsonl: args.jsonl ?? false,
+        throttleMs: INDEX_PROGRESS_OUTPUT_INTERVAL_MS,
+      });
+
+      await writer.write({
+        json: { type: "started" },
+        kind: "lifecycle",
+        text: "library index enable started\nsteps: collecting -> clearing -> indexing-text -> indexing-objects -> finalizing",
+      });
+      const state = await rebuildWikiGraphLibraryIndex(
+        args.target,
+        async (event) => {
+          await writer.write({
+            counters:
+              event.done === undefined || event.total === undefined
+                ? []
+                : [formatIndexCounter(event)],
+            json: {
+              counters:
+                event.done === undefined || event.total === undefined
+                  ? []
+                  : [formatIndexCounter(event)],
+              phase: event.phase,
+              type: "status_snapshot",
+            },
+            kind: "status",
+            phase: event.phase,
+          });
+        },
+      );
+      await writer.write({
+        json: { status: state.status, type: "completed" },
+        kind: "lifecycle",
+        text: "library index enabled",
+      });
+      await writer.write({
+        json: { type: "succeeded" },
+        kind: "lifecycle",
+        text: "succeeded",
+      });
+      return;
+    }
+    case "disable-index": {
+      await writeLibraryIndexState(
+        await disableWikiGraphLibraryIndex(args.target),
+        args.json ?? false,
+      );
       return;
     }
     case "remove": {
@@ -227,6 +294,42 @@ function formatLibraryArchiveJSON(
     lastScannedAt: archive.lastScannedAt,
     createdAt: archive.createdAt,
     updatedAt: archive.updatedAt,
+  };
+}
+
+async function writeLibraryIndexState(
+  state: Awaited<ReturnType<typeof readWikiGraphLibraryIndexState>>,
+  json: boolean,
+): Promise<void> {
+  if (json) {
+    await writeTextToStdout(formatCLIJSON(state));
+    return;
+  }
+
+  await writeTextToStdout(
+    [
+      `Status: ${state.status}`,
+      `Enabled: ${state.enabled ? "yes" : "no"}`,
+      `Source fingerprint: ${state.sourceFingerprint}`,
+      ...(state.fingerprint === undefined
+        ? []
+        : [`Index fingerprint: ${state.fingerprint}`]),
+      `Sources: ${state.sources.length}`,
+      "",
+    ].join("\n"),
+  );
+}
+
+function formatIndexCounter(input: {
+  readonly done?: number;
+  readonly total?: number;
+  readonly unit?: "chapter" | "object" | "sentence";
+}): ProgressCounter {
+  return {
+    done: input.done ?? 0,
+    name: input.unit === "sentence" ? "sentences" : "objects",
+    total: input.total ?? 0,
+    unit: input.unit === "sentence" ? "sentences" : "objects",
   };
 }
 

@@ -28,8 +28,11 @@ export async function createListObject(
   item: ArchiveListItem,
   context: ArchiveOutputContext,
 ): Promise<ArchiveOutputObject> {
+  const librarySource = createLibrarySourceObject(item);
+
   if (item.type === "triple") {
     return {
+      ...librarySource,
       ...(context.evidenceLimit === undefined || item.evidence === undefined
         ? {}
         : {
@@ -48,6 +51,7 @@ export async function createListObject(
   }
 
   return {
+    ...librarySource,
     ...(context.evidenceLimit === undefined || item.evidence === undefined
       ? {}
       : {
@@ -87,9 +91,11 @@ export async function createFindObject(
   context: ArchiveOutputContext,
 ): Promise<ArchiveOutputObject> {
   const uri = toWikiGraphUri(hit.id);
+  const librarySource = createLibrarySourceObject(hit);
 
   if (hit.type === "chapter") {
     return {
+      ...librarySource,
       ...(hit.state === undefined ? {} : { state: hit.state }),
       title: hit.title,
       uri,
@@ -97,6 +103,7 @@ export async function createFindObject(
   }
   if (hit.type === "chapter-title") {
     return {
+      ...librarySource,
       title: hit.title,
       type: "chapter-title",
       uri,
@@ -104,6 +111,7 @@ export async function createFindObject(
   }
   if (hit.type === "meta") {
     return {
+      ...librarySource,
       title: hit.title,
       uri,
     };
@@ -112,6 +120,7 @@ export async function createFindObject(
     const triple = hit.triple;
 
     return {
+      ...librarySource,
       ...(hit.backlinks === undefined
         ? {}
         : { backlinks: await createBacklinksObject(hit.backlinks, context) }),
@@ -132,6 +141,7 @@ export async function createFindObject(
   }
 
   return {
+    ...librarySource,
     ...(hit.backlinks === undefined
       ? {}
       : { backlinks: await createBacklinksObject(hit.backlinks, context) }),
@@ -174,6 +184,7 @@ export function createSourceObject(
   item: ArchiveEvidenceItem,
 ): ArchiveOutputSource {
   return {
+    ...createLibrarySourceObject(item),
     ...(item.score === undefined ? {} : { score: item.score }),
     text: item.source,
     uri: item.id,
@@ -212,15 +223,19 @@ export async function createPageObject(
   page: ArchivePage,
   context: ArchiveOutputContext,
 ): Promise<unknown> {
+  const librarySource = createLibrarySourceObject(page);
+
   switch (page.type) {
     case "entity-wikipage":
       return {
+        ...librarySource,
         en: page.en,
         uri: page.id,
         zh: page.zh,
       };
     case "entity":
       return {
+        ...librarySource,
         labels: page.labels.slice(0, 7),
         qid: page.qid,
         ...(context.evidenceLimit === undefined
@@ -236,6 +251,7 @@ export async function createPageObject(
       };
     case "triple":
       return {
+        ...librarySource,
         label: page.label,
         ...(context.evidenceLimit === undefined
           ? {}
@@ -250,6 +266,7 @@ export async function createPageObject(
       };
     case "chapter": {
       return {
+        ...librarySource,
         state: page.state,
         title: page.title,
         uri: toWikiGraphUri(page.id),
@@ -257,6 +274,7 @@ export async function createPageObject(
     }
     case "chapter-title":
       return {
+        ...librarySource,
         title: page.title,
         type: "chapter-title",
         uri: toWikiGraphUri(page.id),
@@ -264,7 +282,7 @@ export async function createPageObject(
     case "chapter-tree": {
       const { id: _id, ...rest } = page;
 
-      return { ...rest, uri: toWikiGraphUri(page.id) };
+      return { ...librarySource, ...rest, uri: toWikiGraphUri(page.id) };
     }
     case "fragment": {
       const {
@@ -278,6 +296,7 @@ export async function createPageObject(
 
       if (textStreamType !== undefined) {
         return {
+          ...librarySource,
           ...(backlinks === undefined
             ? {}
             : { backlinks: await createBacklinksObject(backlinks, context) }),
@@ -287,6 +306,7 @@ export async function createPageObject(
       }
 
       return {
+        ...librarySource,
         ...rest,
         ...(backlinks === undefined
           ? {}
@@ -303,26 +323,46 @@ export async function createPageObject(
     case "meta": {
       const { id: _id, type: _type, ...rest } = page;
 
-      return { ...rest, uri: toWikiGraphUri(page.id) };
+      return { ...librarySource, ...rest, uri: toWikiGraphUri(page.id) };
     }
     case "state": {
       if ("state" in page) {
-        return { ...page.state, uri: toWikiGraphUri(page.id) };
+        return {
+          ...librarySource,
+          ...page.state,
+          uri: toWikiGraphUri(page.id),
+        };
       }
 
-      return { uri: toWikiGraphUri(page.id), value: page.value };
+      return {
+        ...librarySource,
+        uri: toWikiGraphUri(page.id),
+        value: page.value,
+      };
     }
     case "node": {
       const { id: _id, ...rest } = page;
 
-      return { ...rest, uri: toWikiGraphUri(page.id) };
+      return { ...librarySource, ...rest, uri: toWikiGraphUri(page.id) };
     }
     case "summary": {
       const { id: _id, ...rest } = page;
 
-      return { ...rest, uri: toWikiGraphUri(page.id) };
+      return { ...librarySource, ...rest, uri: toWikiGraphUri(page.id) };
     }
   }
+}
+
+function createLibrarySourceObject(source: {
+  readonly archiveId?: number;
+  readonly libraryArchiveUri?: string;
+}): Pick<ArchiveOutputObject, "archiveId" | "libraryArchiveUri"> {
+  return {
+    ...(source.archiveId === undefined ? {} : { archiveId: source.archiveId }),
+    ...(source.libraryArchiveUri === undefined
+      ? {}
+      : { libraryArchiveUri: source.libraryArchiveUri }),
+  };
 }
 
 export async function createPackObject(

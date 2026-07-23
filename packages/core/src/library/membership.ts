@@ -29,6 +29,8 @@ import {
   type ParsedWikiGraphLibraryUri,
   type WikiGraphLibraryRecord,
 } from "./registry.js";
+import { markWikiGraphLibraryIndexDirty } from "./search-index.js";
+import { withWikiGraphLibraryLock } from "./lock.js";
 
 const PUBLIC_ID_BYTES = 6;
 const LIBRARY_ARCHIVE_MEMBERSHIP_SCHEMA_SQL = `
@@ -89,6 +91,18 @@ export async function scanWikiGraphLibrary(
   target: ParsedWikiGraphLibraryUri,
 ): Promise<WikiGraphLibraryScanResult> {
   const library = await resolveWikiGraphLibrary(target);
+  return await withWikiGraphLibraryLock(library.id, "write", async () => {
+    const result = await scanWikiGraphLibraryUnlocked(target, library);
+
+    await markWikiGraphLibraryIndexDirty(library);
+    return result;
+  });
+}
+
+async function scanWikiGraphLibraryUnlocked(
+  target: ParsedWikiGraphLibraryUri,
+  library: WikiGraphLibraryRecord,
+): Promise<WikiGraphLibraryScanResult> {
   const files = await listWikgFiles(library.folderPath);
 
   await withLibraryArchiveMembershipDatabase(async (database) => {
@@ -190,6 +204,16 @@ export async function getWikiGraphLibraryArchive(
   return await resolveLibraryArchiveTarget(target, library);
 }
 
+export async function getWikiGraphLibraryArchiveById(
+  library: WikiGraphLibraryRecord,
+  archiveId: number,
+): Promise<WikiGraphLibraryArchiveRecord> {
+  return await withLibraryArchiveMembershipDatabase(
+    async (database) =>
+      await requireLibraryArchiveById(database, library, archiveId),
+  );
+}
+
 export async function resolveWikiGraphLibraryArchivePath(
   archiveLocator: string,
 ): Promise<string> {
@@ -255,19 +279,26 @@ export async function addWikiGraphLibraryArchive(input: {
     targetRelativePath,
   );
 
-  return await withLibraryArchiveMembershipDatabase(async (database) => {
-    await database.transaction(async () => {
-      await ensureLibraryArchiveByRelativePath(
-        database,
-        library.id,
-        targetFile,
-      );
-    });
-    return await requireLibraryArchiveByRelativePath(
-      database,
-      library,
-      targetRelativePath,
+  return await withWikiGraphLibraryLock(library.id, "write", async () => {
+    const archive = await withLibraryArchiveMembershipDatabase(
+      async (database) => {
+        await database.transaction(async () => {
+          await ensureLibraryArchiveByRelativePath(
+            database,
+            library.id,
+            targetFile,
+          );
+        });
+        return await requireLibraryArchiveByRelativePath(
+          database,
+          library,
+          targetRelativePath,
+        );
+      },
     );
+
+    await markWikiGraphLibraryIndexDirty(library);
+    return archive;
   });
 }
 
@@ -277,11 +308,14 @@ export async function removeWikiGraphLibraryArchive(input: {
   const library = await resolveWikiGraphLibrary(input.target);
   const archive = await resolveLibraryArchiveTarget(input.target, library);
 
-  await rm(archive.path, { force: true });
-  await withLibraryArchiveMembershipDatabase(async (database) => {
-    await database.run("DELETE FROM library_archives WHERE id = ?", [
-      archive.id,
-    ]);
+  await withWikiGraphLibraryLock(library.id, "write", async () => {
+    await rm(archive.path, { force: true });
+    await withLibraryArchiveMembershipDatabase(async (database) => {
+      await database.run("DELETE FROM library_archives WHERE id = ?", [
+        archive.id,
+      ]);
+    });
+    await markWikiGraphLibraryIndexDirty(library);
   });
 
   return { ...archive, exists: false, status: "missing" };
@@ -316,19 +350,26 @@ export async function moveWikiGraphLibraryArchive(input: {
     targetRelativePath,
   );
 
-  return await withLibraryArchiveMembershipDatabase(async (database) => {
-    await database.run(
-      "UPDATE library_archives SET relative_path = ? WHERE id = ?",
-      [targetRelativePath, archive.id],
+  return await withWikiGraphLibraryLock(library.id, "write", async () => {
+    const moved = await withLibraryArchiveMembershipDatabase(
+      async (database) => {
+        await database.run(
+          "UPDATE library_archives SET relative_path = ? WHERE id = ?",
+          [targetRelativePath, archive.id],
+        );
+        await updateLibraryArchiveSeen(database, archive.id, targetFile, {
+          status: "present",
+        });
+        return await requireLibraryArchiveByPublicId(
+          database,
+          library,
+          archive.publicId,
+        );
+      },
     );
-    await updateLibraryArchiveSeen(database, archive.id, targetFile, {
-      status: "present",
-    });
-    return await requireLibraryArchiveByPublicId(
-      database,
-      library,
-      archive.publicId,
-    );
+
+    await markWikiGraphLibraryIndexDirty(library);
+    return moved;
   });
 }
 
@@ -515,6 +556,33 @@ async function requireLibraryArchiveByPublicId(
   );
   if (row === undefined) {
     throw new Error(`Unknown Wiki Graph library archive: ${publicId}`);
+  }
+  const relativePath = getString(row, "relative_path");
+  return mapLibraryArchiveRecord(
+    library,
+    row,
+    await pathExists(join(library.folderPath, relativePath)),
+  );
+}
+
+async function requireLibraryArchiveById(
+  database: Database,
+  library: WikiGraphLibraryRecord,
+  archiveId: number,
+): Promise<WikiGraphLibraryArchiveRecord> {
+  const row = await database.queryOne(
+    `
+      SELECT id, public_id, relative_path, status, last_seen_mutation_token,
+             last_seen_size, last_seen_mtime_ms, last_scanned_at,
+             created_at, updated_at
+      FROM library_archives
+      WHERE library_id = ? AND id = ?
+    `,
+    [library.id, archiveId],
+    (row) => row,
+  );
+  if (row === undefined) {
+    throw new Error(`Unknown Wiki Graph library archive: ${archiveId}`);
   }
   const relativePath = getString(row, "relative_path");
   return mapLibraryArchiveRecord(

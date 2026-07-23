@@ -1,9 +1,14 @@
 import {
   findArchiveObjects,
+  findWikiGraphLibraryObjects,
   listArchiveCollection,
   listArchiveEvidence,
+  listRelatedWikiGraphLibraryObjects,
+  listWikiGraphLibraryEvidence,
+  listWikiGraphLibraryObjects,
   listRelatedArchiveObjects,
   readContinuationCursor,
+  resolveWikiGraphLibraryQueryTargetById,
   type ArchiveCollectionOptions,
   type ArchiveFindOptions,
 } from "wiki-graph-core";
@@ -37,6 +42,11 @@ export async function runNextArchivePage(
         `Continuation cursor ${cursorId} belongs to ${cursorArchivePath}, not ${archivePath}.`,
       );
     }
+  }
+
+  if (cursor.indexScope?.kind === "library-index") {
+    await runNextLibraryIndexPage(args, cursor);
+    return;
   }
 
   await readArchiveDocument(getCursorArchivePath(cursor), async (document) => {
@@ -224,6 +234,188 @@ export async function runNextArchivePage(
         return;
     }
   });
+}
+
+async function runNextLibraryIndexPage(
+  args: CLIArchiveArguments,
+  cursor: Awaited<ReturnType<typeof readContinuationCursor>>,
+): Promise<void> {
+  if (cursor.indexScope.kind !== "library-index") {
+    throw new Error("Internal error: expected a library index cursor.");
+  }
+
+  const target = await resolveWikiGraphLibraryQueryTargetById(
+    cursor.indexScope.libraryId,
+  );
+  const format = args.format ?? cursor.format;
+  const limit = args.limit ?? DEFAULT_OUTPUT_LIMIT;
+
+  switch (cursor.kind) {
+    case "collection": {
+      const collectionOptions: ArchiveCollectionOptions = {
+        ...(cursor.backlinks === undefined
+          ? {}
+          : { backlinks: cursor.backlinks }),
+        ...(cursor.chapters === null ? {} : { chapters: cursor.chapters }),
+        cursor: cursor.cursor,
+        ...(cursor.evidenceLimit === undefined
+          ? {}
+          : { evidenceLimit: cursor.evidenceLimit }),
+        ...(cursor.ids === null ? {} : { ids: cursor.ids }),
+        limit,
+        order: cursor.order,
+        ...(cursor.sourceContext === undefined
+          ? {}
+          : { sourceContext: cursor.sourceContext }),
+        ...(cursor.triplePattern === undefined
+          ? {}
+          : { triplePattern: cursor.triplePattern }),
+      };
+
+      if (cursor.types !== null) {
+        Object.assign(collectionOptions, {
+          types: cursor.types as ArchiveCollectionOptions["types"],
+        });
+      }
+
+      await writeFindHits(
+        createCollectionFindResult(
+          await listWikiGraphLibraryObjects(target, collectionOptions),
+        ),
+        {
+          ...createCursorOutputContext(cursor, format, limit),
+          continuationKind: "collection",
+        },
+        format,
+      );
+      return;
+    }
+    case "search": {
+      const findOptions: ArchiveFindOptions = {
+        archiveKey: cursor.archiveKey,
+        ...(cursor.backlinks === undefined
+          ? {}
+          : { backlinks: cursor.backlinks }),
+        ...(cursor.chapters === null ? {} : { chapters: cursor.chapters }),
+        cursor: cursor.cursor,
+        ...(cursor.evidenceLimit === undefined
+          ? {}
+          : { evidenceLimit: cursor.evidenceLimit }),
+        limit,
+        ...(cursor.sourceContext === undefined
+          ? {}
+          : { sourceContext: cursor.sourceContext }),
+        ...(cursor.triplePattern === undefined
+          ? {}
+          : { triplePattern: cursor.triplePattern }),
+      };
+
+      if (cursor.types !== null) {
+        Object.assign(findOptions, {
+          types: cursor.types as ArchiveFindOptions["types"],
+        });
+      }
+
+      await writeFindHits(
+        await findWikiGraphLibraryObjects(
+          target,
+          cursor.query ?? "",
+          findOptions,
+        ),
+        createCursorOutputContext(cursor, format, limit),
+        format,
+      );
+      return;
+    }
+    case "evidence":
+      await writeEvidence(
+        await listWikiGraphLibraryEvidence(target, cursor.targetUri, {
+          cursor: cursor.cursor,
+          limit,
+          order: cursor.order,
+          ...(cursor.query === undefined ? {} : { query: cursor.query }),
+          ...(cursor.sourceContext === undefined
+            ? {}
+            : { sourceContext: cursor.sourceContext }),
+        }),
+        {
+          ...createCursorOutputContext(cursor, format, limit),
+          continuationKind: "evidence",
+          order: cursor.order,
+          ...(cursor.query === undefined ? {} : { query: cursor.query }),
+          targetUri: cursor.targetUri,
+        },
+        format,
+      );
+      return;
+    case "related":
+      await writeList(
+        await listRelatedWikiGraphLibraryObjects(target, cursor.targetUri, {
+          cursor: cursor.cursor,
+          ...(cursor.evidenceLimit === undefined
+            ? {}
+            : { evidenceLimit: cursor.evidenceLimit }),
+          limit,
+          order: cursor.order,
+          ...(cursor.query === undefined ? {} : { query: cursor.query }),
+          ...(cursor.role === undefined ? {} : { role: cursor.role }),
+          ...(cursor.sourceContext === undefined
+            ? {}
+            : { sourceContext: cursor.sourceContext }),
+        }),
+        {
+          ...createCursorOutputContext(cursor, format, limit),
+          continuationKind: "related",
+          ...(cursor.evidenceLimit === undefined
+            ? {}
+            : { evidenceLimit: cursor.evidenceLimit }),
+          order: cursor.order,
+          ...(cursor.query === undefined ? {} : { query: cursor.query }),
+          ...(cursor.role === undefined ? {} : { role: cursor.role }),
+          targetUri: cursor.targetUri,
+        },
+        format,
+      );
+      return;
+  }
+}
+
+function createCursorOutputContext(
+  cursor: Awaited<ReturnType<typeof readContinuationCursor>>,
+  format: "json" | "jsonl" | "text",
+  limit: number,
+) {
+  return {
+    archiveKey: cursor.archiveKey,
+    archivePath: cursor.archivePath,
+    format,
+    indexScope: cursor.indexScope,
+    limit,
+    types:
+      cursor.kind === "evidence" || cursor.kind === "related"
+        ? null
+        : cursor.types,
+    ...(cursor.kind === "search" || cursor.kind === "collection"
+      ? cursor.backlinks === undefined
+        ? {}
+        : { backlinks: cursor.backlinks }
+      : {}),
+    ...(cursor.kind === "search" || cursor.kind === "collection"
+      ? cursor.evidenceLimit === undefined
+        ? {}
+        : { evidenceLimit: cursor.evidenceLimit }
+      : {}),
+    ...(cursor.kind === "search" || cursor.kind === "collection"
+      ? cursor.sourceContext === undefined
+        ? {}
+        : { sourceContext: cursor.sourceContext }
+      : {}),
+    ...(cursor.kind === "search"
+      ? cursor.query === undefined
+        ? {}
+        : { query: cursor.query }
+      : {}),
+  };
 }
 
 function getCursorArchivePath(

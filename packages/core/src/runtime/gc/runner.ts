@@ -6,6 +6,7 @@ import { runSearchCacheGc } from "../../retrieval/query/index.js";
 import { runBuildQueueGc } from "../../api/index.js";
 import { runWikgCoordinatorGc } from "../../storage/wikg/index.js";
 import { runWikipageCacheGc } from "../../external/wikipage/index.js";
+import { runLibraryIndexGc } from "../../library/index.js";
 import { formatError } from "../../utils/node-error.js";
 
 import { tryAcquireGcLock } from "./lock.js";
@@ -25,6 +26,10 @@ const GC_JOBS: readonly NamedGcJob[] = [
   {
     name: "search-cache",
     run: runSearchCacheGc,
+  },
+  {
+    name: "library-index",
+    run: runLibraryIndexGc,
   },
   {
     name: "wikipage-cache",

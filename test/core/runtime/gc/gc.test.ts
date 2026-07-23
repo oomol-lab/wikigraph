@@ -42,6 +42,7 @@ describe("gc", () => {
       expect(report.jobs.map((item) => item.name)).toStrictEqual([
         "wikg-coordinator",
         "search-cache",
+        "library-index",
         "wikipage-cache",
         "build-queue",
         "tmp",

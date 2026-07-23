@@ -11,13 +11,16 @@ import {
 import type {
   ArchiveArgumentValues,
   CLILibraryAction,
+  CLIObjectKind,
   ParsedCLIArguments,
 } from "../types.js";
 import {
   formatWikiGraphHelpCommand,
   rejectArchiveBooleanFlag,
   rejectArchiveFlag,
+  stripObjectUriPrefix,
 } from "../helpers.js";
+import { parseArchiveArguments } from "../archive.js";
 
 const LIBRARY_ARCHIVE_ACTIONS = new Set(["move", "remove"]);
 const LIBRARY_METADATA_ACTIONS = new Set([
@@ -34,6 +37,15 @@ const LIBRARY_SCOPE_ACTIONS = new Set([
   "list",
   "remove",
   "scan",
+]);
+const LIBRARY_INDEX_ACTIONS = new Set(["disable", "enable", "get"]);
+const LIBRARY_QUERY_ACTIONS = new Set([
+  "evidence",
+  "get",
+  "list",
+  "pack",
+  "related",
+  "search",
 ]);
 
 export function parseLibraryUriFirstArguments(
@@ -70,7 +82,35 @@ export function parseLibraryUriFirstArguments(
   }
 
   const action =
-    explicitAction ?? (target.kind === "metadata" ? "get" : "list");
+    explicitAction ??
+    (target.kind === "scope" &&
+    target.objectUri !== undefined &&
+    target.objectUri !== "wikg://index"
+      ? resolveImplicitLibraryQueryAction(target.objectUri, values.query)
+      : target.kind === "metadata" || target.objectUri === "wikg://index"
+        ? "get"
+        : "list");
+
+  if (target.kind === "scope" && target.objectUri === "wikg://index") {
+    return parseLibraryIndexArguments(
+      uri,
+      target,
+      action,
+      explicitAction === undefined ? [] : positionals.slice(2),
+      values,
+    );
+  }
+
+  if (target.kind === "scope" && target.objectUri !== undefined) {
+    return parseLibraryQueryArguments(
+      uri,
+      target,
+      action,
+      explicitAction === undefined ? [] : positionals.slice(2),
+      values,
+    );
+  }
+
   if (!isLibraryAction(action)) {
     throw new Error(
       withHelpRoute(
@@ -116,6 +156,179 @@ export function parseLibraryUriFirstArguments(
     explicitAction === undefined ? [] : positionals.slice(2),
     values,
   );
+}
+
+function parseLibraryQueryArguments(
+  uri: string,
+  target: ParsedWikiGraphLibraryUri,
+  action: string,
+  tail: readonly string[],
+  values: ArchiveArgumentValues,
+): ParsedCLIArguments {
+  if (!LIBRARY_QUERY_ACTIONS.has(action)) {
+    throw new Error(
+      withHelpRoute(
+        `The library scope ${uri} does not support \`${action}\`.`,
+        formatWikiGraphHelpCommand(uri, action),
+      ),
+    );
+  }
+  if (target.objectUri === undefined) {
+    throw new Error("Internal error: missing library query object URI.");
+  }
+
+  const parsed = parseArchiveArguments(
+    action as "evidence" | "get" | "list" | "pack" | "related" | "search",
+    [formatTemporaryLocatedLibraryQueryUri(target.objectUri), ...tail],
+    values,
+    formatWikiGraphHelpCommand(uri, action),
+    {
+      ...optionalDefaultKinds(getLibraryQueryDefaultKinds(target.objectUri)),
+    },
+  );
+
+  if (parsed.kind !== "archive") {
+    return parsed;
+  }
+
+  const temporaryArchivePath = parsed.args.archivePath;
+  const replaceTemporaryUri = (
+    value: string | undefined,
+  ): string | undefined =>
+    value === undefined
+      ? undefined
+      : value === temporaryArchivePath
+        ? uri
+        : value.replace(temporaryArchivePath, uri);
+
+  return {
+    ...parsed,
+    args: {
+      ...parsed.args,
+      archivePath: uri,
+      ...optionalObjectId(replaceTemporaryUri(parsed.args.objectId)),
+    },
+  };
+}
+
+function optionalDefaultKinds(
+  defaultKinds: readonly CLIObjectKind[] | undefined,
+): { readonly defaultKinds?: readonly CLIObjectKind[] } {
+  return defaultKinds === undefined ? {} : { defaultKinds };
+}
+
+function optionalObjectId(objectId: string | undefined): {
+  readonly objectId?: string;
+} {
+  return objectId === undefined ? {} : { objectId };
+}
+
+function formatTemporaryLocatedLibraryQueryUri(objectUri: string): string {
+  const path = stripObjectUriPrefix(objectUri);
+  return `wikg://__library_index__.wikg/${path}`;
+}
+
+function getLibraryQueryDefaultKinds(
+  objectUri: string,
+): readonly CLIObjectKind[] | undefined {
+  const path = stripObjectUriPrefix(objectUri);
+  const [head] = path.split("/");
+
+  switch (head) {
+    case "chapter":
+      return ["chapter"];
+    case "chunk":
+      return ["chunk"];
+    case "entity":
+      return ["entity"];
+    case "source":
+      return ["source"];
+    case "summary":
+      return ["summary"];
+    case "triple":
+      return ["triple"];
+    default:
+      return undefined;
+  }
+}
+
+function resolveImplicitLibraryQueryAction(
+  objectUri: string,
+  query: string | undefined,
+): "get" | "list" | "search" {
+  const path = stripObjectUriPrefix(objectUri);
+  if (/^(?:chapter|chunk|entity|source|summary|triple)$/u.test(path)) {
+    return query === undefined ? "list" : "search";
+  }
+
+  return "get";
+}
+
+function parseLibraryIndexArguments(
+  uri: string,
+  target: ParsedWikiGraphLibraryUri,
+  action: string,
+  tail: readonly string[],
+  values: ArchiveArgumentValues,
+): ParsedCLIArguments {
+  const helpRoute = formatWikiGraphHelpCommand(uri, action);
+  if (!LIBRARY_INDEX_ACTIONS.has(action)) {
+    throw new Error(
+      withHelpRoute(
+        `The library index ${uri} does not support \`${action}\`.`,
+        helpRoute,
+      ),
+    );
+  }
+
+  rejectExtraPositionals(action, tail, 0, helpRoute);
+  rejectArchiveFlag(action, "--path", values.path, helpRoute);
+  rejectArchiveFlag(action, "--input", values.input, helpRoute);
+  rejectArchiveFlag(action, "--json-input", values["json-input"], helpRoute);
+  rejectArchiveFlag(action, "--query", values.query, helpRoute);
+  rejectArchiveFlag(action, "--limit", values.limit, helpRoute);
+  rejectArchiveFlag(action, "--cursor", values.cursor, helpRoute);
+  rejectArchiveFlag(action, "--context", values.context, helpRoute);
+  rejectArchiveFlag(action, "--evidence", values.evidence, helpRoute);
+  rejectArchiveFlag(action, "--llm", values.llm, helpRoute);
+  rejectArchiveFlag(action, "--output", values.output, helpRoute);
+  rejectArchiveFlag(
+    action,
+    "--output-format",
+    values["output-format"],
+    helpRoute,
+  );
+  rejectArchiveBooleanFlag(action, "--all", values.all, helpRoute);
+  rejectArchiveBooleanFlag(action, "--backlinks", values.backlinks, helpRoute);
+  rejectArchiveBooleanFlag(action, "--confirm", values.confirm, helpRoute);
+  rejectArchiveBooleanFlag(action, "--reverse", values.reverse, helpRoute);
+
+  if (action === "enable") {
+    if (values.json === true) {
+      throw new Error(
+        withHelpRoute(
+          "The `enable` command does not support --json because it streams progress events. Use --jsonl for line-delimited progress output.",
+          helpRoute,
+        ),
+      );
+    }
+    return {
+      args: { action: "enable-index", jsonl: values.jsonl, target },
+      help: false,
+      kind: "library",
+    };
+  }
+
+  rejectArchiveBooleanFlag(action, "--jsonl", values.jsonl, helpRoute);
+  return {
+    args: {
+      action: action === "disable" ? "disable-index" : "get-index",
+      ...(values.json === undefined ? {} : { json: values.json }),
+      target,
+    },
+    help: false,
+    kind: "library",
+  };
 }
 
 function parseLibraryArchiveArguments(
@@ -248,6 +461,9 @@ function parseLibraryScopeArguments(
     case "set":
     case "put":
     case "delete":
+    case "disable-index":
+    case "enable-index":
+    case "get-index":
     case "clear":
     case "move":
       throw new Error(
@@ -326,6 +542,9 @@ function parseLibraryMetadataArguments(
     case "remove":
     case "add":
     case "move":
+    case "disable-index":
+    case "enable-index":
+    case "get-index":
     case "scan":
       throw new Error(
         "Internal error: scope action routed to library metadata.",
@@ -382,7 +601,10 @@ function isLibraryAction(action: string): action is CLILibraryAction {
     action === "clear" ||
     action === "create" ||
     action === "delete" ||
+    action === "disable-index" ||
+    action === "enable-index" ||
     action === "get" ||
+    action === "get-index" ||
     action === "list" ||
     action === "move" ||
     action === "put" ||

@@ -1,5 +1,6 @@
 import {
   formatLocatedWikiGraphUri,
+  parseWikiGraphLibraryUri,
   parseLocatedWikiGraphUri,
   requireLocatedObjectOrArchiveUri,
   resolveWikiGraphLibraryArchivePath,
@@ -70,15 +71,31 @@ export async function resolveArchiveCommandRuntimeArguments(
 }
 
 export function getArchivePath(uri: string): string {
+  if (parseWikiGraphLibraryUri(uri)?.kind === "scope") {
+    return uri;
+  }
+
   return requireLocatedObjectOrArchiveUri(uri).archivePath;
 }
 
 export function getArchiveIndexScope(uri: string): QueryIndexScope {
+  if (parseWikiGraphLibraryUri(uri)?.kind === "scope") {
+    return { kind: "library-index", libraryId: -1 };
+  }
+
   const archivePath = getArchivePath(uri);
   return { archiveKey: archivePath, archivePath, kind: "archive-index" };
 }
 
 export function getObjectUri(uri: string): string {
+  const libraryTarget = parseWikiGraphLibraryUri(uri);
+  if (
+    libraryTarget?.kind === "scope" &&
+    libraryTarget.objectUri !== undefined
+  ) {
+    return libraryTarget.objectUri;
+  }
+
   const parsed = requireLocatedObjectOrArchiveUri(uri);
 
   return parsed.objectUri ?? "wikg://";

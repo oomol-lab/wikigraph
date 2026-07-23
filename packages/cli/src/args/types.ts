@@ -107,7 +107,10 @@ export type CLILibraryAction =
   | "clear"
   | "create"
   | "delete"
+  | "disable-index"
+  | "enable-index"
   | "get"
+  | "get-index"
   | "list"
   | "move"
   | "put"
@@ -121,6 +124,7 @@ export interface CLILibraryArguments {
   readonly inputPath?: string | undefined;
   readonly inputValue?: string | undefined;
   readonly json?: boolean | undefined;
+  readonly jsonl?: boolean | undefined;
   readonly jsonInputValue?: string | undefined;
   readonly key?: string | undefined;
   readonly path?: string | undefined;

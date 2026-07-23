@@ -82,18 +82,23 @@ function formatBacklinkLines(backlinks: ArchiveOutputBacklinks): string[] {
 }
 
 function formatObjectSummaryLines(object: ArchiveOutputObject): string[] {
+  const sourceLines = formatLibrarySourceLines(object);
+
   if (
     getTextStreamOutputType(object.uri) !== undefined &&
     object.text !== undefined
   ) {
-    return formatSourceObject({
-      text: object.text,
-      uri: object.uri,
-    }).split("\n");
+    return [
+      ...formatSourceObject({
+        text: object.text,
+        uri: object.uri,
+      }).split("\n"),
+      ...sourceLines,
+    ];
   }
 
   if (object.predicate !== undefined) {
-    return [object.uri, formatTripleObjectLabel(object)];
+    return [object.uri, formatTripleObjectLabel(object), ...sourceLines];
   }
 
   if (isChapterStateListObject(object)) {
@@ -101,6 +106,7 @@ function formatObjectSummaryLines(object: ArchiveOutputObject): string[] {
       [object.uri, object.title, formatStateInline(object.state)]
         .filter((part): part is string => part !== undefined && part !== "")
         .join("  "),
+      ...sourceLines,
     ];
   }
 
@@ -110,7 +116,24 @@ function formatObjectSummaryLines(object: ArchiveOutputObject): string[] {
     object.label,
     object.state === undefined ? undefined : formatStateInline(object.state),
     object.evidence === undefined ? object.text : undefined,
+    ...sourceLines,
   ].filter((line): line is string => line !== undefined && line !== "");
+}
+
+function formatLibrarySourceLines(object: ArchiveOutputObject): string[] {
+  return object.archiveId === undefined &&
+    object.libraryArchiveUri === undefined
+    ? []
+    : [
+        [
+          object.archiveId === undefined
+            ? undefined
+            : `archiveId:${object.archiveId}`,
+          object.libraryArchiveUri,
+        ]
+          .filter((part): part is string => part !== undefined)
+          .join("  "),
+      ];
 }
 
 export function getListObjectSeparator(
