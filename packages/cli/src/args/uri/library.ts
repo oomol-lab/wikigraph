@@ -429,7 +429,10 @@ function parseLibraryScopeArguments(
       rejectArchiveFlag(action, "--path", values.path, helpRoute);
       rejectArchiveFlag(action, "--input", values.input, helpRoute);
       rejectArchiveFlag(action, "--to", values.to, helpRoute);
-      if (!target.isDefault && values.confirm !== true) {
+      if (
+        (target.kind === "archive" || !target.isDefault) &&
+        values.confirm !== true
+      ) {
         throw new Error(withHelpRoute("Missing --confirm.", helpRoute));
       }
       return {

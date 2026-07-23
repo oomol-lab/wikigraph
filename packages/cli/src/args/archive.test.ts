@@ -1109,6 +1109,12 @@ describe("cli/args/archive", () => {
       kind: "help",
     });
     expect(
+      parseCLIArguments(["wikg://book.wikg/chapter/tree", "apply", "--help"]),
+    ).toMatchObject({
+      help: true,
+      kind: "help",
+    });
+    expect(
       parseCLIArguments([
         "wikg://book.wikg/chapter/tree",
         "set",

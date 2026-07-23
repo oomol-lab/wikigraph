@@ -70,17 +70,17 @@ export function parseArchiveUriFirstArguments(
   if (values.help === true && explicitAction !== undefined) {
     const helpTarget = classifyArchiveUriHelpTarget(uri);
 
-    if (!isUriHelpPredicate(helpTarget, explicitAction)) {
+    if (!isUriHelpPredicate(helpTarget, action)) {
       throw new Error(
         withHelpRoute(
-          `The URI target ${uri} does not support \`${explicitAction}\`.`,
+          `The URI target ${uri} does not support \`${action}\`.`,
           formatWikiGraphHelpCommand(uri),
         ),
       );
     }
     return {
       help: true,
-      helpText: renderUriPredicateHelpText(helpTarget, explicitAction, uri),
+      helpText: renderUriPredicateHelpText(helpTarget, action, uri),
       kind: "help",
     };
   }
