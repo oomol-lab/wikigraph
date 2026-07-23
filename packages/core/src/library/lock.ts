@@ -10,9 +10,13 @@ const LIBRARY_LOCK_SCHEMA_SQL = `
     mode TEXT NOT NULL,
     owner_id TEXT NOT NULL,
     owner_pid INTEGER NOT NULL,
+    heartbeat_at INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   );
 `;
+
+const LIBRARY_LOCK_HEARTBEAT_INTERVAL_MS = 15_000;
+const LIBRARY_LOCK_STALE_MS = 5 * 60 * 1000;
 
 export type LibraryLockMode = "read" | "write";
 
@@ -40,9 +44,10 @@ export async function acquireWikiGraphLibraryLock(
   try {
     await database.transaction(async () => {
       const existing = await database.queryOne(
-        "SELECT mode, owner_id, owner_pid FROM library_locks WHERE library_id = ?",
+        "SELECT mode, owner_id, owner_pid, heartbeat_at FROM library_locks WHERE library_id = ?",
         [libraryId],
         (row) => ({
+          heartbeatAt: getNumber(row, "heartbeat_at"),
           mode: getString(row, "mode"),
           ownerId: getString(row, "owner_id"),
           ownerPid: getNumber(row, "owner_pid"),
@@ -50,7 +55,7 @@ export async function acquireWikiGraphLibraryLock(
       );
 
       if (existing !== undefined) {
-        if (isProcessAlive(existing.ownerPid)) {
+        if (isLockActive(existing)) {
           throw new Error(
             `Wiki Graph library is locked for ${existing.mode}: ${libraryId}.`,
           );
@@ -64,18 +69,24 @@ export async function acquireWikiGraphLibraryLock(
       await database.run(
         `
           INSERT INTO library_locks (
-            library_id, mode, owner_id, owner_pid, created_at
+            library_id, mode, owner_id, owner_pid, heartbeat_at, created_at
           )
-          VALUES (?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?)
         `,
-        [libraryId, mode, ownerId, process.pid, Date.now()],
+        [libraryId, mode, ownerId, process.pid, Date.now(), Date.now()],
       );
     });
   } finally {
     await database.close();
   }
 
+  const heartbeat = setInterval(() => {
+    void updateLibraryLockHeartbeat(libraryId, ownerId).catch(() => undefined);
+  }, LIBRARY_LOCK_HEARTBEAT_INTERVAL_MS);
+  heartbeat.unref?.();
+
   return async () => {
+    clearInterval(heartbeat);
     const releaseDatabase = await openLibraryLockDatabase();
 
     try {
@@ -87,6 +98,16 @@ export async function acquireWikiGraphLibraryLock(
       await releaseDatabase.close();
     }
   };
+}
+
+function isLockActive(lock: {
+  readonly heartbeatAt: number;
+  readonly ownerPid: number;
+}): boolean {
+  return (
+    Date.now() - lock.heartbeatAt <= LIBRARY_LOCK_STALE_MS &&
+    isProcessAlive(lock.ownerPid)
+  );
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -107,13 +128,33 @@ export async function isWikiGraphLibraryLocked(
   libraryId: number,
 ): Promise<boolean> {
   return await withLibraryLockDatabase(async (database) => {
-    const found = await database.queryOne(
-      "SELECT 1 AS found FROM library_locks WHERE library_id = ?",
+    const existing = await database.queryOne(
+      "SELECT owner_pid, heartbeat_at FROM library_locks WHERE library_id = ?",
       [libraryId],
-      (row) => getNumber(row, "found"),
+      (row) => ({
+        heartbeatAt: getNumber(row, "heartbeat_at"),
+        ownerPid: getNumber(row, "owner_pid"),
+      }),
     );
 
-    return found === 1;
+    return existing !== undefined && isLockActive(existing);
+  });
+}
+
+async function updateLibraryLockHeartbeat(
+  libraryId: number,
+  ownerId: string,
+): Promise<void> {
+  await withLibraryLockDatabase(async (database) => {
+    await database.run(
+      `
+UPDATE library_locks
+SET heartbeat_at = ?
+WHERE library_id = ?
+  AND owner_id = ?
+`,
+      [Date.now(), libraryId, ownerId],
+    );
   });
 }
 
@@ -130,8 +171,29 @@ async function withLibraryLockDatabase<T>(
 }
 
 async function openLibraryLockDatabase(): Promise<Database> {
-  return await openSharedStateDatabase(
+  const database = await openSharedStateDatabase(
     resolveWikiGraphCoreDatabasePath(),
     LIBRARY_LOCK_SCHEMA_SQL,
   );
+
+  await ensureLibraryLockColumns(database);
+  return database;
+}
+
+async function ensureLibraryLockColumns(database: Database): Promise<void> {
+  const columns = new Set(
+    (
+      await database.queryAll(
+        "PRAGMA table_info(library_locks)",
+        undefined,
+        (row) => getString(row, "name"),
+      )
+    ).values(),
+  );
+
+  if (!columns.has("heartbeat_at")) {
+    await database.run(
+      "ALTER TABLE library_locks ADD COLUMN heartbeat_at INTEGER NOT NULL DEFAULT 0",
+    );
+  }
 }

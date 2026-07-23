@@ -852,6 +852,7 @@ CREATE TABLE IF NOT EXISTS library_locks (
   mode TEXT NOT NULL,
   owner_id TEXT NOT NULL,
   owner_pid INTEGER NOT NULL,
+  heartbeat_at INTEGER NOT NULL,
   created_at INTEGER NOT NULL
 );
 `,
@@ -861,10 +862,10 @@ CREATE TABLE IF NOT EXISTS library_locks (
     await database.run(
       `
 INSERT INTO library_locks (
-  library_id, mode, owner_id, owner_pid, created_at
-) VALUES (?, 'write', 'test-owner', ?, ?)
+  library_id, mode, owner_id, owner_pid, heartbeat_at, created_at
+) VALUES (?, 'write', 'test-owner', ?, ?, ?)
 `,
-      [libraryId, process.pid, Date.now()],
+      [libraryId, process.pid, Date.now(), Date.now()],
     );
   } finally {
     await database.close();
