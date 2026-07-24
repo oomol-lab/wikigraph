@@ -25,24 +25,127 @@ const STATE_LOCK_TEST_SCHEMA_SQL = `
 `;
 
 describe("state lock coordination", () => {
-  it("shares read locks and rejects opportunistic writes while a reader is active", async () => {
+  it("allows read/read sharing while making writes wait for existing reads", async () => {
     await withStateLockTestDatabase(async (databasePath) => {
-      const firstReader = await acquireTestLock(databasePath, "read");
+      const order: string[] = [];
+      const readerStarted = createBarrier();
+      const releaseReaders = createBarrier();
+      const writerCompleted = createBarrier();
+
+      const firstReader = withStateLock(
+        createTestLockOptions(databasePath, "read"),
+        async () => {
+          order.push("first-read-enter");
+          readerStarted.resolve();
+          await releaseReaders.promise;
+          order.push("first-read-exit");
+        },
+      );
+      await readerStarted.promise;
+
+      const secondReader = await acquireTestLock(databasePath, "read", {
+        wait: false,
+      });
+      expect(secondReader).toBeDefined();
+
+      const writer = withStateLock(
+        createTestLockOptions(databasePath, "write"),
+        () => {
+          order.push("write-enter");
+          writerCompleted.resolve();
+        },
+      );
+
+      await delay(20);
+      expect(order).toStrictEqual(["first-read-enter"]);
+
+      await secondReader?.();
+      releaseReaders.resolve();
+      await Promise.all([firstReader, writer, writerCompleted.promise]);
+      expect(order).toStrictEqual([
+        "first-read-enter",
+        "first-read-exit",
+        "write-enter",
+      ]);
+    });
+  });
+
+  it("makes a second writer wait for the first writer", async () => {
+    await withStateLockTestDatabase(async (databasePath) => {
+      const order: string[] = [];
+      const firstWriterStarted = createBarrier();
+      const releaseFirstWriter = createBarrier();
+
+      const firstWriter = withStateLock(
+        createTestLockOptions(databasePath, "write"),
+        async () => {
+          order.push("first-write-enter");
+          firstWriterStarted.resolve();
+          await releaseFirstWriter.promise;
+          order.push("first-write-exit");
+        },
+      );
+      await firstWriterStarted.promise;
+
+      const secondWriter = withStateLock(
+        createTestLockOptions(databasePath, "write"),
+        () => {
+          order.push("second-write-enter");
+        },
+      );
+
+      await delay(20);
+      expect(order).toStrictEqual(["first-write-enter"]);
+
+      releaseFirstWriter.resolve();
+      await Promise.all([firstWriter, secondWriter]);
+      expect(order).toStrictEqual([
+        "first-write-enter",
+        "first-write-exit",
+        "second-write-enter",
+      ]);
+    });
+  });
+
+  it("waits instead of throwing lock conflicts for the closure API", async () => {
+    await withStateLockTestDatabase(async (databasePath) => {
+      const holderRelease = await acquireTestLock(databasePath, "write");
+      const events: string[] = [];
+
+      const waiter = withStateLock(
+        createTestLockOptions(databasePath, "read"),
+        () => {
+          events.push("waiter-entered");
+        },
+      );
+
+      await delay(20);
+      expect(events).toStrictEqual([]);
+
+      await holderRelease?.();
+      await expect(waiter).resolves.toBeUndefined();
+      expect(events).toStrictEqual(["waiter-entered"]);
+    });
+  });
+
+  it("returns undefined for opportunistic acquire while locked and releases a free acquire", async () => {
+    await withStateLockTestDatabase(async (databasePath) => {
+      const holderRelease = await acquireTestLock(databasePath, "read");
 
       try {
-        const secondReader = await acquireTestLock(databasePath, "read", {
-          wait: false,
-        });
-        const writer = await acquireTestLock(databasePath, "write", {
-          wait: false,
-        });
-
-        expect(secondReader).toBeDefined();
-        expect(writer).toBeUndefined();
-        await secondReader?.();
+        await expect(
+          acquireTestLock(databasePath, "write", { wait: false }),
+        ).resolves.toBeUndefined();
       } finally {
-        await firstReader?.();
+        await holderRelease?.();
       }
+
+      const release = await acquireTestLock(databasePath, "write", {
+        wait: false,
+      });
+      expect(release).toBeDefined();
+      await release?.();
+      await expect(countStateLocks(databasePath)).resolves.toBe(0);
     });
   });
 
@@ -62,21 +165,60 @@ describe("state lock coordination", () => {
     });
   });
 
-  it("cleans stale owner rows before acquiring a foreground lock", async () => {
+  it("only cleans stale locks whose heartbeat expired and owner process is gone", async () => {
     await withStateLockTestDatabase(async (databasePath) => {
+      const now = Date.now();
       await insertStateLock(databasePath, {
-        heartbeatAt: Date.now(),
+        heartbeatAt: now - 120_000,
         mode: "write",
-        ownerId: "dead-owner",
+        ownerId: "expired-dead-owner",
         ownerPid: 999999,
       });
 
       const release = await acquireTestLock(databasePath, "write", {
         wait: false,
       });
-
       expect(release).toBeDefined();
       await release?.();
+      await expect(listStateLockOwnerIds(databasePath)).resolves.toStrictEqual(
+        [],
+      );
+    });
+  });
+
+  it("preserves expired locks while the owner process is still alive", async () => {
+    await withStateLockTestDatabase(async (databasePath) => {
+      await insertStateLock(databasePath, {
+        heartbeatAt: Date.now() - 120_000,
+        mode: "write",
+        ownerId: "expired-live-owner",
+        ownerPid: process.pid,
+      });
+
+      await expect(
+        acquireTestLock(databasePath, "write", { wait: false }),
+      ).resolves.toBeUndefined();
+      await expect(listStateLockOwnerIds(databasePath)).resolves.toStrictEqual([
+        "expired-live-owner",
+      ]);
+    });
+  });
+
+  it("preserves fresh locks even when the owner process is gone", async () => {
+    await withStateLockTestDatabase(async (databasePath) => {
+      await insertStateLock(databasePath, {
+        heartbeatAt: Date.now(),
+        mode: "write",
+        ownerId: "fresh-dead-owner",
+        ownerPid: 999999,
+      });
+
+      await expect(
+        acquireTestLock(databasePath, "write", { wait: false }),
+      ).resolves.toBeUndefined();
+      await expect(listStateLockOwnerIds(databasePath)).resolves.toStrictEqual([
+        "fresh-dead-owner",
+      ]);
     });
   });
 });
@@ -148,4 +290,58 @@ async function insertStateLock(
   } finally {
     await database.close();
   }
+}
+
+async function countStateLocks(databasePath: string): Promise<number> {
+  const database = await Database.open(
+    databasePath,
+    STATE_LOCK_TEST_SCHEMA_SQL,
+  );
+
+  try {
+    return (
+      (await database.queryOne(
+        "SELECT COUNT(*) AS count FROM state_locks",
+        undefined,
+        (row) => Number(row.count),
+      )) ?? 0
+    );
+  } finally {
+    await database.close();
+  }
+}
+
+async function listStateLockOwnerIds(databasePath: string): Promise<string[]> {
+  const database = await Database.open(
+    databasePath,
+    STATE_LOCK_TEST_SCHEMA_SQL,
+  );
+
+  try {
+    return await database.queryAll(
+      "SELECT owner_id FROM state_locks ORDER BY owner_id",
+      undefined,
+      (row) => String(row.owner_id),
+    );
+  } finally {
+    await database.close();
+  }
+}
+
+function createBarrier(): {
+  readonly promise: Promise<void>;
+  readonly resolve: () => void;
+} {
+  let resolveBarrier: () => void = () => undefined;
+  const promise = new Promise<void>((resolve) => {
+    resolveBarrier = resolve;
+  });
+
+  return { promise, resolve: resolveBarrier };
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise<void>((resolveDelay) => {
+    setTimeout(resolveDelay, ms);
+  });
 }
