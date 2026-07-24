@@ -187,7 +187,14 @@ describe("cli/library args", () => {
     });
     expect(() =>
       parseCLIArguments(["wikg://lib/abc123abc123.lib", "inspect"]),
-    ).toThrow("does not support `inspect`");
+    ).toThrow(
+      "Library-level inspection is not supported. Inspect one managed archive with `wg wikg://lib/<archive-id> inspect`.",
+    );
+    expect(() =>
+      parseCLIArguments(["wikg://lib", "inspect", "--help"]),
+    ).toThrow(
+      "Library-level inspection is not supported. Inspect one managed archive with `wg wikg://lib/<archive-id> inspect`.",
+    );
   });
 
   it("routes library URI and predicate help through command pages", () => {

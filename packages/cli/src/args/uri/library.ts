@@ -84,6 +84,15 @@ export function parseLibraryUriFirstArguments(
           ? "get"
           : "list");
 
+  if (action === "inspect" && target.kind !== "archive") {
+    throw new Error(
+      withHelpRoute(
+        "Library-level inspection is not supported. Inspect one managed archive with `wg wikg://lib/<archive-id> inspect`.",
+        formatWikiGraphHelpCommand(uri),
+      ),
+    );
+  }
+
   if (values.help === true) {
     return parseLibraryHelpArguments(uri, target, action, explicitAction);
   }
