@@ -112,7 +112,7 @@ describe("cli/library args", () => {
     });
   });
 
-  it("parses library archive member commands and rejects unsupported inspect", () => {
+  it("parses library archive member commands and routes inspect to archive readiness", () => {
     expect(
       parseCLIArguments(["wikg://lib/archive123", "--json"]),
     ).toMatchObject({
@@ -162,9 +162,39 @@ describe("cli/library args", () => {
     expect(() => parseCLIArguments(["wikg://lib/meta", "move"])).toThrow(
       "does not support `move`",
     );
+    expect(
+      parseCLIArguments(["wikg://lib/archive123", "inspect"]),
+    ).toMatchObject({
+      args: {
+        action: "inspect",
+        archivePath: "wikg://lib/archive123",
+      },
+      kind: "archive",
+    });
+    expect(
+      parseCLIArguments([
+        "wikg://lib/team.lib/archive123",
+        "inspect",
+        "--json",
+      ]),
+    ).toMatchObject({
+      args: {
+        action: "inspect",
+        archivePath: "wikg://lib/team.lib/archive123",
+        json: true,
+      },
+      kind: "archive",
+    });
     expect(() =>
       parseCLIArguments(["wikg://lib/abc123abc123.lib", "inspect"]),
-    ).toThrow("does not support `inspect`");
+    ).toThrow(
+      "Library-level inspection is not supported. Inspect one managed archive with `wg wikg://lib/<archive-id> inspect`.",
+    );
+    expect(() =>
+      parseCLIArguments(["wikg://lib", "inspect", "--help"]),
+    ).toThrow(
+      "Library-level inspection is not supported. Inspect one managed archive with `wg wikg://lib/<archive-id> inspect`.",
+    );
   });
 
   it("routes library URI and predicate help through command pages", () => {
