@@ -79,10 +79,11 @@ code and tests when adding new home SQLite files:
 
 For v1 -> v2, derived home data is deleted or invalidated: query/search caches,
 external cache, GC state, build queue SQLite/cache when safe, library aggregate
-indexes, and external archive search index overlays/workspaces for `fts.db` only.
-The upgrader must not delete non-`fts.db` overlays and must block when active GC,
-build job, worker lease, coordinator owner/lock/sqlite lease/commit lock, or
-non-`fts.db` overlay state is present.
+indexes, external archive search index overlays/workspaces for `fts.db`, and
+orphaned SQLite materialization cache overlays whose archive file no longer
+exists. The upgrader must block when active GC, build job, worker lease,
+coordinator owner/lock/sqlite lease/commit lock, or remaining non-derived
+overlay state is present.
 
 Pure information commands such as `wg --version` and help rendering must not open
 home SQLite and must not trigger schema upgrade.

@@ -418,6 +418,7 @@ describe("schema-upgrade", () => {
 
   it("rejects a home upgrade with a non-fts overlay", async () => {
     await withBlockedHomeUpgrade("overlay", async (home) => {
+      await writeFile(join(home, "book.wikg"), "archive");
       await writeCoordinatorOverlay(home, {
         archiveKey: "archive-key",
         entryPath: "database.db",
@@ -427,6 +428,34 @@ describe("schema-upgrade", () => {
         "non-derived coordinator overlays",
       );
     });
+  });
+
+  it("removes orphaned sqlite cache overlays for missing archives during home upgrade", async () => {
+    await withLegacyHome(
+      "wikigraph-schema-orphan-sqlite-overlay-",
+      async (home) => {
+        const workspacePath = join(
+          home,
+          "staging",
+          "work",
+          "archive-key",
+          "database.db",
+        );
+        await mkdir(dirname(workspacePath), { recursive: true });
+        await writeFile(workspacePath, "materialized database cache");
+        await writeCoordinatorOverlay(home, {
+          archiveKey: "archive-key",
+          entryPath: "database.db",
+          workspacePath,
+        });
+
+        await ensureWikiGraphHomeSchemaCurrent();
+
+        await expect(readHomeSchemaVersion(home)).resolves.toBe(2);
+        await expect(stat(workspacePath)).rejects.toThrow();
+        await expect(countCoordinatorOverlays(home)).resolves.toBe(0);
+      },
+    );
   });
 
   it("keeps core registry tables and constraints available after home upgrade", async () => {
@@ -706,7 +735,11 @@ async function writeActiveCoordinatorState(
 
 async function writeCoordinatorOverlay(
   home: string,
-  input: { readonly archiveKey: string; readonly entryPath: string },
+  input: {
+    readonly archiveKey: string;
+    readonly entryPath: string;
+    readonly workspacePath?: string;
+  },
 ): Promise<void> {
   await mkdir(join(home, "staging"), { recursive: true });
   const database = await Database.open(join(home, "staging", "staging.sqlite"));
@@ -723,8 +756,33 @@ async function writeCoordinatorOverlay(
       )
     `);
     await database.run(
-      "INSERT INTO entry_overlays (archive_key, archive_path, entry_path, kind, workspace_path, updated_at) VALUES (?, ?, ?, 'file', NULL, ?)",
-      [input.archiveKey, join(home, "book.wikg"), input.entryPath, Date.now()],
+      "INSERT INTO entry_overlays (archive_key, archive_path, entry_path, kind, workspace_path, updated_at) VALUES (?, ?, ?, 'file', ?, ?)",
+      [
+        input.archiveKey,
+        join(home, "book.wikg"),
+        input.entryPath,
+        input.workspacePath ?? null,
+        Date.now(),
+      ],
+    );
+  } finally {
+    await database.close();
+  }
+}
+
+async function countCoordinatorOverlays(home: string): Promise<number> {
+  const database = await Database.open(
+    join(home, "staging", "staging.sqlite"),
+    "",
+    { readonly: true },
+  );
+  try {
+    return (
+      (await database.queryOne(
+        "SELECT COUNT(*) AS count FROM entry_overlays",
+        undefined,
+        (row) => Number(row.count),
+      )) ?? 0
     );
   } finally {
     await database.close();

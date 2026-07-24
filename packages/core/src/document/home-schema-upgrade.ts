@@ -98,8 +98,9 @@ export async function ensureWikiGraphHomeSchemaCurrent(): Promise<void> {
     }
 
     if (schemaVersion < CURRENT_HOME_SCHEMA_VERSION) {
-      await assertHomeUpgradeSafe();
+      await assertHomeUpgradeSafeBeforeCleanup();
       await cleanupHomeDerivedData();
+      await assertNoNonDerivedCoordinatorOverlays();
       await writeHomeSchemaVersion(
         coreDatabasePath,
         CURRENT_HOME_SCHEMA_VERSION,
@@ -284,13 +285,14 @@ async function cleanupHomeDerivedData(): Promise<void> {
   const stagingDatabasePath = join(stagingDirectoryPath, "staging.sqlite");
   if (await pathExists(stagingDatabasePath)) {
     await removeArchiveSearchIndexOverlays(stagingDatabasePath);
+    await removeOrphanedSqliteCacheOverlays(stagingDatabasePath);
   }
 }
 
-async function assertHomeUpgradeSafe(): Promise<void> {
+async function assertHomeUpgradeSafeBeforeCleanup(): Promise<void> {
   await assertCoreLocksSafe();
   await assertGcLockSafe();
-  await assertCoordinatorStateSafe();
+  await assertCoordinatorActiveStateSafe();
   await assertBuildQueueSafe();
 }
 
@@ -366,7 +368,7 @@ async function assertGcLockSafe(): Promise<void> {
   }
 }
 
-async function assertCoordinatorStateSafe(): Promise<void> {
+async function assertCoordinatorActiveStateSafe(): Promise<void> {
   const stagingDatabasePath = join(
     resolveWikiGraphStagingDirectoryPath(),
     "staging.sqlite",
@@ -409,7 +411,26 @@ async function assertCoordinatorStateSafe(): Promise<void> {
         );
       }
     }
+  } finally {
+    await database.close();
+  }
+}
 
+async function assertNoNonDerivedCoordinatorOverlays(): Promise<void> {
+  const stagingDatabasePath = join(
+    resolveWikiGraphStagingDirectoryPath(),
+    "staging.sqlite",
+  );
+
+  if (!(await pathExists(stagingDatabasePath))) {
+    return;
+  }
+
+  const database = await Database.open(stagingDatabasePath, "", {
+    readonly: true,
+  });
+
+  try {
     if (!(await tableExists(database, "entry_overlays"))) {
       return;
     }
@@ -543,6 +564,54 @@ async function removeArchiveSearchIndexOverlays(
       `,
       parameters,
     );
+  } finally {
+    await database.close();
+  }
+}
+
+async function removeOrphanedSqliteCacheOverlays(
+  stagingDatabasePath: string,
+): Promise<void> {
+  const database = await Database.open(stagingDatabasePath);
+
+  try {
+    if (!(await tableExists(database, "entry_overlays"))) {
+      return;
+    }
+
+    const overlays = await database.queryAll(
+      `
+        SELECT archive_key, archive_path, entry_path, workspace_path
+        FROM entry_overlays
+        WHERE entry_path IN (?, ?)
+      `,
+      ["database.db", SEARCH_INDEX_DATABASE_PATH],
+      (row) => ({
+        archiveKey: String(row.archive_key),
+        archivePath: String(row.archive_path),
+        entryPath: String(row.entry_path),
+        workspacePath:
+          row.workspace_path === null ? undefined : String(row.workspace_path),
+      }),
+    );
+
+    for (const overlay of overlays) {
+      if (await pathExists(overlay.archivePath)) {
+        continue;
+      }
+
+      if (overlay.workspacePath !== undefined) {
+        await deletePathIfExists(overlay.workspacePath);
+      }
+
+      await database.run(
+        `
+          DELETE FROM entry_overlays
+          WHERE archive_key = ? AND entry_path = ?
+        `,
+        [overlay.archiveKey, overlay.entryPath],
+      );
+    }
   } finally {
     await database.close();
   }
