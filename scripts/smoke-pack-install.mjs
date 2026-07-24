@@ -18,7 +18,9 @@ function readTarballName(packOutput) {
     : packResult.filename;
 
   if (typeof filename !== "string" || filename.length === 0) {
-    throw new Error("Failed to resolve tarball filename from npm pack output.");
+    throw new Error(
+      "Failed to resolve tarball filename from pnpm pack output.",
+    );
   }
 
   return filename;
@@ -38,7 +40,7 @@ function packPackage(packageDirectory) {
   const tarballName = readTarballName(packOutput);
   const tarballPath = isAbsolute(tarballName)
     ? tarballName
-    : join(packageDirectory, tarballName);
+    : join(tempRoot, tarballName);
   packedTarballs.push(tarballPath);
   return tarballPath;
 }
@@ -115,14 +117,10 @@ function writeInstallPackageJson(cwd, name) {
 }
 
 function installTarballs(cwd, tarballPaths) {
-  execFileSync(
-    "npm",
-    ["install", "--ignore-scripts", "--no-audit", "--no-fund", ...tarballPaths],
-    {
-      cwd,
-      stdio: "inherit",
-    },
-  );
+  execFileSync("pnpm", ["add", "--ignore-scripts", ...tarballPaths], {
+    cwd,
+    stdio: "inherit",
+  });
 }
 
 try {
@@ -140,6 +138,14 @@ try {
     execFileSync(
       join(cliInstallRoot, "node_modules", ".bin", command),
       ["--help"],
+      {
+        cwd: cliInstallRoot,
+        stdio: "inherit",
+      },
+    );
+    execFileSync(
+      join(cliInstallRoot, "node_modules", ".bin", command),
+      ["--version"],
       {
         cwd: cliInstallRoot,
         stdio: "inherit",

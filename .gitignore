@@ -3,10 +3,6 @@
 # Logs
 logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
@@ -53,9 +49,6 @@ web_modules/
 .wikigraph/
 test/.reports/
 
-# Optional npm cache directory
-.npm
-
 # Optional eslint cache
 .eslintcache
 
@@ -65,11 +58,8 @@ test/.reports/
 # Optional REPL history
 .node_repl_history
 
-# Output of 'npm pack'
+# Package tarballs
 *.tgz
-
-# Yarn Integrity file
-.yarn-integrity
 
 # dotenv environment variable files
 .env
@@ -131,14 +121,6 @@ dist
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 
-# yarn v3
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
 
 # Vite logs files
 vite.config.js.timestamp-*

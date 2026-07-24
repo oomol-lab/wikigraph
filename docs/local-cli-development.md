@@ -22,8 +22,8 @@ pnpm cli:install-local
 ```
 
 The script builds and packs the workspace, then installs the generated
-`wiki-graph` package through npm as a global package. After it finishes, `wg`
-and `wikigraph` resolve through the machine-level npm installation.
+`wiki-graph` package through pnpm as a global package. After it finishes, `wg`
+and `wikigraph` resolve through the machine-level pnpm installation.
 
 This workflow is useful for:
 
@@ -127,7 +127,7 @@ Use pnpm without installing when validating source changes, CLI behavior, help
 text, archive operations, state handling, or bug fixes in the current checkout.
 
 Use the install workflow only when the question is about the packaged command
-itself: global `wg` resolution, npm package layout, `dist` artifacts, executable
+itself: global `wg` resolution, package layout, `dist` artifacts, executable
 metadata, or previewing an unreleased branch outside this repository.
 
 ## Related Maintainer Docs

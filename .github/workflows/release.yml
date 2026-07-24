@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   release:
-    name: Release to npm
+    name: Release packages
     runs-on: ubuntu-latest
 
     steps:
@@ -39,16 +39,23 @@ jobs:
       - name: Read package version
         id: package
         run: |
-          VERSION="$(node -p "require('./package.json').version")"
+          VERSION="$(node -p "require('./packages/cli/package.json').version")"
+          CORE_VERSION="$(node -p "require('./packages/core/package.json').version")"
+          if [ "${VERSION}" != "${CORE_VERSION}" ]; then
+            echo "Package versions must match: wiki-graph=${VERSION}, wiki-graph-core=${CORE_VERSION}" >&2
+            exit 1
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Ensure npm version is not already published
+      - name: Ensure package versions are not already published
         run: |
-          if npm view "spinedigest@${{ steps.package.outputs.version }}" version >/dev/null 2>&1; then
-            echo "spinedigest@${{ steps.package.outputs.version }} is already published" >&2
-            exit 1
-          fi
+          for package in wiki-graph wiki-graph-core; do
+            if pnpm view "${package}@${{ steps.package.outputs.version }}" version >/dev/null 2>&1; then
+              echo "${package}@${{ steps.package.outputs.version }} is already published" >&2
+              exit 1
+            fi
+          done
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -65,7 +72,9 @@ jobs:
           fi
 
       - name: Publish package
-        run: npm publish --provenance --access public --loglevel verbose
+        run: |
+          pnpm publish:core
+          pnpm publish:cli
 
       - name: Create release tag
         run: |

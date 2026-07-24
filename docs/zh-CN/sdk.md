@@ -10,12 +10,16 @@
 
 ```bash
 $ npm install wiki-graph-core
+# 或
+$ pnpm add wiki-graph-core
 ```
 
 用户需要获得 `wg` 命令时，安装 CLI 包：
 
 ```bash
 $ npm install -g wiki-graph
+# 或
+$ pnpm add --global wiki-graph
 ```
 
 CLI 包依赖 `wiki-graph-core`。应用代码应直接依赖 `wiki-graph-core`。

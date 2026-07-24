@@ -10,12 +10,16 @@ Install the SDK package when code needs programmatic access:
 
 ```bash
 $ npm install wiki-graph-core
+# or
+$ pnpm add wiki-graph-core
 ```
 
 Install the CLI package when a user should receive the `wg` command:
 
 ```bash
 $ npm install -g wiki-graph
+# or
+$ pnpm add --global wiki-graph
 ```
 
 The CLI package depends on `wiki-graph-core`. Application code should depend on `wiki-graph-core` directly.

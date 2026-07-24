@@ -1,44 +1,69 @@
 import { execFileSync } from "child_process";
-import { rmSync } from "fs";
-import { join, resolve } from "path";
+import { mkdirSync } from "fs";
+import { delimiter, isAbsolute, join, resolve } from "path";
 
-const packageRoot = resolve(import.meta.dirname, "..");
-let tarballName;
+const workspaceRoot = resolve(import.meta.dirname, "..");
+const cliRoot = join(workspaceRoot, "packages", "cli");
+const globalBinDir = execFileSync("pnpm", ["bin", "--global"], {
+  cwd: workspaceRoot,
+  encoding: "utf8",
+}).trim();
+const localGlobalDir = join(globalBinDir, ".wiki-graph-local-global");
+const packRoot = join(localGlobalDir, "packs");
+const pnpmGlobalEnv = {
+  ...process.env,
+  PATH: [globalBinDir, process.env.PATH].filter(Boolean).join(delimiter),
+};
 
-function readTarballName(packOutput) {
-  const jsonMatch = packOutput.match(/(\[\s*\{[\s\S]*\}\s*\])\s*$/);
-
-  if (!jsonMatch) {
-    throw new Error("Failed to locate npm pack JSON output.");
-  }
-
-  const packResult = JSON.parse(jsonMatch[1]);
-  const filename = packResult[0]?.filename;
+function readTarballPath(packOutput) {
+  const packResult = JSON.parse(packOutput);
+  const filename = Array.isArray(packResult)
+    ? packResult[0]?.filename
+    : packResult.filename;
 
   if (typeof filename !== "string" || filename.length === 0) {
-    throw new Error("Failed to resolve tarball filename from npm pack output.");
+    throw new Error(
+      "Failed to resolve tarball filename from pnpm pack output.",
+    );
   }
 
-  return filename;
+  return isAbsolute(filename) ? filename : join(packRoot, filename);
 }
 
-try {
-  const packOutput = execFileSync("npm", ["pack", "--json"], {
-    cwd: packageRoot,
+mkdirSync(packRoot, { recursive: true });
+
+execFileSync("pnpm", ["build"], {
+  cwd: workspaceRoot,
+  stdio: "inherit",
+});
+
+const packOutput = execFileSync(
+  "pnpm",
+  ["pack", "--json", "--pack-destination", packRoot],
+  {
+    cwd: cliRoot,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
-  });
+  },
+);
 
-  tarballName = readTarballName(packOutput);
+const tarballPath = readTarballPath(packOutput);
 
-  const tarballPath = join(packageRoot, tarballName);
-
-  execFileSync("npm", ["install", "-g", tarballPath], {
-    cwd: packageRoot,
+execFileSync(
+  "pnpm",
+  [
+    "add",
+    "--global",
+    "--global-dir",
+    localGlobalDir,
+    `--config.global-bin-dir=${globalBinDir}`,
+    "--allow-build=esbuild",
+    "--allow-build=sqlite3",
+    tarballPath,
+  ],
+  {
+    cwd: workspaceRoot,
+    env: pnpmGlobalEnv,
     stdio: "inherit",
-  });
-} finally {
-  if (tarballName !== undefined) {
-    rmSync(join(packageRoot, tarballName), { force: true });
-  }
-}
+  },
+);

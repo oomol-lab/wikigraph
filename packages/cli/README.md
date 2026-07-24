@@ -6,6 +6,8 @@ It installs the `wg` and `wikigraph` commands. Use it to create archives, import
 
 ```bash
 npm install -g wiki-graph
+# or
+pnpm add --global wiki-graph
 wg wikg://quickstart.wikg create
 wg wikg://quickstart.wikg --help
 ```

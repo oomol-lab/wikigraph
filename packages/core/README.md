@@ -6,6 +6,8 @@ Use it when you want to integrate Wiki Graph archive, document, retrieval, libra
 
 ```bash
 npm install wiki-graph-core
+# or
+pnpm add wiki-graph-core
 ```
 
 Requires Node.js `>=22.12.0`.
