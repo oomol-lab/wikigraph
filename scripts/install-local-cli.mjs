@@ -1,23 +1,19 @@
 import { execFileSync } from "child_process";
-import { mkdirSync } from "fs";
-import { delimiter, isAbsolute, join, resolve } from "path";
-import {
-  getLocalGlobalDir,
-  removeLocalInstallState,
-} from "./local-cli-install-state.mjs";
+import { mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { isAbsolute, join, resolve } from "path";
 
 const workspaceRoot = resolve(import.meta.dirname, "..");
 const cliRoot = join(workspaceRoot, "packages", "cli");
-const globalBinDir = execFileSync("pnpm", ["bin", "--global"], {
-  cwd: workspaceRoot,
-  encoding: "utf8",
-}).trim();
-const localGlobalDir = getLocalGlobalDir(globalBinDir);
-const packRoot = join(localGlobalDir, "packs");
-const pnpmGlobalEnv = {
-  ...process.env,
-  PATH: [globalBinDir, process.env.PATH].filter(Boolean).join(delimiter),
-};
+const packRoot = mkdtempSync(join(tmpdir(), "wiki-graph-local-pack-"));
+
+function createNpmEnv() {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key]) => !key.toLowerCase().startsWith("npm_config_"),
+    ),
+  );
+}
 
 function readTarballPath(packOutput) {
   const packResult = JSON.parse(packOutput);
@@ -39,36 +35,24 @@ execFileSync("pnpm", ["build"], {
   stdio: "inherit",
 });
 
-removeLocalInstallState(globalBinDir);
-mkdirSync(packRoot, { recursive: true });
+try {
+  const packOutput = execFileSync(
+    "pnpm",
+    ["pack", "--json", "--pack-destination", packRoot],
+    {
+      cwd: cliRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "inherit"],
+    },
+  );
 
-const packOutput = execFileSync(
-  "pnpm",
-  ["pack", "--json", "--pack-destination", packRoot],
-  {
-    cwd: cliRoot,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "inherit"],
-  },
-);
+  const tarballPath = readTarballPath(packOutput);
 
-const tarballPath = readTarballPath(packOutput);
-
-execFileSync(
-  "pnpm",
-  [
-    "add",
-    "--global",
-    "--global-dir",
-    localGlobalDir,
-    `--config.global-bin-dir=${globalBinDir}`,
-    "--allow-build=esbuild",
-    "--allow-build=sqlite3",
-    tarballPath,
-  ],
-  {
+  execFileSync("npm", ["install", "--global", "--force", tarballPath], {
     cwd: workspaceRoot,
-    env: pnpmGlobalEnv,
+    env: createNpmEnv(),
     stdio: "inherit",
-  },
-);
+  });
+} finally {
+  rmSync(packRoot, { force: true, recursive: true });
+}
