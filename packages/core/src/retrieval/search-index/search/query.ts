@@ -16,6 +16,8 @@ import {
   createLimitParams,
   createLimitSql,
   createObjectHitKey,
+  createObjectTypeParams,
+  createObjectTypeSql,
   createTextHitKey,
   createTextKindFilter,
   rankToScore,
@@ -154,6 +156,7 @@ async function queryObjectRows(
         ON r.id = search_object_properties_fts.rowid
       WHERE search_object_properties_fts MATCH ?
         ${createChapterSql(options.chapters)}
+        ${createObjectTypeSql(options.types)}
       ORDER BY rank ASC, r.archive_id, r.chapter_id, r.owner_kind, r.owner_id, r.property_kind
       ${createLimitSql(options.objectHitLimit)}
     `,
@@ -161,6 +164,7 @@ async function queryObjectRows(
       ...TIER_WEIGHTS,
       matchExpression,
       ...createChapterParams(options.chapters),
+      ...createObjectTypeParams(options.types),
       ...createLimitParams(options.objectHitLimit),
     ],
     (row) => ({

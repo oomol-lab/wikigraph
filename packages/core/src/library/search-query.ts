@@ -28,7 +28,9 @@ import {
   readSearchSessionObjectBucketPage,
   type BucketSearchCursor,
   type SearchChapterTitleCursorKey,
+  type SearchChunkHitInput,
   type SearchChunkCursorKey,
+  type SearchEntityHitInput,
   type SearchObjectCursorKey,
   type SearchSessionDescriptor,
   type SearchTextCursorKey,
@@ -258,8 +260,16 @@ async function readLibraryObjectBucketPage(
   readonly items: readonly ArchiveFindHit[];
   readonly nextCursor: BucketSearchCursor | undefined;
 }> {
+  let deferredChunkHits: readonly SearchChunkHitInput[] = [];
+
   if (!session.objectCachesPopulated) {
-    await populateLibraryObjectBucketCaches(target, session);
+    const input = await createLibraryObjectBucketCacheInput(target, session);
+
+    deferredChunkHits = input.chunkHits;
+    await populateSearchSessionObjectCaches({
+      entityHits: input.entityHits,
+      sessionId: session.sessionId,
+    });
   }
   const page = await readSearchSessionObjectBucketPage(
     session.sessionId,
@@ -276,6 +286,17 @@ async function readLibraryObjectBucketPage(
     async (document, hit) => await hydrateCachedObjectBucketHit(document, hit),
   );
   const last = page.at(Math.min(limit, page.length) - 1);
+
+  if (
+    page.length <= limit &&
+    deferredChunkHits.length > 0 &&
+    shouldReadLibraryBucket(session, "node")
+  ) {
+    await populateSearchSessionObjectCaches({
+      chunkHits: deferredChunkHits,
+      sessionId: session.sessionId,
+    });
+  }
 
   return {
     items: hydrated,
@@ -410,10 +431,13 @@ function assertLibrarySearchCursorTypesMatch(
   }
 }
 
-async function populateLibraryObjectBucketCaches(
+async function createLibraryObjectBucketCacheInput(
   target: ParsedWikiGraphLibraryUri,
   session: SearchSessionDescriptor,
-): Promise<void> {
+): Promise<{
+  readonly chunkHits: readonly SearchChunkHitInput[];
+  readonly entityHits: readonly SearchEntityHitInput[];
+}> {
   const result = await queryWikiGraphLibrarySearchIndex(target, session.query, {
     ...(session.chapters === null ? {} : { chapters: session.chapters }),
     match: session.match as ArchiveFindResult["match"],
@@ -442,7 +466,7 @@ async function populateLibraryObjectBucketCaches(
     }
   }
 
-  await populateSearchSessionObjectCaches({
+  return {
     chunkHits: [...chunkScores].map(([key, propertyTopScores]) => {
       const { archiveId, objectId } = parseLibraryScopedObjectKey(key);
 
@@ -461,8 +485,7 @@ async function populateLibraryObjectBucketCaches(
         qid: objectId,
       };
     }),
-    sessionId: session.sessionId,
-  });
+  };
 }
 
 async function hydrateLibraryIndexHits(

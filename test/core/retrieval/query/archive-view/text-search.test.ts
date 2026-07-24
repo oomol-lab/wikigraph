@@ -19,6 +19,7 @@ import {
   teardownArchiveViewTestState,
   withTempDir,
 } from "./helpers.js";
+import { SEARCH_OBJECT_PROPERTY_OWNER_KIND } from "../../../../../packages/core/src/retrieval/search-index/index.js";
 
 beforeEach(setupArchiveViewTestState);
 afterEach(teardownArchiveViewTestState);
@@ -394,6 +395,70 @@ describe("archive/query/archive-view/text search", () => {
 
         expect(result?.objectHits).toHaveLength(2);
         expect(result?.textHits).toHaveLength(2);
+      } finally {
+        await document.release();
+      }
+    });
+  });
+
+  it("filters object search index rows by requested object types", async () => {
+    await withTempDir("wikigraph-archive-view-", async (path) => {
+      const document = await DirectoryDocument.open(`${path}/document`);
+
+      try {
+        await seedSourcedDocument(document);
+        await document.openSession(async (openedDocument) => {
+          await openedDocument.replaceToc({
+            items: [
+              {
+                children: [],
+                serialId: 1,
+                title: "SharedFacet chapter",
+              },
+            ],
+            version: 1,
+          });
+          await openedDocument.chunks.save({
+            content: "SharedFacet node content.",
+            generation: 0,
+            id: 302,
+            label: "SharedFacet node",
+            sentenceId: [1, 0],
+            sentenceIds: [[1, 0]],
+            wordsCount: 3,
+            weight: 1,
+          });
+          await openedDocument.mentions.save({
+            chapterId: 1,
+            id: "shared-facet-entity",
+            qid: "QSharedFacet",
+            rangeEnd: 11,
+            rangeStart: 0,
+            sentenceIndex: 0,
+            surface: "SharedFacet",
+          });
+        });
+        await rebuildArchiveSearchIndex(document);
+
+        const chapter = await querySearchIndex(document, "SharedFacet", {
+          types: ["chapter-title"],
+        });
+        const node = await querySearchIndex(document, "SharedFacet", {
+          types: ["node"],
+        });
+        const entity = await querySearchIndex(document, "SharedFacet", {
+          types: ["entity"],
+        });
+
+        expect(
+          new Set(chapter?.objectHits.map((hit) => hit.ownerKind)),
+        ).toEqual(new Set([SEARCH_OBJECT_PROPERTY_OWNER_KIND.chapter]));
+        expect(new Set(node?.objectHits.map((hit) => hit.ownerKind))).toEqual(
+          new Set([SEARCH_OBJECT_PROPERTY_OWNER_KIND.chunk]),
+        );
+        expect(new Set(entity?.objectHits.map((hit) => hit.ownerKind))).toEqual(
+          new Set([SEARCH_OBJECT_PROPERTY_OWNER_KIND.entity]),
+        );
       } finally {
         await document.release();
       }

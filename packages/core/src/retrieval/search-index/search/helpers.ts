@@ -2,9 +2,13 @@ import type { SqlBindValue } from "../../../document/database.js";
 import type { ArchiveFindObjectType } from "../../query/view.js";
 import {
   FTS5_RANK_SCORE_SCALE,
+  SEARCH_OBJECT_PROPERTY_KIND,
+  SEARCH_OBJECT_PROPERTY_OWNER_KIND,
   TEXT_SENTENCE_KIND,
   type SearchIndexObjectHit,
   type SearchIndexTextHit,
+  type SearchObjectPropertyKind,
+  type SearchObjectPropertyOwnerKind,
   type TextSentenceKind,
 } from "./types.js";
 
@@ -51,6 +55,70 @@ export function shouldQueryObjects(
     types.includes("node") ||
     types.includes("entity")
   );
+}
+
+export function createObjectTypeSql(
+  types: readonly ArchiveFindObjectType[] | null | undefined,
+): string {
+  const filters = createObjectTypeFilters(types);
+
+  return filters.length === 0
+    ? ""
+    : `AND (${filters
+        .map(() => "(r.owner_kind = ? AND r.property_kind = ?)")
+        .join(" OR ")})`;
+}
+
+export function createObjectTypeParams(
+  types: readonly ArchiveFindObjectType[] | null | undefined,
+): readonly SqlBindValue[] {
+  return createObjectTypeFilters(types).flatMap((filter) => [
+    filter.ownerKind,
+    filter.propertyKind,
+  ]);
+}
+
+function createObjectTypeFilters(
+  types: readonly ArchiveFindObjectType[] | null | undefined,
+): readonly {
+  readonly ownerKind: SearchObjectPropertyOwnerKind;
+  readonly propertyKind: SearchObjectPropertyKind;
+}[] {
+  if (types === undefined || types === null) {
+    return [];
+  }
+
+  const filters: {
+    readonly ownerKind: SearchObjectPropertyOwnerKind;
+    readonly propertyKind: SearchObjectPropertyKind;
+  }[] = [];
+
+  if (types.includes("chapter") || types.includes("chapter-title")) {
+    filters.push({
+      ownerKind: SEARCH_OBJECT_PROPERTY_OWNER_KIND.chapter,
+      propertyKind: SEARCH_OBJECT_PROPERTY_KIND.title,
+    });
+  }
+  if (types.includes("node")) {
+    filters.push(
+      {
+        ownerKind: SEARCH_OBJECT_PROPERTY_OWNER_KIND.chunk,
+        propertyKind: SEARCH_OBJECT_PROPERTY_KIND.label,
+      },
+      {
+        ownerKind: SEARCH_OBJECT_PROPERTY_OWNER_KIND.chunk,
+        propertyKind: SEARCH_OBJECT_PROPERTY_KIND.content,
+      },
+    );
+  }
+  if (types.includes("entity")) {
+    filters.push({
+      ownerKind: SEARCH_OBJECT_PROPERTY_OWNER_KIND.entity,
+      propertyKind: SEARCH_OBJECT_PROPERTY_KIND.surface,
+    });
+  }
+
+  return filters;
 }
 
 export function createTextKindFilter(
