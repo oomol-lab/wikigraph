@@ -1,4 +1,3 @@
-import { WikiGraphArchiveFile } from "../storage/wikg/index.js";
 import type { ReadonlyDocument } from "../document/index.js";
 import {
   listArchiveEvidence,
@@ -10,6 +9,10 @@ import {
   createCollectionResult,
   createFindResult,
 } from "../retrieval/query/archive-view/helper/results.js";
+import {
+  findWikiGraphLibraryObjectsBucketed,
+  shouldUseLibraryBucketedSearch,
+} from "./search-query.js";
 import { hydrateSearchIndexHits } from "../retrieval/query/archive-view/search/hydration.js";
 import type {
   ArchiveCollectionOptions,
@@ -33,6 +36,13 @@ import {
   type WikiGraphLibraryArchiveRecord,
 } from "./membership.js";
 import {
+  createLibrarySource,
+  createSortedArchiveIds,
+  isReadableLibraryArchive,
+  readLibraryArchiveDocument,
+  resolveReadableIndexedArchive,
+} from "./query-helpers.js";
+import {
   parseWikiGraphLibraryUri,
   resolveWikiGraphLibrary,
   resolveWikiGraphLibraryById,
@@ -54,6 +64,10 @@ export async function findWikiGraphLibraryObjects(
   query: string,
   options: ArchiveFindOptions = {},
 ): Promise<ArchiveFindResult> {
+  if (shouldUseLibraryBucketedSearch(options)) {
+    return await findWikiGraphLibraryObjectsBucketed(target, query, options);
+  }
+
   const indexHitLimit = createLibraryQueryIndexHitLimit(options);
   const result = await queryWikiGraphLibrarySearchIndex(target, query, {
     objectHitLimit: indexHitLimit,
@@ -452,7 +466,7 @@ function createEvidencePreview(evidence: ArchiveEvidence, limit: number) {
   };
 }
 
-function createLibrarySources(
+export function createLibrarySources(
   values: readonly {
     readonly archiveId?: number;
     readonly libraryArchiveUri?: string;
@@ -537,55 +551,6 @@ function shouldListTextStreams(options: ArchiveCollectionOptions): boolean {
     options.types !== undefined &&
     options.types.some((type) => type === "source" || type === "summary")
   );
-}
-
-function createSortedArchiveIds(result: {
-  readonly objectHits: readonly { readonly archiveId: number }[];
-  readonly textHits: readonly { readonly archiveId: number }[];
-}): readonly number[] {
-  return [
-    ...new Set([
-      ...result.objectHits.map((hit) => hit.archiveId),
-      ...result.textHits.map((hit) => hit.archiveId),
-    ]),
-  ].sort((left, right) => left - right);
-}
-
-async function resolveReadableIndexedArchive(
-  target: ParsedWikiGraphLibraryUri,
-  archiveId: number,
-  options: { readonly operation: string },
-): Promise<WikiGraphLibraryArchiveRecord> {
-  const library = await resolveWikiGraphLibrary(target);
-  const archive = await getWikiGraphLibraryArchiveById(library, archiveId);
-  if (!isReadableLibraryArchive(archive)) {
-    throw new Error(
-      `Wiki Graph library archive ${archiveId} is not readable while ${options.operation}.`,
-    );
-  }
-  return archive;
-}
-
-function isReadableLibraryArchive(
-  archive: WikiGraphLibraryArchiveRecord,
-): boolean {
-  return archive.exists && archive.status === "present";
-}
-
-async function readLibraryArchiveDocument<T>(
-  archive: WikiGraphLibraryArchiveRecord,
-  operation: (document: ReadonlyDocument) => Promise<T>,
-): Promise<T> {
-  return await new WikiGraphArchiveFile(archive.path).readDocument(operation);
-}
-
-function createLibrarySource(
-  archive: WikiGraphLibraryArchiveRecord,
-): ArchiveLibrarySource {
-  return {
-    archiveId: archive.id,
-    libraryArchiveUri: archive.uri,
-  };
 }
 
 function formatErrorMessage(error: unknown): string {

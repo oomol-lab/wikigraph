@@ -7,7 +7,10 @@ import { Database } from "../../../../packages/core/src/document/index.js";
 import {
   createSearchSession,
   deleteArchiveSearchSessions,
+  readEntitySearchSessionPage,
+  readSearchSessionObjectBucketPage,
 } from "../../../../packages/core/src/retrieval/query/search-cache/index.js";
+import { getObjectBucketCursorId } from "../../../../packages/core/src/retrieval/query/archive-view/search/bucket-order.js";
 import {
   getWikiGraphStateDirectoryPathForTesting,
   setWikiGraphStateDirectoryPathForTesting,
@@ -134,6 +137,102 @@ describe("archive/query/search-cache", () => {
       await deleteArchiveSearchSessions("archive-a");
 
       await expect(listPredicates(path)).resolves.toStrictEqual(["mentions"]);
+    });
+  });
+
+  it("keeps same-qid entity hits isolated by archive id", async () => {
+    await withTempDir("wikigraph-search-cache-", async (path) => {
+      setWikiGraphStateDirectoryPathForTesting(path);
+
+      const sessionId = await createSearchSession({
+        archiveKey: "library-key",
+        chapters: null,
+        entityHits: [
+          { archiveId: 1, propertyTopScores: [1], qid: "Q1" },
+          { archiveId: 2, propertyTopScores: [1], qid: "Q1" },
+        ],
+        items: [],
+        lens: "broad",
+        match: "any",
+        order: "rank",
+        query: "query",
+        revisionScope: JSON.stringify({ libraryRevision: 1, scope: "all" }),
+        terms: ["query"],
+        types: ["entity"],
+      });
+
+      const page = await readEntitySearchSessionPage(
+        sessionId,
+        0,
+        10,
+        "library-key",
+      );
+
+      expect(page.items.map((item) => [item.id, item.archiveId])).toStrictEqual(
+        [
+          ["wikg://entity/Q1", 1],
+          ["wikg://entity/Q1", 2],
+        ],
+      );
+    });
+  });
+
+  it("reads triple bucket rows after a cursor", async () => {
+    await withTempDir("wikigraph-search-cache-", async (path) => {
+      setWikiGraphStateDirectoryPathForTesting(path);
+
+      const sessionId = await createSearchSession({
+        archiveKey: "archive-key",
+        chapters: null,
+        items: [],
+        lens: "broad",
+        match: "any",
+        order: "rank",
+        query: "query",
+        revisionScope: JSON.stringify({ chaptersRevision: 0, scope: "all" }),
+        terms: ["query"],
+        tripleHits: [
+          {
+            evidenceTopScores: [3],
+            objectQid: "Q2",
+            predicate: "mentions",
+            subjectQid: "Q1",
+          },
+          {
+            evidenceTopScores: [2],
+            objectQid: "Q3",
+            predicate: "mentions",
+            subjectQid: "Q1",
+          },
+        ],
+        types: null,
+      });
+      const firstPage = await readSearchSessionObjectBucketPage(
+        sessionId,
+        1,
+        undefined,
+        1,
+      );
+      const first = firstPage[0];
+
+      if (first === undefined) {
+        throw new Error("Expected a first triple bucket hit.");
+      }
+      const secondPage = await readSearchSessionObjectBucketPage(
+        sessionId,
+        1,
+        {
+          archiveId: first.archiveId ?? 0,
+          id: getObjectBucketCursorId(first),
+          kind: "triple",
+          score: first.score ?? 0,
+        },
+        1,
+      );
+
+      expect(secondPage.map((item) => item.id)).toStrictEqual([
+        "wikg://triple/Q1/mentions/Q3",
+      ]);
     });
   });
 
