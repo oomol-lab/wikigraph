@@ -298,7 +298,7 @@ function isStateLockStale(
   staleMs = DEFAULT_STATE_LOCK_STALE_MS,
 ): boolean {
   return (
-    Date.now() - lock.heartbeatAt > staleMs || !isProcessAlive(lock.ownerPid)
+    Date.now() - lock.heartbeatAt > staleMs && !isProcessAlive(lock.ownerPid)
   );
 }
 
